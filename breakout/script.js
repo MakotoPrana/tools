@@ -35,17 +35,33 @@
     B: { color: '#4a6fd8', points: 20, hp: 1 },
   };
 
-  // ステージの配置 ('.' は空き)
+  // ステージごとのボールの初速とブロックの配置 ('.' は空き)
   const STAGES = [
-    [
-      'SSSSSSSS',
-      'RRRRRRRR',
-      'OOOOOOOO',
-      'YYYYYYYY',
-      'GGGGGGGG',
-      'CCCCCCCC',
-      'BBBBBBBB',
-    ],
+    {
+      speed: BALL_SPEED,
+      map: [
+        'SSSSSSSS',
+        'RRRRRRRR',
+        'OOOOOOOO',
+        'YYYYYYYY',
+        'GGGGGGGG',
+        'CCCCCCCC',
+        'BBBBBBBB',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 30,
+      map: [
+        '..SSSS..',
+        '.SRRRRS.',
+        'SROOOORS',
+        'ROYYYYOR',
+        'OY.GG.YO',
+        'YG.CC.GY',
+        'GC.BB.CG',
+        '.C....C.',
+      ],
+    },
   ];
 
   // ---------- DOM ----------
@@ -107,7 +123,7 @@
   }
 
   function buildStage(index) {
-    const rows = STAGES[index];
+    const rows = STAGES[index].map;
     const cols = rows[0].length;
     const bw = (W - BRICK_MARGIN * 2 - BRICK_GAP * (cols - 1)) / cols;
     bricks = [];
@@ -138,7 +154,7 @@
   function startStage() {
     buildStage(stageIndex);
     particles = [];
-    ball.speed = BALL_SPEED;
+    ball.speed = STAGES[stageIndex].speed;
     paddle.x = (W - paddle.w) / 2;
     serve();
     updateStats();
@@ -175,7 +191,7 @@
       gameOver();
       return;
     }
-    ball.speed = Math.max(BALL_SPEED, ball.speed * 0.9);
+    ball.speed = Math.max(STAGES[stageIndex].speed, ball.speed * 0.9);
     serve();
   }
 
@@ -200,7 +216,7 @@
     finishScore();
     const hasNext = stageIndex + 1 < STAGES.length;
     showOverlay(
-      'STAGE CLEAR!',
+      hasNext ? 'STAGE CLEAR!' : 'ALL CLEAR!',
       `ライフボーナス ${lives} × ${LIFE_BONUS} = ${bonus}\nスコア ${score}`,
       hasNext ? '次のステージへ' : 'もう一度',
     );
