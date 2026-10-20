@@ -243,6 +243,7 @@ body {
 .help h2 { margin: 0 0 8px; font-size: 1.1rem; }
 .help h3 { margin: 18px 0 6px; font-size: 1rem; }
 .help p { margin: 0 0 8px; }
+.help .note { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
 
 .help table { width: 100%; border-collapse: collapse; }
 .help th, .help td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }

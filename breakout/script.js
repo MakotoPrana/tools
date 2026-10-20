@@ -8,6 +8,8 @@
   const BALL_R = 5;
   const BALL_SPEED = 260; // 初速 (px/秒)
   const BALL_SPEED_UP = 3; // ブロックを壊すたびに上がる速さ
+  const BALL_ATTACK = 10; // ボールの攻撃力。当たるたびにブロックのHPがこの分だけ減る
+  const GAUGE_DRAIN = 1.5; // 減ったHPの残像が消える速さ (最大HPの何倍/秒)
   const BALL_MAX_SPEED = 480;
   const MAX_BOUNCE_ANGLE = Math.PI / 3; // パドルの端で打ち返したときの角度
   const PADDLE_W = 64;
@@ -27,15 +29,15 @@
   const DEFENSE_GAP = 40; // パドルから防衛ラインまでの距離。ブロックがこの線を越えるとライフが減る
   const BEST_KEY = 'breakout-best';
 
-  // ブロックの種類: 色・得点・耐久
+  // ブロックの種類: 色・得点・HP
   const BRICKS = {
-    S: { color: '#b8c2cc', points: 100, hp: 2 },
-    R: { color: '#ef3b3b', points: 70, hp: 1 },
-    O: { color: '#ef8a21', points: 60, hp: 1 },
-    Y: { color: '#f7d308', points: 50, hp: 1 },
-    G: { color: '#42b642', points: 40, hp: 1 },
-    C: { color: '#31c7ef', points: 30, hp: 1 },
-    B: { color: '#4a6fd8', points: 20, hp: 1 },
+    S: { color: '#b8c2cc', points: 100, hp: 30 },
+    R: { color: '#ef3b3b', points: 70, hp: 20 },
+    O: { color: '#ef8a21', points: 60, hp: 20 },
+    Y: { color: '#f7d308', points: 50, hp: 15 },
+    G: { color: '#42b642', points: 40, hp: 10 },
+    C: { color: '#31c7ef', points: 30, hp: 10 },
+    B: { color: '#4a6fd8', points: 20, hp: 10 },
   };
 
   // ステージごとのボールの初速、ブロックが迫ってくる速さ (px/秒) と配置
@@ -152,7 +154,7 @@
   }
 
   // 配置の文字列からブロックの位置と種類を求める。
-  // 小文字のマスは、その色の半分の幅のブロック2つに分かれる (得点もそれぞれ半分)
+  // 小文字のマスは、その色の半分の幅のブロック2つに分かれる (得点とHPもそれぞれ半分)
   function layoutBricks(stage) {
     const reserve = stage.reserve || [];
     const rows = [...reserve, ...stage.map];
@@ -168,11 +170,12 @@
         const x = BRICK_MARGIN + c * (bw + BRICK_GAP);
         const y = baseRowY(row);
         if (ch === ch.toUpperCase()) {
-          list.push({ x, y, w: bw, h: BRICK_H, row, kind, points: kind.points });
+          list.push({ x, y, w: bw, h: BRICK_H, row, kind, points: kind.points, maxHp: kind.hp });
         } else {
           const points = Math.round(kind.points / 2);
-          list.push({ x, y, w: halfW, h: BRICK_H, row, kind, points });
-          list.push({ x: x + halfW + BRICK_GAP, y, w: halfW, h: BRICK_H, row, kind, points });
+          const maxHp = Math.ceil(kind.hp / 2);
+          list.push({ x, y, w: halfW, h: BRICK_H, row, kind, points, maxHp });
+          list.push({ x: x + halfW + BRICK_GAP, y, w: halfW, h: BRICK_H, row, kind, points, maxHp });
         }
       });
     });
@@ -197,7 +200,8 @@
   }
 
   function buildStage(index) {
-    bricks = layoutBricks(STAGES[index]).map((b) => ({ ...b, hp: b.kind.hp }));
+    // shownHp はゲージに残像として見せるHP、flash は当たった瞬間に白く光らせる残り時間
+    bricks = layoutBricks(STAGES[index]).map((b) => ({ ...b, hp: b.maxHp, shownHp: b.maxHp, flash: 0 }));
   }
 
   // 空いた段を詰める: その段より上 (控えの段を含む) のブロックを1段下げる
@@ -211,6 +215,8 @@
   function moveBricks(dt) {
     bricks.forEach((b) => {
       b.y = Math.min(rowY(b.row), b.y + SHIFT_SPEED * dt);
+      b.shownHp = Math.max(b.hp, b.shownHp - b.maxHp * GAUGE_DRAIN * dt);
+      b.flash = Math.max(0, b.flash - dt);
     });
     if (state !== 'playing') return;
     // 下りてきたブロックがボールに重なったら、ボールをブロックの下へ押し出す
@@ -521,7 +527,8 @@
       // 控えの段はまだ画面に出ていないので当たらない
       if (isHidden(b) || !touchesBall(b)) continue;
 
-      b.hp -= 1;
+      b.hp -= BALL_ATTACK;
+      b.flash = 0.15;
       if (b.hp <= 0) {
         bricks.splice(i, 1);
         combo += 1;
@@ -584,16 +591,22 @@
     ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
     ctx.fillRect(b.x, b.y + b.h - 2, b.w, 2);
     ctx.fillRect(b.x + b.w - 2, b.y, 2, b.h);
-    if (b.hp < b.kind.hp) {
-      // ひびの入ったブロック
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(b.x + b.w * 0.3, b.y + 1);
-      ctx.lineTo(b.x + b.w * 0.45, b.y + b.h * 0.5);
-      ctx.lineTo(b.x + b.w * 0.6, b.y + b.h * 0.4);
-      ctx.lineTo(b.x + b.w * 0.7, b.y + b.h - 1);
-      ctx.stroke();
+    if (b.flash > 0) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${(b.flash / 0.15) * 0.6})`;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+    }
+    if (b.hp < b.maxHp) {
+      // HPゲージ。減った分はしばらく白い残像として残り、少し遅れて縮む
+      const gx = b.x + 2;
+      const gy = b.y + b.h - 5;
+      const gw = b.w - 4;
+      const ratio = b.hp / b.maxHp;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(gx, gy, gw, 3);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.fillRect(gx, gy, gw * (b.shownHp / b.maxHp), 3);
+      ctx.fillStyle = ratio > 0.5 ? '#5be37a' : ratio > 0.25 ? '#ffd23f' : '#ff5a5a';
+      ctx.fillRect(gx, gy, gw * ratio, 3);
     }
   }
 
