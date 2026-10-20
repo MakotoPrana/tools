@@ -6,8 +6,7 @@
   const H = 480;
   const START_LIVES = 3;
   const BALL_R = 5;
-  const BALL_SPEED = 260; // 初速 (px/秒)
-  const BALL_SPEED_UP = 3; // ブロックを壊すたびに上がる速さ
+  const BALL_SPEED = 260; // ステージ1のボールの速さ (px/秒)。ステージ中は変わらない
   const BALL_ATTACK = 10; // ボールの攻撃力。当たるたびにブロックのHPがこの分だけ減る
   const SMASH_WINDOW = 0.25; // タップしてからパドルの枠が光っている時間。この間にボールが当たるとスマッシュ
   const SMASH_COOLDOWN = 0.5; // 次にパドルを光らせられるまでの間隔 (連打で光らせ続けられないように)
@@ -15,7 +14,6 @@
   const SMASH_POWER = 2; // スマッシュ中の攻撃力の倍率
   const TRAIL_LENGTH = 14; // スマッシュ中の尾の長さ (フレーム数)
   const GAUGE_DRAIN = 1.5; // 減ったHPの残像が消える速さ (最大HPの何倍/秒)
-  const BALL_MAX_SPEED = 480;
   const MAX_BOUNCE_ANGLE = Math.PI / 3; // パドルの端で打ち返したときの角度
   const PADDLE_W = 64;
   const PADDLE_H = 10;
@@ -53,7 +51,7 @@
     X: { color: '#3a3f47', points: 50, hp: 10, bomb: true },
   };
 
-  // ステージごとのボールの初速、ブロックが迫ってくる速さ (px/秒) と配置
+  // ステージごとのボールの速さ、ブロックが迫ってくる速さ (px/秒) と配置
   // ('.' は空き、小文字は半分の幅のブロック2つ)。
   // tiers / reserveTiers は map / reserve と同じ位置に硬さの段階 ('2'〜'5') を書く。書かないマスは第1段階
   // reserve は画面の上に隠れている控えの段。表示中の段が全部消えると上の段が1段ずつ詰まり、
@@ -61,7 +59,7 @@
   const STAGES = [
     {
       speed: BALL_SPEED,
-      advance: 2,
+      advance: 1.5,
       map: [
         'SSSSSSSS',
         'RRRRRRRR',
@@ -74,7 +72,7 @@
     },
     {
       speed: BALL_SPEED + 30,
-      advance: 2.5,
+      advance: 1.8,
       map: [
         '..SSSS..',
         '.SRrrRS.',
@@ -92,7 +90,7 @@
     },
     {
       speed: BALL_SPEED + 40,
-      advance: 2.5,
+      advance: 1.8,
       reserve: [
         'SSSSSSSS',
         'RrRrRrRr',
@@ -387,7 +385,6 @@
       gameOver();
       return;
     }
-    ball.speed = Math.max(STAGES[stageIndex].speed, ball.speed * 0.9);
     serve();
   }
 
@@ -641,10 +638,6 @@
       if (b.hp > 0) return true;
 
       destroyBricks([b]);
-      ball.speed = Math.min(BALL_MAX_SPEED, ball.speed + BALL_SPEED_UP);
-      const ratio = ball.speed / Math.hypot(ball.vx, ball.vy);
-      ball.vx *= ratio;
-      ball.vy *= ratio;
       if (state !== 'playing') return false;
       if (!smashing) return true;
       i = -1; // 爆発でブロックが減ったかもしれないので、貫通の続きは最初から調べ直す
