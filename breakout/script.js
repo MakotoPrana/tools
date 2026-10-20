@@ -12,7 +12,9 @@
   const MAX_BOUNCE_ANGLE = Math.PI / 3; // パドルの端で打ち返したときの角度
   const PADDLE_W = 64;
   const PADDLE_H = 10;
-  const PADDLE_Y = H - 40;
+  // スマホではパドルの下に指を置く余白を取る
+  const PADDLE_Y_MOUSE = H - 40;
+  const PADDLE_Y_TOUCH = H - 100;
   const PADDLE_KEY_SPEED = 420;
   const TOUCH_SENSITIVITY = 1.3; // 指の移動量に対するパドルの移動量
   const BRICK_TOP = 56;
@@ -53,7 +55,6 @@
   const boardWrap = $('board-wrap');
   const header = $('top');
   const statsEl = $('stats');
-  const touchZone = $('touch-zone');
   const overlay = $('overlay');
   const overlayTitle = $('overlay-title');
   const overlayText = $('overlay-text');
@@ -76,8 +77,8 @@
   let combo = 0;
   let bricks = [];
   let particles = [];
-  const paddle = { x: (W - PADDLE_W) / 2, w: PADDLE_W };
-  const ball = { x: W / 2, y: PADDLE_Y - BALL_R, vx: 0, vy: 0, speed: BALL_SPEED };
+  const paddle = { x: (W - PADDLE_W) / 2, y: PADDLE_Y_MOUSE, w: PADDLE_W };
+  const ball = { x: W / 2, y: PADDLE_Y_MOUSE - BALL_R, vx: 0, vy: 0, speed: BALL_SPEED };
   const keys = { left: false, right: false };
   let scale = 1;
   let dpr = 1;
@@ -152,7 +153,7 @@
 
   function placeBallOnPaddle() {
     ball.x = paddle.x + paddle.w / 2;
-    ball.y = PADDLE_Y - BALL_R;
+    ball.y = paddle.y - BALL_R;
     ball.vx = 0;
     ball.vy = 0;
   }
@@ -289,8 +290,8 @@
 
     if (
       ball.vy > 0 &&
-      ball.y + BALL_R >= PADDLE_Y &&
-      ball.y - BALL_R <= PADDLE_Y + PADDLE_H &&
+      ball.y + BALL_R >= paddle.y &&
+      ball.y - BALL_R <= paddle.y + PADDLE_H &&
       ball.x >= paddle.x - BALL_R &&
       ball.x <= paddle.x + paddle.w + BALL_R
     ) {
@@ -298,7 +299,7 @@
       const angle = Math.max(-1, Math.min(1, offset)) * MAX_BOUNCE_ANGLE;
       ball.vx = ball.speed * Math.sin(angle);
       ball.vy = -ball.speed * Math.cos(angle);
-      ball.y = PADDLE_Y - BALL_R;
+      ball.y = paddle.y - BALL_R;
       combo = 0;
     }
 
@@ -348,12 +349,13 @@
   // ---------- 描画 ----------
   function layout() {
     dpr = window.devicePixelRatio || 1;
+    paddle.y = coarseMQ.matches ? PADDLE_Y_TOUCH : PADDLE_Y_MOUSE;
+    if (state === 'serve') placeBallOnPaddle();
     const app = boardWrap.parentElement;
     const appStyle = getComputedStyle(app);
     const availW = app.clientWidth - parseFloat(appStyle.paddingLeft) - parseFloat(appStyle.paddingRight) - 4; // 枠線の分
     const availH = window.innerHeight - header.offsetHeight - statsEl.offsetHeight - 8 - 16 - 4;
-    const zoneH = touchZone.offsetHeight ? touchZone.offsetHeight + 8 : 0;
-    const w = Math.max(240, Math.floor(Math.min(availW, ((availH - zoneH) * W) / H, W * 1.6)));
+    const w = Math.max(240, Math.floor(Math.min(availW, (availH * W) / H, W * 1.6)));
     scale = w / W;
     canvas.style.width = `${w}px`;
     canvas.style.height = `${Math.round(H * scale)}px`;
@@ -361,7 +363,6 @@
     canvas.height = Math.round(H * scale * dpr);
     boardWrap.style.width = `${w + 4}px`;
     statsEl.style.maxWidth = `${w + 4}px`;
-    touchZone.style.width = `${w + 4}px`;
     draw();
   }
 
@@ -402,9 +403,22 @@
 
     if (state === 'ready') return;
 
+    if (paddle.y === PADDLE_Y_TOUCH) {
+      // パドルの下の、指を置くための余白
+      const top = paddle.y + PADDLE_H + 24;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.fillRect(0, top, W, H - top);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+      ctx.font = '600 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('◀ ここを左右になぞって操作 ▶', W / 2, (top + H) / 2);
+      ctx.textBaseline = 'alphabetic';
+    }
+
     ctx.fillStyle = '#5a9cf0';
     ctx.beginPath();
-    ctx.roundRect(paddle.x, PADDLE_Y, paddle.w, PADDLE_H, PADDLE_H / 2);
+    ctx.roundRect(paddle.x, paddle.y, paddle.w, PADDLE_H, PADDLE_H / 2);
     ctx.fill();
 
     if (state !== 'over') {
@@ -429,7 +443,7 @@
   }
 
   // 指で操作するときは、指を置いた位置ではなく動かした量だけパドルを動かす。
-  // 指でパドルが隠れないよう、盤面のどこ (下の操作エリアも含む) をなぞってもよい
+  // 指でパドルが隠れないよう、盤面のどこをなぞってもよい
   let downX = null;
   let lastX = 0;
 
@@ -465,14 +479,12 @@
     if (tapped || e.pointerType === 'mouse') launch();
   }
 
-  for (const el of [canvas, touchZone]) {
-    el.addEventListener('pointerdown', onPointerDown);
-    el.addEventListener('pointermove', onPointerMove);
-    el.addEventListener('pointerup', onPointerUp);
-    el.addEventListener('pointercancel', () => {
-      downX = null;
-    });
-  }
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', () => {
+    downX = null;
+  });
 
   document.addEventListener('keydown', (e) => {
     switch (e.code) {
@@ -537,12 +549,13 @@
   }
 
   overlayText.textContent = coarseMQ.matches
-    ? '盤面か下の操作エリアを左右になぞると\nパドルが動きます。タップで発射します'
+    ? 'パドルの下の帯を左右になぞると\nパドルが動きます。タップで発射します'
     : 'マウスか ← → でパドルを動かし\nクリックかスペースでボールを発射します';
 
   buildStage(0);
   updateStats();
   layout();
   window.addEventListener('resize', layout);
+  coarseMQ.addEventListener('change', layout);
   requestAnimationFrame(frame);
 })();
