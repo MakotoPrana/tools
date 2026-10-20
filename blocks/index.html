@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ブロック落としパズル</title>
+  <meta name="description" content="ブラウザで遊べる落ち物ブロックパズル。スマホはタップ・スワイプとボタン、パソコンはキーボードで操作できます。" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5093421396736590"
+     crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top" id="top">
+      <a class="back" href="../">‹ ツール一覧</a>
+      <h1>ブロック落としパズル</h1>
+      <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" tabindex="-1">Ⅱ</button>
+    </header>
+
+    <div class="play">
+      <section class="stage" id="stage">
+        <aside class="side">
+          <div class="panel">
+            <p class="panel-label">HOLD</p>
+            <canvas id="hold"></canvas>
+          </div>
+          <dl class="stats">
+            <div><dt>SCORE</dt><dd id="score">0</dd></div>
+            <div><dt>LEVEL</dt><dd id="level">1</dd></div>
+            <div><dt>LINES</dt><dd id="lines">0</dd></div>
+            <div><dt>BEST</dt><dd id="best">0</dd></div>
+          </dl>
+        </aside>
+
+        <div class="board-wrap" id="board-wrap">
+          <canvas id="board" aria-label="ゲーム盤面"></canvas>
+          <p class="toast" id="toast" aria-live="polite"></p>
+          <div class="overlay" id="overlay">
+            <p class="overlay-title" id="overlay-title">ブロック落としパズル</p>
+            <p class="overlay-text" id="overlay-text"></p>
+            <button type="button" id="start-btn" class="start-btn">スタート</button>
+          </div>
+        </div>
+
+        <aside class="side">
+          <div class="panel">
+            <p class="panel-label">NEXT</p>
+            <canvas id="next"></canvas>
+          </div>
+        </aside>
+      </section>
+
+      <div class="pad pad-left" aria-label="移動ボタン">
+        <button type="button" tabindex="-1" data-action="left" aria-label="左へ移動">◀</button>
+        <button type="button" tabindex="-1" data-action="down" aria-label="下へ移動">▼</button>
+        <button type="button" tabindex="-1" data-action="right" aria-label="右へ移動">▶</button>
+      </div>
+      <div class="pad pad-right" aria-label="回転・落下ボタン">
+        <button type="button" tabindex="-1" data-action="hold" class="small">HOLD</button>
+        <button type="button" tabindex="-1" data-action="hard" class="small" aria-label="一気に落とす">DROP ⤓</button>
+        <button type="button" tabindex="-1" data-action="rotateCCW" aria-label="左回転">⟲</button>
+        <button type="button" tabindex="-1" data-action="rotateCW" aria-label="右回転">⟳</button>
+      </div>
+    </div>
+
+    <section class="help">
+      <h2>遊び方</h2>
+      <p>落ちてくるブロックを動かして、横一列をすき間なく埋めると消えます。一度にたくさんの列を消すほど高得点。10列消すごとにレベルが上がり、落ちる速さが上がります。ブロックが上まで積み上がるとゲームオーバーです。</p>
+
+      <h3>スマホの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>盤面をタップ</th><td>右回転</td></tr>
+          <tr><th>左右にドラッグ</th><td>左右に移動</td></tr>
+          <tr><th>下にドラッグ</th><td>少しずつ落とす</td></tr>
+          <tr><th>下にすばやくスワイプ</th><td>一気に落とす</td></tr>
+          <tr><th>上にすばやくスワイプ</th><td>ホールド</td></tr>
+        </tbody>
+      </table>
+      <p class="note">画面下のボタンでも操作できます。◀ ▶ ▼ は押しっぱなしで連続移動します。</p>
+
+      <h3>キーボードの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>← →</th><td>左右に移動</td></tr>
+          <tr><th>↓</th><td>少しずつ落とす</td></tr>
+          <tr><th>スペース</th><td>一気に落とす</td></tr>
+          <tr><th>↑ / X</th><td>右回転</td></tr>
+          <tr><th>Z / Ctrl</th><td>左回転</td></tr>
+          <tr><th>C / Shift</th><td>ホールド</td></tr>
+          <tr><th>P / Esc</th><td>一時停止</td></tr>
+        </tbody>
+      </table>
+
+      <h3>得点</h3>
+      <p>1列 100点、2列 300点、3列 500点、4列 800点に、そのときのレベルを掛けた点数が入ります。少しずつ落とすと1マス1点、一気に落とすと1マス2点のボーナスもあります。ホールドは次のブロックが出るまでに1回だけ使えます。</p>
+    </section>
+  </main>
+
+  <footer>&copy; tools.e-seventh.com</footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
