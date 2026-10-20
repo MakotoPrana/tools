@@ -29,7 +29,10 @@
   const DEFENSE_GAP = 40; // パドルから防衛ラインまでの距離。ブロックがこの線を越えるとライフが減る
   const BEST_KEY = 'breakout-best';
 
-  // ブロックの種類: 色・得点・HP
+  // 硬さの段階ごとのHPと得点の倍率 (1 がふつうのブロック)
+  const TIER_SCALE = { 1: 1, 2: 2, 3: 4 };
+
+  // ブロックの種類: 色・得点・HP (第1段階の値)
   const BRICKS = {
     S: { color: '#b8c2cc', points: 100, hp: 30 },
     R: { color: '#ef3b3b', points: 70, hp: 20 },
@@ -42,6 +45,7 @@
 
   // ステージごとのボールの初速、ブロックが迫ってくる速さ (px/秒) と配置
   // ('.' は空き、小文字は半分の幅のブロック2つ)。
+  // tiers / reserveTiers は map / reserve と同じ位置に硬さの段階 ('2' か '3') を書く。書かないマスは第1段階
   // reserve は画面の上に隠れている控えの段。表示中の段が全部消えると上の段が1段ずつ詰まり、
   // 控えの段が下のものから順にせり出してくる
   const STAGES = [
@@ -71,6 +75,10 @@
         'GC.BB.CG',
         '.c....c.',
       ],
+      tiers: [
+        '...22...',
+        '.2....2.',
+      ],
     },
     {
       speed: BALL_SPEED + 40,
@@ -80,12 +88,22 @@
         'RrRrRrRr',
         'OOOOOOOO',
       ],
+      reserveTiers: [
+        '2..33..2',
+        '',
+        '2......2',
+      ],
       map: [
         'YYYYYYYY',
         'GGggggGG',
         'CCCCCCCC',
         'B.BBBB.B',
         'bb....bb',
+      ],
+      tiers: [
+        '',
+        '',
+        '.2....2.',
       ],
     },
   ];
@@ -158,6 +176,7 @@
   function layoutBricks(stage) {
     const reserve = stage.reserve || [];
     const rows = [...reserve, ...stage.map];
+    const tierRows = [...reserve.map((_, i) => (stage.reserveTiers || [])[i] || ''), ...stage.map.map((_, i) => (stage.tiers || [])[i] || '')];
     const cols = rows[0].length;
     const bw = (W - BRICK_MARGIN * 2 - BRICK_GAP * (cols - 1)) / cols;
     const halfW = (bw - BRICK_GAP) / 2;
@@ -169,13 +188,16 @@
         const row = r - reserve.length; // 0 が表示される一番上の段。負の段は画面の上に隠れている
         const x = BRICK_MARGIN + c * (bw + BRICK_GAP);
         const y = baseRowY(row);
+        const tier = TIER_SCALE[tierRows[r][c]] ? Number(tierRows[r][c]) : 1;
+        const hp = kind.hp * TIER_SCALE[tier];
+        const pts = kind.points * TIER_SCALE[tier];
         if (ch === ch.toUpperCase()) {
-          list.push({ x, y, w: bw, h: BRICK_H, row, kind, points: kind.points, maxHp: kind.hp });
+          list.push({ x, y, w: bw, h: BRICK_H, row, kind, tier, points: pts, maxHp: hp });
         } else {
-          const points = Math.round(kind.points / 2);
-          const maxHp = Math.ceil(kind.hp / 2);
-          list.push({ x, y, w: halfW, h: BRICK_H, row, kind, points, maxHp });
-          list.push({ x: x + halfW + BRICK_GAP, y, w: halfW, h: BRICK_H, row, kind, points, maxHp });
+          const points = Math.round(pts / 2);
+          const maxHp = Math.ceil(hp / 2);
+          list.push({ x, y, w: halfW, h: BRICK_H, row, kind, tier, points, maxHp });
+          list.push({ x: x + halfW + BRICK_GAP, y, w: halfW, h: BRICK_H, row, kind, tier, points, maxHp });
         }
       });
     });
@@ -449,7 +471,7 @@
     // 控えの段は盤面の上の余白に薄く描く
     layoutBricks(stage).forEach((b) => {
       g.globalAlpha = b.y + b.h <= BRICK_TOP ? 0.35 : 1;
-      g.fillStyle = b.kind.color;
+      g.fillStyle = shade(b.kind.color, [1, 1, 0.75, 0.55][b.tier]);
       g.fillRect(ox + b.x * k, oy + b.y * k, Math.max(1, b.w * k), Math.max(1, b.h * k));
     });
     g.globalAlpha = 1;
@@ -642,15 +664,93 @@
     ctx.restore();
   }
 
-  function drawBrick(b) {
-    ctx.fillStyle = b.kind.color;
-    ctx.fillRect(b.x, b.y, b.w, b.h);
+  // 色を明るさの倍率で変える ('#rrggbb' → 'rgb(...)')
+  const shadeCache = new Map();
+  function shade(hex, f) {
+    const key = hex + f;
+    if (!shadeCache.has(key)) {
+      const n = parseInt(hex.slice(1), 16);
+      const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.min(255, Math.round(v * f)));
+      shadeCache.set(key, `rgb(${c.join(', ')})`);
+    }
+    return shadeCache.get(key);
+  }
+
+  function bevel(b, size, light, dark) {
+    ctx.fillStyle = light;
+    ctx.fillRect(b.x, b.y, b.w, size);
+    ctx.fillRect(b.x, b.y, size, b.h);
+    ctx.fillStyle = dark;
+    ctx.fillRect(b.x, b.y + b.h - size, b.w, size);
+    ctx.fillRect(b.x + b.w - size, b.y, size, b.h);
+  }
+
+  function rivet(x, y) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.arc(x + 0.5, y + 0.5, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.beginPath();
+    ctx.arc(x, y, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 第1段階: 素の板 / 第2段階: 補強板をリベットで留めた板 / 第3段階: 縞の入った厚い装甲板
+  function drawBrickBody(b) {
+    const { x, y, w, h } = b;
+    const color = b.kind.color;
+    if (b.tier === 1) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, w, h);
+      bevel(b, 2, 'rgba(255, 255, 255, 0.35)', 'rgba(0, 0, 0, 0.28)');
+      return;
+    }
+    if (b.tier === 2) {
+      ctx.fillStyle = shade(color, 0.82);
+      ctx.fillRect(x, y, w, h);
+      bevel(b, 3, 'rgba(255, 255, 255, 0.4)', 'rgba(0, 0, 0, 0.4)');
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 3.5, y + 3.5, w - 7, h - 7);
+      for (const [rx, ry] of [[x + 5, y + 5], [x + w - 5, y + 5], [x + 5, y + h - 5], [x + w - 5, y + h - 5]]) rivet(rx, ry);
+      return;
+    }
+    const grad = ctx.createLinearGradient(0, y, 0, y + h);
+    grad.addColorStop(0, shade(color, 0.95));
+    grad.addColorStop(1, shade(color, 0.5));
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w, h);
+    // 斜めの縞
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let sx = x - h; sx < x + w; sx += 5) {
+      ctx.moveTo(sx, y + h);
+      ctx.lineTo(sx + h, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+    // 中央の厚い板とボルト
+    const pw = Math.max(6, w * 0.36);
+    const px = x + (w - pw) / 2;
+    ctx.fillStyle = shade(color, 0.75);
+    ctx.fillRect(px, y + 3, pw, h - 6);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-    ctx.fillRect(b.x, b.y, b.w, 2);
-    ctx.fillRect(b.x, b.y, 2, b.h);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
-    ctx.fillRect(b.x, b.y + b.h - 2, b.w, 2);
-    ctx.fillRect(b.x + b.w - 2, b.y, 2, b.h);
+    ctx.fillRect(px, y + 3, pw, 1);
+    rivet(x + w / 2, y + h / 2);
+    bevel(b, 3, 'rgba(255, 255, 255, 0.5)', 'rgba(0, 0, 0, 0.55)');
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  }
+
+  function drawBrick(b) {
+    drawBrickBody(b);
     if (b.flash > 0) {
       ctx.fillStyle = `rgba(255, 255, 255, ${(b.flash / 0.15) * 0.6})`;
       ctx.fillRect(b.x, b.y, b.w, b.h);
