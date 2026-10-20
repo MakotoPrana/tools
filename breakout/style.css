@@ -114,6 +114,30 @@ body {
 
 #board { display: block; cursor: none; }
 
+/* 指でパドルを隠さずに操作するためのエリア (タッチ端末のみ表示) */
+.touch-zone {
+  display: none;
+  margin: 8px auto 0;
+  height: 64px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@media (pointer: coarse) {
+  .touch-zone { display: flex; }
+}
+
 .overlay {
   position: absolute;
   inset: 0;

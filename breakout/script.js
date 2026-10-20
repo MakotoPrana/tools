@@ -14,6 +14,7 @@
   const PADDLE_H = 10;
   const PADDLE_Y = H - 40;
   const PADDLE_KEY_SPEED = 420;
+  const TOUCH_SENSITIVITY = 1.3; // 指の移動量に対するパドルの移動量
   const BRICK_TOP = 56;
   const BRICK_MARGIN = 12;
   const BRICK_GAP = 4;
@@ -52,6 +53,7 @@
   const boardWrap = $('board-wrap');
   const header = $('top');
   const statsEl = $('stats');
+  const touchZone = $('touch-zone');
   const overlay = $('overlay');
   const overlayTitle = $('overlay-title');
   const overlayText = $('overlay-text');
@@ -350,7 +352,8 @@
     const appStyle = getComputedStyle(app);
     const availW = app.clientWidth - parseFloat(appStyle.paddingLeft) - parseFloat(appStyle.paddingRight) - 4; // 枠線の分
     const availH = window.innerHeight - header.offsetHeight - statsEl.offsetHeight - 8 - 16 - 4;
-    const w = Math.max(240, Math.floor(Math.min(availW, (availH * W) / H, W * 1.6)));
+    const zoneH = touchZone.offsetHeight ? touchZone.offsetHeight + 8 : 0;
+    const w = Math.max(240, Math.floor(Math.min(availW, ((availH - zoneH) * W) / H, W * 1.6)));
     scale = w / W;
     canvas.style.width = `${w}px`;
     canvas.style.height = `${Math.round(H * scale)}px`;
@@ -358,6 +361,7 @@
     canvas.height = Math.round(H * scale * dpr);
     boardWrap.style.width = `${w + 4}px`;
     statsEl.style.maxWidth = `${w + 4}px`;
+    touchZone.style.width = `${w + 4}px`;
     draw();
   }
 
@@ -424,28 +428,51 @@
     return ((e.clientX - rect.left) / rect.width) * W;
   }
 
+  // 指で操作するときは、指を置いた位置ではなく動かした量だけパドルを動かす。
+  // 指でパドルが隠れないよう、盤面のどこ (下の操作エリアも含む) をなぞってもよい
   let downX = null;
+  let lastX = 0;
 
-  canvas.addEventListener('pointerdown', (e) => {
+  function onPointerDown(e) {
     downX = e.clientX;
-    if (state === 'serve' || state === 'playing') movePaddleTo(pointerX(e));
-  });
+    lastX = e.clientX;
+    if (e.pointerType !== 'mouse') {
+      // 指が盤面の外に出てもなぞり続けられるようにする
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // キャプチャできなくても操作は続けられる
+      }
+    }
+    if (e.pointerType === 'mouse' && (state === 'serve' || state === 'playing')) movePaddleTo(pointerX(e));
+  }
 
-  canvas.addEventListener('pointermove', (e) => {
+  function onPointerMove(e) {
     if (state !== 'serve' && state !== 'playing') return;
-    // マウスはボタンを押さなくても追従、指はなぞっている間だけ
-    if (e.pointerType === 'mouse' || downX !== null) movePaddleTo(pointerX(e));
-  });
+    if (e.pointerType === 'mouse') {
+      movePaddleTo(pointerX(e));
+    } else if (downX !== null) {
+      const rect = canvas.getBoundingClientRect();
+      const dx = ((e.clientX - lastX) / rect.width) * W * TOUCH_SENSITIVITY;
+      movePaddleTo(paddle.x + paddle.w / 2 + dx);
+    }
+    lastX = e.clientX;
+  }
 
-  canvas.addEventListener('pointerup', (e) => {
+  function onPointerUp(e) {
     const tapped = downX !== null && Math.abs(e.clientX - downX) < 12;
     downX = null;
     if (tapped || e.pointerType === 'mouse') launch();
-  });
+  }
 
-  canvas.addEventListener('pointercancel', () => {
-    downX = null;
-  });
+  for (const el of [canvas, touchZone]) {
+    el.addEventListener('pointerdown', onPointerDown);
+    el.addEventListener('pointermove', onPointerMove);
+    el.addEventListener('pointerup', onPointerUp);
+    el.addEventListener('pointercancel', () => {
+      downX = null;
+    });
+  }
 
   document.addEventListener('keydown', (e) => {
     switch (e.code) {
@@ -510,7 +537,7 @@
   }
 
   overlayText.textContent = coarseMQ.matches
-    ? '画面を左右になぞってパドルを動かし\nタップでボールを発射します'
+    ? '盤面か下の操作エリアを左右になぞると\nパドルが動きます。タップで発射します'
     : 'マウスか ← → でパドルを動かし\nクリックかスペースでボールを発射します';
 
   buildStage(0);
