@@ -3,15 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ブロック崩し</title>
-  <meta name="description" content="ブラウザで遊べるブロック崩しゲーム。スマホは指でなぞって、パソコンはマウスやキーボードでパドルを動かします。" />
+  <title>BRICK SIEGE</title>
+  <meta name="description" content="迫りくるブロックから防衛ラインを守り抜く、タワーディフェンス風のブロック崩し。スマホは指でなぞって、パソコンはマウスやキーボードで遊べます。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="app">
     <header class="top" id="top">
       <a class="back" href="../">‹ ツール一覧</a>
-      <h1>ブロック崩し</h1>
+      <h1>BRICK SIEGE</h1>
       <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" tabindex="-1">Ⅱ</button>
     </header>
 
@@ -25,12 +28,18 @@
     <div class="board-wrap" id="board-wrap">
       <canvas id="board" aria-label="ゲーム画面"></canvas>
       <div class="overlay" id="overlay">
-        <p class="overlay-title" id="overlay-title">ブロック崩し</p>
+        <div class="title-screen" id="title-screen" hidden>
+          <p class="game-logo"><span class="logo-brick">BRICK</span><span class="logo-siege">SIEGE</span></p>
+          <p class="game-kana">ブリック・シージ</p>
+          <p class="game-tagline">迫りくるブロックから、防衛ラインを守り抜け</p>
+        </div>
+        <p class="overlay-title" id="overlay-title"></p>
         <p class="overlay-text" id="overlay-text"></p>
         <div class="stage-grid" id="stage-grid" hidden></div>
         <div class="overlay-actions">
           <button type="button" id="start-btn" class="start-btn">スタート</button>
           <button type="button" id="menu-btn" class="menu-btn" hidden>ステージ選択へ</button>
+          <button type="button" id="title-btn" class="menu-btn" hidden>タイトルへ</button>
         </div>
       </div>
     </div>

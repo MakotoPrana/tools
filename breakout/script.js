@@ -32,7 +32,9 @@
   // 爆弾ブロックの爆風が届く距離 (爆弾の縁から、半分の幅のブロック1個分)
   const BLAST_RADIUS = ((W - BRICK_MARGIN * 2 - BRICK_GAP * 7) / 8 - BRICK_GAP) / 2;
   const BOMB_DAMAGE = 20; // 爆風が与えるダメージ
-  const DEFENSE_GAP = 40; // パドルから防衛ラインまでの距離。ブロックがこの線を越えるとライフが減る
+  const DEFENSE_GAP = 40;
+  const TITLE_WALL_SPEED = 14; // タイトル画面の後ろで壁が迫ってくる速さ (px/秒)
+  const TITLE_WALL_SPAN = 20; // タイトル画面の壁が一巡する段数 (画面に見える段数より多くする) // パドルから防衛ラインまでの距離。ブロックがこの線を越えるとライフが減る
   const BEST_KEY = 'breakout-best';
 
   // 硬さの段階ごとのHPと得点の倍率 (1 がふつうのブロック)
@@ -125,6 +127,8 @@
   const header = $('top');
   const statsEl = $('stats');
   const overlay = $('overlay');
+  const titleScreen = $('title-screen');
+  const titleBtn = $('title-btn');
   const overlayTitle = $('overlay-title');
   const overlayText = $('overlay-text');
   const startBtn = $('start-btn');
@@ -427,14 +431,48 @@
     }
   }
 
-  function showOverlay(title, text, button, withMenu = false) {
-    overlayTitle.textContent = title;
+  // オーバーレイに出すもの (タイトル / 見出しと説明 / ステージ選択のタイル / 各ボタン) を切り替える
+  function setOverlay({ title = false, heading = '', text = '', tiles = false, button = '', menu = false, toTitle = false }) {
+    overlay.classList.toggle('is-title', title);
+    titleScreen.hidden = !title;
+    overlayTitle.hidden = !heading;
+    overlayTitle.textContent = heading;
+    overlayText.hidden = !text;
     overlayText.textContent = text;
+    stageGrid.hidden = !tiles;
+    startBtn.hidden = !button;
     startBtn.textContent = button;
-    startBtn.hidden = false;
-    menuBtn.hidden = !withMenu;
-    stageGrid.hidden = true;
+    menuBtn.hidden = !menu;
+    titleBtn.hidden = !toTitle;
     overlay.hidden = false;
+  }
+
+  function showOverlay(title, text, button, withMenu = false) {
+    setOverlay({ heading: title, text, button, menu: withMenu });
+  }
+
+  // タイトル画面。後ろではステージ1のブロックの壁が防衛ラインへ迫り続ける
+  function showTitle() {
+    state = 'title';
+    // ステージ1の配置を2つ、間を空けて並べ、波のように続けて迫らせる
+    const wave = layoutBricks(STAGES[0]);
+    bricks = [0, -TITLE_WALL_SPAN / 2].flatMap((offset) =>
+      wave.map((b) => ({ ...b, row: b.row + offset, hp: b.maxHp, shownHp: b.maxHp, flash: 0, cracks: [] })),
+    );
+    advance = 0;
+    breachFlash = 0;
+    particles = [];
+    explosions = [];
+    setOverlay({ title: true, button: 'スタート' });
+  }
+
+  // タイトル画面の壁は、防衛ラインの手前まで来た段を画面の上 (見えない所) へ回して流し続ける
+  function updateTitleWall(dt) {
+    advance += TITLE_WALL_SPEED * dt;
+    for (const b of bricks) {
+      if (rowY(b.row) + b.h > lineY() - ROW_PITCH) b.row -= TITLE_WALL_SPAN;
+      b.y = rowY(b.row);
+    }
   }
 
   function showStageSelect() {
@@ -443,14 +481,14 @@
     bricks = []; // タイルが読みやすいよう、背景には何も描かない
     particles = [];
     explosions = [];
-    overlayTitle.textContent = 'ステージ選択';
-    overlayText.textContent = coarseMQ.matches
-      ? 'パドルの下の帯を左右になぞって操作、タップで発射'
-      : 'マウスか ← → で操作、クリックかスペースで発射';
-    startBtn.hidden = true;
-    menuBtn.hidden = true;
-    stageGrid.hidden = false;
-    overlay.hidden = false;
+    setOverlay({
+      heading: 'ステージ選択',
+      text: coarseMQ.matches
+        ? 'パドルの下の帯を左右になぞって操作、タップで発射'
+        : 'マウスか ← → で操作、クリックかスペースで発射',
+      tiles: true,
+      toTitle: true,
+    });
   }
 
   function selectStage(index) {
@@ -512,7 +550,9 @@
   }
 
   function onStartButton() {
-    if (state === 'paused') {
+    if (state === 'title') {
+      showStageSelect();
+    } else if (state === 'paused') {
       togglePause();
     } else if (state === 'clear' && stageIndex + 1 < STAGES.length) {
       stageIndex += 1;
@@ -1105,7 +1145,7 @@
     ctx.restore();
 
     const reserve = reserveRows();
-    if (reserve > 0 && state !== 'ready') {
+    if (reserve > 0 && state !== 'ready' && state !== 'title') {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
       ctx.fillRect(BRICK_MARGIN, BRICK_TOP - 6, W - BRICK_MARGIN * 2, 2);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
@@ -1127,6 +1167,7 @@
     if (state === 'ready') return;
 
     drawDefenseLine();
+    if (state === 'title') return;
 
     if (coarseMQ.matches) {
       // パドルの下の、指を置くための帯
@@ -1285,6 +1326,11 @@
     showStageSelect();
   });
 
+  titleBtn.addEventListener('click', () => {
+    titleBtn.blur();
+    showTitle();
+  });
+
   pauseBtn.addEventListener('click', () => {
     pauseBtn.blur();
     togglePause();
@@ -1306,13 +1352,14 @@
     const dt = Math.min(now - lastTime, 50) / 1000;
     lastTime = now;
     if (state === 'playing' || state === 'serve') update(dt);
+    else if (state === 'title') updateTitleWall(dt);
     if (state !== 'paused') updateParticles(dt);
     draw();
     requestAnimationFrame(frame);
   }
 
   buildStageTiles();
-  showStageSelect();
+  showTitle();
   updateStats();
   layout();
   window.addEventListener('resize', layout);
