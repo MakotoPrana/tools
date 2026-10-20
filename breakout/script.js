@@ -4,13 +4,10 @@
   // 盤面の論理サイズ (表示サイズに合わせて拡大縮小する)
   const W = 360;
   const H = 480;
-  const START_LIVES = 3;
   const BALL_R = 5;
   const BALL_SPEED = 260; // ステージ1のボールの速さ (px/秒)。ステージ中は変わらない
-  const BALL_ATTACK = 10; // ボールの攻撃力。当たるたびにブロックのHPがこの分だけ減る
   const SMASH_WINDOW = 0.25; // タップしてからパドルの枠が光っている時間。この間にボールが当たるとスマッシュ
   const SMASH_COOLDOWN = 0.5; // 次にパドルを光らせられるまでの間隔 (連打で光らせ続けられないように)
-  const SMASH_TIME = 1; // スマッシュ状態が続く時間
   const SMASH_POWER = 2; // スマッシュ中の攻撃力の倍率
   const TRAIL_LENGTH = 14; // スマッシュ中の尾の長さ (フレーム数)
   const GAUGE_DRAIN = 1.5; // 減ったHPの残像が消える速さ (最大HPの何倍/秒)
@@ -26,36 +23,61 @@
   const BRICK_MARGIN = 12;
   const BRICK_GAP = 4;
   const BRICK_H = 14;
-  const LIFE_BONUS = 500;
   const ROW_PITCH = BRICK_H + BRICK_GAP; // 1段の高さ
   const SHIFT_SPEED = 90; // 段が詰まるときにブロックが下りる速さ (px/秒)
-  // 爆弾ブロックの爆風が届く距離 (爆弾の縁から、半分の幅のブロック1個分)
-  const BLAST_RADIUS = ((W - BRICK_MARGIN * 2 - BRICK_GAP * 7) / 8 - BRICK_GAP) / 2;
-  const BOMB_DAMAGE = 20; // 爆風が与えるダメージ
-  const DEFENSE_GAP = 40;
+  const DEFENSE_GAP = 40; // パドルから防衛ラインまでの距離。ブロックがこの線を越えるとライフが減る
   const TITLE_WALL_SPEED = 14; // タイトル画面の後ろで壁が迫ってくる速さ (px/秒)
-  const TITLE_WALL_SPAN = 20; // タイトル画面の壁が一巡する段数 (画面に見える段数より多くする) // パドルから防衛ラインまでの距離。ブロックがこの線を越えるとライフが減る
-  const BEST_KEY = 'breakout-best';
+  const TITLE_WALL_SPAN = 20; // タイトル画面の壁が一巡する段数 (画面に見える段数より多くする)
+  const GOLD_PER_HP = 10; // ブロックの最大HP 10 につき 1 Gold (端数切り上げ)
+  const FAIL_GOLD_RATE = 1 / 3; // 失敗したときに手に入る Gold の割合
+  // タイムアタックの目標時間 = 基本時間 + 想定攻撃力で壊すのに必要な打撃回数 × 1回あたりの時間
+  const TARGET_BASE = 20;
+  const TARGET_PER_HIT = 0.8;
+  const SAVE_KEY = 'brick-siege-save';
 
-  // 硬さの段階ごとのHPと得点の倍率 (1 がふつうのブロック)
+  // 硬さの段階ごとのHPの倍率 (1 がふつうのブロック)
   const TIER_SCALE = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 12 };
 
-  // ブロックの種類: 色・得点・HP (第1段階の値)
+  // ブロックの種類: 色・HP (第1段階の値)
   const BRICKS = {
-    S: { color: '#b8c2cc', points: 100, hp: 30 },
-    R: { color: '#ef3b3b', points: 70, hp: 20 },
-    O: { color: '#ef8a21', points: 60, hp: 20 },
-    Y: { color: '#f7d308', points: 50, hp: 15 },
-    G: { color: '#42b642', points: 40, hp: 10 },
-    C: { color: '#31c7ef', points: 30, hp: 10 },
-    B: { color: '#4a6fd8', points: 20, hp: 10 },
-    // 爆弾ブロック: 壊れると周りのブロックにダメージを与える
-    X: { color: '#3a3f47', points: 50, hp: 10, bomb: true },
+    S: { color: '#b8c2cc', hp: 30 },
+    R: { color: '#ef3b3b', hp: 20 },
+    O: { color: '#ef8a21', hp: 20 },
+    Y: { color: '#f7d308', hp: 15 },
+    G: { color: '#42b642', hp: 10 },
+    C: { color: '#31c7ef', hp: 10 },
+    B: { color: '#4a6fd8', hp: 10 },
+    // 爆弾ブロック: 壊れると周りのブロックにダメージを与える。段階を持たない
+    X: { color: '#3a3f47', hp: 10, bomb: true },
   };
+
+  // 難易度: ライフ、ボールの速さと迫ってくる速さの倍率、手に入る Gold の倍率
+  const DIFFICULTIES = {
+    easy: { name: 'Easy', lives: 5, speed: 0.9, advance: 0.7, gold: 1 },
+    normal: { name: 'Normal', lives: 3, speed: 1, advance: 1, gold: 1.5 },
+    hard: { name: 'Hard', lives: 2, speed: 1.1, advance: 1.3, gold: 2 },
+  };
+  const DIFF_KEYS = Object.keys(DIFFICULTIES);
+
+  // 各ステージの各難易度に設定されたチャレンジ
+  const CHALLENGES = [
+    { id: 'clear', name: 'ステージクリア' },
+    { id: 'time', name: 'タイムアタック' },
+    { id: 'noDamage', name: 'ノーダメージクリア' },
+  ];
+
+  // アップグレード: 初期値から最大値まで levels 回に分けて均等に上がる。
+  // 次の強化のコストは 基準コスト × (今のレベル + 1)
+  const UPGRADES = [
+    { id: 'attack', name: '攻撃力', min: 10, max: 50, levels: 8, cost: 100, desc: 'ボールが当たるたびにブロックのHPを減らす量', format: (v) => String(v) },
+    { id: 'smash', name: 'スマッシュ持続時間', min: 0.5, max: 2, levels: 6, cost: 200, desc: 'スマッシュ状態 (攻撃力2倍・貫通) が続く時間', format: (v) => `${v.toFixed(2)}秒` },
+    { id: 'range', name: '爆弾の範囲', min: 17, max: 34, levels: 8, cost: 100, desc: '爆弾ブロックの縁から爆風が届く距離', format: (v) => `${Math.round(v)}px` },
+    { id: 'bomb', name: '爆弾の攻撃力', min: 20, max: 100, levels: 8, cost: 100, desc: '爆風が周りのブロックに与えるダメージ', format: (v) => String(v) },
+  ];
 
   // ステージごとのボールの速さ、ブロックが迫ってくる速さ (px/秒) と配置
   // ('.' は空き、小文字は半分の幅のブロック2つ)。
-  // tiers / reserveTiers は map / reserve と同じ位置に硬さの段階 ('2'〜'5') を書く。書かないマスは第1段階
+  // tiers / reserveTiers は map / reserve と同じ位置に硬さの段階 ('1'〜'5') を書く。書かないマスは baseTier (省略時は第1段階)
   // reserve は画面の上に隠れている控えの段。表示中の段が全部消えると上の段が1段ずつ詰まり、
   // 控えの段が下のものから順にせり出してくる
   const STAGES = [
@@ -117,6 +139,330 @@
         '4..55..4',
       ],
     },
+    {
+      speed: BALL_SPEED + 40,
+      advance: 1.9,
+      map: [
+        'SSSSSSSS',
+        'RRXRRXRR',
+        'OOOOOOOO',
+        'YyYYYYyY',
+        'GGGGGGGG',
+        'CCXCCXCC',
+        'BBBBBBBB',
+      ],
+      tiers: [
+        '22222222',
+        '22.22.22',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 45,
+      advance: 1.9,
+      map: [
+        '...SS...',
+        '..SRRS..',
+        '.SROORS.',
+        'SROXXORS',
+        '.YOYYOY.',
+        '..GYYG..',
+        '...CC...',
+      ],
+      tiers: [
+        '...33...',
+        '..2..2..',
+        '.2....2.',
+        '2......2',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 50,
+      advance: 2.0,
+      baseTier: 2,
+      map: [
+        'RR.OO.RR',
+        'RR.OO.RR',
+        'YY.XX.YY',
+        'GG.GG.GG',
+        'CC.CC.CC',
+        'BB.BB.BB',
+      ],
+      tiers: [
+        '33.33.33',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 50,
+      advance: 1.8,
+      baseTier: 2,
+      reserve: [
+        'SSSSSSSS',
+        'OOOOOOOO',
+      ],
+      reserveTiers: [
+        '33333333',
+      ],
+      map: [
+        'RRRRRRRR',
+        'YYXYYXYY',
+        'GGGGGGGG',
+        'CcCCCCcC',
+        'BBBBBBBB',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 55,
+      advance: 2.0,
+      baseTier: 2,
+      map: [
+        'SRSRSRSR',
+        'RSRSRSRS',
+        'OYOYOYOY',
+        'YOYXXOYO',
+        'GCGCGCGC',
+        'CGCGCGCG',
+        'BBBBBBBB',
+      ],
+      tiers: [
+        '3.3.3.3.',
+        '.3.3.3.3',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 60,
+      advance: 2.0,
+      baseTier: 2,
+      map: [
+        'SSSSSSSS',
+        'S.RRRR.S',
+        'S.OXXO.S',
+        'S.YYYY.S',
+        'S.GGGG.S',
+        'SSCCCCSS',
+        'bb.BB.bb',
+      ],
+      tiers: [
+        '44444444',
+        '4......4',
+        '4......4',
+        '4......4',
+        '4......4',
+        '44....44',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 60,
+      advance: 2.1,
+      baseTier: 3,
+      map: [
+        'ssssssss',
+        'rrrrrrrr',
+        'ooXooXoo',
+        'yyyyyyyy',
+        'gggggggg',
+        'cccccccc',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 65,
+      advance: 2.0,
+      baseTier: 3,
+      reserve: [
+        'SSSSSSSS',
+        'RRRRRRRR',
+        'OOXOOXOO',
+      ],
+      reserveTiers: [
+        '44444444',
+      ],
+      map: [
+        'YYYYYYYY',
+        'GGXGGXGG',
+        'CCCCCCCC',
+        'BBBBBBBB',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 70,
+      advance: 2.2,
+      baseTier: 3,
+      map: [
+        '...SS...',
+        '..SSSS..',
+        '.RRXXRR.',
+        'OOOOOOOO',
+        '...YY...',
+        '...GG...',
+        '..CXXC..',
+        '.BB..BB.',
+      ],
+      tiers: [
+        '...55...',
+        '..4444..',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 70,
+      advance: 2.2,
+      baseTier: 3,
+      map: [
+        'SSSSSSSS',
+        '........',
+        'RRRXXRRR',
+        'OOOOOOOO',
+        '........',
+        'YYYYYYYY',
+        'GGXGGXGG',
+        'CCCCCCCC',
+      ],
+      tiers: [
+        '44444444',
+        '',
+        '444..444',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 75,
+      advance: 2.2,
+      baseTier: 3,
+      map: [
+        'BCGYYGCB',
+        'CGYOOYGC',
+        'GYORROYG',
+        'YORSSROY',
+        'GYORROYG',
+        'CGXOOXGC',
+        'BCGYYGCB',
+      ],
+      tiers: [
+        '',
+        '',
+        '...44...',
+        '...55...',
+        '...44...',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 80,
+      advance: 2.1,
+      baseTier: 3,
+      reserve: [
+        'SSSSSSSS',
+        'RrRrRrRr',
+        'OOOOOOOO',
+        'YYXYYXYY',
+      ],
+      reserveTiers: [
+        '55555555',
+        '44444444',
+        '4......4',
+      ],
+      map: [
+        'GGGGGGGG',
+        'CCXCCXCC',
+        'BBBBBBBB',
+        'bbbbbbbb',
+      ],
+      tiers: [
+        '',
+        '',
+        '4......4',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 85,
+      advance: 2.3,
+      baseTier: 4,
+      map: [
+        'SSSSSSSS',
+        'RRXRRXRR',
+        'OOOOOOOO',
+        'YYYYYYYY',
+        'GGXGGXGG',
+        'CCCCCCCC',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 90,
+      advance: 2.3,
+      baseTier: 4,
+      map: [
+        '...SS...',
+        '..SRRS..',
+        '.SRXXRS.',
+        'SROOOORS',
+        '.SRXXRS.',
+        '..SRRS..',
+        '...SS...',
+      ],
+      tiers: [
+        '',
+        '',
+        '',
+        '..5555..',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 95,
+      advance: 2.2,
+      baseTier: 4,
+      reserve: [
+        'SSSSSSSS',
+        'RRRRRRRR',
+        'OOXOOXOO',
+      ],
+      reserveTiers: [
+        '55555555',
+      ],
+      map: [
+        'YYYYYYYY',
+        'GGXGGXGG',
+        'CCCCCCCC',
+        'BBBBBBBB',
+        'bbbbbbbb',
+      ],
+      tiers: [
+        '',
+        '',
+        '',
+        '55555555',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 100,
+      advance: 2.4,
+      baseTier: 5,
+      map: [
+        'BCGBBGCB',
+        'CXCGGCXC',
+        'GGGYYGGG',
+        'YYOXXOYY',
+        'GCGYYGCG',
+        'cbcbbcbc',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 110,
+      advance: 2.4,
+      baseTier: 5,
+      reserve: [
+        'SSSSSSSS',
+        'RRXRRXRR',
+      ],
+      reserveTiers: [
+        '44444444',
+      ],
+      map: [
+        'OOOOOOOO',
+        'YYXYYXYY',
+        'GGGGGGGG',
+        'CCXCCXCC',
+        'BBBBBBBB',
+      ],
+      tiers: [
+        '44444444',
+      ],
+    },
   ];
 
   // ---------- DOM ----------
@@ -128,35 +474,41 @@
   const statsEl = $('stats');
   const overlay = $('overlay');
   const titleScreen = $('title-screen');
-  const titleBtn = $('title-btn');
   const overlayTitle = $('overlay-title');
   const overlayText = $('overlay-text');
-  const startBtn = $('start-btn');
-  const menuBtn = $('menu-btn');
-  const stageGrid = $('stage-grid');
+  const panelEl = $('panel');
+  const actionsEl = $('overlay-actions');
   const pauseBtn = $('pause-btn');
   const stageEl = $('stage-no');
-  const scoreEl = $('score');
+  const goldEl = $('gold');
   const livesEl = $('lives');
-  const bestEl = $('best');
+  const timeEl = $('time');
   const coarseMQ = window.matchMedia('(pointer: coarse)');
 
   // ---------- 状態 ----------
-  // ready: タイトル / serve: ボールがパドルの上 / playing / paused / clear / over
-  let state = 'ready';
+  // title: タイトル / select・confirm・upgrade・achieve: メニュー画面 /
+  // serve: ボールがパドルの上 / playing / paused / result: ステージの結果
+  const MENU_STATES = new Set(['select', 'confirm', 'upgrade', 'achieve']);
+  const RUN_STATES = new Set(['serve', 'playing', 'paused', 'result']);
+  const save = loadSave();
+  let state = 'title';
   let pausedFrom = 'playing';
   let stageIndex = 0;
-  let firstStage = 0; // 選択画面で選んだ、最初に遊ぶステージ
-  let score = 0;
-  let lives = START_LIVES;
-  let best = loadBest();
-  let combo = 0;
+  let difficulty = save.difficulty; // 遊んでいるステージの難易度
+  let selectedDiff = save.difficulty; // 確認画面で選んでいる難易度 (最初は前回遊んだ難易度)
+  let power = currentPower(); // アップグレードを反映した能力値 (ステージ開始時に決まる)
+  let lives = 0;
+  let runGold = 0; // このステージで壊したブロックの Gold の合計 (難易度の倍率を掛ける前)
+  let runTime = 0; // このステージの経過時間
+  let shownSecond = -1;
+  let damaged = false; // このステージでライフを失ったか
   let advance = 0; // ブロック全体が手前に迫ってきた距離
+  let advanceSpeed = 0;
   let breachFlash = 0; // 防衛ラインを越えられたときに線を光らせる残り時間
   let smashWindow = 0; // パドルの枠が光っている残り時間
   let smashCooldown = 0;
   // スマッシュはパドルで打ってから最初にブロックに当たるまで溜めておき (smashCharged)、
-  // 当たった時点から SMASH_TIME の間続く (smashTime)
+  // 当たった時点から power.smash の間続く (smashTime)
   let smashCharged = false;
   let smashTime = 0; // スマッシュ状態の残り時間
   let smashText = 0; // 「SMASH!」の表示の残り時間
@@ -164,37 +516,139 @@
   let explosions = []; // 爆発の演出
   let bricks = [];
   let particles = [];
+  let primaryAction = null; // オーバーレイでスペース / Enter を押したときの動作
+  let backAction = null; // オーバーレイで Esc を押したときの動作
   const paddle = { x: (W - PADDLE_W) / 2, y: H - PADDLE_BOTTOM_MOUSE, w: PADDLE_W };
   const ball = { x: W / 2, y: H - PADDLE_BOTTOM_MOUSE - BALL_R, vx: 0, vy: 0, speed: BALL_SPEED };
   const keys = { left: false, right: false };
   let scale = 1;
   let dpr = 1;
 
-  function loadBest() {
+  // ---------- セーブデータ ----------
+  // gold: 所持 Gold / upgrades: 能力ごとのレベル / difficulty: 前回遊んだ難易度 /
+  // records[ステージ番号 - 1][難易度]: チャレンジの達成状況とベストタイム
+  function loadSave() {
+    const data = { gold: 0, upgrades: {}, difficulty: 'normal', records: {} };
     try {
-      return Number(localStorage.getItem(BEST_KEY)) || 0;
+      const raw = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (raw && typeof raw === 'object') {
+        if (Number.isFinite(raw.gold) && raw.gold > 0) data.gold = Math.floor(raw.gold);
+        if (DIFFICULTIES[raw.difficulty]) data.difficulty = raw.difficulty;
+        if (raw.upgrades && typeof raw.upgrades === 'object') data.upgrades = raw.upgrades;
+        if (raw.records && typeof raw.records === 'object') data.records = raw.records;
+      }
     } catch {
-      return 0;
+      // 読めないときは最初から
     }
+    UPGRADES.forEach((u) => {
+      const lv = Number(data.upgrades[u.id]);
+      data.upgrades[u.id] = Number.isInteger(lv) ? Math.min(u.levels, Math.max(0, lv)) : 0;
+    });
+    return data;
   }
 
-  function saveBest() {
+  function persist() {
     try {
-      localStorage.setItem(BEST_KEY, String(best));
+      localStorage.setItem(SAVE_KEY, JSON.stringify(save));
     } catch {
       // 保存できない環境では何もしない
     }
   }
 
+  function record(stage, diff) {
+    const r = (save.records[stage] || {})[diff] || {};
+    return {
+      clear: r.clear === true,
+      time: r.time === true,
+      noDamage: r.noDamage === true,
+      bestTime: Number.isFinite(r.bestTime) ? r.bestTime : null,
+    };
+  }
+
+  function setRecord(stage, diff, rec) {
+    if (!save.records[stage] || typeof save.records[stage] !== 'object') save.records[stage] = {};
+    save.records[stage][diff] = rec;
+  }
+
+  function countDone(stage, diff) {
+    const rec = record(stage, diff);
+    return CHALLENGES.filter((c) => rec[c.id]).length;
+  }
+
+  function totalChallenges() {
+    return STAGES.length * DIFF_KEYS.length * CHALLENGES.length;
+  }
+
+  function totalDone(diffs = DIFF_KEYS) {
+    return STAGES.reduce((n, _, i) => n + diffs.reduce((m, d) => m + countDone(i, d), 0), 0);
+  }
+
+  // 全チャレンジを達成したときだけ 100% になるよう切り捨てる
+  function achievePercent() {
+    return Math.floor((totalDone() / totalChallenges()) * 100);
+  }
+
+  function upgradeValue(u, lv = save.upgrades[u.id]) {
+    return u.min + ((u.max - u.min) * lv) / u.levels;
+  }
+
+  function upgradeCost(u) {
+    return u.cost * (save.upgrades[u.id] + 1);
+  }
+
+  function currentPower() {
+    return Object.fromEntries(UPGRADES.map((u) => [u.id, upgradeValue(u)]));
+  }
+
+  // ---------- 表示用 ----------
+  function fmtTime(sec, precise = false) {
+    const tenths = Math.floor(sec * 10);
+    const m = Math.floor(tenths / 600);
+    const s = (tenths % 600) / 10;
+    return `${m}:${precise ? s.toFixed(1).padStart(4, '0') : String(Math.floor(s)).padStart(2, '0')}`;
+  }
+
+  function fmtGold(n) {
+    return `${n.toLocaleString('ja-JP')} G`;
+  }
+
+  function el(tag, className = '', text = '') {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text) node.textContent = text;
+    return node;
+  }
+
+  function button(className, label, action) {
+    const b = el('button', className, label);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      b.blur();
+      action();
+    });
+    return b;
+  }
+
+  function dot(id, on) {
+    return el('span', `dot dot-${id}${on ? ' is-on' : ''}`);
+  }
+
+  function runGoldShown() {
+    return Math.floor(runGold * DIFFICULTIES[difficulty].gold);
+  }
+
   function updateStats() {
-    stageEl.textContent = stageIndex + 1;
-    scoreEl.textContent = score;
-    livesEl.textContent = lives;
-    bestEl.textContent = best;
+    const inRun = RUN_STATES.has(state);
+    const playing = inRun && state !== 'result';
+    stageEl.textContent = inRun ? stageIndex + 1 : '-';
+    goldEl.textContent = playing ? runGoldShown() : save.gold.toLocaleString('ja-JP');
+    livesEl.textContent = inRun ? lives : '-';
+    timeEl.textContent = inRun ? fmtTime(runTime) : '-';
+    shownSecond = Math.floor(runTime);
   }
 
   // 配置の文字列からブロックの位置と種類を求める。
-  // 小文字のマスは、その色の半分の幅のブロック2つに分かれる (得点とHPもそれぞれ半分)
+  // 小文字のマスは、その色の半分の幅のブロック2つに分かれる (HPと Gold もそれぞれ半分)
   function layoutBricks(stage) {
     const reserve = stage.reserve || [];
     const rows = [...reserve, ...stage.map];
@@ -210,21 +664,34 @@
         const row = r - reserve.length; // 0 が表示される一番上の段。負の段は画面の上に隠れている
         const x = BRICK_MARGIN + c * (bw + BRICK_GAP);
         const y = baseRowY(row);
-        const tier = TIER_SCALE[tierRows[r][c]] ? Number(tierRows[r][c]) : 1;
+        const mark = tierRows[r][c];
+        const tier = kind.bomb ? 1 : TIER_SCALE[mark] ? Number(mark) : stage.baseTier || 1;
         const hp = kind.hp * TIER_SCALE[tier];
-        const pts = kind.points * TIER_SCALE[tier];
         if (ch === ch.toUpperCase()) {
-          list.push({ x, y, w: bw, h: BRICK_H, row, kind, tier, points: pts, maxHp: hp });
+          list.push({ x, y, w: bw, h: BRICK_H, row, kind, tier, maxHp: hp, gold: goldFor(hp) });
         } else {
-          const points = Math.round(pts / 2);
           const maxHp = Math.ceil(hp / 2);
-          list.push({ x, y, w: halfW, h: BRICK_H, row, kind, tier, points, maxHp });
-          list.push({ x: x + halfW + BRICK_GAP, y, w: halfW, h: BRICK_H, row, kind, tier, points, maxHp });
+          const gold = goldFor(maxHp);
+          list.push({ x, y, w: halfW, h: BRICK_H, row, kind, tier, maxHp, gold });
+          list.push({ x: x + halfW + BRICK_GAP, y, w: halfW, h: BRICK_H, row, kind, tier, maxHp, gold });
         }
       });
     });
     return list;
   }
+
+  function goldFor(hp) {
+    return Math.ceil(hp / GOLD_PER_HP);
+  }
+
+  // タイムアタックの目標時間 (秒、10秒単位に切り上げ)。
+  // 想定攻撃力はステージ1で10、1ステージ進むごとに2上がる (最大50)
+  function targetTime(index) {
+    const attack = Math.min(50, 10 + index * 2);
+    const hits = layoutBricks(STAGES[index]).reduce((n, b) => n + Math.ceil(b.maxHp / attack), 0);
+    return Math.ceil((TARGET_BASE + hits * TARGET_PER_HIT) / 10) * 10;
+  }
+  const TARGET_TIMES = STAGES.map((_, i) => targetTime(i));
 
   function baseRowY(row) {
     return BRICK_TOP + row * ROW_PITCH;
@@ -316,26 +783,38 @@
     breached.forEach((b) => burst(b));
     breachFlash = 0.6;
     lives -= 1;
+    damaged = true;
     updateStats();
-    if (lives <= 0) gameOver();
-    else if (bricks.length === 0) stageClear();
+    if (lives <= 0) finishStage(false);
+    else if (bricks.length === 0) finishStage(true);
+  }
+
+  function clearBoard() {
+    bricks = [];
+    particles = [];
+    explosions = [];
   }
 
   // ---------- 進行 ----------
-  // 選んだステージから、スコアとライフを最初の状態にして始める
-  function startGame() {
-    stageIndex = firstStage;
-    score = 0;
-    lives = START_LIVES;
-    startStage();
-  }
-
-  function startStage() {
-    buildStage(stageIndex);
+  function startStage(index, diff) {
+    stageIndex = index;
+    difficulty = diff;
+    selectedDiff = diff;
+    save.difficulty = diff;
+    persist();
+    const stage = STAGES[index];
+    const d = DIFFICULTIES[diff];
+    power = currentPower();
+    lives = d.lives;
+    runGold = 0;
+    runTime = 0;
+    damaged = false;
+    buildStage(index);
     placePaddle();
     particles = [];
     explosions = [];
-    ball.speed = STAGES[stageIndex].speed;
+    ball.speed = stage.speed * d.speed;
+    advanceSpeed = stage.advance * d.advance;
     advance = 0;
     breachFlash = 0;
     paddle.x = (W - paddle.w) / 2;
@@ -355,7 +834,6 @@
     smashTime = 0;
     smashCharged = false;
     trail = [];
-    combo = 0;
     state = 'serve';
     overlay.hidden = true;
     placeBallOnPaddle();
@@ -384,71 +862,107 @@
 
   function loseLife() {
     lives -= 1;
+    damaged = true;
     updateStats();
     if (lives <= 0) {
-      gameOver();
+      finishStage(false);
       return;
     }
     serve();
   }
 
-  function finishScore() {
-    if (score > best) {
-      best = score;
-      saveBest();
+  // ステージの終わり。クリアなら集めた Gold をすべて、失敗 (リタイアを含む) なら 1/3 を受け取り、
+  // チャレンジの結果を保存して結果画面を出す
+  function finishStage(cleared) {
+    state = 'result';
+    const d = DIFFICULTIES[difficulty];
+    const full = runGoldShown();
+    const earned = cleared ? full : Math.floor(full * FAIL_GOLD_RATE);
+    save.gold += earned;
+
+    const target = TARGET_TIMES[stageIndex];
+    const timeOk = cleared && runTime <= target;
+    const noDamage = cleared && !damaged;
+    const before = record(stageIndex, difficulty);
+    const news = {};
+    if (cleared) {
+      const rec = { ...before };
+      news.clear = !before.clear;
+      news.time = timeOk && !before.time;
+      news.noDamage = noDamage && !before.noDamage;
+      news.best = before.bestTime !== null && runTime < before.bestTime;
+      rec.clear = true;
+      rec.time = before.time || timeOk;
+      rec.noDamage = before.noDamage || noDamage;
+      rec.bestTime = before.bestTime === null ? runTime : Math.min(before.bestTime, runTime);
+      setRecord(stageIndex, difficulty, rec);
     }
+    persist();
     updateStats();
-  }
 
-  function gameOver() {
-    state = 'over';
-    finishScore();
-    showOverlay('GAME OVER', `スコア ${score}`, 'もう一度', true);
-  }
+    const list = el('dl', 'result-list');
+    const row = (label, value, isNew = false) => {
+      const item = el('div', 'result-row');
+      const dd = el('dd', '', value);
+      if (isNew) dd.append(el('span', 'new-badge', 'NEW'));
+      item.append(el('dt', '', label), dd);
+      list.append(item);
+    };
+    row('獲得 Gold', cleared ? fmtGold(earned) : `${fmtGold(full)} × 1/3 = ${fmtGold(earned)}`);
+    row('クリアタイム', cleared ? fmtTime(runTime, true) : '—', news.best);
+    row('タイムアタック', cleared ? `${timeOk ? '達成' : '未達成'} (目標 ${fmtTime(target)})` : '—', news.time);
+    row('ノーダメージクリア', cleared ? (noDamage ? '達成' : '未達成') : '—', news.noDamage);
+    row('所持 Gold', fmtGold(save.gold));
 
-  function stageClear() {
-    state = 'clear';
-    const bonus = lives * LIFE_BONUS;
-    score += bonus;
-    finishScore();
     const hasNext = stageIndex + 1 < STAGES.length;
-    showOverlay(
-      hasNext ? 'STAGE CLEAR!' : 'ALL CLEAR!',
-      `ライフボーナス ${lives} × ${LIFE_BONUS} = ${bonus}\nスコア ${score}`,
-      hasNext ? '次のステージへ' : 'もう一度',
-      true,
-    );
+    const retry = () => startStage(stageIndex, difficulty);
+    const buttons = cleared && hasNext
+      ? [{ label: '次のステージへ', action: () => showConfirm(stageIndex + 1), primary: true }, { label: 'もう一度', action: retry }]
+      : [{ label: 'もう一度', action: retry, primary: true }];
+    buttons.push({ label: 'ステージ選択へ', action: showStageSelect });
+    setOverlay({
+      heading: cleared ? 'STAGE CLEAR!' : 'STAGE FAILED',
+      text: `STAGE ${stageIndex + 1} ・ ${d.name}`,
+      panel: list,
+      buttons,
+      back: showStageSelect,
+    });
   }
 
   function togglePause() {
     if (state === 'playing' || state === 'serve') {
       pausedFrom = state;
       state = 'paused';
-      showOverlay('一時停止中', '', '再開', true);
+      setOverlay({
+        heading: '一時停止中',
+        text: `STAGE ${stageIndex + 1} ・ ${DIFFICULTIES[difficulty].name}`,
+        buttons: [
+          { label: '再開', action: togglePause, primary: true },
+          { label: 'リタイア (Gold は 1/3)', action: () => finishStage(false) },
+        ],
+        back: togglePause,
+      });
     } else if (state === 'paused') {
       state = pausedFrom;
       overlay.hidden = true;
     }
   }
 
-  // オーバーレイに出すもの (タイトル / 見出しと説明 / ステージ選択のタイル / 各ボタン) を切り替える
-  function setOverlay({ title = false, heading = '', text = '', tiles = false, button = '', menu = false, toTitle = false }) {
+  // オーバーレイに出すもの (タイトル / 見出しと説明 / 画面ごとの中身 / ボタン) を切り替える
+  function setOverlay({ title = false, heading = '', text = '', panel = null, buttons = [], back = null }) {
     overlay.classList.toggle('is-title', title);
     titleScreen.hidden = !title;
     overlayTitle.hidden = !heading;
     overlayTitle.textContent = heading;
     overlayText.hidden = !text;
     overlayText.textContent = text;
-    stageGrid.hidden = !tiles;
-    startBtn.hidden = !button;
-    startBtn.textContent = button;
-    menuBtn.hidden = !menu;
-    titleBtn.hidden = !toTitle;
+    panelEl.hidden = !panel;
+    panelEl.replaceChildren(...(panel ? [panel] : []));
+    actionsEl.replaceChildren(...buttons.map((b) => button(b.primary ? 'start-btn' : 'menu-btn', b.label, b.action)));
+    primaryAction = (buttons.find((b) => b.primary) || {}).action || null;
+    backAction = back;
     overlay.hidden = false;
-  }
-
-  function showOverlay(title, text, button, withMenu = false) {
-    setOverlay({ heading: title, text, button, menu: withMenu });
+    overlay.scrollTop = 0;
   }
 
   // タイトル画面。後ろではステージ1のブロックの壁が防衛ラインへ迫り続ける
@@ -463,7 +977,8 @@
     breachFlash = 0;
     particles = [];
     explosions = [];
-    setOverlay({ title: true, button: 'スタート' });
+    setOverlay({ title: true, buttons: [{ label: 'スタート', action: showStageSelect, primary: true }] });
+    updateStats();
   }
 
   // タイトル画面の壁は、防衛ラインの手前まで来た段を画面の上 (見えない所) へ回して流し続ける
@@ -475,60 +990,213 @@
     }
   }
 
+  // 難易度ごと (行) のチャレンジ (列) の達成状況を点で並べる
+  function challengeDots(stage) {
+    const box = el('span', 'tile-dots');
+    box.setAttribute('aria-hidden', 'true');
+    DIFF_KEYS.forEach((d) => {
+      const rec = record(stage, d);
+      const line = el('span', 'dot-row');
+      CHALLENGES.forEach((c) => line.append(dot(c.id, rec[c.id])));
+      box.append(line);
+    });
+    return box;
+  }
+
+  // ステージ選択: ステージ番号のタイルを1列に3つ並べ、スクロールで選ぶ
   function showStageSelect() {
-    if (state === 'paused') finishScore();
-    state = 'ready';
-    bricks = []; // タイルが読みやすいよう、背景には何も描かない
-    particles = [];
-    explosions = [];
+    state = 'select';
+    clearBoard();
+    const panel = el('div', 'select');
+    const nav = el('div', 'nav-row');
+    nav.append(button('menu-btn', 'アップグレード', showUpgrade), button('menu-btn', '達成率', showAchievements));
+    const grid = el('div', 'stage-grid');
+    const perStage = DIFF_KEYS.length * CHALLENGES.length;
+    STAGES.forEach((_, i) => {
+      const done = DIFF_KEYS.reduce((n, d) => n + countDone(i, d), 0);
+      const tile = button('stage-tile', '', () => showConfirm(i));
+      tile.classList.toggle('is-complete', done === perStage);
+      tile.setAttribute('aria-label', `ステージ${i + 1} (チャレンジ ${done}/${perStage} 達成)`);
+      tile.append(el('span', 'stage-no', String(i + 1)), challengeDots(i));
+      grid.append(tile);
+    });
+    panel.append(nav, grid);
     setOverlay({
       heading: 'ステージ選択',
+      text: `所持 ${fmtGold(save.gold)} ・ 達成率 ${achievePercent()}%`,
+      panel,
+      buttons: [{ label: 'タイトルへ', action: showTitle }],
+      back: showTitle,
+    });
+    // 前に選んだステージのタイルが見える位置までスクロールしておく
+    const tile = grid.children[stageIndex];
+    overlay.scrollTop = Math.max(0, tile.offsetTop - overlay.clientHeight / 2);
+    updateStats();
+  }
+
+  // ステージ開始前の確認画面: 全体像、難易度の選択、難易度ごとのチャレンジの達成状況
+  function showConfirm(index) {
+    state = 'confirm';
+    stageIndex = index;
+    clearBoard();
+    const d = DIFFICULTIES[selectedDiff];
+    const rec = record(index, selectedDiff);
+    const panel = el('div', 'confirm');
+
+    const thumb = el('canvas', 'confirm-thumb');
+    thumb.width = 180;
+    thumb.height = 240;
+    thumb.setAttribute('role', 'img');
+    thumb.setAttribute('aria-label', `ステージ${index + 1}のブロックの配置`);
+    drawStageThumb(thumb, STAGES[index]);
+
+    const side = el('div', 'confirm-side');
+    const tabs = el('div', 'diff-tabs');
+    tabs.setAttribute('role', 'group');
+    tabs.setAttribute('aria-label', '難易度');
+    DIFF_KEYS.forEach((key) => {
+      const tab = button('diff-tab', '', () => {
+        selectedDiff = key;
+        showConfirm(index);
+      });
+      tab.setAttribute('aria-pressed', String(key === selectedDiff));
+      tab.append(el('span', 'diff-name', DIFFICULTIES[key].name), el('span', 'diff-count', `${countDone(index, key)}/${CHALLENGES.length}`));
+      tabs.append(tab);
+    });
+    const info = el('p', 'diff-info', `ライフ ${d.lives} ・ 迫る速さ ×${d.advance} ・ ボール ×${d.speed} ・ Gold ×${d.gold}`);
+
+    const list = el('ul', 'challenges');
+    CHALLENGES.forEach((c) => {
+      const li = el('li', rec[c.id] ? 'is-on' : '');
+      li.append(dot(c.id, rec[c.id]), el('span', 'challenge-name', c.name), el('span', 'challenge-state', rec[c.id] ? '達成' : '未達成'));
+      if (c.id === 'time') {
+        const best = rec.bestTime === null ? '' : ` ・ ベスト ${fmtTime(rec.bestTime, true)}`;
+        li.append(el('span', 'challenge-note', `目標 ${fmtTime(TARGET_TIMES[index])} 以内${best}`));
+      }
+      list.append(li);
+    });
+
+    side.append(tabs, info, list);
+    panel.append(thumb, side);
+    setOverlay({
+      heading: `STAGE ${index + 1}`,
       text: coarseMQ.matches
         ? 'パドルの下の帯を左右になぞって操作、タップで発射'
         : 'マウスか ← → で操作、クリックかスペースで発射',
-      tiles: true,
-      toTitle: true,
+      panel,
+      buttons: [
+        { label: 'スタート', action: () => startStage(index, selectedDiff), primary: true },
+        { label: '戻る', action: showStageSelect },
+      ],
+      back: showStageSelect,
     });
+    updateStats();
   }
 
-  function selectStage(index) {
-    firstStage = index;
-    startGame();
+  // アップグレード画面: 能力ごとのレベル・今の値・次の値・コスト
+  function showUpgrade(keepScroll = false) {
+    const scrollTop = overlay.scrollTop;
+    state = 'upgrade';
+    clearBoard();
+    const panel = el('div', 'upgrades');
+    UPGRADES.forEach((u) => {
+      const lv = save.upgrades[u.id];
+      const maxed = lv >= u.levels;
+      const item = el('div', 'upgrade');
+      const head = el('div', 'upgrade-head');
+      head.append(el('span', 'upgrade-name', u.name), el('span', 'upgrade-lv', maxed ? 'Lv MAX' : `Lv ${lv} / ${u.levels}`));
+      const bar = el('div', 'level-bar');
+      bar.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < u.levels; i++) bar.append(el('span', i < lv ? 'is-on' : ''));
+      const value = el('p', 'upgrade-value');
+      value.append(el('strong', '', u.format(upgradeValue(u, lv))));
+      if (!maxed) value.append(` → ${u.format(upgradeValue(u, lv + 1))}`);
+      const cost = maxed ? 0 : upgradeCost(u);
+      const buy = button('buy-btn', maxed ? '最大まで強化済み' : `${fmtGold(cost)} で強化`, () => buyUpgrade(u));
+      buy.disabled = maxed || save.gold < cost;
+      item.append(head, bar, value, el('p', 'upgrade-desc', u.desc), buy);
+      panel.append(item);
+    });
+    setOverlay({
+      heading: 'アップグレード',
+      text: `所持 ${fmtGold(save.gold)}`,
+      panel,
+      buttons: [{ label: '戻る', action: showStageSelect }],
+      back: showStageSelect,
+    });
+    if (keepScroll) overlay.scrollTop = scrollTop;
+    updateStats();
   }
 
-  // 選択画面のタイル。ブロックの配置を縮小して描く
-  function buildStageTiles() {
-    STAGES.forEach((stage, i) => {
-      const tile = document.createElement('button');
-      tile.type = 'button';
-      tile.className = 'stage-tile';
-      const count = layoutBricks(stage).length;
-      const notes = [`ブロック ${count}個`];
-      if (stage.reserve) notes.push(`控え${stage.reserve.length}段`);
-      tile.setAttribute('aria-label', `ステージ${i + 1}を始める (${notes.join('、')})`);
+  function buyUpgrade(u) {
+    const lv = save.upgrades[u.id];
+    const cost = upgradeCost(u);
+    if (lv >= u.levels || save.gold < cost) return;
+    save.gold -= cost;
+    save.upgrades[u.id] = lv + 1;
+    persist();
+    showUpgrade(true);
+  }
 
-      const thumb = document.createElement('canvas');
-      thumb.className = 'stage-thumb';
-      thumb.width = 120;
-      thumb.height = 160;
-      drawStageThumb(thumb, stage);
+  // 達成率画面: 全体の達成率と、ステージ・難易度ごとのチャレンジの達成状況
+  function showAchievements() {
+    state = 'achieve';
+    clearBoard();
+    const total = totalChallenges();
+    const done = totalDone();
+    const panel = el('div', 'achieve');
 
-      const name = document.createElement('span');
-      name.className = 'stage-tile-name';
-      name.textContent = `STAGE ${i + 1}`;
-      const meta = document.createElement('span');
-      meta.className = 'stage-tile-meta';
-      meta.textContent = notes.join(' · ');
+    const summary = el('div', 'achieve-summary');
+    const bar = el('div', 'progress');
+    const fill = el('span');
+    fill.style.width = `${(done / total) * 100}%`;
+    bar.append(fill);
+    const perDiff = STAGES.length * CHALLENGES.length;
+    summary.append(
+      el('p', 'achieve-pct', `${achievePercent()}%`),
+      el('p', 'achieve-count', `${done} / ${total} チャレンジ`),
+      bar,
+      el('p', 'achieve-diffs', DIFF_KEYS.map((k) => `${DIFFICULTIES[k].name} ${totalDone([k])}/${perDiff}`).join(' ・ ')),
+    );
 
-      tile.append(thumb, name, meta);
-      tile.addEventListener('click', () => {
-        tile.blur();
-        selectStage(i);
+    const legend = el('p', 'legend');
+    CHALLENGES.forEach((c) => {
+      const item = el('span');
+      item.append(dot(c.id, true), c.name);
+      legend.append(item);
+    });
+
+    const table = el('table', 'achieve-table');
+    const headRow = el('tr');
+    headRow.append(el('th', '', 'STAGE'), ...DIFF_KEYS.map((k) => el('th', '', DIFFICULTIES[k].name)));
+    const thead = el('thead');
+    thead.append(headRow);
+    const tbody = el('tbody');
+    STAGES.forEach((_, i) => {
+      const tr = el('tr');
+      tr.append(el('th', '', String(i + 1)));
+      DIFF_KEYS.forEach((k) => {
+        const rec = record(i, k);
+        const td = el('td');
+        td.setAttribute('aria-label', `${DIFFICULTIES[k].name} ${countDone(i, k)}/${CHALLENGES.length}`);
+        CHALLENGES.forEach((c) => td.append(dot(c.id, rec[c.id])));
+        tr.append(td);
       });
-      stageGrid.append(tile);
+      tbody.append(tr);
     });
+    table.append(thead, tbody);
+
+    panel.append(summary, legend, table);
+    setOverlay({
+      heading: '達成率',
+      panel,
+      buttons: [{ label: '戻る', action: showStageSelect }],
+      back: showStageSelect,
+    });
+    updateStats();
   }
 
+  // ステージの全体像。ブロックの配置を縮小して描く
   function drawStageThumb(thumb, stage) {
     const g = thumb.getContext('2d');
     const k = Math.min(thumb.width / W, thumb.height / H);
@@ -539,7 +1207,7 @@
     // 控えの段は盤面の上の余白に薄く描く
     layoutBricks(stage).forEach((b) => {
       g.globalAlpha = b.y + b.h <= BRICK_TOP ? 0.35 : 1;
-      g.fillStyle = shade(b.kind.color, [1, 1, 0.75, 0.55, 0.42, 0.3][b.tier]);
+      g.fillStyle = b.kind.bomb ? '#f7d308' : shade(b.kind.color, [1, 1, 0.75, 0.55, 0.42, 0.3][b.tier]);
       g.fillRect(ox + b.x * k, oy + b.y * k, Math.max(1, b.w * k), Math.max(1, b.h * k));
     });
     g.globalAlpha = 1;
@@ -547,19 +1215,6 @@
     g.fillRect(ox, oy + (H - PADDLE_BOTTOM_MOUSE - DEFENSE_GAP) * k, W * k, 1);
     g.fillStyle = '#5a9cf0';
     g.fillRect(ox + ((W - PADDLE_W) / 2) * k, oy + (H - PADDLE_BOTTOM_MOUSE) * k, PADDLE_W * k, Math.max(1, PADDLE_H * k));
-  }
-
-  function onStartButton() {
-    if (state === 'title') {
-      showStageSelect();
-    } else if (state === 'paused') {
-      togglePause();
-    } else if (state === 'clear' && stageIndex + 1 < STAGES.length) {
-      stageIndex += 1;
-      startStage();
-    } else {
-      startGame();
-    }
   }
 
   // ---------- 更新 ----------
@@ -571,7 +1226,9 @@
     const dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
     if (dir) movePaddleTo(paddle.x + paddle.w / 2 + dir * PADDLE_KEY_SPEED * dt);
 
-    advance += STAGES[stageIndex].advance * dt;
+    runTime += dt;
+    if (Math.floor(runTime) !== shownSecond) updateStats();
+    advance += advanceSpeed * dt;
     breachFlash = Math.max(0, breachFlash - dt);
     smashWindow = Math.max(0, smashWindow - dt);
     smashCooldown = Math.max(0, smashCooldown - dt);
@@ -579,7 +1236,7 @@
     smashText = Math.max(0, smashText - dt);
     moveBricks(dt);
     checkDefenseLine();
-    if (state === 'over' || state === 'clear') return;
+    if (state === 'result') return;
     if (state === 'serve') {
       placeBallOnPaddle();
     } else {
@@ -616,6 +1273,7 @@
       ball.x -= ball.vx * dt;
       ball.vx = -ball.vx;
     }
+    if (state !== 'playing') return;
 
     ball.y += ball.vy * dt;
     if (ball.y < BALL_R) {
@@ -626,6 +1284,7 @@
       ball.y -= ball.vy * dt;
       ball.vy = -ball.vy;
     }
+    if (state !== 'playing') return;
 
     if (
       ball.vy > 0 &&
@@ -639,7 +1298,6 @@
       ball.vx = ball.speed * Math.sin(angle);
       ball.vy = -ball.speed * Math.cos(angle);
       ball.y = paddle.y - BALL_R;
-      combo = 0;
       if (smashWindow > 0) {
         smashWindow = 0;
         smashCharged = true;
@@ -670,10 +1328,10 @@
 
       if (smashCharged) {
         smashCharged = false;
-        smashTime = SMASH_TIME;
+        smashTime = power.smash;
       }
       const smashing = smashTime > 0;
-      b.hp -= BALL_ATTACK * (smashing ? SMASH_POWER : 1);
+      b.hp -= power.attack * (smashing ? SMASH_POWER : 1);
       b.flash = 0.15;
       if (b.hp > 0) return true;
 
@@ -702,22 +1360,20 @@
       if (index < 0) continue;
       bricks.splice(index, 1);
       rows.add(b.row);
-      combo += 1;
-      // コンボは5つ目まで得点が増える (最大3倍)
-      score += b.points + Math.round(b.points * Math.min(combo - 1, 4) * 0.5);
+      runGold += b.gold;
       burst(b);
       if (!b.kind.bomb) continue;
       explode(b, depth);
       for (const o of bricks) {
-        if (isHidden(o) || o.hp <= 0 || gapBetween(b, o) > BLAST_RADIUS) continue;
-        o.hp -= BOMB_DAMAGE;
+        if (isHidden(o) || o.hp <= 0 || gapBetween(b, o) > power.range) continue;
+        o.hp -= power.bomb;
         o.flash = 0.15;
         if (o.hp <= 0) queue.push({ b: o, depth: depth + 1 });
       }
     }
     updateStats();
     if (bricks.length === 0) {
-      stageClear();
+      finishStage(true);
       return;
     }
     // 段が全部消えたとき、控えの段が残っていれば詰めて1段せり出させる。
@@ -734,7 +1390,7 @@
   function explode(b, depth) {
     const x = b.x + b.w / 2;
     const y = b.y + b.h / 2;
-    explosions.push({ x, y, r: Math.max(b.w, b.h) / 2 + BLAST_RADIUS, t: -depth * 0.08 });
+    explosions.push({ x, y, r: Math.max(b.w, b.h) / 2 + power.range, t: -depth * 0.08 });
     for (let i = 0; i < 18; i++) {
       const a = Math.random() * Math.PI * 2;
       const v = 60 + Math.random() * 160;
@@ -1145,7 +1801,7 @@
     ctx.restore();
 
     const reserve = reserveRows();
-    if (reserve > 0 && state !== 'ready' && state !== 'title') {
+    if (reserve > 0 && RUN_STATES.has(state)) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
       ctx.fillRect(BRICK_MARGIN, BRICK_TOP - 6, W - BRICK_MARGIN * 2, 2);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
@@ -1164,7 +1820,8 @@
     });
     ctx.globalAlpha = 1;
 
-    if (state === 'ready') return;
+    // メニュー画面では、読みやすいよう盤面には何も描かない
+    if (MENU_STATES.has(state)) return;
 
     drawDefenseLine();
     if (state === 'title') return;
@@ -1199,7 +1856,7 @@
       ctx.restore();
     }
 
-    if (state !== 'over') drawBall();
+    if (state !== 'result') drawBall();
 
     if (smashText > 0) {
       ctx.save();
@@ -1298,12 +1955,17 @@
         if (e.target instanceof HTMLButtonElement && !overlay.hidden) return;
         if (state === 'serve') launch();
         else if (state === 'playing' && e.code === 'Space') triggerSmash();
-        else if (!overlay.hidden) onStartButton();
+        else if (!overlay.hidden && primaryAction) primaryAction();
         else if (e.code === 'Enter') return;
         break; // プレイ中のスペースでページがスクロールしないようにする
       case 'KeyP':
-      case 'Escape':
+        if (state !== 'playing' && state !== 'serve' && state !== 'paused') return;
         togglePause();
+        break;
+      case 'Escape':
+        if (state === 'playing' || state === 'serve') togglePause();
+        else if (!overlay.hidden && backAction) backAction();
+        else return;
         break;
       default:
         return;
@@ -1314,21 +1976,6 @@
   document.addEventListener('keyup', (e) => {
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
     if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
-  });
-
-  startBtn.addEventListener('click', () => {
-    startBtn.blur();
-    onStartButton();
-  });
-
-  menuBtn.addEventListener('click', () => {
-    menuBtn.blur();
-    showStageSelect();
-  });
-
-  titleBtn.addEventListener('click', () => {
-    titleBtn.blur();
-    showTitle();
   });
 
   pauseBtn.addEventListener('click', () => {
@@ -1358,9 +2005,7 @@
     requestAnimationFrame(frame);
   }
 
-  buildStageTiles();
   showTitle();
-  updateStats();
   layout();
   window.addEventListener('resize', layout);
   coarseMQ.addEventListener('change', layout);
