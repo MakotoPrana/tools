@@ -201,7 +201,39 @@
 
   function buildStage(index) {
     // shownHp はゲージに残像として見せるHP、flash は当たった瞬間に白く光らせる残り時間
-    bricks = layoutBricks(STAGES[index]).map((b) => ({ ...b, hp: b.maxHp, shownHp: b.maxHp, flash: 0 }));
+    bricks = layoutBricks(STAGES[index]).map((b) => ({
+      ...b,
+      hp: b.maxHp,
+      shownHp: b.maxHp,
+      flash: 0,
+      cracks: makeCracks(b.w, b.h),
+    }));
+  }
+
+  // ブロックごとのヒビの形。中心から枝分かれして伸びる線分を、伸びる順に並べておく
+  function makeCracks(w, h) {
+    const segments = [];
+    const grow = (x, y, angle, steps, level) => {
+      for (let i = 0; i < steps; i++) {
+        angle += (Math.random() - 0.5) * 1.1;
+        const len = 3 + Math.random() * 4;
+        const nx = x + Math.cos(angle) * len;
+        const ny = y + Math.sin(angle) * len * 0.7;
+        segments.push({ x1: x, y1: y, x2: nx, y2: ny, level: level + i });
+        // ときどき細い枝を出す
+        if (Math.random() < 0.35) grow(nx, ny, angle + (Math.random() < 0.5 ? 1 : -1) * 0.9, 2, level + i + 1);
+        x = nx;
+        y = ny;
+      }
+    };
+    const cx = w * (0.3 + Math.random() * 0.4);
+    const cy = h * (0.3 + Math.random() * 0.4);
+    const branches = 3 + Math.floor(Math.random() * 2);
+    const start = Math.random() * Math.PI * 2;
+    for (let i = 0; i < branches; i++) {
+      grow(cx, cy, start + (i / branches) * Math.PI * 2, 4 + Math.floor(Math.random() * 3), 0);
+    }
+    return segments.sort((a, b) => a.level - b.level);
   }
 
   // 空いた段を詰める: その段より上 (控えの段を含む) のブロックを1段下げる
@@ -582,6 +614,34 @@
     draw();
   }
 
+  // 残りHPが半分を切るとヒビが入り始め、0に近づくほど伸びて広がる。
+  // ゲージの残像 (shownHp) に合わせるので、当たったあと少しずつ伸びていく
+  function drawCracks(b) {
+    const ratio = b.shownHp / b.maxHp;
+    if (ratio > 0.5) return;
+    const amount = 0.15 + 0.85 * ((0.5 - ratio) / 0.5);
+    const shown = amount * b.cracks.length;
+    // ブロックの外に伸びた部分は描かない
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(b.x, b.y, b.w, b.h);
+    ctx.clip();
+    ctx.lineCap = 'round';
+    for (const [color, width, offset] of [['rgba(255, 255, 255, 0.35)', 1, 0.6], ['rgba(0, 0, 0, 0.6)', 1, 0]]) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      for (let i = 0; i < shown; i++) {
+        const c = b.cracks[i];
+        const t = Math.min(1, shown - i); // 最後の1本は途中まで伸ばす
+        ctx.moveTo(b.x + c.x1 + offset, b.y + c.y1 + offset);
+        ctx.lineTo(b.x + c.x1 + (c.x2 - c.x1) * t + offset, b.y + c.y1 + (c.y2 - c.y1) * t + offset);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function drawBrick(b) {
     ctx.fillStyle = b.kind.color;
     ctx.fillRect(b.x, b.y, b.w, b.h);
@@ -595,6 +655,7 @@
       ctx.fillStyle = `rgba(255, 255, 255, ${(b.flash / 0.15) * 0.6})`;
       ctx.fillRect(b.x, b.y, b.w, b.h);
     }
+    drawCracks(b);
     if (b.hp < b.maxHp) {
       // HPゲージ。減った分はしばらく白い残像として残り、少し遅れて縮む
       const gx = b.x + 2;
