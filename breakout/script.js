@@ -22,6 +22,8 @@
   const BRICK_GAP = 4;
   const BRICK_H = 14;
   const LIFE_BONUS = 500;
+  const ROW_PITCH = BRICK_H + BRICK_GAP; // 1段の高さ
+  const SHIFT_SPEED = 90; // 段が詰まるときにブロックが下りる速さ (px/秒)
   const BEST_KEY = 'breakout-best';
 
   // ブロックの種類: 色・得点・耐久
@@ -35,7 +37,9 @@
     B: { color: '#4a6fd8', points: 20, hp: 1 },
   };
 
-  // ステージごとのボールの初速とブロックの配置 ('.' は空き、小文字は半分の幅のブロック2つ)
+  // ステージごとのボールの初速とブロックの配置 ('.' は空き、小文字は半分の幅のブロック2つ)。
+  // reserve は画面の上に隠れている控えの段。表示中の段が全部消えると上の段が1段ずつ詰まり、
+  // 控えの段が下のものから順にせり出してくる
   const STAGES = [
     {
       speed: BALL_SPEED,
@@ -60,6 +64,21 @@
         'YG.cc.GY',
         'GC.BB.CG',
         '.c....c.',
+      ],
+    },
+    {
+      speed: BALL_SPEED + 40,
+      reserve: [
+        'SSSSSSSS',
+        'RrRrRrRr',
+        'OOOOOOOO',
+      ],
+      map: [
+        'YYYYYYYY',
+        'GGggggGG',
+        'CCCCCCCC',
+        'B.BBBB.B',
+        'bb....bb',
       ],
     },
   ];
@@ -127,7 +146,9 @@
 
   // 配置の文字列からブロックの位置と種類を求める。
   // 小文字のマスは、その色の半分の幅のブロック2つに分かれる (得点もそれぞれ半分)
-  function layoutBricks(rows) {
+  function layoutBricks(stage) {
+    const reserve = stage.reserve || [];
+    const rows = [...reserve, ...stage.map];
     const cols = rows[0].length;
     const bw = (W - BRICK_MARGIN * 2 - BRICK_GAP * (cols - 1)) / cols;
     const halfW = (bw - BRICK_GAP) / 2;
@@ -136,22 +157,52 @@
       [...row].forEach((ch, c) => {
         const kind = BRICKS[ch.toUpperCase()];
         if (!kind) return;
+        const row = r - reserve.length; // 0 が表示される一番上の段。負の段は画面の上に隠れている
         const x = BRICK_MARGIN + c * (bw + BRICK_GAP);
-        const y = BRICK_TOP + r * (BRICK_H + BRICK_GAP);
+        const y = rowY(row);
         if (ch === ch.toUpperCase()) {
-          list.push({ x, y, w: bw, h: BRICK_H, kind, points: kind.points });
+          list.push({ x, y, w: bw, h: BRICK_H, row, kind, points: kind.points });
         } else {
           const points = Math.round(kind.points / 2);
-          list.push({ x, y, w: halfW, h: BRICK_H, kind, points });
-          list.push({ x: x + halfW + BRICK_GAP, y, w: halfW, h: BRICK_H, kind, points });
+          list.push({ x, y, w: halfW, h: BRICK_H, row, kind, points });
+          list.push({ x: x + halfW + BRICK_GAP, y, w: halfW, h: BRICK_H, row, kind, points });
         }
       });
     });
     return list;
   }
 
+  function rowY(row) {
+    return BRICK_TOP + row * ROW_PITCH;
+  }
+
   function buildStage(index) {
-    bricks = layoutBricks(STAGES[index].map).map((b) => ({ ...b, hp: b.kind.hp }));
+    bricks = layoutBricks(STAGES[index]).map((b) => ({ ...b, hp: b.kind.hp }));
+  }
+
+  // 空いた段を詰める: その段より上 (控えの段を含む) のブロックを1段下げる
+  function collapseRow(row) {
+    bricks.forEach((b) => {
+      if (b.row < row) b.row += 1;
+    });
+  }
+
+  // 段が詰まったブロックを、新しい段の位置まで少しずつ下ろす
+  function moveBricks(dt) {
+    bricks.forEach((b) => {
+      b.y = Math.min(rowY(b.row), b.y + SHIFT_SPEED * dt);
+    });
+    if (state !== 'playing') return;
+    // 下りてきたブロックがボールに重なったら、ボールをブロックの下へ押し出す
+    for (const b of bricks) {
+      if (b.row < 0 || !touchesBall(b)) continue;
+      ball.y = b.y + b.h + BALL_R;
+      ball.vy = Math.abs(ball.vy);
+    }
+  }
+
+  function reserveRows() {
+    return new Set(bricks.filter((b) => b.row < 0).map((b) => b.row)).size;
   }
 
   // ---------- 進行 ----------
@@ -287,8 +338,10 @@
       const tile = document.createElement('button');
       tile.type = 'button';
       tile.className = 'stage-tile';
-      const count = layoutBricks(stage.map).length;
-      tile.setAttribute('aria-label', `ステージ${i + 1}を始める (ブロック ${count}個)`);
+      const count = layoutBricks(stage).length;
+      const notes = [`ブロック ${count}個`];
+      if (stage.reserve) notes.push(`控え${stage.reserve.length}段`);
+      tile.setAttribute('aria-label', `ステージ${i + 1}を始める (${notes.join('、')})`);
 
       const thumb = document.createElement('canvas');
       thumb.className = 'stage-thumb';
@@ -301,7 +354,7 @@
       name.textContent = `STAGE ${i + 1}`;
       const meta = document.createElement('span');
       meta.className = 'stage-tile-meta';
-      meta.textContent = `ブロック ${count}個`;
+      meta.textContent = notes.join(' · ');
 
       tile.append(thumb, name, meta);
       tile.addEventListener('click', () => {
@@ -319,10 +372,13 @@
     const oy = (thumb.height - H * k) / 2;
     g.fillStyle = '#1a222d';
     g.fillRect(ox, oy, W * k, H * k);
-    layoutBricks(stage.map).forEach((b) => {
+    // 控えの段は盤面の上の余白に薄く描く
+    layoutBricks(stage).forEach((b) => {
+      g.globalAlpha = b.row < 0 ? 0.35 : 1;
       g.fillStyle = b.kind.color;
       g.fillRect(ox + b.x * k, oy + b.y * k, Math.max(1, b.w * k), Math.max(1, b.h * k));
     });
+    g.globalAlpha = 1;
     g.fillStyle = '#5a9cf0';
     g.fillRect(ox + ((W - PADDLE_W) / 2) * k, oy + (H - PADDLE_BOTTOM_MOUSE) * k, PADDLE_W * k, Math.max(1, PADDLE_H * k));
   }
@@ -347,6 +403,7 @@
     const dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
     if (dir) movePaddleTo(paddle.x + paddle.w / 2 + dir * PADDLE_KEY_SPEED * dt);
 
+    moveBricks(dt);
     if (state === 'serve') {
       placeBallOnPaddle();
     } else {
@@ -410,12 +467,17 @@
   }
 
   // ボールと重なったブロックを1つ削る。当たったら true
+  function touchesBall(b) {
+    const nx = Math.max(b.x, Math.min(ball.x, b.x + b.w));
+    const ny = Math.max(b.y, Math.min(ball.y, b.y + b.h));
+    return (ball.x - nx) ** 2 + (ball.y - ny) ** 2 <= BALL_R * BALL_R;
+  }
+
   function hitBrick() {
     for (let i = 0; i < bricks.length; i++) {
       const b = bricks[i];
-      const nx = Math.max(b.x, Math.min(ball.x, b.x + b.w));
-      const ny = Math.max(b.y, Math.min(ball.y, b.y + b.h));
-      if ((ball.x - nx) ** 2 + (ball.y - ny) ** 2 > BALL_R * BALL_R) continue;
+      // 控えの段はまだ画面に出ていないので当たらない
+      if (b.row < 0 || !touchesBall(b)) continue;
 
       b.hp -= 1;
       if (b.hp <= 0) {
@@ -430,6 +492,7 @@
         ball.vx *= ratio;
         ball.vy *= ratio;
         if (bricks.length === 0) stageClear();
+        else if (!bricks.some((o) => o.row === b.row)) collapseRow(b.row);
       }
       return true;
     }
@@ -495,7 +558,24 @@
     ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
+    // 控えの段は隠し、せり出してくる途中のブロックは盤面の上端から少しずつ見せる
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, BRICK_TOP, W, H - BRICK_TOP);
+    ctx.clip();
     bricks.forEach(drawBrick);
+    ctx.restore();
+
+    const reserve = reserveRows();
+    if (reserve > 0 && state !== 'ready') {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.fillRect(BRICK_MARGIN, BRICK_TOP - 6, W - BRICK_MARGIN * 2, 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.font = '600 11px system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(`控え ${reserve}段`, W - BRICK_MARGIN, BRICK_TOP - 12);
+    }
 
     particles.forEach((p) => {
       ctx.globalAlpha = Math.max(0, p.life / 0.5);
