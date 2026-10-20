@@ -35,7 +35,7 @@
     B: { color: '#4a6fd8', points: 20, hp: 1 },
   };
 
-  // ステージごとのボールの初速とブロックの配置 ('.' は空き)
+  // ステージごとのボールの初速とブロックの配置 ('.' は空き、小文字は半分の幅のブロック2つ)
   const STAGES = [
     {
       speed: BALL_SPEED,
@@ -53,13 +53,13 @@
       speed: BALL_SPEED + 30,
       map: [
         '..SSSS..',
-        '.SRRRRS.',
+        '.SRrrRS.',
         'SROOOORS',
-        'ROYYYYOR',
+        'RoYyyYoR',
         'OY.GG.YO',
-        'YG.CC.GY',
+        'YG.cc.GY',
         'GC.BB.CG',
-        '.C....C.',
+        '.c....c.',
       ],
     },
   ];
@@ -125,25 +125,33 @@
     bestEl.textContent = best;
   }
 
-  function buildStage(index) {
-    const rows = STAGES[index].map;
+  // 配置の文字列からブロックの位置と種類を求める。
+  // 小文字のマスは、その色の半分の幅のブロック2つに分かれる (得点もそれぞれ半分)
+  function layoutBricks(rows) {
     const cols = rows[0].length;
     const bw = (W - BRICK_MARGIN * 2 - BRICK_GAP * (cols - 1)) / cols;
-    bricks = [];
+    const halfW = (bw - BRICK_GAP) / 2;
+    const list = [];
     rows.forEach((row, r) => {
       [...row].forEach((ch, c) => {
-        const kind = BRICKS[ch];
+        const kind = BRICKS[ch.toUpperCase()];
         if (!kind) return;
-        bricks.push({
-          x: BRICK_MARGIN + c * (bw + BRICK_GAP),
-          y: BRICK_TOP + r * (BRICK_H + BRICK_GAP),
-          w: bw,
-          h: BRICK_H,
-          kind,
-          hp: kind.hp,
-        });
+        const x = BRICK_MARGIN + c * (bw + BRICK_GAP);
+        const y = BRICK_TOP + r * (BRICK_H + BRICK_GAP);
+        if (ch === ch.toUpperCase()) {
+          list.push({ x, y, w: bw, h: BRICK_H, kind, points: kind.points });
+        } else {
+          const points = Math.round(kind.points / 2);
+          list.push({ x, y, w: halfW, h: BRICK_H, kind, points });
+          list.push({ x: x + halfW + BRICK_GAP, y, w: halfW, h: BRICK_H, kind, points });
+        }
       });
     });
+    return list;
+  }
+
+  function buildStage(index) {
+    bricks = layoutBricks(STAGES[index].map).map((b) => ({ ...b, hp: b.kind.hp }));
   }
 
   // ---------- 進行 ----------
@@ -279,7 +287,7 @@
       const tile = document.createElement('button');
       tile.type = 'button';
       tile.className = 'stage-tile';
-      const count = stage.map.join('').replace(/\./g, '').length;
+      const count = layoutBricks(stage.map).length;
       tile.setAttribute('aria-label', `ステージ${i + 1}を始める (ブロック ${count}個)`);
 
       const thumb = document.createElement('canvas');
@@ -311,20 +319,9 @@
     const oy = (thumb.height - H * k) / 2;
     g.fillStyle = '#1a222d';
     g.fillRect(ox, oy, W * k, H * k);
-    const cols = stage.map[0].length;
-    const bw = (W - BRICK_MARGIN * 2 - BRICK_GAP * (cols - 1)) / cols;
-    stage.map.forEach((row, r) => {
-      [...row].forEach((ch, c) => {
-        const kind = BRICKS[ch];
-        if (!kind) return;
-        g.fillStyle = kind.color;
-        g.fillRect(
-          ox + (BRICK_MARGIN + c * (bw + BRICK_GAP)) * k,
-          oy + (BRICK_TOP + r * (BRICK_H + BRICK_GAP)) * k,
-          Math.max(1, bw * k),
-          Math.max(1, BRICK_H * k),
-        );
-      });
+    layoutBricks(stage.map).forEach((b) => {
+      g.fillStyle = b.kind.color;
+      g.fillRect(ox + b.x * k, oy + b.y * k, Math.max(1, b.w * k), Math.max(1, b.h * k));
     });
     g.fillStyle = '#5a9cf0';
     g.fillRect(ox + ((W - PADDLE_W) / 2) * k, oy + (H - PADDLE_BOTTOM_MOUSE) * k, PADDLE_W * k, Math.max(1, PADDLE_H * k));
@@ -425,7 +422,7 @@
         bricks.splice(i, 1);
         combo += 1;
         // コンボは5つ目まで得点が増える (最大3倍)
-        score += b.kind.points + Math.round(b.kind.points * Math.min(combo - 1, 4) * 0.5);
+        score += b.points + Math.round(b.points * Math.min(combo - 1, 4) * 0.5);
         updateStats();
         burst(b);
         ball.speed = Math.min(BALL_MAX_SPEED, ball.speed + BALL_SPEED_UP);
