@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ブロック崩し</title>
+  <meta name="description" content="ブラウザで遊べるブロック崩しゲーム。スマホは指でなぞって、パソコンはマウスやキーボードでパドルを動かします。" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top" id="top">
+      <a class="back" href="../">‹ ツール一覧</a>
+      <h1>ブロック崩し</h1>
+      <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" tabindex="-1">Ⅱ</button>
+    </header>
+
+    <dl class="stats" id="stats">
+      <div><dt>STAGE</dt><dd id="stage-no">1</dd></div>
+      <div><dt>SCORE</dt><dd id="score">0</dd></div>
+      <div><dt>LIFE</dt><dd id="lives">3</dd></div>
+      <div><dt>BEST</dt><dd id="best">0</dd></div>
+    </dl>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="ゲーム画面"></canvas>
+      <div class="overlay" id="overlay">
+        <p class="overlay-title" id="overlay-title">ブロック崩し</p>
+        <p class="overlay-text" id="overlay-text"></p>
+        <button type="button" id="start-btn" class="start-btn">スタート</button>
+      </div>
+    </div>
+
+    <section class="help">
+      <h2>遊び方</h2>
+      <p>パドルでボールを打ち返して、画面上のブロックをすべて壊すとステージクリアです。ボールを下に落とすとライフが1つ減り、ライフがなくなるとゲームオーバーです。</p>
+      <p>パドルの端で打ち返すほど、ボールは斜めに飛びます。ブロックを壊すたびにボールが少しずつ速くなります。銀色のブロックは2回当てると壊れます。</p>
+
+      <h3>スマホの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>画面を左右になぞる</th><td>パドルを移動</td></tr>
+          <tr><th>画面をタップ</th><td>ボールを発射</td></tr>
+        </tbody>
+      </table>
+
+      <h3>パソコンの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>マウス移動 / ← →</th><td>パドルを移動</td></tr>
+          <tr><th>クリック / スペース</th><td>ボールを発射</td></tr>
+          <tr><th>P / Esc</th><td>一時停止</td></tr>
+        </tbody>
+      </table>
+
+      <h3>得点</h3>
+      <p>ブロックの色ごとに 20〜70点、銀色のブロックは 100点です。ボールがパドルに戻ってくるまでに続けて壊すとコンボになり、得点が最大3倍まで増えます。ステージをクリアすると、残りライフ1つにつき 500点のボーナスが入ります。</p>
+    </section>
+  </main>
+
+  <footer>&copy; tools.e-seventh.com</footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
