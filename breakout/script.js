@@ -31,6 +31,9 @@
   const LIFE_BONUS = 500;
   const ROW_PITCH = BRICK_H + BRICK_GAP; // 1段の高さ
   const SHIFT_SPEED = 90; // 段が詰まるときにブロックが下りる速さ (px/秒)
+  // 爆弾ブロックの爆風が届く距離 (爆弾の縁から、半分の幅のブロック1個分)
+  const BLAST_RADIUS = ((W - BRICK_MARGIN * 2 - BRICK_GAP * 7) / 8 - BRICK_GAP) / 2;
+  const BOMB_DAMAGE = 20; // 爆風が与えるダメージ
   const DEFENSE_GAP = 40; // パドルから防衛ラインまでの距離。ブロックがこの線を越えるとライフが減る
   const BEST_KEY = 'breakout-best';
 
@@ -46,6 +49,8 @@
     G: { color: '#42b642', points: 40, hp: 10 },
     C: { color: '#31c7ef', points: 30, hp: 10 },
     B: { color: '#4a6fd8', points: 20, hp: 10 },
+    // 爆弾ブロック: 壊れると周りのブロックにダメージを与える
+    X: { color: '#3a3f47', points: 50, hp: 10, bomb: true },
   };
 
   // ステージごとのボールの初速、ブロックが迫ってくる速さ (px/秒) と配置
@@ -62,7 +67,7 @@
         'RRRRRRRR',
         'OOOOOOOO',
         'YYYYYYYY',
-        'GGGGGGGG',
+        'GGXGGXGG',
         'CCCCCCCC',
         'BBBBBBBB',
       ],
@@ -75,7 +80,7 @@
         '.SRrrRS.',
         'SROOOORS',
         'RoYyyYoR',
-        'OY.GG.YO',
+        'OY.XX.YO',
         'YG.cc.GY',
         'GC.BB.CG',
         '.c....c.',
@@ -101,7 +106,7 @@
       map: [
         'YYYYYYYY',
         'GGggggGG',
-        'CCCCCCCC',
+        'CCXCCXCC',
         'B.BBBB.B',
         'bb....bb',
       ],
@@ -154,6 +159,7 @@
   let smashTime = 0; // スマッシュ状態の残り時間
   let smashText = 0; // 「SMASH!」の表示の残り時間
   let trail = []; // ボールの通った位置 (彗星の尾に使う)
+  let explosions = []; // 爆発の演出
   let bricks = [];
   let particles = [];
   const paddle = { x: (W - PADDLE_W) / 2, y: H - PADDLE_BOTTOM_MOUSE, w: PADDLE_W };
@@ -326,6 +332,7 @@
     buildStage(stageIndex);
     placePaddle();
     particles = [];
+    explosions = [];
     ball.speed = STAGES[stageIndex].speed;
     advance = 0;
     breachFlash = 0;
@@ -438,6 +445,7 @@
     state = 'ready';
     bricks = []; // タイルが読みやすいよう、背景には何も描かない
     particles = [];
+    explosions = [];
     overlayTitle.textContent = 'ステージ選択';
     overlayText.textContent = coarseMQ.matches
       ? 'パドルの下の帯を左右になぞって操作、タップで発射'
@@ -548,6 +556,7 @@
   }
 
   function updateParticles(dt) {
+    explosions = explosions.filter((e) => (e.t += dt) < 0.4);
     particles = particles.filter((p) => {
       p.life -= dt;
       p.x += p.vx * dt;
@@ -631,26 +640,73 @@
       b.flash = 0.15;
       if (b.hp > 0) return true;
 
-      bricks.splice(i, 1);
-      i -= 1;
-      combo += 1;
-      // コンボは5つ目まで得点が増える (最大3倍)
-      score += b.points + Math.round(b.points * Math.min(combo - 1, 4) * 0.5);
-      updateStats();
-      burst(b);
+      destroyBricks([b]);
       ball.speed = Math.min(BALL_MAX_SPEED, ball.speed + BALL_SPEED_UP);
       const ratio = ball.speed / Math.hypot(ball.vx, ball.vy);
       ball.vx *= ratio;
       ball.vy *= ratio;
-      if (bricks.length === 0) {
-        stageClear();
-        return false;
-      }
-      // 段が全部消えたとき、控えの段が残っていれば詰めて1段せり出させる
-      if (!bricks.some((o) => o.row === b.row) && reserveRows() > 0) collapseRow(b.row);
+      if (state !== 'playing') return false;
       if (!smashing) return true;
+      i = -1; // 爆発でブロックが減ったかもしれないので、貫通の続きは最初から調べ直す
     }
     return false;
+  }
+
+  // ブロックの縁どうしの距離
+  function gapBetween(a, b) {
+    const dx = Math.max(0, a.x - (b.x + b.w), b.x - (a.x + a.w));
+    const dy = Math.max(0, a.y - (b.y + b.h), b.y - (a.y + a.h));
+    return Math.hypot(dx, dy);
+  }
+
+  // HPが0になったブロックを取り除く。爆弾は周りにダメージを与え、巻き込まれた爆弾も連鎖して爆発する
+  function destroyBricks(list) {
+    const queue = list.map((b) => ({ b, depth: 0 }));
+    const rows = new Set();
+    while (queue.length) {
+      const { b, depth } = queue.shift();
+      const index = bricks.indexOf(b);
+      if (index < 0) continue;
+      bricks.splice(index, 1);
+      rows.add(b.row);
+      combo += 1;
+      // コンボは5つ目まで得点が増える (最大3倍)
+      score += b.points + Math.round(b.points * Math.min(combo - 1, 4) * 0.5);
+      burst(b);
+      if (!b.kind.bomb) continue;
+      explode(b, depth);
+      for (const o of bricks) {
+        if (isHidden(o) || o.hp <= 0 || gapBetween(b, o) > BLAST_RADIUS) continue;
+        o.hp -= BOMB_DAMAGE;
+        o.flash = 0.15;
+        if (o.hp <= 0) queue.push({ b: o, depth: depth + 1 });
+      }
+    }
+    updateStats();
+    if (bricks.length === 0) {
+      stageClear();
+      return;
+    }
+    // 段が全部消えたとき、控えの段が残っていれば詰めて1段せり出させる。
+    // 下の段から詰めると上の段が1つずつ下がるので、その分ずらして詰める
+    [...rows]
+      .filter((r) => !bricks.some((o) => o.row === r))
+      .sort((a, b) => b - a)
+      .forEach((r, i) => {
+        if (reserveRows() > 0) collapseRow(r + i);
+      });
+  }
+
+  // 爆風の演出。連鎖した爆発は少し遅れて広がる
+  function explode(b, depth) {
+    const x = b.x + b.w / 2;
+    const y = b.y + b.h / 2;
+    explosions.push({ x, y, r: Math.max(b.w, b.h) / 2 + BLAST_RADIUS, t: -depth * 0.08 });
+    for (let i = 0; i < 18; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = 60 + Math.random() * 160;
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5, color: i % 3 ? '#ffb347' : '#fff1a8' });
+    }
   }
 
   function sparks(x, y) {
@@ -759,6 +815,10 @@
   function drawBrickBody(b) {
     const { x, y, w, h } = b;
     const color = b.kind.color;
+    if (b.kind.bomb) {
+      drawBombBrick(b);
+      return;
+    }
     if (b.tier === 1) {
       ctx.fillStyle = color;
       ctx.fillRect(x, y, w, h);
@@ -814,6 +874,82 @@
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  }
+
+  // 爆弾ブロック: 両端に警告の縞、中央に導火線の火花がちらつく爆弾
+  function drawBombBrick(b) {
+    const { x, y, w, h } = b;
+    const grad = ctx.createLinearGradient(0, y, 0, y + h);
+    grad.addColorStop(0, '#565d68');
+    grad.addColorStop(1, '#25292f');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w, h);
+    ctx.save();
+    ctx.beginPath();
+    const sw = Math.min(6, w * 0.18);
+    ctx.rect(x, y, sw, h);
+    ctx.rect(x + w - sw, y, sw, h);
+    ctx.clip();
+    ctx.fillStyle = '#f7d308';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#1b1d21';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let sx = x - h; sx < x + w; sx += 5) {
+      ctx.moveTo(sx, y + h);
+      ctx.lineTo(sx + h, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+    bevel(b, 2, 'rgba(255, 255, 255, 0.3)', 'rgba(0, 0, 0, 0.4)');
+    // 爆弾本体
+    const cx = x + w / 2;
+    const cy = y + h / 2 + 1;
+    const r = h * 0.3;
+    ctx.fillStyle = '#111317';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.35, cy - r * 0.35, r * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // 導火線と火花
+    ctx.strokeStyle = '#c9b48a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.6, cy - r * 0.7);
+    ctx.quadraticCurveTo(cx + r * 1.3, cy - r * 1.4, cx + r * 1.6, cy - r * 1.1);
+    ctx.stroke();
+    const flicker = 0.6 + 0.4 * Math.sin(performance.now() / 60 + b.x);
+    ctx.fillStyle = `rgba(255, 200, 80, ${flicker})`;
+    ctx.beginPath();
+    ctx.arc(cx + r * 1.6, cy - r * 1.1, 1.6 * flicker, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawExplosions() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const e of explosions) {
+      if (e.t < 0) continue;
+      const p = e.t / 0.4;
+      const r = e.r * (0.4 + 0.6 * Math.sqrt(p));
+      const g = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
+      g.addColorStop(0, `rgba(255, 245, 200, ${0.9 * (1 - p)})`);
+      g.addColorStop(0.5, `rgba(255, 150, 50, ${0.6 * (1 - p)})`);
+      g.addColorStop(1, 'rgba(255, 80, 20, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255, 220, 150, ${0.8 * (1 - p)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // 鋼鉄の枠の色 (ブロックの色に関係なく同じ)
@@ -985,6 +1121,8 @@
       ctx.textBaseline = 'alphabetic';
       ctx.fillText(`控え ${reserve}段`, W - BRICK_MARGIN, BRICK_TOP - 12);
     }
+
+    drawExplosions();
 
     particles.forEach((p) => {
       ctx.globalAlpha = Math.max(0, p.life / 0.5);
