@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>水分量・カフェイン計算ツール</title>
+  <meta name="description" content="体重と活動量から1日に必要な水分量を計算。コーヒーやお茶の杯数から、今日のカフェイン摂取量が上限の範囲内かもチェックできます。" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5093421396736590"
+     crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <p class="back"><a href="../">‹ ツール一覧</a></p>
+    <h1>水分量・カフェイン計算</h1>
+    <p class="subtitle">必要な水分量と、カフェインのとりすぎをチェック。<br />入力するとすぐに計算されます。</p>
+
+    <nav class="tabs" role="tablist" aria-label="計算の種類">
+      <button type="button" role="tab" id="tab-water" aria-controls="panel-water" aria-selected="true">水分量</button>
+      <button type="button" role="tab" id="tab-caffeine" aria-controls="panel-caffeine" aria-selected="false">カフェイン</button>
+    </nav>
+
+    <!-- 水分量 -->
+    <section id="panel-water" role="tabpanel" aria-labelledby="tab-water">
+      <form id="water-form" class="card" novalidate>
+        <label for="weight">体重 (kg)</label>
+        <input type="number" id="weight" inputmode="decimal" min="10" max="300" step="0.1" placeholder="例: 60" />
+
+        <fieldset>
+          <legend>1日の運動・活動量</legend>
+          <div class="choices" id="activity">
+            <label><input type="radio" name="activity" value="0" checked /><span>ほぼなし<small>デスクワーク中心</small></span></label>
+            <label><input type="radio" name="activity" value="30" /><span>30分<small>通勤・散歩など</small></span></label>
+            <label><input type="radio" name="activity" value="60" /><span>60分<small>ジョギング・立ち仕事</small></span></label>
+            <label><input type="radio" name="activity" value="90" /><span>90分以上<small>スポーツ・肉体労働</small></span></label>
+          </div>
+        </fieldset>
+
+        <label class="check"><input type="checkbox" id="hot" /> 暑い日・汗をたくさんかく日</label>
+
+        <p id="water-error" class="error" role="alert"></p>
+      </form>
+
+      <section id="water-result" class="card result" aria-live="polite">
+        <p class="result-label">飲み物でとりたい量</p>
+        <p class="result-value"><span id="drink-value">--</span><small> L / 日</small></p>
+        <p id="cups" class="result-sub">体重を入力してください</p>
+
+        <div class="cups-row" id="cups-row" aria-hidden="true"></div>
+
+        <dl class="details">
+          <div><dt>1日に必要な水分量 (総量)</dt><dd id="total-value">--</dd></div>
+          <div><dt>うち食事からとれる量</dt><dd id="food-value">--</dd></div>
+          <div><dt>うち体内で作られる量</dt><dd id="metabolic-value">--</dd></div>
+        </dl>
+
+        <div class="advice">
+          <p class="advice-title">飲み方のコツ</p>
+          <p>のどが渇く前に、コップ1杯 (約200ml) ずつこまめに飲みましょう。起床時・入浴前後・就寝前は特に意識すると取りやすくなります。</p>
+        </div>
+      </section>
+    </section>
+
+    <!-- カフェイン -->
+    <section id="panel-caffeine" role="tabpanel" aria-labelledby="tab-caffeine" hidden>
+      <section id="caffeine-result" class="card result" aria-live="polite">
+        <p class="result-label">今日のカフェイン摂取量</p>
+        <p class="result-value"><span id="caffeine-value">0</span><small> mg</small></p>
+        <p id="caffeine-status" class="status">--</p>
+
+        <div class="meter" aria-hidden="true">
+          <div id="meter-fill" class="meter-fill"></div>
+        </div>
+        <p id="meter-label" class="meter-label">--</p>
+
+        <div id="caffeine-advice" class="advice">
+          <p class="advice-title">アドバイス</p>
+          <p id="caffeine-advice-text"></p>
+        </div>
+      </section>
+      <section class="card">
+        <label for="person">あてはまるもの</label>
+        <select id="person">
+          <option value="adult">健康な成人</option>
+          <option value="pregnant">妊娠中・授乳中の方</option>
+          <option value="child">子ども・10代 (体重から計算)</option>
+        </select>
+        <p id="child-note" class="field-note" hidden>上限は体重 1kg あたり 2.5mg で計算します。「水分量」タブの体重を使います。</p>
+
+        <div class="drinks-header">
+          <h2>今日飲んだもの</h2>
+          <button id="reset-drinks" type="button" class="link-button">リセット</button>
+        </div>
+        <ul id="drinks" class="drinks"></ul>
+
+        <div class="custom">
+          <label for="custom-mg">その他のカフェイン (mg)</label>
+          <input type="number" id="custom-mg" inputmode="numeric" min="0" max="2000" step="1" placeholder="例: サプリや錠剤の表示量" />
+        </div>
+      </section>
+
+    </section>
+  </main>
+
+  <footer class="guide">
+    <div class="container">
+      <section class="card">
+        <h2>使い方</h2>
+        <ol class="guide-list">
+          <li>「水分量」タブで体重と運動量を選ぶと、1日に飲み物でとりたい量が表示されます。</li>
+          <li>「カフェイン」タブで、今日飲んだコーヒーやお茶の杯数を ＋ ボタンで入力します。</li>
+          <li>上限の目安に対して、今どのくらい摂っているかがメーターで表示されます。</li>
+          <li>入力内容はこのブラウザ内にのみ保存されます。カフェインの記録は日付が変わるとリセットされます。</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>水分量の計算方法</h2>
+        <p>成人が1日に必要な水分量は、体重 1kg あたり約 35ml が目安とされています。運動や暑さで汗をかく日は、その分を飲み物で補う必要があります。</p>
+        <p class="formula">必要な水分量 = 体重 (kg) × 35ml<br />＋ 運動 30分ごとに 350ml ＋ 暑い日 500ml</p>
+        <p>厚生労働省によると、1日に必要な水分約 2.5L のうち、約 1.2L を飲み水から、約 1.0L を食事から、約 0.3L を体内で作られる水からとっています。このツールでは同じ割合で、食事と体内でまかなえる分を差し引いて「飲み物でとりたい量」を出しています。運動や暑さで増える分は、すべて飲み物でとる計算です。</p>
+        <p class="guide-note">※ 腎臓・心臓の病気などで水分制限がある方は、医師の指示に従ってください。一度に大量の水を飲むのは避けましょう。</p>
+      </section>
+
+      <section class="card">
+        <h2>カフェインの上限の目安</h2>
+        <p>日本には公的な上限値はありませんが、欧州食品安全機関 (EFSA) やカナダ保健省などが次の目安を示しています。</p>
+        <table>
+          <thead><tr><th>対象</th><th>1日の上限の目安</th></tr></thead>
+          <tbody>
+            <tr><td>健康な成人</td><td>400mg</td></tr>
+            <tr><td>妊娠中・授乳中の方</td><td>200mg</td></tr>
+            <tr><td>子ども・10代</td><td>体重 1kg あたり 2.5mg</td></tr>
+          </tbody>
+        </table>
+        <p class="table-gap">成人でも、1回にとる量は 200mg (体重 1kg あたり 3mg) までが目安です。</p>
+
+        <h3>飲み物ごとのカフェイン量 (1杯あたり)</h3>
+        <table>
+          <thead><tr><th>飲み物</th><th>量</th><th>カフェイン</th></tr></thead>
+          <tbody id="drink-table"></tbody>
+        </table>
+        <p class="guide-note">※ 文部科学省「日本食品標準成分表」、食品安全委員会のファクトシートなどをもとにした目安です。商品や淹れ方によって大きく変わります。市販品はパッケージの表示を確認してください。</p>
+      </section>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
