@@ -492,7 +492,8 @@
         ball.vx *= ratio;
         ball.vy *= ratio;
         if (bricks.length === 0) stageClear();
-        else if (!bricks.some((o) => o.row === b.row)) collapseRow(b.row);
+        // 段が全部消えたとき、控えの段が残っていれば詰めて1段せり出させる
+        else if (!bricks.some((o) => o.row === b.row) && reserveRows() > 0) collapseRow(b.row);
       }
       return true;
     }
