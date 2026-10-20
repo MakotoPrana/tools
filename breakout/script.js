@@ -148,6 +148,9 @@
   let breachFlash = 0; // 防衛ラインを越えられたときに線を光らせる残り時間
   let smashWindow = 0; // パドルの枠が光っている残り時間
   let smashCooldown = 0;
+  // スマッシュはパドルで打ってから最初にブロックに当たるまで溜めておき (smashCharged)、
+  // 当たった時点から SMASH_TIME の間続く (smashTime)
+  let smashCharged = false;
   let smashTime = 0; // スマッシュ状態の残り時間
   let smashText = 0; // 「SMASH!」の表示の残り時間
   let trail = []; // ボールの通った位置 (彗星の尾に使う)
@@ -341,6 +344,7 @@
   function serve() {
     smashWindow = 0;
     smashTime = 0;
+    smashCharged = false;
     trail = [];
     combo = 0;
     state = 'serve';
@@ -592,46 +596,59 @@
       combo = 0;
       if (smashWindow > 0) {
         smashWindow = 0;
-        smashTime = SMASH_TIME;
+        smashCharged = true;
+        smashTime = 0;
         smashText = 0.7;
         sparks(ball.x, paddle.y);
+      } else {
+        smashCharged = false; // ブロックに当てずに戻ってきた溜めは消える
       }
     }
 
     if (ball.y - BALL_R > H) loseLife();
   }
 
-  // ボールと重なったブロックを1つ削る。当たったら true
   function touchesBall(b) {
     const nx = Math.max(b.x, Math.min(ball.x, b.x + b.w));
     const ny = Math.max(b.y, Math.min(ball.y, b.y + b.h));
     return (ball.x - nx) ** 2 + (ball.y - ny) ** 2 <= BALL_R * BALL_R;
   }
 
+  // ボールと重なったブロックを削る。跳ね返るときは true。
+  // スマッシュ中に壊したブロックは跳ね返らずに貫通し、その先のブロックにも当たる
   function hitBrick() {
     for (let i = 0; i < bricks.length; i++) {
       const b = bricks[i];
       // 控えの段はまだ画面に出ていないので当たらない
       if (isHidden(b) || !touchesBall(b)) continue;
 
-      b.hp -= BALL_ATTACK * (smashTime > 0 ? SMASH_POWER : 1);
-      b.flash = 0.15;
-      if (b.hp <= 0) {
-        bricks.splice(i, 1);
-        combo += 1;
-        // コンボは5つ目まで得点が増える (最大3倍)
-        score += b.points + Math.round(b.points * Math.min(combo - 1, 4) * 0.5);
-        updateStats();
-        burst(b);
-        ball.speed = Math.min(BALL_MAX_SPEED, ball.speed + BALL_SPEED_UP);
-        const ratio = ball.speed / Math.hypot(ball.vx, ball.vy);
-        ball.vx *= ratio;
-        ball.vy *= ratio;
-        if (bricks.length === 0) stageClear();
-        // 段が全部消えたとき、控えの段が残っていれば詰めて1段せり出させる
-        else if (!bricks.some((o) => o.row === b.row) && reserveRows() > 0) collapseRow(b.row);
+      if (smashCharged) {
+        smashCharged = false;
+        smashTime = SMASH_TIME;
       }
-      return true;
+      const smashing = smashTime > 0;
+      b.hp -= BALL_ATTACK * (smashing ? SMASH_POWER : 1);
+      b.flash = 0.15;
+      if (b.hp > 0) return true;
+
+      bricks.splice(i, 1);
+      i -= 1;
+      combo += 1;
+      // コンボは5つ目まで得点が増える (最大3倍)
+      score += b.points + Math.round(b.points * Math.min(combo - 1, 4) * 0.5);
+      updateStats();
+      burst(b);
+      ball.speed = Math.min(BALL_MAX_SPEED, ball.speed + BALL_SPEED_UP);
+      const ratio = ball.speed / Math.hypot(ball.vx, ball.vy);
+      ball.vx *= ratio;
+      ball.vy *= ratio;
+      if (bricks.length === 0) {
+        stageClear();
+        return false;
+      }
+      // 段が全部消えたとき、控えの段が残っていれば詰めて1段せり出させる
+      if (!bricks.some((o) => o.row === b.row) && reserveRows() > 0) collapseRow(b.row);
+      if (!smashing) return true;
     }
     return false;
   }
@@ -918,8 +935,8 @@
 
   // スマッシュ中は彗星のように尾を引いて光る
   function drawBall() {
-    if (smashTime > 0 && trail.length > 1) {
-      const fade = Math.min(1, smashTime / 0.3); // 終わりぎわは尾を薄くする
+    if ((smashCharged || smashTime > 0) && trail.length > 1) {
+      const fade = smashCharged ? 1 : Math.min(1, smashTime / 0.3); // 終わりぎわは尾を薄くする
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       trail.forEach((p, i) => {
