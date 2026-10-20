@@ -30,7 +30,7 @@
   const BEST_KEY = 'breakout-best';
 
   // 硬さの段階ごとのHPと得点の倍率 (1 がふつうのブロック)
-  const TIER_SCALE = { 1: 1, 2: 2, 3: 4 };
+  const TIER_SCALE = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 12 };
 
   // ブロックの種類: 色・得点・HP (第1段階の値)
   const BRICKS = {
@@ -45,7 +45,7 @@
 
   // ステージごとのボールの初速、ブロックが迫ってくる速さ (px/秒) と配置
   // ('.' は空き、小文字は半分の幅のブロック2つ)。
-  // tiers / reserveTiers は map / reserve と同じ位置に硬さの段階 ('2' か '3') を書く。書かないマスは第1段階
+  // tiers / reserveTiers は map / reserve と同じ位置に硬さの段階 ('2'〜'5') を書く。書かないマスは第1段階
   // reserve は画面の上に隠れている控えの段。表示中の段が全部消えると上の段が1段ずつ詰まり、
   // 控えの段が下のものから順にせり出してくる
   const STAGES = [
@@ -104,6 +104,7 @@
         '',
         '',
         '.2....2.',
+        '4..55..4',
       ],
     },
   ];
@@ -471,7 +472,7 @@
     // 控えの段は盤面の上の余白に薄く描く
     layoutBricks(stage).forEach((b) => {
       g.globalAlpha = b.y + b.h <= BRICK_TOP ? 0.35 : 1;
-      g.fillStyle = shade(b.kind.color, [1, 1, 0.75, 0.55][b.tier]);
+      g.fillStyle = shade(b.kind.color, [1, 1, 0.75, 0.55, 0.42, 0.3][b.tier]);
       g.fillRect(ox + b.x * k, oy + b.y * k, Math.max(1, b.w * k), Math.max(1, b.h * k));
     });
     g.globalAlpha = 1;
@@ -696,7 +697,8 @@
     ctx.fill();
   }
 
-  // 第1段階: 素の板 / 第2段階: 補強板をリベットで留めた板 / 第3段階: 縞の入った厚い装甲板
+  // 第1段階: 素の板 / 第2段階: 補強板をリベットで留めた板 / 第3段階: 縞の入った厚い装甲板 /
+  // 第4段階: 鋼鉄の枠にはめた溝付きの板 / 第5段階: 格子の刻みが入った黒い装甲と光るコア
   function drawBrickBody(b) {
     const { x, y, w, h } = b;
     const color = b.kind.color;
@@ -714,6 +716,14 @@
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 3.5, y + 3.5, w - 7, h - 7);
       for (const [rx, ry] of [[x + 5, y + 5], [x + w - 5, y + 5], [x + 5, y + h - 5], [x + w - 5, y + h - 5]]) rivet(rx, ry);
+      return;
+    }
+    if (b.tier === 4) {
+      drawSteelBrick(b);
+      return;
+    }
+    if (b.tier === 5) {
+      drawFortressBrick(b);
       return;
     }
     const grad = ctx.createLinearGradient(0, y, 0, y + h);
@@ -747,6 +757,79 @@
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  }
+
+  // 鋼鉄の枠の色 (ブロックの色に関係なく同じ)
+  function steelFrame(b, size) {
+    const { x, y, w, h } = b;
+    const grad = ctx.createLinearGradient(0, y, 0, y + h);
+    grad.addColorStop(0, '#d9dee4');
+    grad.addColorStop(0.5, '#8a939d');
+    grad.addColorStop(1, '#4a525b');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.strokeRect(x + size - 0.5, y + size - 0.5, w - size * 2 + 1, h - size * 2 + 1);
+  }
+
+  function drawSteelBrick(b) {
+    const { x, y, w, h } = b;
+    const f = 3; // 枠の太さ
+    steelFrame(b, f);
+    const grad = ctx.createLinearGradient(0, y + f, 0, y + h - f);
+    grad.addColorStop(0, shade(b.kind.color, 0.9));
+    grad.addColorStop(1, shade(b.kind.color, 0.45));
+    ctx.fillStyle = grad;
+    ctx.fillRect(x + f, y + f, w - f * 2, h - f * 2);
+    // 横の溝
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillRect(x + f + 1, y + h / 2 - 1, w - f * 2 - 2, 1);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.fillRect(x + f + 1, y + h / 2, w - f * 2 - 2, 1);
+    for (const [rx, ry] of [[x + 1.8, y + 1.8], [x + w - 1.8, y + 1.8], [x + 1.8, y + h - 1.8], [x + w - 1.8, y + h - 1.8]]) rivet(rx, ry);
+  }
+
+  function drawFortressBrick(b) {
+    const { x, y, w, h } = b;
+    const f = 3;
+    steelFrame(b, f);
+    // 黒い装甲板と格子の刻み
+    ctx.fillStyle = shade(b.kind.color, 0.3);
+    ctx.fillRect(x + f, y + f, w - f * 2, h - f * 2);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x + f, y + f, w - f * 2, h - f * 2);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let sx = x - h; sx < x + w; sx += 4) {
+      ctx.moveTo(sx, y + h);
+      ctx.lineTo(sx + h, y);
+      ctx.moveTo(sx, y);
+      ctx.lineTo(sx + h, y + h);
+    }
+    ctx.stroke();
+    ctx.restore();
+    // ブロックの色で光るコア
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    ctx.save();
+    ctx.shadowColor = b.kind.color;
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = shade(b.kind.color, 1.25);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 3.5);
+    ctx.lineTo(cx + 3.5, cy);
+    ctx.lineTo(cx, cy + 3.5);
+    ctx.lineTo(cx - 3.5, cy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillRect(cx - 0.5, cy - 1.5, 1, 1);
   }
 
   function drawBrick(b) {
