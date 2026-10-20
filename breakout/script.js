@@ -12,11 +12,9 @@
   const MAX_BOUNCE_ANGLE = Math.PI / 3; // パドルの端で打ち返したときの角度
   const PADDLE_W = 64;
   const PADDLE_H = 10;
-  // マップの下端からパドルまでの距離。スマホではパドルの下に指を置く余白を取る
+  // 盤面の下端からパドルまでの距離。スマホではパドルの下に指を置く余白を取る
   const PADDLE_BOTTOM_MOUSE = 40;
   const PADDLE_BOTTOM_TOUCH = 100;
-  const CAMERA_LEAD = 0.6; // 縦に長いマップで、ボールを画面の上から何割の位置に映すか
-  const CAMERA_MARGIN = 40; // ボールと画面の上下の端との最小距離
   const PADDLE_KEY_SPEED = 420;
   const TOUCH_SENSITIVITY = 1.3; // 指の移動量に対するパドルの移動量
   const BRICK_TOP = 56;
@@ -37,11 +35,10 @@
     B: { color: '#4a6fd8', points: 20, hp: 1 },
   };
 
-  // ステージごとのボールの初速、マップの縦の長さ (画面の何倍か) とブロックの配置 ('.' は空き)
+  // ステージごとのボールの初速とブロックの配置 ('.' は空き)
   const STAGES = [
     {
       speed: BALL_SPEED,
-      depth: 1,
       map: [
         'SSSSSSSS',
         'RRRRRRRR',
@@ -54,7 +51,6 @@
     },
     {
       speed: BALL_SPEED + 30,
-      depth: 1,
       map: [
         '..SSSS..',
         '.SRRRRS.',
@@ -64,42 +60,6 @@
         'YG.CC.GY',
         'GC.BB.CG',
         '.C....C.',
-      ],
-    },
-    {
-      // 縦に2倍の長さがあり、画面がボールを追ってスクロールする
-      speed: BALL_SPEED + 40,
-      depth: 2,
-      map: [
-        'SSSSSSSS',
-        'RRRRRRRR',
-        'RRRRRRRR',
-        '........',
-        'OOO..OOO',
-        'OOO..OOO',
-        '........',
-        '........',
-        '.YYYYYY.',
-        '.Y....Y.',
-        '.Y.SS.Y.',
-        '.Y....Y.',
-        '.YYYYYY.',
-        '........',
-        '........',
-        'GG.GG.GG',
-        'GG.GG.GG',
-        '........',
-        '........',
-        '.CC..CC.',
-        '.CC..CC.',
-        '........',
-        '........',
-        '........',
-        'S.B..B.S',
-        '.B.BB.B.',
-        'B.B..B.B',
-        '........',
-        '...SS...',
       ],
     },
   ];
@@ -139,8 +99,6 @@
   const paddle = { x: (W - PADDLE_W) / 2, y: H - PADDLE_BOTTOM_MOUSE, w: PADDLE_W };
   const ball = { x: W / 2, y: H - PADDLE_BOTTOM_MOUSE - BALL_R, vx: 0, vy: 0, speed: BALL_SPEED };
   const keys = { left: false, right: false };
-  let worldH = H; // マップの縦の長さ
-  let camY = 0; // 画面の上端がマップのどこにあるか
   let scale = 1;
   let dpr = 1;
 
@@ -199,8 +157,6 @@
 
   function startStage() {
     buildStage(stageIndex);
-    worldH = H * STAGES[stageIndex].depth;
-    camY = 0; // 縦に長いマップでは、最初にマップの上から下へ流して全体を見せる
     placePaddle();
     particles = [];
     ball.speed = STAGES[stageIndex].speed;
@@ -216,9 +172,8 @@
     placeBallOnPaddle();
   }
 
-  // パドルはスクロールしても画面の同じ高さにいる (当たり判定も見えている位置で行う)
   function placePaddle() {
-    paddle.y = Math.min(worldH, camY + H) - (coarseMQ.matches ? PADDLE_BOTTOM_TOUCH : PADDLE_BOTTOM_MOUSE);
+    paddle.y = H - (coarseMQ.matches ? PADDLE_BOTTOM_TOUCH : PADDLE_BOTTOM_MOUSE);
   }
 
   function placeBallOnPaddle() {
@@ -302,8 +257,6 @@
     if (state === 'paused') finishScore();
     state = 'ready';
     bricks = []; // タイルが読みやすいよう、背景には何も描かない
-    worldH = H;
-    camY = 0;
     particles = [];
     overlayTitle.textContent = 'ステージ選択';
     overlayText.textContent = coarseMQ.matches
@@ -327,9 +280,7 @@
       tile.type = 'button';
       tile.className = 'stage-tile';
       const count = stage.map.join('').replace(/\./g, '').length;
-      const notes = [`ブロック ${count}個`];
-      if (stage.depth > 1) notes.push(`縦${stage.depth}倍`);
-      tile.setAttribute('aria-label', `ステージ${i + 1}を始める (${notes.join('、')})`);
+      tile.setAttribute('aria-label', `ステージ${i + 1}を始める (ブロック ${count}個)`);
 
       const thumb = document.createElement('canvas');
       thumb.className = 'stage-thumb';
@@ -342,7 +293,7 @@
       name.textContent = `STAGE ${i + 1}`;
       const meta = document.createElement('span');
       meta.className = 'stage-tile-meta';
-      meta.textContent = notes.join(' · ');
+      meta.textContent = `ブロック ${count}個`;
 
       tile.append(thumb, name, meta);
       tile.addEventListener('click', () => {
@@ -355,13 +306,11 @@
 
   function drawStageThumb(thumb, stage) {
     const g = thumb.getContext('2d');
-    const mapH = H * stage.depth;
-    // マップ全体が収まるように縮小する (縦に長いマップは細長く見える)
-    const k = Math.min(thumb.width / W, thumb.height / mapH);
+    const k = Math.min(thumb.width / W, thumb.height / H);
     const ox = (thumb.width - W * k) / 2;
-    const oy = (thumb.height - mapH * k) / 2;
+    const oy = (thumb.height - H * k) / 2;
     g.fillStyle = '#1a222d';
-    g.fillRect(ox, oy, W * k, mapH * k);
+    g.fillRect(ox, oy, W * k, H * k);
     const cols = stage.map[0].length;
     const bw = (W - BRICK_MARGIN * 2 - BRICK_GAP * (cols - 1)) / cols;
     stage.map.forEach((row, r) => {
@@ -378,7 +327,7 @@
       });
     });
     g.fillStyle = '#5a9cf0';
-    g.fillRect(ox + ((W - PADDLE_W) / 2) * k, oy + (mapH - PADDLE_BOTTOM_MOUSE) * k, PADDLE_W * k, Math.max(1, PADDLE_H * k));
+    g.fillRect(ox + ((W - PADDLE_W) / 2) * k, oy + (H - PADDLE_BOTTOM_MOUSE) * k, PADDLE_W * k, Math.max(1, PADDLE_H * k));
   }
 
   function onStartButton() {
@@ -402,36 +351,13 @@
     if (dir) movePaddleTo(paddle.x + paddle.w / 2 + dir * PADDLE_KEY_SPEED * dt);
 
     if (state === 'serve') {
-      updateCamera(dt);
-      placePaddle();
       placeBallOnPaddle();
     } else {
       // すり抜けを防ぐため、半径より小さい距離ずつ進める
       const dist = Math.hypot(ball.vx, ball.vy) * dt;
       const steps = Math.max(1, Math.ceil(dist / (BALL_R * 0.8)));
       for (let i = 0; i < steps && state === 'playing'; i++) step(dt / steps);
-      updateCamera(dt);
-      placePaddle();
     }
-  }
-
-  // 縦に長いマップでは画面をボールに合わせてスクロールする
-  function updateCamera(dt) {
-    const maxCam = worldH - H;
-    if (maxCam <= 0) {
-      camY = 0;
-      return;
-    }
-    const clampCam = (y) => Math.min(maxCam, Math.max(0, y));
-    if (state === 'serve') {
-      // 発射前はパドルのある下端へゆっくり流す
-      camY = clampCam(camY + (maxCam - camY) * Math.min(1, dt * 3));
-      return;
-    }
-    const target = clampCam(ball.y - H * CAMERA_LEAD);
-    camY += (target - camY) * Math.min(1, dt * 6);
-    // 追従が遅れてもボールが画面から出ないようにする
-    camY = clampCam(Math.min(ball.y - CAMERA_MARGIN, Math.max(ball.y + CAMERA_MARGIN - H, camY)));
   }
 
   function updateParticles(dt) {
@@ -470,7 +396,6 @@
 
     if (
       ball.vy > 0 &&
-      ball.y <= paddle.y + PADDLE_H / 2 && // スクロールで下りてきたパドルが、下にあるボールを拾わないように
       ball.y + BALL_R >= paddle.y &&
       ball.y - BALL_R <= paddle.y + PADDLE_H &&
       ball.x >= paddle.x - BALL_R &&
@@ -484,7 +409,7 @@
       combo = 0;
     }
 
-    if (ball.y - BALL_R > worldH) loseLife();
+    if (ball.y - BALL_R > H) loseLife();
   }
 
   // ボールと重なったブロックを1つ削る。当たったら true
@@ -570,11 +495,8 @@
   }
 
   function draw() {
-    const k = dpr * scale;
-    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    // ここからマップ上の座標で描く
-    ctx.setTransform(k, 0, 0, k, 0, -camY * k);
 
     bricks.forEach(drawBrick);
 
@@ -587,23 +509,8 @@
 
     if (state === 'ready') return;
 
-    ctx.fillStyle = '#5a9cf0';
-    ctx.beginPath();
-    ctx.roundRect(paddle.x, paddle.y, paddle.w, PADDLE_H, PADDLE_H / 2);
-    ctx.fill();
-
-    if (state !== 'over') {
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // ここから画面上の座標で描く
-    ctx.setTransform(k, 0, 0, k, 0, 0);
-
     if (coarseMQ.matches) {
-      // 指を置くための帯。マップがスクロールしても画面の下端に固定する
+      // パドルの下の、指を置くための帯
       const top = H - PADDLE_BOTTOM_TOUCH + PADDLE_H + 24;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
       ctx.fillRect(0, top, W, H - top);
@@ -615,13 +522,16 @@
       ctx.textBaseline = 'alphabetic';
     }
 
-    if (worldH > H) {
-      // 右端に、マップ全体のどこを映しているかを示すバー
-      const trackH = H - 16;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.fillRect(W - 5, 8, 3, trackH);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-      ctx.fillRect(W - 5, 8 + (camY / worldH) * trackH, 3, (H / worldH) * trackH);
+    ctx.fillStyle = '#5a9cf0';
+    ctx.beginPath();
+    ctx.roundRect(paddle.x, paddle.y, paddle.w, PADDLE_H, PADDLE_H / 2);
+    ctx.fill();
+
+    if (state !== 'over') {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     if (state === 'serve') {
