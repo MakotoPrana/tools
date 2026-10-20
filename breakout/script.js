@@ -216,8 +216,9 @@
     placeBallOnPaddle();
   }
 
+  // パドルはスクロールしても画面の同じ高さにいる (当たり判定も見えている位置で行う)
   function placePaddle() {
-    paddle.y = worldH - (coarseMQ.matches ? PADDLE_BOTTOM_TOUCH : PADDLE_BOTTOM_MOUSE);
+    paddle.y = Math.min(worldH, camY + H) - (coarseMQ.matches ? PADDLE_BOTTOM_TOUCH : PADDLE_BOTTOM_MOUSE);
   }
 
   function placeBallOnPaddle() {
@@ -401,14 +402,17 @@
     if (dir) movePaddleTo(paddle.x + paddle.w / 2 + dir * PADDLE_KEY_SPEED * dt);
 
     if (state === 'serve') {
+      updateCamera(dt);
+      placePaddle();
       placeBallOnPaddle();
     } else {
       // すり抜けを防ぐため、半径より小さい距離ずつ進める
       const dist = Math.hypot(ball.vx, ball.vy) * dt;
       const steps = Math.max(1, Math.ceil(dist / (BALL_R * 0.8)));
       for (let i = 0; i < steps && state === 'playing'; i++) step(dt / steps);
+      updateCamera(dt);
+      placePaddle();
     }
-    updateCamera(dt);
   }
 
   // 縦に長いマップでは画面をボールに合わせてスクロールする
@@ -466,6 +470,7 @@
 
     if (
       ball.vy > 0 &&
+      ball.y <= paddle.y + PADDLE_H / 2 && // スクロールで下りてきたパドルが、下にあるボールを拾わないように
       ball.y + BALL_R >= paddle.y &&
       ball.y - BALL_R <= paddle.y + PADDLE_H &&
       ball.x >= paddle.x - BALL_R &&
@@ -617,18 +622,6 @@
       ctx.fillRect(W - 5, 8, 3, trackH);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
       ctx.fillRect(W - 5, 8 + (camY / worldH) * trackH, 3, (H / worldH) * trackH);
-
-      if (paddle.y > camY + H) {
-        // パドルが画面の下にあるときは、下端にパドルの位置を示す印を出す
-        const cx = paddle.x + paddle.w / 2;
-        ctx.fillStyle = 'rgba(90, 156, 240, 0.85)';
-        ctx.beginPath();
-        ctx.moveTo(cx - 9, H - 12);
-        ctx.lineTo(cx + 9, H - 12);
-        ctx.lineTo(cx, H - 3);
-        ctx.closePath();
-        ctx.fill();
-      }
     }
 
     if (state === 'serve') {
