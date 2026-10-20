@@ -27,13 +27,17 @@
       <div class="overlay" id="overlay">
         <p class="overlay-title" id="overlay-title">ブロック崩し</p>
         <p class="overlay-text" id="overlay-text"></p>
-        <button type="button" id="start-btn" class="start-btn">スタート</button>
+        <div class="stage-grid" id="stage-grid" hidden></div>
+        <div class="overlay-actions">
+          <button type="button" id="start-btn" class="start-btn">スタート</button>
+          <button type="button" id="menu-btn" class="menu-btn" hidden>ステージ選択へ</button>
+        </div>
       </div>
     </div>
 
     <section class="help">
       <h2>遊び方</h2>
-      <p>パドルでボールを打ち返して、画面上のブロックをすべて壊すとステージクリアです。ステージは全部で3つあり、ライフとスコアは次のステージに引き継がれます。ボールを下に落とすとライフが1つ減り、ライフがなくなるとゲームオーバーです。</p>
+      <p>パドルでボールを打ち返して、画面上のブロックをすべて壊すとステージクリアです。ステージは全部で3つあり、最初の画面でどのステージから始めるかを選べます。ライフとスコアは次のステージに引き継がれます。ボールを下に落とすとライフが1つ減り、ライフがなくなるとゲームオーバーです。</p>
       <p>パドルの端で打ち返すほど、ボールは斜めに飛びます。ブロックを壊すたびにボールが少しずつ速くなります。銀色のブロックは2回当てると壊れます。ステージが進むとボールの初速が少しずつ速くなります。ステージ3はマップの縦の長さが2倍あり、画面がボールを追ってスクロールします。パドルが画面の外にあるときは、画面の下端に青い印でパドルの位置が出ます。</p>
 
       <h3>スマホの操作</h3>

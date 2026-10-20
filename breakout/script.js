@@ -115,6 +115,8 @@
   const overlayTitle = $('overlay-title');
   const overlayText = $('overlay-text');
   const startBtn = $('start-btn');
+  const menuBtn = $('menu-btn');
+  const stageGrid = $('stage-grid');
   const pauseBtn = $('pause-btn');
   const stageEl = $('stage-no');
   const scoreEl = $('score');
@@ -127,6 +129,7 @@
   let state = 'ready';
   let pausedFrom = 'playing';
   let stageIndex = 0;
+  let firstStage = 0; // 選択画面で選んだ、最初に遊ぶステージ
   let score = 0;
   let lives = START_LIVES;
   let best = loadBest();
@@ -186,8 +189,9 @@
   }
 
   // ---------- 進行 ----------
+  // 選んだステージから、スコアとライフを最初の状態にして始める
   function startGame() {
-    stageIndex = 0;
+    stageIndex = firstStage;
     score = 0;
     lives = START_LIVES;
     startStage();
@@ -255,7 +259,7 @@
   function gameOver() {
     state = 'over';
     finishScore();
-    showOverlay('GAME OVER', `スコア ${score}`, 'もう一度');
+    showOverlay('GAME OVER', `スコア ${score}`, 'もう一度', true);
   }
 
   function stageClear() {
@@ -268,6 +272,7 @@
       hasNext ? 'STAGE CLEAR!' : 'ALL CLEAR!',
       `ライフボーナス ${lives} × ${LIFE_BONUS} = ${bonus}\nスコア ${score}`,
       hasNext ? '次のステージへ' : 'もう一度',
+      true,
     );
   }
 
@@ -275,18 +280,104 @@
     if (state === 'playing' || state === 'serve') {
       pausedFrom = state;
       state = 'paused';
-      showOverlay('一時停止中', '', '再開');
+      showOverlay('一時停止中', '', '再開', true);
     } else if (state === 'paused') {
       state = pausedFrom;
       overlay.hidden = true;
     }
   }
 
-  function showOverlay(title, text, button) {
+  function showOverlay(title, text, button, withMenu = false) {
     overlayTitle.textContent = title;
     overlayText.textContent = text;
     startBtn.textContent = button;
+    startBtn.hidden = false;
+    menuBtn.hidden = !withMenu;
+    stageGrid.hidden = true;
     overlay.hidden = false;
+  }
+
+  function showStageSelect() {
+    if (state === 'paused') finishScore();
+    state = 'ready';
+    bricks = []; // タイルが読みやすいよう、背景には何も描かない
+    worldH = H;
+    camY = 0;
+    particles = [];
+    overlayTitle.textContent = 'ステージ選択';
+    overlayText.textContent = coarseMQ.matches
+      ? 'パドルの下の帯を左右になぞって操作、タップで発射'
+      : 'マウスか ← → で操作、クリックかスペースで発射';
+    startBtn.hidden = true;
+    menuBtn.hidden = true;
+    stageGrid.hidden = false;
+    overlay.hidden = false;
+  }
+
+  function selectStage(index) {
+    firstStage = index;
+    startGame();
+  }
+
+  // 選択画面のタイル。ブロックの配置を縮小して描く
+  function buildStageTiles() {
+    STAGES.forEach((stage, i) => {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'stage-tile';
+      const count = stage.map.join('').replace(/\./g, '').length;
+      const notes = [`ブロック ${count}個`];
+      if (stage.depth > 1) notes.push(`縦${stage.depth}倍`);
+      tile.setAttribute('aria-label', `ステージ${i + 1}を始める (${notes.join('、')})`);
+
+      const thumb = document.createElement('canvas');
+      thumb.className = 'stage-thumb';
+      thumb.width = 120;
+      thumb.height = 160;
+      drawStageThumb(thumb, stage);
+
+      const name = document.createElement('span');
+      name.className = 'stage-tile-name';
+      name.textContent = `STAGE ${i + 1}`;
+      const meta = document.createElement('span');
+      meta.className = 'stage-tile-meta';
+      meta.textContent = notes.join(' · ');
+
+      tile.append(thumb, name, meta);
+      tile.addEventListener('click', () => {
+        tile.blur();
+        selectStage(i);
+      });
+      stageGrid.append(tile);
+    });
+  }
+
+  function drawStageThumb(thumb, stage) {
+    const g = thumb.getContext('2d');
+    const mapH = H * stage.depth;
+    // マップ全体が収まるように縮小する (縦に長いマップは細長く見える)
+    const k = Math.min(thumb.width / W, thumb.height / mapH);
+    const ox = (thumb.width - W * k) / 2;
+    const oy = (thumb.height - mapH * k) / 2;
+    g.fillStyle = '#1a222d';
+    g.fillRect(ox, oy, W * k, mapH * k);
+    const cols = stage.map[0].length;
+    const bw = (W - BRICK_MARGIN * 2 - BRICK_GAP * (cols - 1)) / cols;
+    stage.map.forEach((row, r) => {
+      [...row].forEach((ch, c) => {
+        const kind = BRICKS[ch];
+        if (!kind) return;
+        g.fillStyle = kind.color;
+        g.fillRect(
+          ox + (BRICK_MARGIN + c * (bw + BRICK_GAP)) * k,
+          oy + (BRICK_TOP + r * (BRICK_H + BRICK_GAP)) * k,
+          Math.max(1, bw * k),
+          Math.max(1, BRICK_H * k),
+        );
+      });
+    });
+    g.fillStyle = '#5a9cf0';
+    g.fillRect(ox + ((W - PADDLE_W) / 2) * k, oy + (mapH - PADDLE_BOTTOM_MOUSE) * k, PADDLE_W * k, Math.max(1, PADDLE_H * k));
   }
 
   function onStartButton() {
@@ -610,6 +701,8 @@
         break;
       case 'Space':
       case 'Enter':
+        // ボタンにフォーカスがあるときは、そのボタンを押す動作に任せる
+        if (e.target instanceof HTMLButtonElement && !overlay.hidden) return;
         if (state === 'serve') launch();
         else if (!overlay.hidden) onStartButton();
         else if (e.code === 'Enter') return;
@@ -632,6 +725,11 @@
   startBtn.addEventListener('click', () => {
     startBtn.blur();
     onStartButton();
+  });
+
+  menuBtn.addEventListener('click', () => {
+    menuBtn.blur();
+    showStageSelect();
   });
 
   pauseBtn.addEventListener('click', () => {
@@ -660,11 +758,8 @@
     requestAnimationFrame(frame);
   }
 
-  overlayText.textContent = coarseMQ.matches
-    ? 'パドルの下の帯を左右になぞると\nパドルが動きます。タップで発射します'
-    : 'マウスか ← → でパドルを動かし\nクリックかスペースでボールを発射します';
-
-  buildStage(0);
+  buildStageTiles();
+  showStageSelect();
   updateStats();
   layout();
   window.addEventListener('resize', layout);
