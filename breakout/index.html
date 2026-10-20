@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ブロック崩し</title>
+  <meta name="description" content="ブラウザで遊べるブロック崩しゲーム。スマホは指でなぞって、パソコンはマウスやキーボードでパドルを動かします。" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top" id="top">
+      <a class="back" href="../">‹ ツール一覧</a>
+      <h1>ブロック崩し</h1>
+      <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" tabindex="-1">Ⅱ</button>
+    </header>
+
+    <dl class="stats" id="stats">
+      <div><dt>STAGE</dt><dd id="stage-no">1</dd></div>
+      <div><dt>SCORE</dt><dd id="score">0</dd></div>
+      <div><dt>LIFE</dt><dd id="lives">3</dd></div>
+      <div><dt>BEST</dt><dd id="best">0</dd></div>
+    </dl>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="ゲーム画面"></canvas>
+      <div class="overlay" id="overlay">
+        <p class="overlay-title" id="overlay-title">ブロック崩し</p>
+        <p class="overlay-text" id="overlay-text"></p>
+        <div class="stage-grid" id="stage-grid" hidden></div>
+        <div class="overlay-actions">
+          <button type="button" id="start-btn" class="start-btn">スタート</button>
+          <button type="button" id="menu-btn" class="menu-btn" hidden>ステージ選択へ</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="help">
+      <h2>遊び方</h2>
+      <p>ブロックは少しずつ手前に迫ってきます。パドルでボールを打ち返してブロックを壊し、赤い点線の「防衛ライン」まで来させないように守りましょう。ブロックが防衛ラインを越えるとライフが1減り、越えたブロックは消えます (同時に越えた段はまとめて1回と数えます)。ボールを下に落としたときもライフが1減り、ライフがなくなるとゲームオーバーです。ブロックをすべて壊すとステージクリアです。ステージは全部で3つあり、最初の画面でどのステージから始めるかを選べます。ライフとスコアは次のステージに引き継がれます。</p>
+      <p>パドルの端で打ち返すほど、ボールは斜めに飛びます。ブロックには種類ごとにHP (耐久力) があり、ボールが当たるたびにボールの攻撃力 (10) の分だけ減って、0になると壊れます。壊れなかったブロックには、残りのHPがゲージで表示されます。HPが半分を切るとヒビが入り、0に近づくほどヒビが広がります。ボールの速さはステージごとに一定で、ステージが進むほどブロックが迫ってくる速さとボールの速さが上がります。ステージ2には幅が半分の小さなブロックも混ざっています。ステージ3は画面の上に控えのブロックが3段隠れています。どこかの段を全部消すと、その段より上のブロックが1段ずつ下がって詰まり、控えの段が上からせり出してきます。控えの段がなくなった後は、段を消しても詰まりません。</p>
+
+      <h3>スマホの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>盤面を左右になぞる (パドルの下の帯がおすすめ)</th><td>パドルを移動 (指を動かした分だけ動きます)</td></tr>
+          <tr><th>画面をタップ</th><td>ボールを発射 / プレイ中はスマッシュの構え</td></tr>
+        </tbody>
+      </table>
+
+      <h3>パソコンの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>マウス移動 / ← →</th><td>パドルを移動</td></tr>
+          <tr><th>クリック / スペース</th><td>ボールを発射 / プレイ中はスマッシュの構え</td></tr>
+          <tr><th>P / Esc</th><td>一時停止</td></tr>
+        </tbody>
+      </table>
+
+      <h3>スマッシュ</h3>
+      <p>プレイ中にタップ (パソコンはクリックかスペース) すると、パドルの枠が一瞬光ります。光っている間にボールを打ち返すとスマッシュになり、ボールが彗星のように尾を引いて、攻撃力が2倍 (20) になります。スマッシュは最初にブロックに当たった時点から1秒間続きます。スマッシュ中にブロックを壊すと、ボールは跳ね返らずに貫通してそのまま進みます (壊しきれなかったときは跳ね返ります)。一度光らせると、0.5秒たつまで次は光りません。</p>
+
+      <h3>爆弾ブロック</h3>
+      <p>黄色と黒の縞に爆弾の絵が描かれたブロックは、壊すと爆発して、周りのブロック (縁から半分の幅のブロック1個分の範囲。上下左右と斜めの隣まで届きます) に 20 のダメージを与えます。爆風で壊れた爆弾ブロックも連鎖して爆発します。爆弾ブロック自体は HP 10、50点です。</p>
+
+      <h3>ブロックのHP</h3>
+      <table>
+        <tbody>
+          <tr><th>青・水色・緑</th><td>HP 10 (1回で壊れる)</td></tr>
+          <tr><th>黄色</th><td>HP 15 (2回)</td></tr>
+          <tr><th>オレンジ・赤</th><td>HP 20 (2回)</td></tr>
+          <tr><th>銀色</th><td>HP 30 (3回)</td></tr>
+        </tbody>
+      </table>
+      <p class="note">上の表はふつうのブロック (第1段階) の値です。リベットで留めた補強板のブロック (第2段階) はHPと得点が2倍、斜めの縞が入った厚い装甲のブロック (第3段階) は4倍、鋼鉄の枠にはめたブロック (第4段階) は7倍、光るコアを持つ黒い装甲のブロック (第5段階) は12倍です。幅が半分のブロックは、HPも同じ色・同じ段階のブロックの半分 (端数は切り上げ) です。</p>
+
+      <h3>得点</h3>
+      <p>ブロックの色ごとに 20〜70点、銀色のブロックは 100点です。幅が半分のブロックは、同じ色のブロックの半分の点数です。ボールがパドルに戻ってくるまでに続けて壊すとコンボになり、得点が最大3倍まで増えます。ステージをクリアすると、残りライフ1つにつき 500点のボーナスが入ります。</p>
+    </section>
+  </main>
+
+  <footer>&copy; tools.e-seventh.com</footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
