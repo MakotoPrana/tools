@@ -24,6 +24,7 @@
   const LIFE_BONUS = 500;
   const ROW_PITCH = BRICK_H + BRICK_GAP; // 1段の高さ
   const SHIFT_SPEED = 90; // 段が詰まるときにブロックが下りる速さ (px/秒)
+  const DEFENSE_GAP = 40; // パドルから防衛ラインまでの距離。ブロックがこの線を越えるとライフが減る
   const BEST_KEY = 'breakout-best';
 
   // ブロックの種類: 色・得点・耐久
@@ -37,12 +38,14 @@
     B: { color: '#4a6fd8', points: 20, hp: 1 },
   };
 
-  // ステージごとのボールの初速とブロックの配置 ('.' は空き、小文字は半分の幅のブロック2つ)。
+  // ステージごとのボールの初速、ブロックが迫ってくる速さ (px/秒) と配置
+  // ('.' は空き、小文字は半分の幅のブロック2つ)。
   // reserve は画面の上に隠れている控えの段。表示中の段が全部消えると上の段が1段ずつ詰まり、
   // 控えの段が下のものから順にせり出してくる
   const STAGES = [
     {
       speed: BALL_SPEED,
+      advance: 2,
       map: [
         'SSSSSSSS',
         'RRRRRRRR',
@@ -55,6 +58,7 @@
     },
     {
       speed: BALL_SPEED + 30,
+      advance: 2.5,
       map: [
         '..SSSS..',
         '.SRrrRS.',
@@ -68,6 +72,7 @@
     },
     {
       speed: BALL_SPEED + 40,
+      advance: 2.5,
       reserve: [
         'SSSSSSSS',
         'RrRrRrRr',
@@ -113,6 +118,8 @@
   let lives = START_LIVES;
   let best = loadBest();
   let combo = 0;
+  let advance = 0; // ブロック全体が手前に迫ってきた距離
+  let breachFlash = 0; // 防衛ラインを越えられたときに線を光らせる残り時間
   let bricks = [];
   let particles = [];
   const paddle = { x: (W - PADDLE_W) / 2, y: H - PADDLE_BOTTOM_MOUSE, w: PADDLE_W };
@@ -159,7 +166,7 @@
         if (!kind) return;
         const row = r - reserve.length; // 0 が表示される一番上の段。負の段は画面の上に隠れている
         const x = BRICK_MARGIN + c * (bw + BRICK_GAP);
-        const y = rowY(row);
+        const y = baseRowY(row);
         if (ch === ch.toUpperCase()) {
           list.push({ x, y, w: bw, h: BRICK_H, row, kind, points: kind.points });
         } else {
@@ -172,8 +179,21 @@
     return list;
   }
 
-  function rowY(row) {
+  function baseRowY(row) {
     return BRICK_TOP + row * ROW_PITCH;
+  }
+
+  function rowY(row) {
+    return baseRowY(row) + advance;
+  }
+
+  function lineY() {
+    return paddle.y - DEFENSE_GAP;
+  }
+
+  // 盤面の上端より上に隠れているブロック (控えの段)
+  function isHidden(b) {
+    return b.y + b.h <= BRICK_TOP;
   }
 
   function buildStage(index) {
@@ -195,14 +215,28 @@
     if (state !== 'playing') return;
     // 下りてきたブロックがボールに重なったら、ボールをブロックの下へ押し出す
     for (const b of bricks) {
-      if (b.row < 0 || !touchesBall(b)) continue;
+      if (isHidden(b) || !touchesBall(b)) continue;
       ball.y = b.y + b.h + BALL_R;
       ball.vy = Math.abs(ball.vy);
     }
   }
 
   function reserveRows() {
-    return new Set(bricks.filter((b) => b.row < 0).map((b) => b.row)).size;
+    return new Set(bricks.filter(isHidden).map((b) => b.row)).size;
+  }
+
+  // 防衛ラインを越えたブロックは消え、ライフが1減る (同時に越えた段はまとめて1回と数える)
+  function checkDefenseLine() {
+    const line = lineY();
+    const breached = bricks.filter((b) => b.y + b.h >= line);
+    if (!breached.length) return;
+    bricks = bricks.filter((b) => b.y + b.h < line);
+    breached.forEach((b) => burst(b));
+    breachFlash = 0.6;
+    lives -= 1;
+    updateStats();
+    if (lives <= 0) gameOver();
+    else if (bricks.length === 0) stageClear();
   }
 
   // ---------- 進行 ----------
@@ -219,6 +253,8 @@
     placePaddle();
     particles = [];
     ball.speed = STAGES[stageIndex].speed;
+    advance = 0;
+    breachFlash = 0;
     paddle.x = (W - paddle.w) / 2;
     serve();
     updateStats();
@@ -374,11 +410,13 @@
     g.fillRect(ox, oy, W * k, H * k);
     // 控えの段は盤面の上の余白に薄く描く
     layoutBricks(stage).forEach((b) => {
-      g.globalAlpha = b.row < 0 ? 0.35 : 1;
+      g.globalAlpha = b.y + b.h <= BRICK_TOP ? 0.35 : 1;
       g.fillStyle = b.kind.color;
       g.fillRect(ox + b.x * k, oy + b.y * k, Math.max(1, b.w * k), Math.max(1, b.h * k));
     });
     g.globalAlpha = 1;
+    g.fillStyle = 'rgba(239, 59, 59, 0.7)';
+    g.fillRect(ox, oy + (H - PADDLE_BOTTOM_MOUSE - DEFENSE_GAP) * k, W * k, 1);
     g.fillStyle = '#5a9cf0';
     g.fillRect(ox + ((W - PADDLE_W) / 2) * k, oy + (H - PADDLE_BOTTOM_MOUSE) * k, PADDLE_W * k, Math.max(1, PADDLE_H * k));
   }
@@ -403,7 +441,11 @@
     const dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
     if (dir) movePaddleTo(paddle.x + paddle.w / 2 + dir * PADDLE_KEY_SPEED * dt);
 
+    advance += STAGES[stageIndex].advance * dt;
+    breachFlash = Math.max(0, breachFlash - dt);
     moveBricks(dt);
+    checkDefenseLine();
+    if (state === 'over' || state === 'clear') return;
     if (state === 'serve') {
       placeBallOnPaddle();
     } else {
@@ -477,7 +519,7 @@
     for (let i = 0; i < bricks.length; i++) {
       const b = bricks[i];
       // 控えの段はまだ画面に出ていないので当たらない
-      if (b.row < 0 || !touchesBall(b)) continue;
+      if (isHidden(b) || !touchesBall(b)) continue;
 
       b.hp -= 1;
       if (b.hp <= 0) {
@@ -555,6 +597,28 @@
     }
   }
 
+  // 防衛ライン。ブロックが近づくほど、越えられた直後ほど赤く強く光る
+  function drawDefenseLine() {
+    const y = lineY();
+    const nearest = bricks.reduce((m, b) => (isHidden(b) ? m : Math.max(m, b.y + b.h)), 0);
+    const danger = Math.min(1, Math.max(0, 1 - (y - nearest) / 120));
+    const alpha = Math.min(1, 0.3 + danger * 0.5 + breachFlash);
+    ctx.strokeStyle = `rgba(239, 59, 59, ${alpha})`;
+    ctx.lineWidth = breachFlash > 0 ? 2.5 : 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = `rgba(239, 59, 59, ${Math.min(1, alpha + 0.2)})`;
+    ctx.font = '600 10px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('防衛ライン', 6, y - 3);
+    ctx.textBaseline = 'alphabetic';
+  }
+
   function draw() {
     ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
     ctx.clearRect(0, 0, W, H);
@@ -586,6 +650,8 @@
     ctx.globalAlpha = 1;
 
     if (state === 'ready') return;
+
+    drawDefenseLine();
 
     if (coarseMQ.matches) {
       // パドルの下の、指を置くための帯
