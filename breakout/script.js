@@ -9,6 +9,11 @@
   const BALL_SPEED = 260; // 初速 (px/秒)
   const BALL_SPEED_UP = 3; // ブロックを壊すたびに上がる速さ
   const BALL_ATTACK = 10; // ボールの攻撃力。当たるたびにブロックのHPがこの分だけ減る
+  const SMASH_WINDOW = 0.25; // タップしてからパドルの枠が光っている時間。この間にボールが当たるとスマッシュ
+  const SMASH_COOLDOWN = 0.5; // 次にパドルを光らせられるまでの間隔 (連打で光らせ続けられないように)
+  const SMASH_TIME = 1; // スマッシュ状態が続く時間
+  const SMASH_POWER = 2; // スマッシュ中の攻撃力の倍率
+  const TRAIL_LENGTH = 14; // スマッシュ中の尾の長さ (フレーム数)
   const GAUGE_DRAIN = 1.5; // 減ったHPの残像が消える速さ (最大HPの何倍/秒)
   const BALL_MAX_SPEED = 480;
   const MAX_BOUNCE_ANGLE = Math.PI / 3; // パドルの端で打ち返したときの角度
@@ -141,6 +146,11 @@
   let combo = 0;
   let advance = 0; // ブロック全体が手前に迫ってきた距離
   let breachFlash = 0; // 防衛ラインを越えられたときに線を光らせる残り時間
+  let smashWindow = 0; // パドルの枠が光っている残り時間
+  let smashCooldown = 0;
+  let smashTime = 0; // スマッシュ状態の残り時間
+  let smashText = 0; // 「SMASH!」の表示の残り時間
+  let trail = []; // ボールの通った位置 (彗星の尾に使う)
   let bricks = [];
   let particles = [];
   const paddle = { x: (W - PADDLE_W) / 2, y: H - PADDLE_BOTTOM_MOUSE, w: PADDLE_W };
@@ -321,7 +331,17 @@
     updateStats();
   }
 
+  // タップでパドルの枠を一瞬光らせる
+  function triggerSmash() {
+    if (state !== 'playing' || smashCooldown > 0) return;
+    smashWindow = SMASH_WINDOW;
+    smashCooldown = SMASH_COOLDOWN;
+  }
+
   function serve() {
+    smashWindow = 0;
+    smashTime = 0;
+    trail = [];
     combo = 0;
     state = 'serve';
     overlay.hidden = true;
@@ -504,6 +524,10 @@
 
     advance += STAGES[stageIndex].advance * dt;
     breachFlash = Math.max(0, breachFlash - dt);
+    smashWindow = Math.max(0, smashWindow - dt);
+    smashCooldown = Math.max(0, smashCooldown - dt);
+    smashTime = Math.max(0, smashTime - dt);
+    smashText = Math.max(0, smashText - dt);
     moveBricks(dt);
     checkDefenseLine();
     if (state === 'over' || state === 'clear') return;
@@ -514,6 +538,8 @@
       const dist = Math.hypot(ball.vx, ball.vy) * dt;
       const steps = Math.max(1, Math.ceil(dist / (BALL_R * 0.8)));
       for (let i = 0; i < steps && state === 'playing'; i++) step(dt / steps);
+      trail.push({ x: ball.x, y: ball.y });
+      if (trail.length > TRAIL_LENGTH) trail.shift();
     }
   }
 
@@ -564,6 +590,12 @@
       ball.vy = -ball.speed * Math.cos(angle);
       ball.y = paddle.y - BALL_R;
       combo = 0;
+      if (smashWindow > 0) {
+        smashWindow = 0;
+        smashTime = SMASH_TIME;
+        smashText = 0.7;
+        sparks(ball.x, paddle.y);
+      }
     }
 
     if (ball.y - BALL_R > H) loseLife();
@@ -582,7 +614,7 @@
       // 控えの段はまだ画面に出ていないので当たらない
       if (isHidden(b) || !touchesBall(b)) continue;
 
-      b.hp -= BALL_ATTACK;
+      b.hp -= BALL_ATTACK * (smashTime > 0 ? SMASH_POWER : 1);
       b.flash = 0.15;
       if (b.hp <= 0) {
         bricks.splice(i, 1);
@@ -602,6 +634,14 @@
       return true;
     }
     return false;
+  }
+
+  function sparks(x, y) {
+    for (let i = 0; i < 14; i++) {
+      const a = Math.PI + Math.random() * Math.PI; // 上向き
+      const v = 80 + Math.random() * 140;
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5, color: i % 2 ? '#ffd76a' : '#ff8a3d' });
+    }
   }
 
   function burst(b) {
@@ -876,6 +916,36 @@
     ctx.textBaseline = 'alphabetic';
   }
 
+  // スマッシュ中は彗星のように尾を引いて光る
+  function drawBall() {
+    if (smashTime > 0 && trail.length > 1) {
+      const fade = Math.min(1, smashTime / 0.3); // 終わりぎわは尾を薄くする
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      trail.forEach((p, i) => {
+        const t = (i + 1) / trail.length;
+        ctx.fillStyle = `rgba(255, ${Math.round(110 + 110 * t)}, ${Math.round(40 + 60 * t)}, ${0.5 * t * fade})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, BALL_R * (0.35 + 0.75 * t), 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+      ctx.save();
+      ctx.shadowColor = '#ff8a3d';
+      ctx.shadowBlur = 12 * fade;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   function draw() {
     ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
     ctx.clearRect(0, 0, W, H);
@@ -927,12 +997,31 @@
     ctx.beginPath();
     ctx.roundRect(paddle.x, paddle.y, paddle.w, PADDLE_H, PADDLE_H / 2);
     ctx.fill();
-
-    if (state !== 'over') {
-      ctx.fillStyle = '#ffffff';
+    if (smashWindow > 0) {
+      // タップ直後はパドルの枠が光る
+      ctx.save();
+      ctx.shadowColor = '#ffd76a';
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = `rgba(255, 236, 170, ${0.4 + 0.6 * (smashWindow / SMASH_WINDOW)})`;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.roundRect(paddle.x - 1, paddle.y - 1, paddle.w + 2, PADDLE_H + 2, PADDLE_H / 2 + 1);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (state !== 'over') drawBall();
+
+    if (smashText > 0) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, smashText / 0.3);
+      ctx.fillStyle = '#ffd76a';
+      ctx.shadowColor = '#ff8a3d';
+      ctx.shadowBlur = 8;
+      ctx.font = 'italic 800 16px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('SMASH!', paddle.x + paddle.w / 2, paddle.y - 14 - (0.7 - smashText) * 30);
+      ctx.restore();
     }
 
     if (state === 'serve') {
@@ -940,6 +1029,9 @@
       ctx.font = '600 14px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(coarseMQ.matches ? 'タップで発射' : 'クリック / スペースで発射', W / 2, H * 0.62);
+      ctx.font = '600 11px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.fillText('打ち返す直前にもう一度押すとスマッシュ', W / 2, H * 0.62 + 20);
     }
   }
 
@@ -965,7 +1057,10 @@
         // キャプチャできなくても操作は続けられる
       }
     }
-    if (e.pointerType === 'mouse' && (state === 'serve' || state === 'playing')) movePaddleTo(pointerX(e));
+    if (e.pointerType === 'mouse' && (state === 'serve' || state === 'playing')) {
+      movePaddleTo(pointerX(e));
+      triggerSmash(); // マウスはボタンを押した瞬間に光らせる
+    }
   }
 
   function onPointerMove(e) {
@@ -983,7 +1078,12 @@
   function onPointerUp(e) {
     const tapped = downX !== null && Math.abs(e.clientX - downX) < 12;
     downX = null;
-    if (tapped || e.pointerType === 'mouse') launch();
+    if (e.pointerType === 'mouse') {
+      launch();
+    } else if (tapped) {
+      if (state === 'serve') launch();
+      else triggerSmash();
+    }
   }
 
   canvas.addEventListener('pointerdown', onPointerDown);
@@ -1008,6 +1108,7 @@
         // ボタンにフォーカスがあるときは、そのボタンを押す動作に任せる
         if (e.target instanceof HTMLButtonElement && !overlay.hidden) return;
         if (state === 'serve') launch();
+        else if (state === 'playing' && e.code === 'Space') triggerSmash();
         else if (!overlay.hidden) onStartButton();
         else if (e.code === 'Enter') return;
         break; // プレイ中のスペースでページがスクロールしないようにする
