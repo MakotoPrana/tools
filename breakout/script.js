@@ -590,7 +590,7 @@
     },
 
     // 減衰する1つの音 (slide を指定すると周波数がその倍率まで動く)
-    osc(freq, t, decay, vol, { type = 'sine', slide = 0, attack = 0.002 } = {}) {
+    osc(freq, t, decay, vol, { type = 'sine', slide = 0, attack = 0.002, out = this.out } = {}) {
       const o = this.ctx.createOscillator();
       const g = this.ctx.createGain();
       o.type = type;
@@ -599,13 +599,13 @@
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(vol, t + attack);
       g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-      o.connect(g).connect(this.out);
+      o.connect(g).connect(out);
       o.start(t);
       o.stop(t + decay + 0.05);
     },
 
     // 雑音をフィルターに通した音 (to を指定するとフィルターの周波数がそこまで動く)
-    noise(t, dur, vol, { type = 'bandpass', freq = 3000, q = 1, to = 0, attack = 0.001 } = {}) {
+    noise(t, dur, vol, { type = 'bandpass', freq = 3000, q = 1, to = 0, attack = 0.001, out = this.out } = {}) {
       const src = this.ctx.createBufferSource();
       const f = this.ctx.createBiquadFilter();
       const g = this.ctx.createGain();
@@ -617,7 +617,7 @@
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(vol, t + attack);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      src.connect(f).connect(g).connect(this.out);
+      src.connect(f).connect(g).connect(out);
       src.start(t, Math.random() * 0.5);
       src.stop(t + dur + 0.05);
     },
@@ -679,13 +679,33 @@
       this.noise(t, 0.015, 0.12, { type: 'lowpass', freq: 1500 });
     },
 
-    // スマッシュで打ち返した音: 空気を切る音と高い金属音
+    // スマッシュで打ち返した音「バシューン」:
+    // 「バ」は打ち出す瞬間の破裂音と低い衝撃、「シュー」は空気を切る音、「ーン」は高い所から下がっていく余韻
     smash() {
       if (!this.ready('smash')) return;
       const t = this.at(0);
-      this.noise(t, 0.22, 0.4, { freq: 600, to: 4500, q: 1.2 });
-      this.strike(3, t, 0.9, 1.4);
-      this.osc(1320, t + 0.02, 0.3, 0.1);
+      // 余韻に短いこだまを付けて「ーン」と尾を引かせる
+      const echo = this.ctx.createDelay();
+      const feedback = this.ctx.createGain();
+      const tail = this.ctx.createGain();
+      echo.delayTime.value = 0.085;
+      feedback.gain.value = 0.38;
+      tail.connect(this.out);
+      tail.connect(echo).connect(feedback).connect(echo);
+      feedback.connect(this.out);
+      // バ
+      this.noise(t, 0.07, 0.75, { type: 'lowpass', freq: 3500, q: 0.7 });
+      this.osc(170, t, 0.14, 0.6, { slide: 0.35 });
+      // シュー
+      this.noise(t + 0.02, 0.45, 0.32, { freq: 1500, to: 5200, q: 1.4, attack: 0.03, out: tail });
+      // ーン
+      this.osc(1500, t + 0.03, 1.1, 0.15, { slide: 0.3, attack: 0.02, out: tail });
+      this.osc(2250, t + 0.03, 0.8, 0.06, { type: 'triangle', slide: 0.3, attack: 0.02, out: tail });
+      // こだまの経路は余韻が消えたら外す
+      setTimeout(() => {
+        tail.disconnect();
+        feedback.disconnect();
+      }, 2200);
     },
 
     // タップでパドルの枠が光った音
