@@ -73,10 +73,18 @@ body {
   height: 44px;
 }
 
-.top h1 { margin: 0; font-size: 1.05rem; white-space: nowrap; }
-.back { color: var(--muted); text-decoration: none; font-size: 0.85rem; white-space: nowrap; }
+.top h1 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.back { flex: none; color: var(--muted); text-decoration: none; font-size: 0.85rem; white-space: nowrap; }
 .back:hover { color: var(--accent); }
-.top-btns { display: flex; gap: 6px; }
+.top-btns { flex: none; display: flex; gap: 6px; }
+
+@media (max-width: 400px) {
+  .top { gap: 6px; }
+  .top h1 { font-size: 0.95rem; }
+  .top-btns { gap: 4px; }
+  .icon-btn { width: 34px; }
+  .icon-btn.text { padding: 0 6px; }
+}
 
 .icon-btn {
   flex: none;

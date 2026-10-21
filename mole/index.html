@@ -10,37 +10,38 @@
 <body>
   <main class="app">
     <header class="top">
-      <a class="back" href="../">‹ ツール一覧</a>
-      <h1>モグラたたき</h1>
+      <a class="back" href="../" data-i18n="backToTools">‹ ツール一覧</a>
+      <h1 data-i18n="gameTitle">モグラたたき</h1>
       <div class="top-btns">
+        <button type="button" id="lang-btn" class="icon-btn text" lang="en" aria-label="Switch to English">EN</button>
         <button type="button" id="bgm-btn" class="icon-btn text" aria-label="BGM" aria-pressed="true">BGM</button>
-        <button type="button" id="sound-btn" class="icon-btn" aria-label="効果音" aria-pressed="true">♪</button>
-        <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" hidden>Ⅱ</button>
+        <button type="button" id="sound-btn" class="icon-btn" data-i18n-aria="soundEffects" aria-label="効果音" aria-pressed="true">♪</button>
+        <button type="button" id="pause-btn" class="icon-btn" data-i18n-aria="pause" aria-label="一時停止" hidden>Ⅱ</button>
       </div>
     </header>
 
     <!-- タイトル -->
     <section class="screen title-screen" id="screen-title">
       <div class="title-hero" id="title-hero"></div>
-      <p class="title-name">モグラたたき</p>
-      <p class="title-sub">どうぶつ大集合</p>
-      <p class="title-hint" id="sound-hint">画面をタップすると BGM と効果音が鳴ります</p>
+      <p class="title-name" data-i18n="gameTitle">モグラたたき</p>
+      <p class="title-sub" data-i18n="subtitle">どうぶつ大集合</p>
+      <p class="title-hint" id="sound-hint" data-i18n="soundHint">画面をタップすると BGM と効果音が鳴ります</p>
       <div class="title-btns">
-        <button type="button" class="btn primary" id="title-play">あそぶ</button>
-        <button type="button" class="btn" id="title-zukan">図鑑</button>
+        <button type="button" class="btn primary" id="title-play" data-i18n="play">あそぶ</button>
+        <button type="button" class="btn" id="title-zukan" data-i18n="zukan">図鑑</button>
       </div>
     </section>
 
     <!-- ステージ選択 -->
     <section class="screen" id="screen-select" hidden>
       <div class="screen-head">
-        <button type="button" class="btn small" id="select-back">‹ タイトル</button>
-        <h2>ステージ選択</h2>
-        <button type="button" class="btn small" id="select-zukan">図鑑</button>
+        <button type="button" class="btn small" id="select-back" data-i18n="backToTitle">‹ タイトル</button>
+        <h2 data-i18n="stageSelect">ステージ選択</h2>
+        <button type="button" class="btn small" id="select-zukan" data-i18n="zukan">図鑑</button>
       </div>
       <dl class="summary">
-        <div><dt>星</dt><dd id="sum-stars">0 / 30</dd></div>
-        <div><dt>図鑑</dt><dd id="sum-zukan">0 / 10</dd></div>
+        <div><dt data-i18n="stars">星</dt><dd id="sum-stars">0 / 30</dd></div>
+        <div><dt data-i18n="zukan">図鑑</dt><dd id="sum-zukan">0 / 10</dd></div>
       </dl>
       <div class="tiles" id="stage-tiles"></div>
     </section>
@@ -48,24 +49,24 @@
     <!-- ステージ開始前の確認 -->
     <section class="screen" id="screen-confirm" hidden>
       <div class="screen-head">
-        <button type="button" class="btn small" id="confirm-back">‹ 戻る</button>
+        <button type="button" class="btn small" id="confirm-back" data-i18n="back">‹ 戻る</button>
         <h2 id="confirm-no">STAGE 1</h2>
         <span class="head-spacer"></span>
       </div>
       <div class="preview" id="confirm-preview"></div>
       <p class="confirm-name" id="confirm-name"></p>
       <dl class="confirm-info">
-        <div><dt>制限時間</dt><dd id="confirm-time"></dd></div>
-        <div><dt>目標</dt><dd id="confirm-target"></dd></div>
-        <div><dt>ベスト</dt><dd id="confirm-best"></dd></div>
+        <div><dt data-i18n="timeLimit">制限時間</dt><dd id="confirm-time"></dd></div>
+        <div><dt data-i18n="target">目標</dt><dd id="confirm-target"></dd></div>
+        <div><dt data-i18n="best">ベスト</dt><dd id="confirm-best"></dd></div>
       </dl>
-      <h3 class="confirm-label">登場する動物</h3>
+      <h3 class="confirm-label" data-i18n="animalsHeading">登場する動物</h3>
       <div class="icons" id="confirm-animals"></div>
-      <h3 class="confirm-label">じゃまもの</h3>
+      <h3 class="confirm-label" data-i18n="hazardsHeading">じゃまもの</h3>
       <div class="icons" id="confirm-hazards"></div>
-      <h3 class="confirm-label">伝説の動物</h3>
+      <h3 class="confirm-label" data-i18n="legendHeading">伝説の動物</h3>
       <div class="legend-box" id="confirm-legend"></div>
-      <button type="button" class="btn primary wide" id="confirm-start">スタート</button>
+      <button type="button" class="btn primary wide" id="confirm-start" data-i18n="start">スタート</button>
     </section>
 
     <!-- プレイ -->
@@ -84,7 +85,7 @@
       </div>
 
       <div class="field" id="field">
-        <div class="grid" id="grid" aria-label="動物の穴"></div>
+        <div class="grid" id="grid" data-i18n-aria="holes" aria-label="動物の穴"></div>
         <p class="toast" id="toast" aria-live="polite"></p>
         <div class="overlay" id="overlay" hidden>
           <p class="overlay-sub" id="overlay-sub"></p>
@@ -99,63 +100,120 @@
     <!-- 図鑑 -->
     <section class="screen" id="screen-zukan" hidden>
       <div class="screen-head">
-        <button type="button" class="btn small" id="zukan-back">‹ 戻る</button>
-        <h2>伝説の動物図鑑</h2>
+        <button type="button" class="btn small" id="zukan-back" data-i18n="back">‹ 戻る</button>
+        <h2 data-i18n="zukanTitle">伝説の動物図鑑</h2>
         <span class="head-spacer"></span>
       </div>
-      <p class="zukan-count"><span id="zukan-count">0 / 10</span><span class="complete" id="zukan-complete" hidden>コンプリート</span></p>
+      <p class="zukan-count"><span id="zukan-count">0 / 10</span><span class="complete" id="zukan-complete" data-i18n="complete" hidden>コンプリート</span></p>
       <div class="tiles" id="zukan-tiles"></div>
     </section>
 
+    <!-- 遊び方 (言語ごとに用意し、選んでいる言語だけ表示する) -->
     <section class="help" id="help">
-      <h2>遊び方</h2>
-      <p>穴から顔を出した動物を、引っ込む前にたたいて得点を集めます。制限時間内に目標の点数に届けばステージクリア。目標点で星1つ、1.5倍で星2つ、2倍で星3つです。</p>
+      <div data-lang="ja" lang="ja">
+        <h2>遊び方</h2>
+        <p>穴から顔を出した動物を、引っ込む前にたたいて得点を集めます。制限時間内に目標の点数に届けばステージクリア。目標点で星1つ、1.5倍で星2つ、2倍で星3つです。</p>
 
-      <h3>動物</h3>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th>モグラ</th><td>10点。基本の動物</td></tr>
-            <tr><th>ウサギ</th><td>15点。すぐ引っ込む</td></tr>
-            <tr><th>リス</th><td>15点。隣の穴と2匹同時に出てくる</td></tr>
-            <tr><th>タヌキ</th><td>25点。2回たたく</td></tr>
-            <tr><th>カエル</th><td>15点。逃がすと別の穴から1回だけ跳び出てくる</td></tr>
-            <tr><th>キツネ</th><td>20点。途中で隣の穴へ移る</td></tr>
-            <tr><th>ハリネズミ</th><td>25点。丸まってトゲを出したらたたかない (−10点)</td></tr>
-            <tr><th>カメ</th><td>40点。3回たたく</td></tr>
-            <tr><th>フクロウ</th><td>25点。後ろを向いている間は当たらない</td></tr>
-            <tr><th>アライグマ</th><td>30点。逃がすと −20点</td></tr>
-          </tbody>
-        </table>
+        <h3>動物</h3>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <tr><th>モグラ</th><td>10点。基本の動物</td></tr>
+              <tr><th>ウサギ</th><td>15点。すぐ引っ込む</td></tr>
+              <tr><th>リス</th><td>15点。隣の穴と2匹同時に出てくる</td></tr>
+              <tr><th>タヌキ</th><td>25点。2回たたく</td></tr>
+              <tr><th>カエル</th><td>15点。逃がすと別の穴から1回だけ跳び出てくる</td></tr>
+              <tr><th>キツネ</th><td>20点。途中で隣の穴へ移る</td></tr>
+              <tr><th>ハリネズミ</th><td>25点。丸まってトゲを出したらたたかない (−10点)</td></tr>
+              <tr><th>カメ</th><td>40点。3回たたく</td></tr>
+              <tr><th>フクロウ</th><td>25点。後ろを向いている間は当たらない</td></tr>
+              <tr><th>アライグマ</th><td>30点。逃がすと −20点</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>じゃまもの</h3>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <tr><th>爆弾</th><td>たたくと −30点</td></tr>
+              <tr><th>石</th><td>たたくと残り時間が3秒減る</td></tr>
+              <tr><th>ハチの巣</th><td>たたくと2秒間どの穴もたたけない</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>伝説の動物</h3>
+        <p>各ステージで1回だけ、伝説の動物が一瞬だけ顔を出します。出てくる直前に穴がキラッと光るのが合図。捕まえると500点が入り、図鑑に登録されます。</p>
+
+        <h3>コンボ</h3>
+        <p>動物を続けてたたくとコンボがつながり、5コンボごとに得点の倍率が 0.5 ずつ上がります (最大 3 倍)。空振り、動物を逃がす、じゃまものをたたく、のどれかでコンボが切れます。</p>
+
+        <h3>操作</h3>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <tr><th>タップ / クリック</th><td>たたく</td></tr>
+              <tr><th>テンキー 1〜9</th><td>3×3 のステージで穴の位置に対応 (7 が左上、3 が右下)</td></tr>
+              <tr><th>P / Esc</th><td>一時停止</td></tr>
+              <tr><th>BGM / ♪ ボタン</th><td>BGM・効果音のオン／オフ</td></tr>
+              <tr><th>EN / 日本語 ボタン</th><td>表示する言語の切り替え</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <h3>じゃまもの</h3>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th>爆弾</th><td>たたくと −30点</td></tr>
-            <tr><th>石</th><td>たたくと残り時間が3秒減る</td></tr>
-            <tr><th>ハチの巣</th><td>たたくと2秒間どの穴もたたけない</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div data-lang="en" lang="en" hidden>
+        <h2>How to Play</h2>
+        <p>Animals pop out of the holes. Whack them before they duck back down to score points. Reach the target score before time runs out to clear the stage. You get one star for the target score, two stars for 1.5 times the target, and three stars for double.</p>
 
-      <h3>伝説の動物</h3>
-      <p>各ステージで1回だけ、伝説の動物が一瞬だけ顔を出します。出てくる直前に穴がキラッと光るのが合図。捕まえると500点が入り、図鑑に登録されます。</p>
+        <h3>Animals</h3>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <tr><th>Mole</th><td>10 pts. The basic animal</td></tr>
+              <tr><th>Rabbit</th><td>15 pts. Ducks back down quickly</td></tr>
+              <tr><th>Squirrel</th><td>15 pts. Two pop out at once, in neighboring holes</td></tr>
+              <tr><th>Tanuki</th><td>25 pts. Takes 2 hits</td></tr>
+              <tr><th>Frog</th><td>15 pts. If it gets away, it hops out of another hole once more</td></tr>
+              <tr><th>Fox</th><td>20 pts. Moves to a neighboring hole partway through</td></tr>
+              <tr><th>Hedgehog</th><td>25 pts. Don't hit it once it curls up and shows its spines (−10 pts)</td></tr>
+              <tr><th>Turtle</th><td>40 pts. Takes 3 hits</td></tr>
+              <tr><th>Owl</th><td>25 pts. Hits don't land while it's facing away</td></tr>
+              <tr><th>Raccoon</th><td>30 pts. If it gets away, you lose 20 pts</td></tr>
+            </tbody>
+          </table>
+        </div>
 
-      <h3>コンボ</h3>
-      <p>動物を続けてたたくとコンボがつながり、5コンボごとに得点の倍率が 0.5 ずつ上がります (最大 3 倍)。空振り、動物を逃がす、じゃまものをたたく、のどれかでコンボが切れます。</p>
+        <h3>Obstacles</h3>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <tr><th>Bomb</th><td>Hitting it costs 30 pts</td></tr>
+              <tr><th>Stone</th><td>Hitting it takes 3 seconds off the clock</td></tr>
+              <tr><th>Beehive</th><td>Hitting it means you can't hit any hole for 2 seconds</td></tr>
+            </tbody>
+          </table>
+        </div>
 
-      <h3>操作</h3>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th>タップ / クリック</th><td>たたく</td></tr>
-            <tr><th>テンキー 1〜9</th><td>3×3 のステージで穴の位置に対応 (7 が左上、3 が右下)</td></tr>
-            <tr><th>P / Esc</th><td>一時停止</td></tr>
-            <tr><th>BGM / ♪ ボタン</th><td>BGM・効果音のオン／オフ</td></tr>
-          </tbody>
-        </table>
+        <h3>Legendary Animals</h3>
+        <p>Once per stage, a legendary animal peeks out for just an instant. Watch for a hole that sparkles right before it appears. Catch it to earn 500 pts and add it to your field guide.</p>
+
+        <h3>Combos</h3>
+        <p>Hit animals in a row to build a combo. Every 5 combo hits, your score multiplier goes up by 0.5 (up to 3x). Missing, letting an animal get away, or hitting an obstacle breaks the combo.</p>
+
+        <h3>Controls</h3>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <tr><th>Tap / Click</th><td>Whack</td></tr>
+              <tr><th>Numpad 1–9</th><td>Matches the hole positions on 3×3 stages (7 is top left, 3 is bottom right)</td></tr>
+              <tr><th>P / Esc</th><td>Pause</td></tr>
+              <tr><th>BGM / ♪ buttons</th><td>Turn music and sound effects on or off</td></tr>
+              <tr><th>EN / 日本語 button</th><td>Switch the language</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   </main>
@@ -166,7 +224,7 @@
       <p class="modal-name" id="modal-name"></p>
       <p class="modal-desc" id="modal-desc"></p>
       <dl class="modal-meta" id="modal-meta"></dl>
-      <button type="button" class="btn wide" id="modal-close">閉じる</button>
+      <button type="button" class="btn wide" id="modal-close" data-i18n="close">閉じる</button>
     </div>
   </div>
 

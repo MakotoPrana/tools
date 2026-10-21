@@ -1142,6 +1142,213 @@
    * 画面
    * ========================================================= */
 
+
+  /* =========================================================
+   * 言語 (日本語 / 英語)
+   *   画面の文言は TEXT、動物・ステージなどの名前は NAMES_EN にまとめる。
+   *   日本語の名前はそれぞれの定義 (ANIMALS・STAGES など) の name を使う
+   * ========================================================= */
+
+  const LANG_KEY = 'mole-lang';
+  const LANGS = ['ja', 'en'];
+
+  const TEXT = {
+    ja: {
+      pageTitle: 'モグラたたき',
+      pageDesc: 'モグラやウサギ、タヌキなど10種類の動物が出てくるモグラたたき。全10ステージで、伝説の動物を捕まえて図鑑を埋めよう。',
+      backToTools: '‹ ツール一覧',
+      gameTitle: 'モグラたたき',
+      subtitle: 'どうぶつ大集合',
+      soundHint: '画面をタップすると BGM と効果音が鳴ります',
+      play: 'あそぶ',
+      zukan: '図鑑',
+      backToTitle: '‹ タイトル',
+      stageSelect: 'ステージ選択',
+      stars: '星',
+      back: '‹ 戻る',
+      timeLimit: '制限時間',
+      target: '目標',
+      best: 'ベスト',
+      animalsHeading: '登場する動物',
+      hazardsHeading: 'じゃまもの',
+      legendHeading: '伝説の動物',
+      start: 'スタート',
+      zukanTitle: '伝説の動物図鑑',
+      complete: 'コンプリート',
+      close: '閉じる',
+      soundEffects: '効果音',
+      pause: '一時停止',
+      resume: '再開',
+      holes: '動物の穴',
+      hole: (n) => `穴 ${n}`,
+      langSwitch: 'Switch to English',
+      seconds: (n) => `${n}秒`,
+      points: (n) => `${n}点`,
+      tileCaught: '伝説の動物を捕まえた',
+      tileLegend: '★ 伝説',
+      starsLabel: (n) => `星 ${n} 個`,
+      tileBest: (n) => `ベスト ${n}点`,
+      caughtCount: (n) => `捕まえた回数 ${n}回`,
+      legendHint: 'プレイ中に一度だけ、一瞬だけ顔を出す',
+      unknown: '？？？',
+      zukanNo: (n) => `No.${n}・STAGE ${n}`,
+      notCaught: 'まだ捕まえていない',
+      rumor: (no, name) => `STAGE ${no}「${name}」に出現するらしい…`,
+      appearsIn: '出現するステージ',
+      firstCaught: '初めて捕まえた日',
+      timesCaught: '捕まえた回数',
+      times: (n) => `${n}回`,
+      goalDone: (t) => `目標 ${t}点 達成!`,
+      goalLeft: (t, left) => `目標 ${t}点まで あと ${left}点`,
+      fxStunned: 'チクチク…',
+      fxDodge: 'スカッ',
+      fxSpike: (p) => `イタッ ${p}`,
+      fxTanuki: 'ポン!',
+      fxTurtle: 'コツン!',
+      fxStone: (sec) => `ガツン! −${sec}秒`,
+      fxHive: 'ブンブン!',
+      fxSteal: (p) => `ぬすまれた! ${p}`,
+      legendCaughtToast: (name) => `${name}を捕まえた!`,
+      lastSpurt: 'ラストスパート!',
+      resultScore: (n, best) => `${n}点${best ? '  (ベスト更新!)' : ''}`,
+      resultShort: (n) => `目標まで あと ${n}点`,
+      resultHits: (hits, combo) => `たたいた数 ${hits}  最大コンボ ${combo}`,
+      resultStats: (acc, esc, haz) => `命中率 ${acc}%  逃がした数 ${esc}  じゃまもの ${haz}`,
+      resultLegend: (name) => `${name}を捕まえた!`,
+      resultNew: 'NEW! 図鑑に登録',
+      resultMissed: '伝説の動物を見逃した…',
+      nextStage: '次のステージへ',
+      retry: 'もう一度',
+      toSelect: 'ステージ選択へ',
+      paused: '一時停止中',
+      restart: 'やり直す',
+    },
+    en: {
+      pageTitle: 'Whack-a-Mole',
+      pageDesc: 'A whack-a-mole game with 10 kinds of animals, from moles and rabbits to tanuki. Play all 10 stages and catch legendary animals to fill your field guide.',
+      backToTools: '‹ All tools',
+      gameTitle: 'Whack-a-Mole',
+      subtitle: 'Animal Round-Up',
+      soundHint: 'Tap the screen to turn on music and sound effects',
+      play: 'Play',
+      zukan: 'Field Guide',
+      backToTitle: '‹ Title',
+      stageSelect: 'Stages',
+      stars: 'Stars',
+      back: '‹ Back',
+      timeLimit: 'Time',
+      target: 'Target',
+      best: 'Best',
+      animalsHeading: 'Animals',
+      hazardsHeading: 'Obstacles',
+      legendHeading: 'Legendary animal',
+      start: 'Start',
+      zukanTitle: 'Legendary Field Guide',
+      complete: 'Complete',
+      close: 'Close',
+      soundEffects: 'Sound effects',
+      pause: 'Pause',
+      resume: 'Resume',
+      holes: 'Animal holes',
+      hole: (n) => `Hole ${n}`,
+      langSwitch: '日本語に切り替え',
+      seconds: (n) => `${n}s`,
+      points: (n) => `${n} pts`,
+      tileCaught: 'legendary animal caught',
+      tileLegend: '★ Legend',
+      starsLabel: (n) => `${n} ${n === 1 ? 'star' : 'stars'}`,
+      tileBest: (n) => `Best ${n} pts`,
+      caughtCount: (n) => `Caught ${n} ${n === 1 ? 'time' : 'times'}`,
+      legendHint: 'Peeks out just once per play, for only an instant',
+      unknown: '???',
+      zukanNo: (n) => `No.${n} · STAGE ${n}`,
+      notCaught: 'Not caught yet',
+      rumor: (no, name) => `Said to appear in STAGE ${no}, "${name}"…`,
+      appearsIn: 'Appears in',
+      firstCaught: 'First caught',
+      timesCaught: 'Times caught',
+      times: (n) => String(n),
+      goalDone: (t) => `Target ${t} pts reached!`,
+      goalLeft: (t, left) => `${left} pts to go (target ${t})`,
+      fxStunned: 'Stung…',
+      fxDodge: 'Whiff',
+      fxSpike: (p) => `Ouch ${p}`,
+      fxTanuki: 'Pon!',
+      fxTurtle: 'Clonk!',
+      fxStone: (sec) => `Clang! −${sec}s`,
+      fxHive: 'Bzzz!',
+      fxSteal: (p) => `Stolen! ${p}`,
+      legendCaughtToast: (name) => `You caught the ${name}!`,
+      lastSpurt: 'Final stretch!',
+      resultScore: (n, best) => `${n} pts${best ? '  (New best!)' : ''}`,
+      resultShort: (n) => `${n} pts short of the target`,
+      resultHits: (hits, combo) => `Hits ${hits}  Max combo ${combo}`,
+      resultStats: (acc, esc, haz) => `Accuracy ${acc}%  Got away ${esc}  Obstacles ${haz}`,
+      resultLegend: (name) => `You caught the ${name}!`,
+      resultNew: 'NEW! Added to the field guide',
+      resultMissed: 'The legendary animal got away…',
+      nextStage: 'Next stage',
+      retry: 'Play again',
+      toSelect: 'Stages',
+      paused: 'Paused',
+      restart: 'Restart',
+    },
+  };
+
+  const NAMES_EN = {
+    mole: 'Mole',
+    rabbit: 'Rabbit',
+    squirrel: 'Squirrel',
+    tanuki: 'Tanuki',
+    frog: 'Frog',
+    fox: 'Fox',
+    hedgehog: 'Hedgehog',
+    turtle: 'Turtle',
+    owl: 'Owl',
+    raccoon: 'Raccoon',
+    bomb: 'Bomb',
+    stone: 'Stone',
+    hive: 'Beehive',
+  };
+
+  const LEGENDS_EN = {
+    'gold-mole': ['Golden Mole', 'A mole that glows gold from head to toe. They say it brings good luck to anyone who sees it.'],
+    'moon-rabbit': ['Moon Rabbit', 'A softly glowing white rabbit that comes down to earth only on full-moon nights.'],
+    'rainbow-squirrel': ['Rainbow Squirrel', 'A squirrel whose tail shines in seven colors. Rumor has it that it turns acorns into jewels.'],
+    'chagama-tanuki': ['Teakettle Tanuki', 'A tanuki that turned itself into a teakettle and could not change back. Only its face pops out.'],
+    'ogama': ['Giant Toad', 'An enormous frog that has lived for hundreds of years. It can clear a mountain in a single hop.'],
+    'kyubi-fox': ['Nine-Tailed Fox', 'A fox with nine tails and a true master of disguise.'],
+    'silver-hedgehog': ['Silver Hedgehog', 'A hedgehog whose spines shine silver. The spines are made of moonlight.'],
+    'ryugu-turtle': ['Dragon Palace Turtle', 'A turtle from the Dragon Palace at the bottom of the sea. It carries a tiny treasure box on its back.'],
+    'wise-owl': ['Wise Old Owl', 'An owl that knows everything about the forest. It is very rarely seen.'],
+    'thief-raccoon': ['Phantom Thief Raccoon', 'A master thief in a black cape. Nobody knows how many snacks it has stolen.'],
+  };
+
+  const STAGE_NAMES_EN = ['Starting Meadow', 'Bunny Field', 'Acorn Forest', 'Hillside Farm', 'Rice Paddy Path', 'Inari Mountain', 'Fallen Leaf Woods', 'Sunset Beach', 'Night Forest', 'Moonlit Town'];
+
+  const loadLang = () => {
+    try {
+      const saved = localStorage.getItem(LANG_KEY);
+      if (LANGS.includes(saved)) return saved;
+    } catch {
+      // 保存がなければブラウザの言語から決める
+    }
+    return (navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en';
+  };
+
+  let lang = loadLang();
+
+  // 文言を取り出す。関数の文言は引数を渡して組み立てる
+  const t = (key, ...args) => {
+    const v = TEXT[lang][key] ?? TEXT.ja[key];
+    return typeof v === 'function' ? v(...args) : v;
+  };
+
+  const kindName = (key) => (lang === 'en' ? NAMES_EN[key] : KINDS[key].name);
+  const legendName = (id) => (lang === 'en' ? LEGENDS_EN[id][0] : LEGENDS[id].name);
+  const legendDesc = (id) => (lang === 'en' ? LEGENDS_EN[id][1] : LEGENDS[id].desc);
+  const stageName = (s) => (lang === 'en' ? STAGE_NAMES_EN[s.no - 1] : s.name);
+
   const $ = (id) => document.getElementById(id);
   const screens = {
     title: $('screen-title'),
@@ -1180,6 +1387,7 @@
     current = name;
     Object.entries(screens).forEach(([key, el]) => { el.hidden = key !== name; });
     pauseBtn.hidden = name !== 'play';
+    $('lang-btn').hidden = name === 'play';
     helpEl.hidden = name !== 'title' && name !== 'select';
     window.scrollTo(0, 0);
     syncMusic();
@@ -1220,16 +1428,16 @@
     $('stage-tiles').innerHTML = STAGES.map((s) => {
       const r = stageRecord(s.no);
       const caught = Boolean(legendRecord(s.legend));
-      return `<button type="button" class="tile${caught ? ' caught' : ''}" data-stage="${s.no}" aria-label="STAGE ${s.no} ${s.name}${caught ? ' 伝説の動物を捕まえた' : ''}">
+      return `<button type="button" class="tile${caught ? ' caught' : ''}" data-stage="${s.no}" aria-label="STAGE ${s.no} ${escapeHTML(stageName(s))}${caught ? `, ${t('tileCaught')}` : ''}">
         <span class="tile-scene" style='--g1:${s.ground[0]};--g2:${s.ground[1]};background:${sceneBackground(s)}'>
           ${artEl(s.legend, { silhouette: !caught })}
-          <span class="tile-mark">${caught ? '★ 伝説' : '？'}</span>
+          <span class="tile-mark">${caught ? t('tileLegend') : '?'}</span>
         </span>
         <span class="tile-body">
           <span class="tile-no">STAGE ${s.no}</span>
-          <span class="tile-name">${s.name}</span>
-          <span class="tile-stars" aria-label="星 ${r.stars} 個">${starText(r.stars)}</span>
-          <span class="tile-best">ベスト ${r.best}点</span>
+          <span class="tile-name">${escapeHTML(stageName(s))}</span>
+          <span class="tile-stars" aria-label="${t('starsLabel', r.stars)}">${starText(r.stars)}</span>
+          <span class="tile-best">${t('tileBest', r.best)}</span>
         </span>
       </button>`;
     }).join('');
@@ -1252,28 +1460,28 @@
     const animals = stageAnimals(s);
 
     $('confirm-no').textContent = `STAGE ${s.no}`;
-    $('confirm-name').textContent = s.name;
+    $('confirm-name').textContent = stageName(s);
     const preview = $('confirm-preview');
     preview.style.setProperty('--g1', s.ground[0]);
     preview.style.setProperty('--g2', s.ground[1]);
     preview.style.background = sceneBackground(s);
     preview.innerHTML = animals.slice(-3).map((a) => artEl(a)).join('');
-    $('confirm-time').textContent = `${s.duration}秒`;
-    $('confirm-target').textContent = `${s.target}点`;
-    $('confirm-best').innerHTML = `${r.best}点 <span class="tile-stars">${starText(r.stars)}</span>`;
+    $('confirm-time').textContent = t('seconds', s.duration);
+    $('confirm-target').textContent = t('points', s.target);
+    $('confirm-best').innerHTML = `${t('points', r.best)} <span class="tile-stars">${starText(r.stars)}</span>`;
 
     $('confirm-animals').innerHTML = animals.map((a) => {
       const isNew = a === s.animal;
-      return `<span class="icon${isNew ? ' new' : ''}">${artEl(a)}${ANIMALS[a].name}${isNew ? '<span class="new-badge">NEW</span>' : ''}</span>`;
+      return `<span class="icon${isNew ? ' new' : ''}">${artEl(a)}${kindName(a)}${isNew ? '<span class="new-badge">NEW</span>' : ''}</span>`;
     }).join('');
     $('confirm-hazards').innerHTML = stageHazards(s).map((h) => {
       const isNew = HAZARDS[h].stage === s.no && s.no > 1;
-      return `<span class="icon${isNew ? ' new' : ''}">${artEl(h)}${HAZARDS[h].name}${isNew ? '<span class="new-badge">NEW</span>' : ''}</span>`;
+      return `<span class="icon${isNew ? ' new' : ''}">${artEl(h)}${kindName(h)}${isNew ? '<span class="new-badge">NEW</span>' : ''}</span>`;
     }).join('');
 
     $('confirm-legend').innerHTML = caught
-      ? `${artEl(s.legend)}<div><p class="legend-name">${LEGENDS[s.legend].name}</p><p class="legend-note">捕まえた回数 ${caught.count}回</p></div>`
-      : `${artEl(s.legend, { silhouette: true })}<div><p class="legend-name">？？？</p><p class="legend-note">プレイ中に一度だけ、一瞬だけ顔を出す</p></div>`;
+      ? `${artEl(s.legend)}<div><p class="legend-name">${legendName(s.legend)}</p><p class="legend-note">${t('caughtCount', caught.count)}</p></div>`
+      : `${artEl(s.legend, { silhouette: true })}<div><p class="legend-name">${t('unknown')}</p><p class="legend-note">${t('legendHint')}</p></div>`;
     show('confirm');
   };
 
@@ -1292,9 +1500,9 @@
       return `<button type="button" class="tile zukan-tile${rec ? ' caught' : ''}" data-legend="${s.legend}">
         <span class="tile-scene">${artEl(s.legend, { silhouette: !rec })}</span>
         <span class="tile-body">
-          <span class="tile-no">No.${s.no}・STAGE ${s.no}</span>
-          <span class="tile-name">${rec ? LEGENDS[s.legend].name : '？？？'}</span>
-          <span class="tile-best">${rec ? `捕まえた回数 ${rec.count}回` : 'まだ捕まえていない'}</span>
+          <span class="tile-no">${t('zukanNo', s.no)}</span>
+          <span class="tile-name">${rec ? legendName(s.legend) : t('unknown')}</span>
+          <span class="tile-best">${rec ? t('caughtCount', rec.count) : t('notCaught')}</span>
         </span>
       </button>`;
     }).join('');
@@ -1307,11 +1515,12 @@
     const art = $('modal-art');
     art.className = `modal-art${rec ? '' : ' silhouette'}`;
     art.innerHTML = artEl(id, { silhouette: !rec });
-    $('modal-name').textContent = rec ? LEGENDS[id].name : '？？？';
-    $('modal-desc').textContent = rec ? LEGENDS[id].desc : `STAGE ${s.no}「${s.name}」に出現するらしい…`;
+    $('modal-name').textContent = rec ? legendName(id) : t('unknown');
+    $('modal-desc').textContent = rec ? legendDesc(id) : t('rumor', s.no, stageName(s));
+    const where = `STAGE ${s.no} ${stageName(s)}`;
     const rows = rec
-      ? [['出現するステージ', `STAGE ${s.no} ${s.name}`], ['初めて捕まえた日', rec.first], ['捕まえた回数', `${rec.count}回`]]
-      : [['出現するステージ', `STAGE ${s.no} ${s.name}`]];
+      ? [[t('appearsIn'), where], [t('firstCaught'), rec.first], [t('timesCaught'), t('times', rec.count)]]
+      : [[t('appearsIn'), where]];
     $('modal-meta').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHTML(v)}</dd></div>`).join('');
     modal.hidden = false;
     $('modal-close').focus({ preventScroll: true });
@@ -1345,7 +1554,7 @@
       el.type = 'button';
       el.className = 'hole';
       el.tabIndex = -1;
-      el.setAttribute('aria-label', `穴 ${i + 1}`);
+      el.setAttribute('aria-label', t('hole', i + 1));
       el.innerHTML = '<span class="hole-back"></span><span class="mole-clip"><span class="mole"></span></span><span class="hole-front"></span>';
       el.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -1388,7 +1597,7 @@
     bestEl.textContent = stageRecord(stage.no).best;
     goalFill.style.width = `${Math.min(100, (game.score / stage.target) * 100)}%`;
     goalFill.classList.toggle('done', game.score >= stage.target);
-    goalText.textContent = game.score >= stage.target ? `目標 ${stage.target}点 達成!` : `目標 ${stage.target}点まで あと ${stage.target - game.score}点`;
+    goalText.textContent = game.score >= stage.target ? t('goalDone', stage.target) : t('goalLeft', stage.target, stage.target - game.score);
   };
 
   const toast = (text, long = false) => {
@@ -1441,22 +1650,22 @@
 
     switch (result.kind) {
       case 'stunned':
-        spawnFx(x, y, 'チクチク…', 'soft');
+        spawnFx(x, y, t('fxStunned'), 'soft');
         break;
       case 'miss':
         spawnFx(x, y, 'MISS', 'soft');
         Sound.miss();
         break;
       case 'dodge':
-        spawnFx(x, y, 'スカッ', 'soft');
+        spawnFx(x, y, t('fxDodge'), 'soft');
         Sound.miss();
         break;
       case 'spike':
-        spawnFx(x, y, `イタッ ${result.points}`, 'bad');
+        spawnFx(x, y, t('fxSpike', result.points), 'bad');
         Sound.spike();
         break;
       case 'hurt':
-        spawnFx(x, y, result.animal === 'tanuki' ? 'ポン!' : 'コツン!');
+        spawnFx(x, y, result.animal === 'tanuki' ? t('fxTanuki') : t('fxTurtle'));
         Sound.hurt();
         break;
       case 'bomb':
@@ -1466,18 +1675,18 @@
         if (navigator.vibrate) navigator.vibrate(120);
         break;
       case 'stone':
-        spawnFx(x, y, `ガツン! −${STONE_PENALTY_SEC}秒`, 'bad');
+        spawnFx(x, y, t('fxStone', STONE_PENALTY_SEC), 'bad');
         shake();
         Sound.stone();
         break;
       case 'hive':
-        spawnFx(x, y, 'ブンブン!', 'bad');
+        spawnFx(x, y, t('fxHive'), 'bad');
         fieldEl.classList.add('stunned');
         Sound.hive();
         break;
       case 'legend':
         spawnFx(x, y, `+${result.points}`, 'gold');
-        toast(`伝説の${LEGENDS[result.id].name.replace(/^伝説の/, '')}を捕まえた!`, true);
+        toast(t('legendCaughtToast', legendName(result.id)), true);
         Sound.legend();
         break;
       case 'hit':
@@ -1534,7 +1743,7 @@
     Sound.unlock();
     if (game) game.abort();
     stage = s;
-    $('play-stage').textContent = `STAGE ${s.no}  ${s.name}`;
+    $('play-stage').textContent = `STAGE ${s.no}  ${stageName(s)}`;
     show('play');
     buildGrid();
     fieldEl.classList.remove('stunned');
@@ -1570,20 +1779,20 @@
     Sound.end(r.cleared);
 
     const lines = [
-      `${r.score}点${isBest && r.score > 0 ? '  (ベスト更新!)' : ''}`,
-      r.cleared ? '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars) : `目標まで あと ${stage.target - r.score}点`,
-      `たたいた数 ${r.hits}  最大コンボ ${r.maxCombo}`,
-      `命中率 ${Math.round(r.accuracy * 100)}%  逃がした数 ${r.escaped}  じゃまもの ${r.hazardsHit}`,
+      t('resultScore', r.score, isBest && r.score > 0),
+      r.cleared ? '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars) : t('resultShort', stage.target - r.score),
+      t('resultHits', r.hits, r.maxCombo),
+      t('resultStats', Math.round(r.accuracy * 100), r.escaped, r.hazardsHit),
     ];
     const legend = r.legendCaught
-      ? { html: `${artEl(legendId)}<span>${LEGENDS[legendId].name}を捕まえた!${legendBefore ? '' : '<br>NEW! 図鑑に登録'}</span>` }
-      : { html: `${artEl(legendId, { silhouette: !legendBefore })}<span>伝説の動物を見逃した…</span>`, missed: true };
+      ? { html: `${artEl(legendId)}<span>${t('resultLegend', legendName(legendId))}${legendBefore ? '' : `<br>${t('resultNew')}`}</span>` }
+      : { html: `${artEl(legendId, { silhouette: !legendBefore })}<span>${t('resultMissed')}</span>`, missed: true };
 
     const buttons = [];
     const next = STAGES[stage.no];
-    if (next) buttons.push({ label: '次のステージへ', primary: r.cleared, action: () => { game = null; hideOverlay(); openConfirm(next); } });
-    buttons.push({ label: 'もう一度', primary: !r.cleared || !next, action: () => startStage(stage) });
-    buttons.push({ label: 'ステージ選択へ', action: leavePlay });
+    if (next) buttons.push({ label: t('nextStage'), primary: r.cleared, action: () => { game = null; hideOverlay(); openConfirm(next); } });
+    buttons.push({ label: t('retry'), primary: !r.cleared || !next, action: () => startStage(stage) });
+    buttons.push({ label: t('toSelect'), action: leavePlay });
     buttons.sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)));
 
     showOverlay({
@@ -1616,7 +1825,7 @@
         syncMusic();
         break;
       case 'lastSpurt':
-        toast('ラストスパート!');
+        toast(t('lastSpurt'));
         Music.rate = LAST_SPURT_RATE;
         break;
       case 'stunEnd':
@@ -1624,7 +1833,7 @@
         break;
       case 'steal': {
         const [x, y] = holeCenter(data.index);
-        spawnFx(x, y, `ぬすまれた! ${data.points}`, 'bad');
+        spawnFx(x, y, t('fxSteal', data.points), 'bad');
         renderHud();
         break;
       }
@@ -1634,20 +1843,20 @@
         break;
       case 'paused':
         pauseBtn.textContent = '▶';
-        pauseBtn.setAttribute('aria-label', '再開');
+        pauseBtn.setAttribute('aria-label', t('resume'));
         syncMusic();
         showOverlay({
-          title: '一時停止中',
+          title: t('paused'),
           buttons: [
-            { label: '再開', primary: true, action: resumeGame },
-            { label: 'やり直す', action: () => startStage(stage) },
-            { label: 'ステージ選択へ', action: leavePlay },
+            { label: t('resume'), primary: true, action: resumeGame },
+            { label: t('restart'), action: () => startStage(stage) },
+            { label: t('toSelect'), action: leavePlay },
           ],
         });
         break;
       case 'resumed':
         pauseBtn.textContent = 'Ⅱ';
-        pauseBtn.setAttribute('aria-label', '一時停止');
+        pauseBtn.setAttribute('aria-label', t('pause'));
         syncMusic();
         break;
       case 'end':
@@ -1760,6 +1969,41 @@
   // テスト用 (ブラウザのコンソールから参照できるように)
   window.__mole = { MoleGame, Music, STAGES, KINDS, stageParams, get game() { return game; } };
 
+  /* 言語の切り替え */
+
+  const langBtn = $('lang-btn');
+
+  // HTML に書いた文言 (data-i18n) と、言語ごとの遊び方 (data-lang) を反映する
+  const applyLang = () => {
+    document.documentElement.lang = lang;
+    document.title = t('pageTitle');
+    const desc = document.querySelector('meta[name="description"]');
+    if (desc) desc.setAttribute('content', t('pageDesc'));
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
+    document.querySelectorAll('[data-lang]').forEach((el) => { el.hidden = el.dataset.lang !== lang; });
+    // ボタンには切り替え先の言語を表示する
+    langBtn.textContent = lang === 'ja' ? 'EN' : '日本語';
+    langBtn.lang = lang === 'ja' ? 'en' : 'ja';
+    langBtn.setAttribute('aria-label', t('langSwitch'));
+  };
+
+  langBtn.addEventListener('click', () => {
+    lang = lang === 'ja' ? 'en' : 'ja';
+    try {
+      localStorage.setItem(LANG_KEY, lang);
+    } catch {
+      // 保存できなくても切り替え自体は有効
+    }
+    applyLang();
+    closeModal();
+    // いま開いている画面を描き直す
+    if (current === 'select') openSelect();
+    else if (current === 'confirm') openConfirm(stage);
+    else if (current === 'zukan') openZukan(zukanReturn);
+  });
+
+  applyLang();
   show('title');
   requestAnimationFrame(loop);
 })();

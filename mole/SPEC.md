@@ -234,9 +234,29 @@
 - 画面右上の「BGM」ボタンで、効果音（♪ ボタン）とは別にオン／オフできる
 - タブが裏に回ると止まる
 
+### 言語
+
+- 日本語と英語に対応する。画面右上の「EN」／「日本語」ボタンで切り替える（ボタンには切り替え先の言語を表示する）
+- 初めて開いたときは、ブラウザの言語が日本語なら日本語、それ以外なら英語にする。切り替えた言語は保存し、次に開いたときもその言語にする
+- プレイ中はボタンを隠し、切り替えられない（表示中の文言が混ざらないように）
+- 画面の文言は script.js の `TEXT`、動物・伝説の動物・ステージの英語名は `NAMES_EN`・`LEGENDS_EN`・`STAGE_NAMES_EN` にまとめる。遊び方は index.html に言語ごとに書く
+- 英語名
+
+| 日本語 | 英語 |
+| --- | --- |
+| モグラ・ウサギ・リス・タヌキ・カエル | Mole・Rabbit・Squirrel・Tanuki・Frog |
+| キツネ・ハリネズミ・カメ・フクロウ・アライグマ | Fox・Hedgehog・Turtle・Owl・Raccoon |
+| 爆弾・石・ハチの巣 | Bomb・Stone・Beehive |
+| 黄金のモグラ・月のウサギ・虹色のリス・茶釜のタヌキ・大ガマ | Golden Mole・Moon Rabbit・Rainbow Squirrel・Teakettle Tanuki・Giant Toad |
+| 九尾のキツネ・白銀のハリネズミ・竜宮のカメ・森の賢者フクロウ・怪盗アライグマ | Nine-Tailed Fox・Silver Hedgehog・Dragon Palace Turtle・Wise Old Owl・Phantom Thief Raccoon |
+| はじまりの草原・うさぎの野原・どんぐりの森・里山の畑・田んぼのあぜ道 | Starting Meadow・Bunny Field・Acorn Forest・Hillside Farm・Rice Paddy Path |
+| いなり山・落ち葉の林・夕暮れの浜辺・夜の森・月夜の町 | Inari Mountain・Fallen Leaf Woods・Sunset Beach・Night Forest・Moonlit Town |
+| 図鑑 | Field Guide |
+
 ### 保存
 
 - ブラウザの localStorage（キー `mole-save`）に保存する
+- 表示する言語はキー `mole-lang` に保存する
 - 効果音のオン／オフはキー `mole-sound` に保存する
 - BGM のオン／オフはキー `mole-bgm` に保存する
 
