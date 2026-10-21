@@ -1,0 +1,376 @@
+:root {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --text: #1f2933;
+  --muted: #6b7785;
+  --border: #dde2e8;
+  --accent: #2f7de1;
+  --grass: #7cc35a;
+  --grass-dark: #5ea443;
+  --hole: #3b2a1e;
+  --hole-rim: #8a6a4a;
+  --mole: #8b5a3c;
+  --good: #2fa84f;
+  --bad: #e0453a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15191e;
+    --card: #1f252c;
+    --text: #e6eaef;
+    --muted: #9aa5b1;
+    --border: #333c46;
+    --accent: #5a9cf0;
+    --grass: #4f8a3a;
+    --grass-dark: #3d702c;
+    --hole: #1a120c;
+    --hole-rim: #5e4630;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  line-height: 1.6;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 4px 16px 16px;
+}
+
+/* ヘッダー */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 44px;
+}
+
+.top h1 { margin: 0; font-size: 1.05rem; white-space: nowrap; }
+.back { color: var(--muted); text-decoration: none; font-size: 0.85rem; white-space: nowrap; }
+.back:hover { color: var(--accent); }
+.top-btns { display: flex; gap: 6px; }
+
+.icon-btn {
+  flex: none;
+  width: 40px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.icon-btn[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
+
+/* スコア表示 */
+.hud {
+  margin: 0 0 8px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.hud div {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+
+.hud dt {
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.hud dd {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+#time.low { color: var(--bad); }
+
+.goal { margin-bottom: 8px; }
+
+.goal-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.goal-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.goal-bar span.done { background: var(--good); }
+.goal-text { margin: 2px 0 0; color: var(--muted); font-size: 0.75rem; text-align: right; }
+
+/* フィールド */
+.field {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(var(--grass), var(--grass-dark));
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.field.shake { animation: shake 0.3s; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.grid {
+  display: grid;
+  gap: 4%;
+  padding: 6% 5% 5%;
+  aspect-ratio: 1;
+}
+
+.hole {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.hole:focus-visible { outline: 3px solid #fff; outline-offset: -3px; border-radius: 12px; }
+
+/* 穴の奥と手前のふちの間からモグラが顔を出す */
+.hole-back,
+.hole-front {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 6%;
+  height: 34%;
+  border-radius: 50%;
+}
+
+.hole-back { background: var(--hole); box-shadow: inset 0 6px 10px rgba(0, 0, 0, 0.6); }
+
+.hole-front {
+  z-index: 2;
+  height: 17%;
+  bottom: 6%;
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  background: var(--grass-dark);
+  border-top: 3px solid var(--hole-rim);
+}
+
+.mole-clip {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 23%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mole {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 0;
+  height: 88%;
+  transform: translateY(125%);
+  transition: transform var(--move-ms, 140ms) ease-out;
+}
+
+.mole svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+.hole.up .mole,
+.hole.hit .mole { transform: translateY(0); }
+
+.hole.hit .mole { animation: squash 0.25s ease-out; }
+
+@keyframes squash {
+  0% { transform: translateY(0) scale(1, 1); }
+  30% { transform: translateY(8%) scale(1.12, 0.84); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+
+/* モグラの種類ごとの見た目 */
+.m-body { fill: var(--mole); }
+.m-belly { fill: #d9b48f; }
+.m-nose { fill: #e86b7a; }
+.m-eye { fill: #1b1b1b; }
+.m-cheek { fill: #f29aa6; opacity: 0.6; }
+.m-x { stroke: #1b1b1b; stroke-width: 4; stroke-linecap: round; display: none; }
+.m-helmet, .m-bomb, .m-crown { display: none; }
+
+.hole.hit .m-eye { display: none; }
+.hole.hit .m-x { display: inline; }
+
+.hole[data-type="gold"] .m-body { fill: #e8b923; }
+.hole[data-type="gold"] .m-belly { fill: #fbe38a; }
+.hole[data-type="gold"] .m-crown { display: inline; }
+
+.hole[data-type="helmet"] .m-helmet { display: inline; }
+.hole[data-type="helmet"].cracked .m-helmet { opacity: 0.55; }
+.hole[data-type="helmet"].cracked .m-crack { display: inline; }
+.m-crack { display: none; }
+
+.hole[data-type="bomb"] .m-mole { display: none; }
+.hole[data-type="bomb"] .m-bomb { display: inline; }
+.hole[data-type="bomb"].hit .mole { animation: boom 0.3s ease-out; }
+
+@keyframes boom {
+  0% { transform: scale(1); filter: brightness(1); }
+  40% { transform: scale(1.3); filter: brightness(3); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+/* たたいたときの演出 */
+.fx {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  font-weight: 800;
+  font-size: clamp(0.9rem, 4.5vw, 1.3rem);
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  animation: float 0.7s ease-out forwards;
+}
+
+.fx.bad { color: #ffd0cc; }
+.fx.miss { color: rgba(255, 255, 255, 0.75); font-size: 0.85rem; }
+
+@keyframes float {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.7); }
+  20% { opacity: 1; transform: translate(-50%, -60%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -150%) scale(1); }
+}
+
+.ring {
+  position: absolute;
+  z-index: 3;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border: 4px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: ring 0.3s ease-out forwards;
+}
+
+@keyframes ring {
+  from { opacity: 1; transform: scale(0.3); }
+  to { opacity: 0; transform: scale(1.2); }
+}
+
+.toast {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  top: 40%;
+  margin: 0;
+  text-align: center;
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toast.show { animation: toast 0.9s ease-out; }
+
+@keyframes toast {
+  0% { opacity: 0; transform: scale(0.6); }
+  15% { opacity: 1; transform: scale(1.1); }
+  70% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.1); }
+}
+
+.overlay {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: rgba(8, 12, 18, 0.72);
+  color: #fff;
+  text-align: center;
+}
+
+.overlay[hidden] { display: none; }
+.overlay-sub { margin: 0; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; color: #b9d7ff; }
+.overlay-sub:empty { display: none; }
+.overlay-title { margin: 0; font-size: 1.5rem; font-weight: 800; }
+.overlay-text { margin: 0; font-size: 0.85rem; line-height: 1.8; white-space: pre-line; color: #d5dbe2; }
+.overlay.clear .overlay-title { color: #ffe270; }
+.overlay.fail .overlay-title { color: #ffb4ad; }
+
+.start-btn {
+  margin-top: 6px;
+  padding: 10px 32px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 遊び方 */
+.help {
+  margin-top: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-size: 0.9rem;
+}
+
+.help h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.help h3 { margin: 18px 0 6px; font-size: 1rem; }
+.help p { margin: 0 0 8px; }
+
+.help table { width: 100%; border-collapse: collapse; }
+.help th, .help td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+.help th { width: 45%; font-weight: 600; }
+
+footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 16px 32px; }
