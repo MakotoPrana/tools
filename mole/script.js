@@ -837,6 +837,25 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140">${items}</svg>`;
   };
 
+  // タイトル画面の一枚絵 (400×260 の空と丘)。地面は STAGE 1 の小物を敷き詰める
+  const titleSkySVG = () => {
+    const rainbow = ['#ff8f8f', '#ffc46b', '#fff27a', '#9be38a', '#8fd0ff', '#b9a4ff']
+      .map((c, i) => `<path d="M${-10 + i * 7} 210A${150 - i * 7} ${150 - i * 7} 0 0 1 ${290 - i * 7} 210" stroke="${c}" stroke-width="7" fill="none" opacity="0.55"/>`).join('');
+    const trees = [[46, 176], [86, 186], [318, 182], [356, 172]].map(([x, y]) => `<rect x="${x - 2}" y="${y}" width="4" height="12" fill="#6b8f3a"/><circle cx="${x}" cy="${y - 6}" r="11" fill="#5fae45"/><circle cx="${x - 4}" cy="${y - 9}" r="3" fill="#fff" opacity="0.25"/>`).join('');
+    const flowers = [[30, 222, '#fff'], [120, 214, '#ffd23f'], [210, 226, '#ffc2d6'], [300, 218, '#fff'], [372, 228, '#ffd23f']]
+      .map(([x, y, c]) => DECOR.flower(x, y, c)).join('');
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" preserveAspectRatio="xMidYMax slice">`
+      + '<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd3ff"/><stop offset="1" stop-color="#fde9f2"/></linearGradient></defs>'
+      + `<rect width="400" height="260" fill="url(#s)"/>${rainbow}`
+      + `<g transform="translate(372 30)"><g fill="#ffe27a">${Array.from({ length: 8 }, (_, i) => `<rect x="-2" y="-23" width="4" height="7" rx="2" transform="rotate(${i * 45})"/>`).join('')}</g><circle r="14" fill="#ffd84d"/></g>${face(372, 30, 1.1, '#8a5a1a')}`
+      + `<path d="M0 196Q70 150 150 182T300 170T400 178V260H0Z" fill="#a8dc7a"/>${trees}`
+      + `<path d="M0 214Q100 188 200 210T400 206V260H0Z" fill="#7cc35a"/>${flowers}`
+      + '<path d="M0 238Q100 230 200 238T400 236V260H0Z" fill="#7cc35a"/></svg>';
+  };
+
+  const titleBackground = () => `${svgURL(titleSkySVG())} top center / 100% auto no-repeat, `
+    + `${svgURL(decorSVG(STAGES[0]))} 0 0 / 140px 140px repeat, #7cc35a`;
+
   const sceneCache = {};
   // 背景の CSS (空 → 地面の小物 → 地面の色、の順に重ねる)
   const sceneBackground = (stage) => {
@@ -1413,8 +1432,20 @@
 
   /* タイトル */
 
-  $('title-hero').innerHTML = ['mole', 'rabbit', 'tanuki', 'fox', 'squirrel'].map((k) => artEl(k)).join('');
-  $('title-hero').style.background = sceneBackground(STAGES[1]);
+  $('title-card').style.background = titleBackground();
+  const titleHoles = $('title-holes');
+  titleHoles.innerHTML = ['mole', 'rabbit', 'tanuki', 'fox', 'squirrel']
+    .map((k) => `<span class="t-hole"><span class="hole-back"></span><span class="mole-clip"><span class="mole">${artSVG(k)}</span></span><span class="hole-front"></span></span>`)
+    .join('');
+  // タイトルの動物もたたける (目を回すだけ)
+  titleHoles.addEventListener('pointerdown', (e) => {
+    const hole = e.target.closest('.t-hole');
+    if (!hole || hole.classList.contains('hit')) return;
+    Sound.unlock();
+    Sound.hit(0);
+    hole.classList.add('hit');
+    setTimeout(() => hole.classList.remove('hit'), 600);
+  });
   $('title-play').addEventListener('click', () => { Sound.unlock(); openSelect(); });
   $('title-zukan').addEventListener('click', () => openZukan('title'));
 
