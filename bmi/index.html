@@ -2,119 +2,14 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-4VLZW1VMVC');
-  </script>
-  <title>BMI計算ツール</title>
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5093421396736590"
-     crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="style.css" />
+  <!-- 旧URL。/tools/bmi/ へ移動したので転送する (UTM などのパラメータも引き継ぐ) -->
+  <meta http-equiv="refresh" content="0; url=../tools/bmi/" />
+  <link rel="canonical" href="https://tools.e-seventh.com/tools/bmi/" />
+  <meta name="robots" content="noindex" />
+  <title>移動しました</title>
+  <script>location.replace('../tools/bmi/' + location.search + location.hash);</script>
 </head>
 <body>
-  <main class="container">
-    <h1>BMI計算</h1>
-    <p class="subtitle">毎日の計測で、からだの変化に早めに気づこう。<br />小さな記録の積み重ねが、健康維持の第一歩です。</p>
-
-    <form id="bmi-form" class="card" novalidate>
-      <label for="height">身長 (cm)</label>
-      <input type="number" id="height" inputmode="decimal" min="50" max="250" step="0.1" placeholder="例: 170" required />
-
-      <label for="weight">体重 (kg)</label>
-      <input type="number" id="weight" inputmode="decimal" min="10" max="300" step="0.1" placeholder="例: 65" required />
-
-      <p id="error" class="error" role="alert"></p>
-
-      <button type="submit">計算する</button>
-    </form>
-
-    <section id="result" class="card hidden" aria-live="polite">
-      <p class="bmi-label">あなたのBMI</p>
-      <p id="bmi-value" class="bmi-value">--</p>
-      <p id="bmi-category" class="bmi-category"></p>
-
-      <div class="gauge">
-        <div class="gauge-bar">
-          <span class="seg under"></span>
-          <span class="seg normal"></span>
-          <span class="seg over1"></span>
-          <span class="seg over2"></span>
-        </div>
-        <div id="gauge-marker" class="gauge-marker"></div>
-        <div class="gauge-labels">
-          <span>15</span><span>18.5</span><span>25</span><span>30</span><span>40</span>
-        </div>
-      </div>
-
-      <div id="advice" class="advice">
-        <p class="advice-title">アドバイス</p>
-        <p id="advice-text"></p>
-        <p class="advice-note">※ 一般的な目安です。筋肉量の多い方や妊娠中の方、子ども・高齢者には当てはまらない場合があります。</p>
-      </div>
-
-      <dl class="details">
-        <div><dt>適正体重 (BMI 22)</dt><dd id="ideal-weight">--</dd></div>
-        <div><dt>普通体重の範囲</dt><dd id="normal-range">--</dd></div>
-        <div><dt>適正体重との差</dt><dd id="diff-weight">--</dd></div>
-      </dl>
-    </section>
-
-    <section class="card">
-      <div class="history-header">
-        <h2>履歴</h2>
-        <button id="clear-history" type="button" class="link-button">クリア</button>
-      </div>
-      <p class="chart-caption">BMIの推移 (直近20件)</p>
-      <div id="chart" class="chart">
-        <p id="chart-empty" class="chart-empty">計算するとグラフが表示されます</p>
-        <div id="chart-tooltip" class="chart-tooltip" hidden></div>
-      </div>
-      <ul id="history" class="history"></ul>
-    </section>
-
-  </main>
-
-  <footer class="guide">
-    <div class="container">
-      <section class="card">
-        <h2>使い方</h2>
-        <ol class="guide-list">
-          <li>身長 (cm) と体重 (kg) を入力します。小数点以下 1 桁まで入力できます。</li>
-          <li>「計算する」を押すと、BMI・判定・アドバイスが表示されます。</li>
-          <li>ゲージの黒い線が、あなたのBMIの位置を示します。</li>
-          <li>計算結果は直近 20 件まで「履歴」に残り、グラフで推移を確認できます。履歴はこのブラウザ内にのみ保存され、「クリア」で削除できます。</li>
-        </ol>
-      </section>
-
-      <section class="card">
-        <h2>BMIと肥満度について</h2>
-        <p>BMI (Body Mass Index) は、身長と体重から求める体格の指標で、次の式で計算します。</p>
-        <p class="formula">BMI = 体重 (kg) ÷ 身長 (m) ÷ 身長 (m)</p>
-        <p>日本肥満学会では BMI 22 を最も病気になりにくい「標準体重」とし、BMI 25 以上を「肥満」としています。肥満度が上がるほど、高血圧・糖尿病・脂質異常症などの生活習慣病のリスクが高まるとされています。</p>
-
-        <table>
-          <thead><tr><th>BMI</th><th>判定</th></tr></thead>
-          <tbody>
-            <tr><td>18.5未満</td><td>低体重</td></tr>
-            <tr><td>18.5以上 25未満</td><td>普通体重</td></tr>
-            <tr><td>25以上 30未満</td><td>肥満 (1度)</td></tr>
-            <tr><td>30以上 35未満</td><td>肥満 (2度)</td></tr>
-            <tr><td>35以上 40未満</td><td>肥満 (3度)</td></tr>
-            <tr><td>40以上</td><td>肥満 (4度)</td></tr>
-          </tbody>
-        </table>
-
-        <p class="guide-note">※ BMIは筋肉と脂肪を区別しないため、筋肉量の多い方は高めに出ることがあります。子ども・高齢者・妊娠中の方は別の基準で評価されます。健康上の判断は医師にご相談ください。</p>
-      </section>
-    </div>
-  </footer>
-
-  <script src="script.js"></script>
+  <p>このページは <a href="../tools/bmi/">新しい場所</a> へ移動しました。</p>
 </body>
 </html>

@@ -23,7 +23,7 @@
 
   const LEGEND_SCORE = 500;
   const LEGEND_GLINT_MS = 500; // 伝説の動物が出る前に穴が光る時間
-  const LEGEND_STAY_MS = 400; // 伝説の動物が顔を出している時間
+  const LEGEND_STAY_MS = 460; // 伝説の動物が顔を出している時間
   const LEGEND_WINDOW = [0.2, 0.8]; // 制限時間のどこで出るか
 
   const STONE_PENALTY_SEC = 3;
@@ -168,7 +168,7 @@
   const PLAYABLE_STAGES = EDITION === 'demo' ? CHAPTERS[0].to : STAGES.length;
   // 完全版とサイトのトップ。体験版からのリンクには、どこから来たかが分かるよう UTM パラメータをつける
   const SITE_URL = 'https://tools.e-seventh.com/';
-  const FULL_VERSION_URL = `${SITE_URL}mole/`;
+  const FULL_VERSION_URL = `${SITE_URL}games/mole/`;
   const trackedURL = (url, placement) => `${url}?utm_source=itch.io&utm_medium=demo&utm_campaign=mole_demo&utm_content=${placement}`;
   const isPlayable = (no) => no <= PLAYABLE_STAGES;
 
@@ -209,7 +209,7 @@
 
     return {
       interval: range(lerp(950, 720, k), lerp(450, 330, k)), // 次が出るまでの間隔 (ms)
-      stay: range(lerp(1200, 950, k), lerp(700, 540, k)), // 出ている時間 (ms)
+      stay: range(lerp(1380, 1100, k), lerp(800, 620, k)), // 出ている時間 (ms)
       maxActive: range(Math.round(lerp(1, 3, k)), 3 + Math.round(k * 2)), // 同時に出ている最大数
       weights,
     };
@@ -692,11 +692,11 @@
       });
     }
 
-    // 目標点 / 1.5倍 / 2倍 で星 1〜3
+    // 目標点 / 1.25倍 / 1.5倍 で星 1〜3
     stars() {
       const t = this.stage.target;
-      if (this.score >= t * 2) return 3;
-      if (this.score >= t * 1.5) return 2;
+      if (this.score >= t * 1.5) return 3;
+      if (this.score >= t * 1.25) return 2;
       if (this.score >= t) return 1;
       return 0;
     }

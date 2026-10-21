@@ -2,9 +2,9 @@
 """itch.io に載せる体験版 (第1章 STAGE 1〜10 まで) の zip を作る。
 
 使い方 (リポジトリのどこからでも):
-    python3 mole/build-itchio.py
+    python3 games/mole/build-itchio.py
 
-mole/dist/mole-itchio.zip ができるので、itch.io のプロジェクトに
+games/mole/dist/mole-itchio.zip ができるので、itch.io のプロジェクトに
 「HTML」の種類でアップロードし、「This file will be played in the browser」にチェックを入れる。
 
 やっていること:

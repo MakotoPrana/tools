@@ -2,120 +2,14 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-4VLZW1VMVC');
-  </script>
-  <title>BRICK SIEGE</title>
-  <meta name="description" content="迫りくるブロックから防衛ラインを守り抜く、タワーディフェンス風のブロック崩し。全20ステージ、Gold で能力をアップグレードしながら全チャレンジ制覇を目指します。" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" />
-  <link rel="stylesheet" href="style.css?v=2" />
+  <!-- 旧URL。/games/breakout/ へ移動したので転送する (UTM などのパラメータも引き継ぐ) -->
+  <meta http-equiv="refresh" content="0; url=../games/breakout/" />
+  <link rel="canonical" href="https://tools.e-seventh.com/games/breakout/" />
+  <meta name="robots" content="noindex" />
+  <title>移動しました</title>
+  <script>location.replace('../games/breakout/' + location.search + location.hash);</script>
 </head>
 <body>
-  <main class="app">
-    <header class="top" id="top">
-      <a class="back" href="../">‹ ツール一覧</a>
-      <h1>BRICK SIEGE</h1>
-      <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" tabindex="-1">Ⅱ</button>
-    </header>
-
-    <dl class="stats" id="stats">
-      <div><dt>STAGE</dt><dd id="stage-no">-</dd></div>
-      <div><dt>GOLD</dt><dd id="gold">0</dd></div>
-      <div><dt>LIFE</dt><dd id="lives">-</dd></div>
-      <div><dt>TIME</dt><dd id="time">-</dd></div>
-    </dl>
-
-    <div class="board-wrap" id="board-wrap">
-      <canvas id="board" aria-label="ゲーム画面"></canvas>
-      <div class="overlay" id="overlay">
-        <div class="title-screen" id="title-screen" hidden>
-          <p class="game-logo"><span class="logo-brick">BRICK</span><span class="logo-siege">SIEGE</span></p>
-          <p class="game-kana">ブリック・シージ</p>
-          <p class="game-tagline">迫りくるブロックから、防衛ラインを守り抜け</p>
-        </div>
-        <p class="overlay-title" id="overlay-title"></p>
-        <p class="overlay-text" id="overlay-text"></p>
-        <div class="panel" id="panel" hidden></div>
-        <div class="overlay-actions" id="overlay-actions"></div>
-      </div>
-    </div>
-
-    <section class="help">
-      <h2>遊び方</h2>
-      <p>ブロックは少しずつ手前に迫ってきます。パドルでボールを打ち返してブロックを壊し、赤い点線の「防衛ライン」まで来させないように守りましょう。ブロックが防衛ラインを越えるとライフが1減り、越えたブロックは消えます (同時に越えた段はまとめて1回と数えます)。ボールを下に落としたときもライフが1減り、ライフがなくなるとステージ失敗です。ブロックをすべて壊すとステージクリアです。</p>
-      <p>パドルの端で打ち返すほど、ボールは斜めに飛びます。ブロックには種類ごとにHP (耐久力) があり、ボールが当たるたびにボールの攻撃力の分だけ減って、0になると壊れます。壊れなかったブロックには、残りのHPがゲージで表示されます。HPが半分を切るとヒビが入り、0に近づくほどヒビが広がります。ステージが進むほど、ブロックが迫ってくる速さとボールの速さが上がり、硬いブロックが増えます。画面の上に控えのブロックが隠れているステージでは、どこかの段を全部消すと、その段より上のブロックが1段ずつ下がって詰まり、控えの段が上からせり出してきます。</p>
-
-      <h3>ステージと難易度</h3>
-      <p>ステージは全部で20あり、ステージ選択画面でどれからでも遊べます。ステージを選ぶと確認画面で全体像を見て、難易度 (Easy / Normal / Hard) を選べます。最初は前回遊んだ難易度が選ばれています。</p>
-      <table>
-        <tbody>
-          <tr><th>Easy</th><td>ライフ 5、迫る速さ ×0.7、ボール ×0.9、Gold ×1</td></tr>
-          <tr><th>Normal</th><td>ライフ 3、迫る速さ ×1、ボール ×1、Gold ×1.5</td></tr>
-          <tr><th>Hard</th><td>ライフ 2、迫る速さ ×1.3、ボール ×1.1、Gold ×2</td></tr>
-        </tbody>
-      </table>
-
-      <h3>チャレンジと達成率</h3>
-      <p>各ステージの各難易度に「ステージクリア」「タイムアタック (目標時間以内にクリア)」「ノーダメージクリア (ライフを1つも失わずにクリア)」の3つのチャレンジがあります。全20ステージ × 3難易度 × 3チャレンジ = 180個をすべて達成すると達成率100%です。達成状況はステージ選択画面の「達成率」で見られます。</p>
-
-      <h3>Gold とアップグレード</h3>
-      <p>ブロックを壊すと Gold が貯まり (最大HP 10 につき 1 Gold、難易度の倍率つき)、ステージをクリアするとすべて受け取れます。失敗したとき (リタイアを含む) は 1/3 だけ受け取れます。Gold はステージ選択画面の「アップグレード」で能力の強化に使えます。強化は保存され、ずっと有効です。</p>
-      <table>
-        <tbody>
-          <tr><th>攻撃力</th><td>10 → 50 (8段階)</td></tr>
-          <tr><th>スマッシュ持続時間</th><td>0.5秒 → 2秒 (6段階)</td></tr>
-          <tr><th>爆弾の範囲</th><td>17px → 34px (8段階)</td></tr>
-          <tr><th>爆弾の攻撃力</th><td>20 → 100 (8段階)</td></tr>
-        </tbody>
-      </table>
-
-      <h3>スマホの操作</h3>
-      <table>
-        <tbody>
-          <tr><th>盤面を左右になぞる (パドルの下の帯がおすすめ)</th><td>パドルを移動 (指を動かした分だけ動きます)</td></tr>
-          <tr><th>画面をタップ</th><td>ボールを発射 / プレイ中はスマッシュの構え</td></tr>
-        </tbody>
-      </table>
-
-      <h3>パソコンの操作</h3>
-      <table>
-        <tbody>
-          <tr><th>マウス移動 / ← →</th><td>パドルを移動</td></tr>
-          <tr><th>クリック / スペース</th><td>ボールを発射 / プレイ中はスマッシュの構え</td></tr>
-          <tr><th>P / Esc</th><td>一時停止 (メニュー画面では Esc で戻る)</td></tr>
-        </tbody>
-      </table>
-
-      <h3>スマッシュ</h3>
-      <p>プレイ中にタップ (パソコンはクリックかスペース) すると、パドルの枠が一瞬光ります。光っている間にボールを打ち返すとスマッシュになり、ボールが彗星のように尾を引いて、攻撃力が2倍になります。スマッシュは最初にブロックに当たった時点から、スマッシュ持続時間の間続きます。スマッシュ中にブロックを壊すと、ボールは跳ね返らずに貫通してそのまま進みます (壊しきれなかったときは跳ね返ります)。一度光らせると、0.5秒たつまで次は光りません。</p>
-
-      <h3>爆弾ブロック</h3>
-      <p>黄色と黒の縞に爆弾の絵が描かれたブロックは、壊すと爆発して、爆弾の範囲内にある周りのブロックに爆弾の攻撃力の分のダメージを与えます。爆風で壊れた爆弾ブロックも連鎖して爆発します。爆弾ブロック自体は HP 10 で、硬さの段階はありません。</p>
-
-      <h3>ブロックのHP</h3>
-      <table>
-        <tbody>
-          <tr><th>青・水色・緑</th><td>HP 10</td></tr>
-          <tr><th>黄色</th><td>HP 15</td></tr>
-          <tr><th>オレンジ・赤</th><td>HP 20</td></tr>
-          <tr><th>銀色</th><td>HP 30</td></tr>
-        </tbody>
-      </table>
-      <p class="note">上の表はふつうのブロック (第1段階) の値です。リベットで留めた補強板のブロック (第2段階) はHPが2倍、斜めの縞が入った厚い装甲のブロック (第3段階) は4倍、鋼鉄の枠にはめたブロック (第4段階) は7倍、光るコアを持つ黒い装甲のブロック (第5段階) は12倍です。幅が半分のブロックは、HPも同じ色・同じ段階のブロックの半分 (端数は切り上げ) です。</p>
-    </section>
-  </main>
-
-  <footer>&copy; tools.e-seventh.com</footer>
-
-  <script src="script.js?v=2"></script>
+  <p>このページは <a href="../games/breakout/">新しい場所</a> へ移動しました。</p>
 </body>
 </html>
