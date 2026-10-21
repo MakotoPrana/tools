@@ -11,6 +11,9 @@
   const HOLE_COOLDOWN = 350; // 引っ込んでから同じ穴に出てくるまでの最短時間
   const COUNTDOWN_MS = 3000;
   const LAST_SPURT_SEC = 10;
+  const RESULT_STAR_DELAY_MS = 450; // 結果画面で1つ目の星が出るまでの時間
+  const RESULT_STAR_GAP_MS = 300; // 星と星の間
+  const CONFETTI_COUNT = 70;
   const RESULT_LOCK_MS = 2000; // 結果画面のボタンを押せるようになるまでの時間 (たたく勢いで押さないように)
   const MAX_DT = 100; // タブの切り替えなどで dt が跳ねたときの上限
   const SAVE_KEY = 'mole-save';
@@ -938,9 +941,46 @@
     spike() { this.tone(1200, 0.05, { type: 'square', vol: 0.08, slide: 400 }); },
     miss() { this.tone(180, 0.06, { type: 'triangle', vol: 0.08 }); },
     count(go) { this.tone(go ? 880 : 520, go ? 0.25 : 0.12, { type: 'triangle', vol: 0.15 }); },
+    // ビブラートのかかった音 (失敗したときの「ワワワーン」用)
+    wobble(freq, dur, delay) {
+      if (!this.enabled || !this.ctx) return;
+      const t = this.ctx.currentTime + delay;
+      const osc = this.ctx.createOscillator();
+      const lfo = this.ctx.createOscillator();
+      const depth = this.ctx.createGain();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.linearRampToValueAtTime(freq * 0.94, t + dur);
+      lfo.frequency.value = 6;
+      depth.gain.value = freq * 0.03;
+      lfo.connect(depth).connect(osc.frequency);
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.setValueAtTime(0.08, t + dur * 0.6);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(gain).connect(this.ctx.destination);
+      osc.start(t);
+      lfo.start(t);
+      osc.stop(t + dur);
+      lfo.stop(t + dur);
+    },
+
     end(cleared) {
-      const notes = cleared ? [523, 659, 784, 1047] : [392, 330, 262];
-      notes.forEach((f, i) => this.tone(f, 0.18, { type: 'triangle', vol: 0.15, delay: i * 0.12 }));
+      if (cleared) {
+        // 駆け上がってから和音で締めるファンファーレ
+        [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.15, { type: 'square', vol: 0.09, delay: i * 0.1 }));
+        [784, 988, 1175].forEach((f, i) => this.tone(f, 0.12, { type: 'square', vol: 0.08, delay: 0.45 + i * 0.08 }));
+        [523, 659, 784, 1047].forEach((f) => this.tone(f, 0.9, { type: 'triangle', vol: 0.1, delay: 0.75 }));
+      } else {
+        [392, 370, 349].forEach((f, i) => this.wobble(f, 0.3, i * 0.34));
+        this.wobble(330, 1, 1.02);
+      }
+    },
+
+    // 結果画面で星が1つ出るたびに鳴らす (星が増えるほど高く)
+    star(i) {
+      this.tone(1175 + i * 220, 0.18, { type: 'triangle', vol: 0.14 });
+      this.tone(1760 + i * 330, 0.14, { type: 'sine', vol: 0.08, delay: 0.05 });
     },
   };
 
@@ -1731,9 +1771,12 @@
 
   let overlayLockTimer = null;
 
-  const showOverlay = ({ sub = '', title, text = '', legend = '', buttons, cls = '', lockMs = 0 }) => {
+  const showOverlay = ({ sub = '', title, text = '', legend = '', stars = null, buttons, cls = '', lockMs = 0 }) => {
     $('overlay-sub').textContent = sub;
     $('overlay-title').textContent = title;
+    // 星は1つずつ順番に出す (CSS のアニメーションの遅れで順番をつける)
+    $('overlay-stars').innerHTML = stars === null ? ''
+      : [0, 1, 2].map((i) => `<span class="ostar${i < stars ? ' on' : ''}" style="animation-delay:${RESULT_STAR_DELAY_MS + i * RESULT_STAR_GAP_MS}ms">★</span>`).join('');
     $('overlay-text').textContent = text;
     const legendEl = $('overlay-legend');
     legendEl.className = `overlay-legend${legend && legend.missed ? ' missed' : ''}`;
@@ -1770,12 +1813,53 @@
 
   const hideOverlay = () => { overlay.hidden = true; };
 
+  const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // 紙吹雪を降らせる
+  const confetti = () => {
+    if (reducedMotion()) return;
+    const box = document.createElement('div');
+    box.className = 'confetti';
+    const colors = ['#ff6b8b', '#ffd23f', '#5ec8f2', '#7ad36b', '#b38cff', '#ff9f43', '#ffffff'];
+    for (let i = 0; i < CONFETTI_COUNT; i++) {
+      const piece = document.createElement('span');
+      const w = 6 + Math.random() * 5;
+      piece.style.cssText = `left:${Math.random() * 100}%;width:${w}px;height:${w * 1.6}px;background:${colors[i % colors.length]};`
+        + `--dx:${(Math.random() - 0.5) * 120}px;--rot:${(Math.random() < 0.5 ? -1 : 1) * (360 + Math.random() * 540)}deg;`
+        + `animation-duration:${2.2 + Math.random() * 1.6}s;animation-delay:${Math.random() * 0.6}s;${i % 3 === 0 ? 'border-radius:50%;' : ''}`;
+      box.appendChild(piece);
+    }
+    fieldEl.appendChild(box);
+    setTimeout(() => box.remove(), 5000);
+  };
+
+  // 結果の演出で動物たちを穴から出す。クリアなら喜んで跳ね、失敗ならからかうように揺れる
+  const showCrowd = (cleared) => {
+    const animals = stageAnimals(stage);
+    holeEls.forEach((el) => {
+      const kind = animals[Math.floor(Math.random() * animals.length)];
+      el.dataset.kind = kind;
+      el.querySelector('.mole').innerHTML = artSVG(kind);
+      el.classList.remove('hit', 'spiky', 'turned', 'legend', 'hazard', 'glint');
+      el.dataset.hurt = 0;
+      el.style.setProperty('--crowd-delay', `${Math.round(Math.random() * 400)}ms`);
+      el.classList.add('up', cleared ? 'cheer' : 'tease');
+    });
+  };
+
+  // 結果の演出を片づける
+  const clearResultFx = () => {
+    fieldEl.classList.remove('gloom', 'flash');
+    fieldEl.querySelectorAll('.confetti').forEach((el) => el.remove());
+  };
+
   const startStage = (s) => {
     Sound.unlock();
     if (game) game.abort();
     stage = s;
     $('play-stage').textContent = `STAGE ${s.no}  ${stageName(s)}`;
     show('play');
+    clearResultFx();
     buildGrid();
     fieldEl.classList.remove('stunned');
     game = new MoleGame(stage, onGameEvent);
@@ -1788,6 +1872,7 @@
     if (game) game.abort();
     game = null;
     hideOverlay();
+    clearResultFx();
     openSelect();
   };
 
@@ -1809,9 +1894,20 @@
     renderHud();
     Sound.end(r.cleared);
 
+    // 演出: クリアは紙吹雪と光、失敗は盤面を暗くして揺らす
+    showCrowd(r.cleared);
+    if (r.cleared) {
+      fieldEl.classList.add('flash');
+      confetti();
+      for (let i = 0; i < r.stars; i++) setTimeout(() => Sound.star(i), RESULT_STAR_DELAY_MS + i * RESULT_STAR_GAP_MS + 200);
+    } else {
+      fieldEl.classList.add('gloom');
+      setTimeout(shake, 450); // TIME UP の文字が落ちてきたところで揺らす
+    }
+
     const lines = [
       t('resultScore', r.score, isBest && r.score > 0),
-      r.cleared ? '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars) : t('resultShort', stage.target - r.score),
+      ...(r.cleared ? [] : [t('resultShort', stage.target - r.score)]),
       t('resultHits', r.hits, r.maxCombo),
       t('resultStats', Math.round(r.accuracy * 100), r.escaped, r.hazardsHit),
     ];
@@ -1821,7 +1917,7 @@
 
     const buttons = [];
     const next = STAGES[stage.no];
-    if (next) buttons.push({ label: t('nextStage'), primary: r.cleared, action: () => { game = null; hideOverlay(); openConfirm(next); } });
+    if (next) buttons.push({ label: t('nextStage'), primary: r.cleared, action: () => { game = null; hideOverlay(); clearResultFx(); openConfirm(next); } });
     buttons.push({ label: t('retry'), primary: !r.cleared || !next, action: () => startStage(stage) });
     buttons.push({ label: t('toSelect'), action: leavePlay });
     buttons.sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)));
@@ -1831,6 +1927,7 @@
       title: r.cleared ? 'STAGE CLEAR!' : 'TIME UP',
       text: lines.join('\n'),
       legend,
+      stars: r.stars,
       buttons,
       cls: r.cleared ? 'clear' : 'fail',
       lockMs: RESULT_LOCK_MS,
