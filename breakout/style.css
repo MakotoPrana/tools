@@ -55,6 +55,8 @@ body {
 .back { color: var(--muted); text-decoration: none; font-size: 0.85rem; white-space: nowrap; }
 .back:hover { color: var(--accent); }
 
+.top-btns { flex: none; display: flex; gap: 6px; }
+
 .icon-btn {
   flex: none;
   width: 40px;
@@ -67,6 +69,9 @@ body {
   font-weight: 700;
   cursor: pointer;
 }
+
+/* 効果音を消しているとき */
+.icon-btn[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
 
 /* スコア表示 */
 .stats {

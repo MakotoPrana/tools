@@ -34,6 +34,7 @@
   const TARGET_BASE = 20;
   const TARGET_PER_HIT = 0.8;
   const SAVE_KEY = 'brick-siege-save';
+  const SOUND_KEY = 'brick-siege-sound';
 
   // 硬さの段階ごとのHPの倍率 (1 がふつうのブロック)
   const TIER_SCALE = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 12 };
@@ -479,6 +480,7 @@
   const panelEl = $('panel');
   const actionsEl = $('overlay-actions');
   const pauseBtn = $('pause-btn');
+  const soundBtn = $('sound-btn');
   const stageEl = $('stage-no');
   const goldEl = $('gold');
   const livesEl = $('lives');
@@ -527,6 +529,232 @@
   // ---------- セーブデータ ----------
   // gold: 所持 Gold / upgrades: 能力ごとのレベル / difficulty: 前回遊んだ難易度 /
   // records[ステージ番号 - 1][難易度]: チャレンジの達成状況とベストタイム
+  // ---------- 効果音 (Web Audio で合成) ----------
+  // ブロックを叩く音は、いくつかの響き (固有の振動) と叩いた瞬間の短い雑音を重ねて作る。
+  // 第1段階は板や樹脂の乾いた「カチッ」、第2段階からは金属の棒の響き (倍音の比 1 : 2.76 : 5.40 : 8.93) で、
+  // 段階が上がるほど低く長く響く「カチン → カン → キーン → ガーン」にする
+  const BAR = [1, 2.76, 5.4, 8.93];
+  const STRIKES = {
+    1: { base: 1900, ratios: [1, 1.63, 2.5], gains: [1, 0.45, 0.2], decay: 0.04, click: 2500, clickDur: 0.012, vol: 0.34 },
+    2: { base: 1500, ratios: BAR.slice(0, 3), gains: [1, 0.55, 0.3], decay: 0.1, click: 3500, clickDur: 0.008, vol: 0.3 },
+    3: { base: 980, ratios: BAR, gains: [1, 0.6, 0.38, 0.2], decay: 0.2, click: 3000, clickDur: 0.007, vol: 0.3 },
+    4: { base: 720, ratios: BAR, gains: [1, 0.7, 0.5, 0.32], decay: 0.4, click: 4200, clickDur: 0.006, vol: 0.27, shimmer: true },
+    5: { base: 380, ratios: BAR, gains: [1, 0.75, 0.55, 0.38], decay: 0.65, click: 1800, clickDur: 0.012, vol: 0.32, thud: true },
+  };
+
+  const Sound = {
+    ctx: null,
+    out: null,
+    noiseBuf: null,
+    enabled: true,
+    last: new Map(),
+
+    // 音を出せるようにする。ブラウザが許すのはタップやキー入力の最中だけなので、操作のたびに呼ぶ
+    unlock() {
+      if (!this.enabled) return;
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        this.ctx = new AC();
+        // 爆発の連鎖などで音が重なっても割れないよう、まとめて圧縮してから出す
+        const comp = this.ctx.createDynamicsCompressor();
+        this.out = this.ctx.createGain();
+        this.out.gain.value = 0.8;
+        this.out.connect(comp).connect(this.ctx.destination);
+        const len = this.ctx.sampleRate;
+        this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const data = this.noiseBuf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      }
+      if (this.ctx.state === 'running') return;
+      const resumed = this.ctx.resume();
+      if (resumed && resumed.catch) resumed.catch(() => {});
+      // iPhone の Safari は、操作の最中に無音を1回鳴らすと音を出せるようになる
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.ctx.createBuffer(1, 1, 22050);
+      src.connect(this.ctx.destination);
+      src.start(0);
+    },
+
+    // 鳴らしてよいか。同じ音は gap 秒以内に重ねて鳴らさない (連鎖で数十個同時に鳴るのを防ぐ)
+    ready(name, gap = 0) {
+      if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return false;
+      const now = this.ctx.currentTime;
+      if (gap && now - (this.last.get(name) ?? -1) < gap) return false;
+      this.last.set(name, now);
+      return true;
+    },
+
+    at(delay) {
+      return this.ctx.currentTime + delay;
+    },
+
+    // 減衰する1つの音 (slide を指定すると周波数がその倍率まで動く)
+    osc(freq, t, decay, vol, { type = 'sine', slide = 0, attack = 0.002 } = {}) {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t);
+      if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * slide), t + decay);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+      o.connect(g).connect(this.out);
+      o.start(t);
+      o.stop(t + decay + 0.05);
+    },
+
+    // 雑音をフィルターに通した音 (to を指定するとフィルターの周波数がそこまで動く)
+    noise(t, dur, vol, { type = 'bandpass', freq = 3000, q = 1, to = 0, attack = 0.001 } = {}) {
+      const src = this.ctx.createBufferSource();
+      const f = this.ctx.createBiquadFilter();
+      const g = this.ctx.createGain();
+      src.buffer = this.noiseBuf;
+      f.type = type;
+      f.Q.value = q;
+      f.frequency.setValueAtTime(freq, t);
+      if (to) f.frequency.exponentialRampToValueAtTime(to, t + dur);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f).connect(g).connect(this.out);
+      src.start(t, Math.random() * 0.5);
+      src.stop(t + dur + 0.05);
+    },
+
+    // 叩いた音。強さ (power) で大きさを、len で響きの長さを変える
+    strike(tier, t, power = 1, len = 1) {
+      const p = STRIKES[tier];
+      const pitch = 1 + (Math.random() - 0.5) * 0.04; // 毎回少しずつ違う音にする
+      const vol = p.vol * power * (0.9 + Math.random() * 0.2);
+      p.ratios.forEach((r, i) => {
+        const f = p.base * r * pitch;
+        const d = p.decay * len / (1 + i * 0.35); // 高い響きほど早く消える
+        this.osc(f, t, d, vol * p.gains[i]);
+        if (p.shimmer) this.osc(f * 1.004, t, d, vol * p.gains[i] * 0.5); // わずかにずらした音でうなりを出す
+      });
+      this.noise(t, p.clickDur, vol * 1.6, { type: 'highpass', freq: p.click });
+      if (p.thud) this.osc(95, t, 0.18, vol * 1.2, { slide: 0.6 });
+    },
+
+    hit(tier, smashing, delay = 0) {
+      if (!this.ready(`hit${tier}`, 0.025)) return;
+      this.strike(tier, this.at(delay), smashing ? 1.3 : 1);
+    },
+
+    // 壊れる音: 短く叩いた音に、崩れる音と飛び散るかけらの音を重ねる
+    shatter(tier, delay = 0) {
+      if (!this.ready(`break${tier}`, 0.03)) return;
+      const t = this.at(delay);
+      const p = STRIKES[tier];
+      this.strike(tier, t, 1.1, 0.5);
+      const crumble = 0.08 + tier * 0.03;
+      this.noise(t, crumble, 0.35, { freq: tier === 1 ? 2200 : 3800, to: 500, q: 0.8 });
+      for (let i = 0; i < 2 + tier; i++) {
+        const f = p.base * (1.4 + Math.random() * 1.8);
+        this.osc(f, t + 0.02 + Math.random() * crumble, 0.03 + Math.random() * 0.04, 0.05 + Math.random() * 0.04);
+      }
+    },
+
+    explosion(delay = 0) {
+      if (!this.ready('boom', 0.04)) return;
+      const t = this.at(delay);
+      this.noise(t, 0.7, 0.9, { type: 'lowpass', freq: 2400, to: 120, q: 0.7 });
+      this.osc(80, t, 0.5, 0.7, { slide: 0.45 });
+      this.noise(t + 0.03, 0.25, 0.25, { type: 'highpass', freq: 3000 }); // 火の粉のはじける音
+    },
+
+    wall() {
+      if (!this.ready('wall', 0.03)) return;
+      const t = this.at(0);
+      this.osc(900, t, 0.03, 0.08);
+      this.noise(t, 0.01, 0.08, { freq: 1800 });
+    },
+
+    paddle() {
+      if (!this.ready('paddle', 0.03)) return;
+      const t = this.at(0);
+      this.osc(360, t, 0.1, 0.32, { type: 'triangle' });
+      this.osc(720, t, 0.05, 0.12);
+      this.noise(t, 0.015, 0.12, { type: 'lowpass', freq: 1500 });
+    },
+
+    // スマッシュで打ち返した音: 空気を切る音と高い金属音
+    smash() {
+      if (!this.ready('smash')) return;
+      const t = this.at(0);
+      this.noise(t, 0.22, 0.4, { freq: 600, to: 4500, q: 1.2 });
+      this.strike(3, t, 0.9, 1.4);
+      this.osc(1320, t + 0.02, 0.3, 0.1);
+    },
+
+    // タップでパドルの枠が光った音
+    charge() {
+      if (!this.ready('charge')) return;
+      const t = this.at(0);
+      this.noise(t, 0.05, 0.15, { type: 'highpass', freq: 6000 });
+      this.osc(2400, t, 0.06, 0.05);
+    },
+
+    launch() {
+      if (!this.ready('launch')) return;
+      this.osc(520, this.at(0), 0.1, 0.15, { type: 'triangle', slide: 1.6 });
+    },
+
+    miss() {
+      if (!this.ready('miss')) return;
+      const t = this.at(0);
+      this.osc(330, t, 0.5, 0.22, { type: 'triangle', slide: 0.45 });
+      this.osc(165, t, 0.5, 0.12, { type: 'triangle', slide: 0.45 });
+    },
+
+    // 防衛ラインを越えられた警報
+    breach() {
+      if (!this.ready('breach', 0.3)) return;
+      const t = this.at(0);
+      [0, 0.18].forEach((d) => this.osc(d ? 330 : 440, t + d, 0.16, 0.07, { type: 'square', attack: 0.005 }));
+      this.osc(70, t, 0.35, 0.5, { slide: 0.6 });
+    },
+
+    // 控えの段がせり出してくる地響き
+    rumble() {
+      if (!this.ready('rumble', 0.2)) return;
+      this.noise(this.at(0), 0.4, 0.3, { type: 'lowpass', freq: 260, q: 0.5, attack: 0.05 });
+    },
+
+    end(cleared) {
+      if (!this.ready('end')) return;
+      const t = this.at(0.05);
+      const notes = cleared ? [523, 659, 784, 1047] : [392, 330, 262, 196];
+      const step = cleared ? 0.11 : 0.18;
+      notes.forEach((f, i) => this.osc(f, t + i * step, cleared ? 0.3 : 0.4, 0.28, { type: 'triangle', attack: 0.01 }));
+      if (cleared) this.osc(1568, t + notes.length * step, 0.6, 0.16);
+    },
+
+    ui() {
+      if (!this.ready('ui', 0.03)) return;
+      this.osc(1000, this.at(0), 0.04, 0.06);
+    },
+
+    coin() {
+      if (!this.ready('coin')) return;
+      const t = this.at(0);
+      this.osc(1976, t, 0.1, 0.08, { type: 'square' });
+      this.osc(2637, t + 0.07, 0.3, 0.07, { type: 'square' });
+    },
+  };
+
+  try {
+    Sound.enabled = localStorage.getItem(SOUND_KEY) !== 'off';
+  } catch {
+    // 既定のまま (鳴らす)
+  }
+
+  // ブロックの音は硬さの段階で決める (爆弾ブロックは段階を持たないので第1段階の音)
+  function brickTier(b) {
+    return b.kind.bomb ? 1 : b.tier;
+  }
+
   function loadSave() {
     const data = { gold: 0, upgrades: {}, difficulty: 'normal', records: {} };
     try {
@@ -624,6 +852,7 @@
     b.type = 'button';
     b.addEventListener('click', () => {
       b.blur();
+      Sound.ui();
       action();
     });
     return b;
@@ -782,6 +1011,7 @@
     bricks = bricks.filter((b) => b.y + b.h < line);
     breached.forEach((b) => burst(b));
     breachFlash = 0.6;
+    Sound.breach();
     lives -= 1;
     damaged = true;
     updateStats();
@@ -827,6 +1057,7 @@
     if (state !== 'playing' || smashCooldown > 0) return;
     smashWindow = SMASH_WINDOW;
     smashCooldown = SMASH_COOLDOWN;
+    Sound.charge();
   }
 
   function serve() {
@@ -858,9 +1089,11 @@
     ball.vx = ball.speed * Math.sin(angle);
     ball.vy = -ball.speed * Math.cos(angle);
     state = 'playing';
+    Sound.launch();
   }
 
   function loseLife() {
+    Sound.miss();
     lives -= 1;
     damaged = true;
     updateStats();
@@ -875,6 +1108,7 @@
   // チャレンジの結果を保存して結果画面を出す
   function finishStage(cleared) {
     state = 'result';
+    Sound.end(cleared);
     const d = DIFFICULTIES[difficulty];
     const full = runGoldShown();
     const earned = cleared ? full : Math.floor(full * FAIL_GOLD_RATE);
@@ -1134,6 +1368,7 @@
     if (lv >= u.levels || save.gold < cost) return;
     save.gold -= cost;
     save.upgrades[u.id] = lv + 1;
+    Sound.coin();
     persist();
     showUpgrade(true);
   }
@@ -1265,9 +1500,11 @@
     if (ball.x < BALL_R) {
       ball.x = BALL_R;
       ball.vx = Math.abs(ball.vx);
+      Sound.wall();
     } else if (ball.x > W - BALL_R) {
       ball.x = W - BALL_R;
       ball.vx = -Math.abs(ball.vx);
+      Sound.wall();
     }
     if (hitBrick()) {
       ball.x -= ball.vx * dt;
@@ -1279,6 +1516,7 @@
     if (ball.y < BALL_R) {
       ball.y = BALL_R;
       ball.vy = Math.abs(ball.vy);
+      Sound.wall();
     }
     if (hitBrick()) {
       ball.y -= ball.vy * dt;
@@ -1304,8 +1542,10 @@
         smashTime = 0;
         smashText = 0.7;
         sparks(ball.x, paddle.y);
+        Sound.smash();
       } else {
         smashCharged = false; // ブロックに当てずに戻ってきた溜めは消える
+        Sound.paddle();
       }
     }
 
@@ -1333,7 +1573,10 @@
       const smashing = smashTime > 0;
       b.hp -= power.attack * (smashing ? SMASH_POWER : 1);
       b.flash = 0.15;
-      if (b.hp > 0) return true;
+      if (b.hp > 0) {
+        Sound.hit(brickTier(b), smashing);
+        return true;
+      }
 
       destroyBricks([b]);
       if (state !== 'playing') return false;
@@ -1362,6 +1605,7 @@
       rows.add(b.row);
       runGold += b.gold;
       burst(b);
+      Sound.shatter(brickTier(b), depth * 0.08);
       if (!b.kind.bomb) continue;
       explode(b, depth);
       for (const o of bricks) {
@@ -1369,6 +1613,7 @@
         o.hp -= power.bomb;
         o.flash = 0.15;
         if (o.hp <= 0) queue.push({ b: o, depth: depth + 1 });
+        else Sound.hit(brickTier(o), false, (depth + 1) * 0.08);
       }
     }
     updateStats();
@@ -1382,7 +1627,10 @@
       .filter((r) => !bricks.some((o) => o.row === r))
       .sort((a, b) => b - a)
       .forEach((r, i) => {
-        if (reserveRows() > 0) collapseRow(r + i);
+        if (reserveRows() > 0) {
+          collapseRow(r + i);
+          Sound.rumble();
+        }
       });
   }
 
@@ -1391,6 +1639,7 @@
     const x = b.x + b.w / 2;
     const y = b.y + b.h / 2;
     explosions.push({ x, y, r: Math.max(b.w, b.h) / 2 + power.range, t: -depth * 0.08 });
+    Sound.explosion(depth * 0.08);
     for (let i = 0; i < 18; i++) {
       const a = Math.random() * Math.PI * 2;
       const v = 60 + Math.random() * 160;
@@ -1977,6 +2226,29 @@
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
     if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
   });
+
+  // 音はタップやキー入力の最中にしか鳴らし始められないので、操作のたびに準備する
+  document.addEventListener('pointerdown', () => Sound.unlock(), true);
+  document.addEventListener('keydown', () => Sound.unlock(), true);
+
+  function updateSoundBtn() {
+    soundBtn.setAttribute('aria-pressed', String(Sound.enabled));
+    soundBtn.setAttribute('aria-label', Sound.enabled ? '効果音を消す' : '効果音を鳴らす');
+  }
+
+  soundBtn.addEventListener('click', () => {
+    soundBtn.blur();
+    Sound.enabled = !Sound.enabled;
+    try {
+      localStorage.setItem(SOUND_KEY, Sound.enabled ? 'on' : 'off');
+    } catch {
+      // 保存できなくても、このページを開いている間は切り替わる
+    }
+    Sound.unlock();
+    Sound.ui();
+    updateSoundBtn();
+  });
+  updateSoundBtn();
 
   pauseBtn.addEventListener('click', () => {
     pauseBtn.blur();
