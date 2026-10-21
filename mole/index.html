@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>モグラたたき</title>
+  <meta name="description" content="ブラウザで遊べるモグラたたきゲーム。スマホはタップ、パソコンはクリックかテンキーで遊べます。" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../">‹ ツール一覧</a>
+      <h1>モグラたたき</h1>
+      <div class="top-btns">
+        <button type="button" id="sound-btn" class="icon-btn" aria-label="効果音" aria-pressed="true">♪</button>
+        <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止">Ⅱ</button>
+      </div>
+    </header>
+
+    <dl class="hud">
+      <div><dt>SCORE</dt><dd id="score">0</dd></div>
+      <div><dt>TIME</dt><dd id="time">0</dd></div>
+      <div><dt>COMBO</dt><dd id="combo">0</dd></div>
+      <div><dt>BEST</dt><dd id="best">0</dd></div>
+    </dl>
+
+    <div class="goal">
+      <div class="goal-bar"><span id="goal-fill"></span></div>
+      <p class="goal-text" id="goal-text">目標 0点</p>
+    </div>
+
+    <section class="field" id="field">
+      <div class="grid" id="grid" aria-label="モグラの穴"></div>
+      <p class="toast" id="toast" aria-live="polite"></p>
+      <div class="overlay" id="overlay">
+        <p class="overlay-sub" id="overlay-sub"></p>
+        <p class="overlay-title" id="overlay-title">モグラたたき</p>
+        <p class="overlay-text" id="overlay-text"></p>
+        <button type="button" id="start-btn" class="start-btn">スタート</button>
+      </div>
+    </section>
+
+    <section class="help">
+      <h2>遊び方</h2>
+      <p>穴から顔を出したモグラを、引っ込む前にたたいて得点を集めます。制限時間内に目標の点数に届けばステージクリア。時間がたつほどモグラの出るペースが上がります。</p>
+
+      <h3>モグラの種類</h3>
+      <table>
+        <tbody>
+          <tr><th>ふつうのモグラ</th><td>10点</td></tr>
+          <tr><th>ヘルメットモグラ</th><td>2回たたくと 30点</td></tr>
+          <tr><th>金のモグラ</th><td>すぐ引っ込むが 50点</td></tr>
+          <tr><th>爆弾</th><td>たたくと −30点・コンボが切れる</td></tr>
+        </tbody>
+      </table>
+
+      <h3>コンボ</h3>
+      <p>モグラを続けてたたくとコンボがつながり、5コンボごとに得点の倍率が 0.5 ずつ上がります (最大 3 倍)。空振りしたり、モグラを逃がしたりするとコンボが切れます。</p>
+
+      <h3>操作</h3>
+      <table>
+        <tbody>
+          <tr><th>タップ / クリック</th><td>たたく</td></tr>
+          <tr><th>テンキー 1〜9</th><td>穴の位置に対応 (7 が左上、3 が右下)</td></tr>
+          <tr><th>P / Esc</th><td>一時停止</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>&copy; tools.e-seventh.com</footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
