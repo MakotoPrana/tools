@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>モグラたたき</title>
-  <meta name="description" content="モグラやウサギ、タヌキなど10種類の動物が出てくるモグラたたき。全10ステージで、伝説の動物を捕まえて図鑑を埋めよう。" />
+  <meta name="description" content="モグラやウサギ、パンダなど15種類の動物が出てくるモグラたたき。全30ステージで、伝説の動物を捕まえて図鑑を埋めよう。" />
+  <!-- full: 全ステージ / demo: 体験版 (itch.io 用、第1章まで)。build-itchio.py が demo に書き換える -->
+  <meta name="mole-edition" content="full" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -13,7 +15,10 @@
       <a class="back" href="../" data-i18n="backToTools">‹ ツール一覧</a>
       <h1 data-i18n="gameTitle">モグラたたき</h1>
       <div class="top-btns">
-        <button type="button" id="lang-btn" class="icon-btn text" lang="en" aria-label="Switch to English">EN</button>
+        <div class="lang-toggle" id="lang-btn" role="group" aria-label="言語 / Language">
+          <button type="button" data-set-lang="ja" lang="ja" aria-pressed="true">日本語</button>
+          <button type="button" data-set-lang="en" lang="en" aria-pressed="false">EN</button>
+        </div>
         <button type="button" id="bgm-btn" class="icon-btn text" aria-label="BGM" aria-pressed="true">BGM</button>
         <button type="button" id="sound-btn" class="icon-btn" data-i18n-aria="soundEffects" aria-label="効果音" aria-pressed="true">♪</button>
         <button type="button" id="pause-btn" class="icon-btn" data-i18n-aria="pause" aria-label="一時停止" hidden>Ⅱ</button>
@@ -35,6 +40,8 @@
         </div>
         <p class="title-hint" id="sound-hint" data-i18n="soundHint">画面をタップすると BGM と効果音が鳴ります</p>
       </div>
+      <!-- 体験版だけ、完全版 (tools.e-seventh.com) への案内を出す -->
+      <div class="promo" data-promo="title" hidden></div>
     </section>
 
     <!-- ステージ選択 -->
@@ -48,7 +55,8 @@
         <div><dt data-i18n="stars">星</dt><dd id="sum-stars">0 / 30</dd></div>
         <div><dt data-i18n="zukan">図鑑</dt><dd id="sum-zukan">0 / 10</dd></div>
       </dl>
-      <div class="tiles" id="stage-tiles"></div>
+      <div class="promo compact" data-promo="select" hidden></div>
+      <div id="stage-tiles"></div>
     </section>
 
     <!-- ステージ開始前の確認 -->
@@ -111,7 +119,8 @@
         <span class="head-spacer"></span>
       </div>
       <p class="zukan-count"><span id="zukan-count">0 / 10</span><span class="complete" id="zukan-complete" data-i18n="complete" hidden>コンプリート</span></p>
-      <div class="tiles" id="zukan-tiles"></div>
+      <div class="promo compact" data-promo="zukan" hidden></div>
+      <div id="zukan-tiles"></div>
     </section>
 
     <!-- 遊び方 (言語ごとに用意し、選んでいる言語だけ表示する) -->
@@ -119,6 +128,7 @@
       <div data-lang="ja" lang="ja">
         <h2>遊び方</h2>
         <p>穴から顔を出した動物を、引っ込む前にたたいて得点を集めます。制限時間内に目標の点数に届けばステージクリア。目標点で星1つ、1.5倍で星2つ、2倍で星3つです。</p>
+        <p>ステージは全30。10ステージごとに1つの章になっていて、第1章「どうぶつの里」、第2章「せかいの旅」、第3章「ゆめの国」と進むほど難しくなります。</p>
 
         <h3>動物</h3>
         <div class="table-wrap">
@@ -134,6 +144,11 @@
               <tr><th>カメ</th><td>40点。3回たたく</td></tr>
               <tr><th>フクロウ</th><td>25点。後ろを向いている間は当たらない</td></tr>
               <tr><th>アライグマ</th><td>30点。逃がすと −20点</td></tr>
+              <tr><th>ペンギン</th><td>20点。横一列に3羽で出てくる。3羽ともたたくと +50点</td></tr>
+              <tr><th>ハムスター</th><td>10点。3回までたたけて、たたくたびに点が入る</td></tr>
+              <tr><th>カメレオン</th><td>30点。背景に溶けこんで見えにくい</td></tr>
+              <tr><th>コアラ</th><td>10点。たたくと残り時間が2秒増える</td></tr>
+              <tr><th>パンダ</th><td>竹を食べ終わる前に早くたたくほど高得点 (60点 → 20点)</td></tr>
             </tbody>
           </table>
         </div>
@@ -163,7 +178,7 @@
               <tr><th>テンキー 1〜9</th><td>3×3 のステージで穴の位置に対応 (7 が左上、3 が右下)</td></tr>
               <tr><th>P / Esc</th><td>一時停止</td></tr>
               <tr><th>BGM / ♪ ボタン</th><td>BGM・効果音のオン／オフ</td></tr>
-              <tr><th>EN / 日本語 ボタン</th><td>表示する言語の切り替え</td></tr>
+              <tr><th>日本語 / EN ボタン</th><td>表示する言語の切り替え</td></tr>
             </tbody>
           </table>
         </div>
@@ -172,6 +187,7 @@
       <div data-lang="en" lang="en" hidden>
         <h2>How to Play</h2>
         <p>Animals pop out of the holes. Whack them before they duck back down to score points. Reach the target score before time runs out to clear the stage. You get one star for the target score, two stars for 1.5 times the target, and three stars for double.</p>
+        <p>There are 30 stages in three chapters of 10: Chapter 1 "Animal Village", Chapter 2 "Around the World" and Chapter 3 "Land of Dreams". Each chapter is harder than the last.</p>
 
         <h3>Animals</h3>
         <div class="table-wrap">
@@ -187,6 +203,11 @@
               <tr><th>Turtle</th><td>40 pts. Takes 3 hits</td></tr>
               <tr><th>Owl</th><td>25 pts. Hits don't land while it's facing away</td></tr>
               <tr><th>Raccoon</th><td>30 pts. If it gets away, you lose 20 pts</td></tr>
+              <tr><th>Penguin</th><td>20 pts. Three pop out side by side. Hit all three for +50 pts</td></tr>
+              <tr><th>Hamster</th><td>10 pts. You can hit it up to 3 times, and every hit scores</td></tr>
+              <tr><th>Chameleon</th><td>30 pts. Blends into the background, so it's hard to see</td></tr>
+              <tr><th>Koala</th><td>10 pts. Hitting it adds 2 seconds to the clock</td></tr>
+              <tr><th>Panda</th><td>The sooner you hit it, before it finishes its bamboo, the more it scores (60 → 20 pts)</td></tr>
             </tbody>
           </table>
         </div>
@@ -216,7 +237,7 @@
               <tr><th>Numpad 1–9</th><td>Matches the hole positions on 3×3 stages (7 is top left, 3 is bottom right)</td></tr>
               <tr><th>P / Esc</th><td>Pause</td></tr>
               <tr><th>BGM / ♪ buttons</th><td>Turn music and sound effects on or off</td></tr>
-              <tr><th>EN / 日本語 button</th><td>Switch the language</td></tr>
+              <tr><th>日本語 / EN button</th><td>Switch the language</td></tr>
             </tbody>
           </table>
         </div>
@@ -230,6 +251,7 @@
       <p class="modal-name" id="modal-name"></p>
       <p class="modal-desc" id="modal-desc"></p>
       <dl class="modal-meta" id="modal-meta"></dl>
+      <div class="modal-action" id="modal-action"></div>
       <button type="button" class="btn wide" id="modal-close" data-i18n="close">閉じる</button>
     </div>
   </div>

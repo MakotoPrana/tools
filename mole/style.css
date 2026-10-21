@@ -84,6 +84,7 @@ body {
   .top-btns { gap: 4px; }
   .icon-btn { width: 34px; }
   .icon-btn.text { padding: 0 6px; }
+  .lang-toggle button { padding: 0 5px; }
 }
 
 .icon-btn {
@@ -100,6 +101,31 @@ body {
 }
 
 .icon-btn.text { width: auto; padding: 0 8px; font-size: 0.72rem; letter-spacing: 0.04em; }
+/* 言語のトグル (日本語 / EN)。選んでいる方を色付きにする */
+.lang-toggle {
+  display: flex;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.lang-toggle button {
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lang-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; cursor: default; }
+.lang-toggle button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+
 .icon-btn[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
 
 /* ボタン */
@@ -244,6 +270,59 @@ body {
   font-size: 0.8rem;
 }
 
+/* 体験版の完全版案内 */
+.promo {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 16px 16px 14px;
+  border: 2px solid var(--star);
+  border-radius: 16px;
+  background: var(--legend-bg);
+  text-align: center;
+}
+
+.promo-badge {
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--star);
+  color: #1f1600;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.7;
+}
+
+.promo-title { margin: 0; font-size: 1.1rem; font-weight: 800; text-wrap: balance; }
+.promo-desc { margin: 0; max-width: 36em; color: var(--muted); font-size: 0.85rem; }
+.promo-btns { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 14px; margin-top: 4px; }
+.promo .btn { text-decoration: none; }
+.nowrap { white-space: nowrap; }
+.promo-site { color: var(--accent); font-size: 0.85rem; font-weight: 700; }
+
+.promo.compact {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  justify-items: start;
+  gap: 8px 12px;
+  margin: 0 0 14px;
+  padding: 8px 10px 8px 14px;
+  text-align: left;
+}
+
+.promo-text { margin: 0; min-width: 0; font-size: 0.85rem; font-weight: 700; }
+
+/* 結果画面の小さなリンク */
+.overlay .promo-link {
+  flex-basis: 100%;
+  margin-top: 2px;
+  color: #ffe270;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* 動物の絵 */
 .art { display: block; }
 .art svg { display: block; width: 100%; height: auto; overflow: visible; }
@@ -372,6 +451,62 @@ body {
   color: #1f1600;
   font-size: 0.8rem;
 }
+
+/* 章 */
+.chapter + .chapter { margin-top: 20px; }
+
+.chapter-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.chapter-no { color: var(--accent); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; }
+.chapter-stars, .chapter-lock { margin-left: auto; color: var(--muted); font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chapter-lock { display: inline-flex; align-items: center; gap: 4px; }
+.chapter-lock .lock { width: 14px; height: 14px; }
+
+/* 章の最後のステージ */
+.tile.finale { border-color: var(--star); box-shadow: 0 0 0 1px var(--star) inset; }
+
+.tile-final {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--star);
+  color: #1f1600;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+}
+
+/* 体験版で遊べないステージ */
+.tile.locked { cursor: pointer; }
+.tile.locked .tile-scene { filter: grayscale(0.7) brightness(0.85); }
+.tile.locked .tile-name, .tile.locked .tile-no { color: var(--muted); }
+
+.tile-lock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.tile-lock .lock { width: 26px; height: 26px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.modal-lock { padding: 24px 0; color: var(--muted); }
+.modal-lock .lock { width: 56px; height: 56px; }
+.modal-action:empty { display: none; }
+.modal-action { margin-bottom: 10px; }
+.modal-action .btn, .overlay a.btn { text-decoration: none; text-align: center; }
+.overlay-btns.locked a { pointer-events: none; opacity: 0.4; }
+.overlay.chapter .overlay-sub { color: #ffe270; font-size: 1rem; letter-spacing: 0.04em; }
 
 .zukan-tile .tile-scene { height: 96px; background: var(--legend-bg); }
 .zukan-tile .tile-scene .art { width: 64px; margin-bottom: 4px; }
@@ -596,6 +731,20 @@ body {
 .hole[data-hurt="2"] .crack2 { display: inline; }
 .hole.legend .mole svg { filter: drop-shadow(0 0 5px rgba(255, 240, 150, 0.95)); }
 .hole.hazard.hit .mole { animation: boom 0.3s ease-out; }
+
+/* カメレオンは背景に溶けこむ (たたかれると姿が見える) */
+.hole.camo .mole svg { opacity: 0.28; transition: opacity 0.15s; }
+.hole.camo.hit .mole svg { opacity: 1; }
+
+/* ハムスターはたたかれるたびにほっぺがしぼむ */
+.hm-cheeks { transform-box: fill-box; transform-origin: center; transition: transform 0.15s; }
+.hole[data-hurt="1"] .hm-cheeks { transform: scale(0.82); }
+.hole[data-hurt="2"] .hm-cheeks { transform: scale(0.64); }
+
+/* パンダの竹は食べるほど短くなる */
+.hole[data-bite="1"] .bs3,
+.hole[data-bite="2"] .bs3,
+.hole[data-bite="2"] .bs2 { display: none; }
 
 @keyframes boom {
   0% { transform: scale(1); filter: brightness(1); }
