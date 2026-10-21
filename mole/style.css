@@ -159,6 +159,7 @@ body {
 
 .title-name { margin: 14px 0 0; font-size: 2rem; font-weight: 800; letter-spacing: 0.04em; }
 .title-sub { margin: 0; color: var(--muted); font-weight: 700; letter-spacing: 0.2em; }
+.title-hint { margin: 8px 0 0; color: var(--muted); font-size: 0.8rem; }
 .title-btns { display: flex; gap: 10px; margin-top: 16px; }
 
 /* 動物の絵 */

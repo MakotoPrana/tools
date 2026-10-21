@@ -740,13 +740,29 @@
     ctx: null,
     enabled: true,
 
+    onStateChange: null,
+
+    get running() {
+      return Boolean(this.ctx) && this.ctx.state === 'running';
+    },
+
+    // 音を出せるようにする。ブラウザが許すのはタップやキー入力の最中だけなので、操作のたびに呼ぶ
     unlock() {
       if (!this.ctx) {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return;
         this.ctx = new AC();
+        this.ctx.onstatechange = () => { if (this.onStateChange) this.onStateChange(); };
       }
-      if (this.ctx.state === 'suspended') this.ctx.resume();
+      if (this.ctx.state === 'running') return;
+      // suspended のほか、iPhone で電話などに割り込まれたあとの interrupted も再開する
+      const resumed = this.ctx.resume();
+      if (resumed && resumed.catch) resumed.catch(() => {});
+      // iPhone の Safari は、操作の最中に無音を1回鳴らすと音を出せるようになる
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.ctx.createBuffer(1, 1, 22050);
+      src.connect(this.ctx.destination);
+      src.start(0);
     },
 
     tone(freq, dur, { type = 'square', vol = 0.12, slide = 0, delay = 0 } = {}) {
@@ -1558,6 +1574,7 @@
       // 保存できなくても切り替え自体は有効
     }
     renderSoundBtn();
+    renderSoundHint();
   });
   renderSoundBtn();
 
@@ -1571,19 +1588,28 @@
       // 保存できなくても切り替え自体は有効
     }
     renderBgmBtn();
+    renderSoundHint();
     syncMusic();
   });
   renderBgmBtn();
 
-  // ブラウザは操作があるまで音を出せないので、最初のタップやキー入力で BGM を始める
-  const firstGesture = () => {
+  // ブラウザは操作があるまで音を出せない。iPhone では指が触れた瞬間 (pointerdown) では許されず、
+  // 指を離したとき (touchend / click) に許されるため、音が出せるようになるまで操作のたびに試す
+  const soundHint = $('sound-hint');
+  const renderSoundHint = () => {
+    soundHint.hidden = Sound.running || (!Sound.enabled && !Music.enabled);
+  };
+  const onGesture = () => {
+    if (Sound.running) return;
     Sound.unlock();
     syncMusic();
-    document.removeEventListener('pointerdown', firstGesture, true);
-    document.removeEventListener('keydown', firstGesture, true);
   };
-  document.addEventListener('pointerdown', firstGesture, true);
-  document.addEventListener('keydown', firstGesture, true);
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach((type) => document.addEventListener(type, onGesture, true));
+  Sound.onStateChange = () => {
+    renderSoundHint();
+    syncMusic();
+  };
+  renderSoundHint();
 
   // テンキーの並び (7 8 9 / 4 5 6 / 1 2 3) を 3×3 の穴に対応させる
   const NUMPAD = { 7: 0, 8: 1, 9: 2, 4: 3, 5: 4, 6: 5, 1: 6, 2: 7, 3: 8 };
