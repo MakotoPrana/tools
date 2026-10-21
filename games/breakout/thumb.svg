@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <!-- ゲーム一覧 (games/index.html) のタイル画像。ブロックの色は script.js の BRICKS と同じ -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#121a24"/>
+      <stop offset="1" stop-color="#07090d"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.35"/>
+      <stop offset="0.45" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="trail" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff8a3d" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ffd76a" stop-opacity="0.9"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#ffd76a" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="hazard" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="#1b1d21"/><rect width="4" height="8" fill="#f7d308"/>
+    </pattern>
+    <symbol id="brick" viewBox="0 0 34 13">
+      <rect width="34" height="13" rx="1.5" fill="currentColor"/>
+      <rect width="34" height="13" rx="1.5" fill="url(#shine)"/>
+    </symbol>
+  </defs>
+
+  <rect width="320" height="200" fill="url(#bg)"/>
+  <g stroke="#fff" stroke-opacity="0.04">
+    <path d="M0 40H320M0 80H320M0 120H320M0 160H320M40 0V200M80 0V200M120 0V200M160 0V200M200 0V200M240 0V200M280 0V200"/>
+  </g>
+
+  <!-- ブロック。左上から S R O Y G C B の列 -->
+  <g>
+    <g color="#b8c2cc">
+      <use href="#brick" x="6" y="18" width="34" height="13"/><use href="#brick" x="45" y="18" width="34" height="13"/><use href="#brick" x="84" y="18" width="34" height="13"/><use href="#brick" x="123" y="18" width="34" height="13"/><use href="#brick" x="162" y="18" width="34" height="13"/><use href="#brick" x="201" y="18" width="34" height="13"/><use href="#brick" x="240" y="18" width="34" height="13"/><use href="#brick" x="279" y="18" width="34" height="13"/>
+    </g>
+    <g color="#ef3b3b">
+      <use href="#brick" x="6" y="35" width="34" height="13"/><use href="#brick" x="45" y="35" width="34" height="13"/><use href="#brick" x="84" y="35" width="34" height="13"/><use href="#brick" x="123" y="35" width="34" height="13"/><use href="#brick" x="162" y="35" width="34" height="13"/><use href="#brick" x="201" y="35" width="34" height="13"/><use href="#brick" x="240" y="35" width="34" height="13"/><use href="#brick" x="279" y="35" width="34" height="13"/>
+    </g>
+    <g color="#ef8a21">
+      <use href="#brick" x="6" y="52" width="34" height="13"/><use href="#brick" x="45" y="52" width="34" height="13"/><use href="#brick" x="84" y="52" width="34" height="13"/><use href="#brick" x="123" y="52" width="34" height="13"/><use href="#brick" x="162" y="52" width="34" height="13"/><use href="#brick" x="240" y="52" width="34" height="13"/><use href="#brick" x="279" y="52" width="34" height="13"/>
+    </g>
+    <g color="#f7d308">
+      <use href="#brick" x="6" y="69" width="34" height="13"/><use href="#brick" x="45" y="69" width="34" height="13"/><use href="#brick" x="123" y="69" width="34" height="13"/><use href="#brick" x="162" y="69" width="34" height="13"/><use href="#brick" x="279" y="69" width="34" height="13"/>
+    </g>
+    <g color="#42b642">
+      <use href="#brick" x="6" y="86" width="34" height="13"/><use href="#brick" x="84" y="86" width="34" height="13"/><use href="#brick" x="123" y="86" width="34" height="13"/><use href="#brick" x="240" y="86" width="34" height="13"/><use href="#brick" x="279" y="86" width="34" height="13"/>
+    </g>
+    <g color="#31c7ef">
+      <use href="#brick" x="45" y="103" width="34" height="13"/><use href="#brick" x="123" y="103" width="34" height="13"/><use href="#brick" x="279" y="103" width="34" height="13"/>
+    </g>
+    <!-- 爆弾ブロック -->
+    <g transform="translate(45 86)">
+      <rect width="34" height="13" rx="1.5" fill="url(#hazard)"/>
+      <rect x="6" y="2" width="22" height="9" rx="1" fill="#3a3f47"/>
+      <circle cx="17" cy="6.5" r="3.4" fill="#111317"/>
+      <path d="M19 4l3-3" stroke="#c9b48a" stroke-width="1.2"/>
+      <circle cx="22.5" cy="0.8" r="1.4" fill="#ffc850"/>
+    </g>
+    <!-- たたかれて砕けるブロック -->
+    <g transform="translate(201 69)" color="#f7d308" opacity="0.55">
+      <use href="#brick" width="34" height="13"/>
+    </g>
+  </g>
+
+  <!-- 火花 -->
+  <g>
+    <circle cx="232" cy="88" r="2" fill="#fff1a8"/><circle cx="242" cy="80" r="1.6" fill="#ffb347"/>
+    <circle cx="222" cy="92" r="1.4" fill="#ffb347"/><circle cx="238" cy="94" r="1.2" fill="#fff1a8"/>
+    <path d="M214 86l-6-3M226 98l-2 6M246 88l7 2" stroke="#ffd76a" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+
+  <!-- ボールの軌跡とボール -->
+  <path d="M150 168L226 92" stroke="url(#trail)" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="228" cy="90" r="16" fill="url(#glow)"/>
+  <circle cx="228" cy="90" r="5" fill="#fff"/>
+
+  <!-- 防衛ライン -->
+  <path d="M0 150H320" stroke="#ef3b3b" stroke-opacity="0.75" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <rect x="0" y="150" width="320" height="50" fill="#ef3b3b" fill-opacity="0.05"/>
+
+  <!-- パドル -->
+  <g transform="translate(116 176)">
+    <rect width="68" height="10" rx="5" fill="#5a9cf0"/>
+    <rect x="4" y="1.5" width="60" height="3" rx="1.5" fill="#fff" fill-opacity="0.45"/>
+  </g>
+</svg>

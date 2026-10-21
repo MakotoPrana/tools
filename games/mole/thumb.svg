@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <!-- ゲーム一覧 (games/index.html) のタイル画像。動物の絵は script.js の DRAW と同じ形 -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7cc8f8"/>
+      <stop offset="1" stop-color="#d4f0ff"/>
+    </linearGradient>
+    <clipPath id="above-rim"><rect x="-10" y="-40" width="120" height="140"/></clipPath>
+  </defs>
+
+  <rect width="320" height="200" fill="url(#sky)"/>
+
+  <!-- 虹 -->
+  <g fill="none" stroke-width="7" opacity="0.45">
+    <circle cx="150" cy="190" r="128" stroke="#f7a8a8"/>
+    <circle cx="150" cy="190" r="121" stroke="#f9d29a"/>
+    <circle cx="150" cy="190" r="114" stroke="#f6ef9c"/>
+    <circle cx="150" cy="190" r="107" stroke="#b5e6a5"/>
+    <circle cx="150" cy="190" r="100" stroke="#a9d4f5"/>
+    <circle cx="150" cy="190" r="93" stroke="#c9b6ef"/>
+  </g>
+
+  <!-- 太陽と雲 -->
+  <g transform="translate(278 34)">
+    <g stroke="#ffc93c" stroke-width="3" stroke-linecap="round">
+      <path d="M0 -26v6M0 20v6M-26 0h6M20 0h6M-18 -18l4 4M14 14l4 4M-18 18l4 -4M14 -14l4 -4"/>
+    </g>
+    <circle r="15" fill="#ffd84d"/>
+    <circle cx="-5" cy="-2" r="1.8" fill="#6b4a1e"/><circle cx="5" cy="-2" r="1.8" fill="#6b4a1e"/>
+    <path d="M-5 5q5 4 10 0" stroke="#6b4a1e" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  </g>
+  <g fill="#fff" opacity="0.95">
+    <ellipse cx="46" cy="36" rx="22" ry="9"/><ellipse cx="58" cy="30" rx="14" ry="10"/><ellipse cx="36" cy="31" rx="10" ry="7"/>
+  </g>
+
+  <!-- 丘と木 -->
+  <path d="M0 112Q60 84 130 104T260 96T320 100V200H0Z" fill="#9bd27a"/>
+  <g>
+    <rect x="31" y="84" width="3" height="18" fill="#7a5a3a"/><circle cx="32.5" cy="82" r="10" fill="#5ea443"/>
+    <rect x="281" y="78" width="3" height="20" fill="#7a5a3a"/><circle cx="282.5" cy="75" r="11" fill="#5ea443"/>
+  </g>
+  <path d="M0 130Q80 112 160 124T320 120V200H0Z" fill="#7cc35a"/>
+
+  <!-- 草花 -->
+  <g>
+    <g fill="#fff"><circle cx="22" cy="182" r="3"/><circle cx="18" cy="186" r="3"/><circle cx="26" cy="186" r="3"/><circle cx="20" cy="190" r="3"/><circle cx="24" cy="190" r="3"/></g><circle cx="22" cy="187" r="2.2" fill="#ffd23f"/>
+    <g fill="#ffd23f"><circle cx="298" cy="176" r="3"/><circle cx="294" cy="180" r="3"/><circle cx="302" cy="180" r="3"/><circle cx="296" cy="184" r="3"/><circle cx="300" cy="184" r="3"/></g><circle cx="298" cy="181" r="2.2" fill="#fff"/>
+    <g fill="#f4b6c2"><circle cx="160" cy="186" r="2.6"/><circle cx="156.5" cy="189.5" r="2.6"/><circle cx="163.5" cy="189.5" r="2.6"/><circle cx="158" cy="193" r="2.6"/><circle cx="162" cy="193" r="2.6"/></g><circle cx="160" cy="190" r="2" fill="#ffd23f"/>
+    <path d="M90 196q2-10 6-14M96 196q0-8-4-12M232 194q2-10 6-14M238 194q0-8-4-12" stroke="#5ea443" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- ウサギ (左の穴) -->
+  <g transform="translate(70 162)">
+    <ellipse rx="34" ry="10" fill="#3b2a1e"/>
+    <g transform="translate(-27 -54.6) scale(0.54)" clip-path="url(#above-rim)">
+      <g transform="rotate(-8 30 24)"><rect x="22" y="-26" width="17" height="54" rx="8.5" fill="#efebe6"/><rect x="26.5" y="-20" width="8" height="40" rx="4" fill="#f4b6c2"/></g>
+      <g transform="rotate(8 70 24)"><rect x="61" y="-26" width="17" height="54" rx="8.5" fill="#efebe6"/><rect x="65.5" y="-20" width="8" height="40" rx="4" fill="#f4b6c2"/></g>
+      <rect x="8" y="8" width="84" height="120" rx="42" fill="#efebe6"/>
+      <ellipse cx="50" cy="92" rx="27" ry="24" fill="#fff"/>
+      <circle cx="35" cy="44" r="5" fill="#1b1b1b"/><circle cx="36.75" cy="42.25" r="1.75" fill="#fff"/>
+      <circle cx="65" cy="44" r="5" fill="#1b1b1b"/><circle cx="66.75" cy="42.25" r="1.75" fill="#fff"/>
+      <ellipse cx="26" cy="58" rx="6" ry="4" fill="#f29aa6" opacity="0.6"/><ellipse cx="74" cy="58" rx="6" ry="4" fill="#f29aa6" opacity="0.6"/>
+      <path d="M45.5 54h9l-4.5 4.5z" fill="#e86b7a"/>
+      <path d="M50 58.5q-4 6-9 3M50 58.5q4 6 9 3" stroke="#7a5a4a" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </g>
+    <path d="M-34 0a34 10 0 0 0 68 0a34 13 0 0 1 -68 0z" fill="#5ea443"/>
+  </g>
+
+  <!-- タヌキ (右の穴) -->
+  <g transform="translate(250 162)">
+    <ellipse rx="34" ry="10" fill="#3b2a1e"/>
+    <g transform="translate(-27 -54) scale(0.54)" clip-path="url(#above-rim)">
+      <circle cx="24" cy="16" r="11" fill="#4a3626"/><circle cx="76" cy="16" r="11" fill="#4a3626"/>
+      <rect x="8" y="8" width="84" height="120" rx="42" fill="#9a7350"/>
+      <ellipse cx="50" cy="92" rx="27" ry="24" fill="#e3cfae"/>
+      <ellipse cx="35" cy="48" rx="13" ry="10" fill="#4a3626" transform="rotate(15 35 48)"/>
+      <ellipse cx="65" cy="48" rx="13" ry="10" fill="#4a3626" transform="rotate(-15 65 48)"/>
+      <circle cx="35" cy="47" r="6.5" fill="#fff"/><circle cx="35" cy="47" r="4" fill="#1b1b1b"/><circle cx="36.4" cy="45.6" r="1.4" fill="#fff"/>
+      <circle cx="65" cy="47" r="6.5" fill="#fff"/><circle cx="65" cy="47" r="4" fill="#1b1b1b"/><circle cx="66.4" cy="45.6" r="1.4" fill="#fff"/>
+      <ellipse cx="50" cy="63" rx="14" ry="10" fill="#e8d6b6"/>
+      <ellipse cx="50" cy="58" rx="6" ry="4.5" fill="#2a1d14"/>
+    </g>
+    <path d="M-34 0a34 10 0 0 0 68 0a34 13 0 0 1 -68 0z" fill="#5ea443"/>
+  </g>
+
+  <!-- モグラ (まん中の穴、手前で大きく) -->
+  <g transform="translate(160 176)">
+    <ellipse rx="44" ry="13" fill="#3b2a1e"/>
+    <g transform="translate(-35 -70) scale(0.7)" clip-path="url(#above-rim)">
+      <rect x="8" y="8" width="84" height="120" rx="42" fill="#8b5a3c"/>
+      <ellipse cx="50" cy="92" rx="27" ry="24" fill="#d9b48f"/>
+      <circle cx="36" cy="46" r="4.5" fill="#1b1b1b"/><circle cx="37.6" cy="44.4" r="1.6" fill="#fff"/>
+      <circle cx="64" cy="46" r="4.5" fill="#1b1b1b"/><circle cx="65.6" cy="44.4" r="1.6" fill="#fff"/>
+      <ellipse cx="26" cy="60" rx="6" ry="4" fill="#f29aa6" opacity="0.6"/><ellipse cx="74" cy="60" rx="6" ry="4" fill="#f29aa6" opacity="0.6"/>
+      <ellipse cx="50" cy="60" rx="9" ry="7" fill="#e86b7a"/>
+      <ellipse cx="30" cy="96" rx="9" ry="6" fill="#f0c7a8"/><ellipse cx="70" cy="96" rx="9" ry="6" fill="#f0c7a8"/>
+    </g>
+    <path d="M-44 0a44 13 0 0 0 88 0a44 17 0 0 1 -88 0z" fill="#5ea443"/>
+  </g>
+
+  <!-- ピコピコハンマー -->
+  <g transform="translate(206 92) rotate(28)">
+    <rect x="-3.5" y="0" width="7" height="46" rx="3" fill="#f2c14e"/>
+    <rect x="-24" y="-16" width="48" height="22" rx="10" fill="#ef5a5a"/>
+    <rect x="-24" y="-16" width="9" height="22" rx="4" fill="#ffe3a3"/>
+    <rect x="15" y="-16" width="9" height="22" rx="4" fill="#ffe3a3"/>
+  </g>
+  <g stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.9">
+    <path d="M236 66l6-8M244 78l9-3M246 92l9 1"/>
+  </g>
+</svg>

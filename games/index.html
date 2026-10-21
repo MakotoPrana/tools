@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>ゲーム | Origami Works</title>
+  <meta name="description" content="ブラウザですぐに遊べる、Origami Works の無料ゲーム集です。登録不要・スマホでも遊べます。" />
+  <link rel="icon" href="../assets/favicon.png" type="image/png" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5093421396736590"
+     crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --text: #1f2933;
+      --muted: #6b7785;
+      --border: #dde2e8;
+      --accent: #2f7de1;
+      /* ロゴの折り鶴の青 */
+      --brand: #2c5f82;
+      --brand-soft: rgba(44, 95, 130, 0.08);
+      --fold: #d7e3ec;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #15191e;
+        --card: #1f252c;
+        --text: #e6eaef;
+        --muted: #9aa5b1;
+        --border: #333c46;
+        --accent: #5a9cf0;
+        --brand: #6fa3c9;
+        --brand-soft: rgba(111, 163, 201, 0.1);
+        --fold: #2b3d4c;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 12px 16px 48px;
+    }
+
+    .back { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
+    .back:hover { color: var(--accent); }
+
+    /* ヘッダー: 折り紙の面を重ねた背景に、ロゴの折り鶴とワードマーク */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      margin: 12px 0 28px;
+      padding: 28px 20px 26px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background:
+        linear-gradient(135deg, var(--brand-soft) 0 32%, transparent 32%),
+        linear-gradient(225deg, var(--brand-soft) 0 22%, transparent 22%),
+        linear-gradient(20deg, transparent 62%, var(--brand-soft) 62%),
+        var(--card);
+      text-align: center;
+    }
+
+    /* 右下に大きく、うすく敷いた折り鶴 */
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -40px;
+      bottom: -56px;
+      width: 220px;
+      aspect-ratio: 354 / 290;
+      background: url("../assets/origami-crane.png") center / contain no-repeat;
+      opacity: 0.08;
+      transform: rotate(-12deg);
+      pointer-events: none;
+    }
+
+    .hero-crane {
+      display: block;
+      width: 112px;
+      height: auto;
+      margin: 0 auto 6px;
+      animation: glide 5s ease-in-out infinite;
+    }
+
+    @keyframes glide {
+      0%, 100% { transform: translateY(0) rotate(0); }
+      50% { transform: translateY(-6px) rotate(-2deg); }
+    }
+
+    /* 暗い背景では鶴の青が沈むので、うしろをほんのり明るくする */
+    @media (prefers-color-scheme: dark) {
+      .hero-crane { filter: drop-shadow(0 0 14px rgba(160, 200, 230, 0.25)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-crane { animation: none; }
+    }
+
+    /* ワードマークは白抜きの画像をマスクにして、文字色で塗る (ダークモードでも読めるように) */
+    .wordmark {
+      display: block;
+      width: 150px;
+      aspect-ratio: 260 / 101;
+      margin: 0 auto 14px;
+      background: var(--text);
+      -webkit-mask: url("../assets/origami-works-wordmark.png") center / contain no-repeat;
+      mask: url("../assets/origami-works-wordmark.png") center / contain no-repeat;
+    }
+
+    .hero h1 {
+      position: relative;
+      display: inline-block;
+      margin: 0;
+      font-size: 1.6rem;
+      letter-spacing: 0.08em;
+    }
+
+    /* 見出しの両脇に、折り紙のひし形 */
+    .hero h1::before,
+    .hero h1::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      background: linear-gradient(135deg, var(--brand) 50%, var(--fold) 50%);
+      transform: translateY(-50%) rotate(45deg);
+    }
+    .hero h1::before { left: -26px; }
+    .hero h1::after { right: -26px; }
+
+    .hero p { position: relative; margin: 8px 0 0; color: var(--muted); font-size: 0.9rem; }
+
+    /* ゲームのタイル */
+    .games {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .game {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: inherit;
+      text-decoration: none;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    }
+
+    .game:hover, .game:focus-visible {
+      border-color: var(--brand);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    }
+    .game:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* 右上の角を折り紙のように折る。ホバーで少し大きく折れる */
+    .game::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 30px;
+      height: 30px;
+      background: linear-gradient(225deg, var(--bg) 50%, var(--fold) 50%, var(--brand) 100%);
+      border-bottom-left-radius: 6px;
+      box-shadow: -2px 2px 4px rgba(0, 0, 0, 0.15);
+      transition: width 0.2s, height 0.2s;
+    }
+    .game:hover::after, .game:focus-visible::after { width: 40px; height: 40px; }
+
+    .game-thumb {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      object-fit: cover;
+      border-bottom: 1px solid var(--border);
+      transition: transform 0.3s;
+    }
+    .game:hover .game-thumb { transform: scale(1.03); }
+
+    .game-body { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 16px; background: var(--card); position: relative; }
+    .game-name { margin: 0; font-weight: 700; font-size: 1.1rem; }
+    .game-desc { margin: 0; color: var(--muted); font-size: 0.85rem; }
+
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: auto 0 0; padding: 4px 0 0; list-style: none; }
+    .tags li {
+      padding: 1px 10px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    footer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 0 16px 32px;
+    }
+    footer img { width: 36px; height: auto; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back" href="../">‹ ツール一覧</a>
+
+    <header class="hero">
+      <img class="hero-crane" src="../assets/origami-crane.png" width="354" height="290" alt="" />
+      <span class="wordmark" role="img" aria-label="Origami Works"></span>
+      <h1>ゲーム</h1>
+      <p>ブラウザですぐに遊べるゲームを集めました。<br />登録不要・無料、スマホでも遊べます。</p>
+    </header>
+
+    <ul class="games">
+      <li>
+        <a class="game" href="breakout/">
+          <img class="game-thumb" src="breakout/thumb.svg" width="320" height="200" alt="" />
+          <div class="game-body">
+            <h2 class="game-name">BRICK SIEGE</h2>
+            <p class="game-desc">迫りくるブロックから防衛ラインを守り抜く、タワーディフェンス風のブロック崩し。Gold で能力をアップグレードしながら全チャレンジ制覇を目指そう。</p>
+            <ul class="tags">
+              <li>ブロック崩し</li>
+              <li>全20ステージ</li>
+            </ul>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a class="game" href="mole/">
+          <img class="game-thumb" src="mole/thumb.svg" width="320" height="200" alt="" />
+          <div class="game-body">
+            <h2 class="game-name">モグラたたき</h2>
+            <p class="game-desc">モグラやウサギ、パンダなど15種類の動物が出てくるモグラたたき。伝説の動物を捕まえて図鑑を埋めよう。</p>
+            <ul class="tags">
+              <li>どうぶつ15種類</li>
+              <li>全30ステージ</li>
+            </ul>
+          </div>
+        </a>
+      </li>
+    </ul>
+  </main>
+
+  <footer>
+    <img src="../assets/origami-crane.png" width="354" height="290" alt="" />
+    <span>&copy; tools.e-seventh.com</span>
+  </footer>
+</body>
+</html>
