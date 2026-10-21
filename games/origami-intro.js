@@ -3,13 +3,15 @@
  *   一枚の紙が2回折られ、そこから折り鶴の面が広がってロゴの鶴になり、下にスタジオ名が出る。
  *   最後の鶴はロゴ画像 (assets/origami-crane.png) そのものに切り替わるので、ロゴと一致する。
  *
- * 使い方:
- *   <script src="/assets/intro/origami-intro.js"></script>
- *   OrigamiIntro.play().then(() => { ゲームを始める });       // 画面全体に重ねて再生し、終わると消える
+ * 各ゲームで共通に使う。ゲームのページから:
+ *   <script src="../origami-intro.js"></script>
+ *   <script>OrigamiIntro.play();</script>                      // 画面全体に重ねて再生し、終わると消える
+ *   OrigamiIntro.play().then(() => { ... });                   // 終わってから何かしたいとき
  *   OrigamiIntro.play({ hold: 600, fadeOut: 400 });           // 最後の絵を残す時間と、消えるまでの時間 (ms)
  *   const intro = OrigamiIntro.mount(要素); intro.render(1.2); // 好きな時刻の絵を描く (プレビュー用)
  *
- * 画像ファイルはこのスクリプトの1つ上のフォルダ (assets/) から読む。
+ * 画像 (origami-crane.png・origami-works-wordmark.png) は、ふだんはこのスクリプトから見て ../assets/ にあるものを読む。
+ * 別の場所に置くときは <script src="origami-intro.js" data-assets="assets/"> のように指定する (itch.io 版の zip など)。
  */
 (() => {
   'use strict';
@@ -49,8 +51,10 @@
   const PAPER_HALF = 132; // ひし形の中心から角まで
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const scriptSrc = document.currentScript ? document.currentScript.src : '';
-  const assetURL = (name) => new URL(`../${name}`, scriptSrc || window.location.href).href;
+  const script = document.currentScript;
+  const scriptSrc = script ? script.src : window.location.href;
+  const assetBase = new URL((script && script.dataset.assets) || '../assets/', scriptSrc).href;
+  const assetURL = (name) => new URL(name, assetBase).href;
 
   const clamp01 = (v) => Math.min(1, Math.max(0, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -261,15 +265,24 @@
       done = true;
       intro.stop();
       overlay.classList.add('oi-out');
+      window.removeEventListener('keydown', skipKey, { capture: true });
       setTimeout(() => {
         overlay.remove();
         resolve();
       }, fadeOut);
     };
-    if (skippable) {
-      overlay.addEventListener('pointerdown', finish);
-      window.addEventListener('keydown', finish, { once: true });
-    }
+    // 飛ばすときの操作がゲームに伝わらないよう、ここで止める (タイトルのボタンを押したことにならないように)
+    const skipKey = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (skippable) finish();
+    };
+    window.addEventListener('keydown', skipKey, { capture: true });
+    overlay.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (skippable) finish();
+    });
+    overlay.addEventListener('click', (e) => e.stopPropagation());
     intro.play().then(() => setTimeout(finish, hold));
   });
 
