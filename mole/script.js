@@ -14,6 +14,8 @@
   const MAX_DT = 100; // タブの切り替えなどで dt が跳ねたときの上限
   const SAVE_KEY = 'mole-save';
   const SOUND_KEY = 'mole-sound';
+  const BGM_KEY = 'mole-bgm';
+  const LAST_SPURT_RATE = 1.15; // 残り10秒の BGM のテンポ
 
   const LEGEND_SCORE = 500;
   const LEGEND_GLINT_MS = 500; // 伝説の動物が出る前に穴が光る時間
@@ -842,6 +844,169 @@
   }
 
   /* =========================================================
+   * BGM (Web Audio で合成)。音符は 8分音符ひとつずつ、"-" は休み
+   *   mel: メロディ / bass: ベース / drum: 1小節ぶんのリズム (k キック・s スネア・h ハイハット)
+   * ========================================================= */
+
+  const SONGS = {
+    // タイトル・ステージ選択・図鑑
+    menu: {
+      tempo: 104,
+      lead: 'triangle',
+      mel: 'E5 - G5 - A5 G5 E5 - | D5 - C5 D5 E5 - - - | F5 - A5 - G5 F5 E5 - | D5 E5 D5 C5 D5 - - - |'
+        + 'E5 - G5 - A5 G5 E5 - | D5 - C5 D5 E5 - G5 - | A5 G5 F5 E5 D5 - E5 D5 | C5 - - - - - - -',
+      bass: 'C3 - G3 - C3 - G3 - | G2 - D3 - G2 - D3 - | F2 - C3 - F2 - C3 - | G2 - D3 - G2 - B2 - |'
+        + 'C3 - G3 - C3 - G3 - | A2 - E3 - A2 - E3 - | F2 - C3 - G2 - B2 - | C3 - G3 - C3 - - -',
+      drum: 'k - h - k - h -',
+    },
+    // STAGE 1〜8 のプレイ中
+    play: {
+      tempo: 150,
+      lead: 'square',
+      mel: 'C5 C5 A4 C5 D5 C5 A4 - | A#4 A#4 G4 A#4 C5 A#4 G4 - | A4 C5 F5 E5 D5 C5 A#4 A4 | G4 A4 A#4 G4 C5 - - - |'
+        + 'C5 C5 A4 C5 D5 C5 A4 - | A#4 A#4 G4 A#4 C5 A#4 G4 - | A4 C5 F5 G5 A5 G5 F5 E5 | F5 - C5 - F5 - - -',
+      bass: 'F2 F3 F2 F3 F2 F3 F2 F3 | C2 C3 C2 C3 C2 C3 C2 C3 | F2 F3 D2 D3 A#1 A#2 C2 C3 | C2 C3 C2 C3 E2 E3 C2 C3 |'
+        + 'F2 F3 F2 F3 F2 F3 F2 F3 | C2 C3 C2 C3 C2 C3 C2 C3 | F2 F3 D2 D3 A#1 A#2 C2 C3 | F2 F3 C2 C3 F2 - - -',
+      drum: 'k h s h k h s h',
+    },
+    // 夜のステージ (STAGE 9・10) のプレイ中
+    night: {
+      tempo: 132,
+      lead: 'square',
+      mel: 'A4 - C5 - E5 - D5 C5 | B4 - G4 - B4 - - - | A4 - C5 - E5 - A5 G5 | E5 - - - - - - - |'
+        + 'F5 - E5 - D5 - C5 - | B4 - C5 - D5 - E5 - | C5 B4 A4 - G#4 - B4 - | A4 - - - - - - -',
+      bass: 'A2 - E3 - A2 - E3 - | G2 - D3 - G2 - D3 - | F2 - C3 - F2 - C3 - | E2 - B2 - E2 - G#2 - |'
+        + 'D2 - A2 - D2 - A2 - | G2 - D3 - G2 - D3 - | F2 - C3 - E2 - B2 - | A2 - E3 - A2 - - -',
+      drum: 'k - h - s - h h',
+    },
+  };
+
+  const NOTE_INDEX = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+  const noteFreq = (name) => {
+    const m = /^([A-G])(#?)(\d)$/.exec(name);
+    if (!m) return 0;
+    const midi = (Number(m[3]) + 1) * 12 + NOTE_INDEX[m[1]] + (m[2] ? 1 : 0);
+    return 440 * 2 ** ((midi - 69) / 12);
+  };
+
+  const parseTrack = (str) => str.replace(/\|/g, ' ').trim().split(/\s+/).map((t) => (t === '-' ? 0 : noteFreq(t)));
+
+  const Music = {
+    enabled: true,
+    key: null,
+    track: null,
+    step: 0,
+    nextTime: 0,
+    timer: null,
+    rate: 1,
+    out: null,
+    noiseBuf: null,
+
+    play(key) {
+      const ctx = Sound.ctx;
+      if (!ctx || (this.key === key && this.timer)) return;
+      this.stop();
+      if (!this.out) {
+        this.out = ctx.createGain();
+        this.out.connect(ctx.destination);
+      }
+      this.out.gain.cancelScheduledValues(ctx.currentTime);
+      this.out.gain.setValueAtTime(0.5, ctx.currentTime);
+      const song = SONGS[key];
+      this.key = key;
+      this.track = { ...song, mel: parseTrack(song.mel), bass: parseTrack(song.bass), drum: song.drum.split(/\s+/) };
+      this.step = 0;
+      this.rate = 1;
+      this.nextTime = ctx.currentTime + 0.05;
+      this.timer = setInterval(() => this.tick(), 25);
+      this.tick();
+    },
+
+    stop() {
+      if (this.timer) clearInterval(this.timer);
+      this.timer = null;
+      this.key = null;
+      // すでに鳴らす予定の音もすばやく消す
+      if (this.out && Sound.ctx) this.out.gain.setTargetAtTime(0, Sound.ctx.currentTime, 0.03);
+    },
+
+    tick() {
+      const ctx = Sound.ctx;
+      const t = this.track;
+      const stepDur = 60 / (t.tempo * this.rate) / 2;
+      // タブが裏に回ってタイマーが遅れたときは、まとめて鳴らさずに今から再開する
+      if (this.nextTime < ctx.currentTime - 0.05) this.nextTime = ctx.currentTime + 0.05;
+      while (this.nextTime < ctx.currentTime + 0.12) {
+        this.playStep(t, this.step, this.nextTime, stepDur);
+        this.nextTime += stepDur;
+        this.step = (this.step + 1) % t.mel.length;
+      }
+    },
+
+    voice(freq, time, dur, type, vol) {
+      const ctx = Sound.ctx;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, time);
+      gain.gain.setValueAtTime(vol, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(gain).connect(this.out);
+      osc.start(time);
+      osc.stop(time + dur);
+    },
+
+    hitNoise(time, dur, vol) {
+      const ctx = Sound.ctx;
+      if (!this.noiseBuf) {
+        const len = Math.floor(ctx.sampleRate * 0.2);
+        this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = this.noiseBuf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      }
+      const src = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      src.buffer = this.noiseBuf;
+      gain.gain.setValueAtTime(vol, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      src.connect(gain).connect(this.out);
+      src.start(time);
+      src.stop(time + dur);
+    },
+
+    kick(time) {
+      const ctx = Sound.ctx;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.setValueAtTime(130, time);
+      osc.frequency.exponentialRampToValueAtTime(45, time + 0.12);
+      gain.gain.setValueAtTime(0.25, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
+      osc.connect(gain).connect(this.out);
+      osc.start(time);
+      osc.stop(time + 0.15);
+    },
+
+    playStep(t, step, time, stepDur) {
+      const mel = t.mel[step];
+      const bass = t.bass[step % t.bass.length];
+      if (mel) this.voice(mel, time, stepDur * 0.9, t.lead, t.lead === 'square' ? 0.05 : 0.09);
+      if (bass) this.voice(bass, time, stepDur * 0.95, 'triangle', 0.12);
+      const drum = t.drum[step % t.drum.length];
+      if (drum === 'k') this.kick(time);
+      else if (drum === 's') this.hitNoise(time, 0.1, 0.09);
+      else if (drum === 'h') this.hitNoise(time, 0.03, 0.03);
+    },
+  };
+
+  try {
+    Music.enabled = localStorage.getItem(BGM_KEY) !== 'off';
+  } catch {
+    // 既定のまま
+  }
+
+  /* =========================================================
    * 画面
    * ========================================================= */
 
@@ -866,6 +1031,7 @@
   const overlay = $('overlay');
   const pauseBtn = $('pause-btn');
   const soundBtn = $('sound-btn');
+  const bgmBtn = $('bgm-btn');
   const modal = $('modal');
 
   const starText = (n) => `${'★'.repeat(n)}<span class="off">${'★'.repeat(3 - n)}</span>`;
@@ -884,6 +1050,25 @@
     pauseBtn.hidden = name !== 'play';
     helpEl.hidden = name !== 'title' && name !== 'select';
     window.scrollTo(0, 0);
+    syncMusic();
+  };
+
+  // いまの画面とゲームの状態に合った BGM を鳴らす (プレイ中はカウントダウン後から)
+  const syncMusic = () => {
+    let key = null;
+    if (Music.enabled && Sound.ctx && !document.hidden) {
+      if (current === 'play') {
+        if (game && game.phase === 'playing') key = stage.no >= 9 ? 'night' : 'play';
+      } else {
+        key = 'menu';
+      }
+    }
+    if (key) {
+      Music.play(key);
+      if (game && game.lastSpurt && current === 'play') Music.rate = LAST_SPURT_RATE;
+    } else {
+      Music.stop();
+    }
   };
 
   /* タイトル */
@@ -1274,9 +1459,11 @@
       case 'go':
         toast('START!');
         Sound.count(true);
+        syncMusic();
         break;
       case 'lastSpurt':
         toast('ラストスパート!');
+        Music.rate = LAST_SPURT_RATE;
         break;
       case 'stunEnd':
         fieldEl.classList.remove('stunned');
@@ -1294,6 +1481,7 @@
       case 'paused':
         pauseBtn.textContent = '▶';
         pauseBtn.setAttribute('aria-label', '再開');
+        syncMusic();
         showOverlay({
           title: '一時停止中',
           buttons: [
@@ -1306,8 +1494,10 @@
       case 'resumed':
         pauseBtn.textContent = 'Ⅱ';
         pauseBtn.setAttribute('aria-label', '一時停止');
+        syncMusic();
         break;
       case 'end':
+        syncMusic();
         onEnd(data);
         break;
     }
@@ -1351,6 +1541,30 @@
   });
   renderSoundBtn();
 
+  const renderBgmBtn = () => bgmBtn.setAttribute('aria-pressed', String(Music.enabled));
+  bgmBtn.addEventListener('click', () => {
+    Music.enabled = !Music.enabled;
+    Sound.unlock();
+    try {
+      localStorage.setItem(BGM_KEY, Music.enabled ? 'on' : 'off');
+    } catch {
+      // 保存できなくても切り替え自体は有効
+    }
+    renderBgmBtn();
+    syncMusic();
+  });
+  renderBgmBtn();
+
+  // ブラウザは操作があるまで音を出せないので、最初のタップやキー入力で BGM を始める
+  const firstGesture = () => {
+    Sound.unlock();
+    syncMusic();
+    document.removeEventListener('pointerdown', firstGesture, true);
+    document.removeEventListener('keydown', firstGesture, true);
+  };
+  document.addEventListener('pointerdown', firstGesture, true);
+  document.addEventListener('keydown', firstGesture, true);
+
   // テンキーの並び (7 8 9 / 4 5 6 / 1 2 3) を 3×3 の穴に対応させる
   const NUMPAD = { 7: 0, 8: 1, 9: 2, 4: 3, 5: 4, 6: 5, 1: 6, 2: 7, 3: 8 };
 
@@ -1373,13 +1587,14 @@
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && game) game.pause();
+    syncMusic();
   });
   window.addEventListener('blur', () => {
     if (game) game.pause();
   });
 
   // テスト用 (ブラウザのコンソールから参照できるように)
-  window.__mole = { MoleGame, STAGES, KINDS, stageParams, get game() { return game; } };
+  window.__mole = { MoleGame, Music, STAGES, KINDS, stageParams, get game() { return game; } };
 
   show('title');
   requestAnimationFrame(loop);
