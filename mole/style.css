@@ -84,6 +84,7 @@ body {
   .top-btns { gap: 4px; }
   .icon-btn { width: 34px; }
   .icon-btn.text { padding: 0 6px; }
+  .lang-toggle button { padding: 0 5px; }
 }
 
 .icon-btn {
@@ -100,6 +101,31 @@ body {
 }
 
 .icon-btn.text { width: auto; padding: 0 8px; font-size: 0.72rem; letter-spacing: 0.04em; }
+/* 言語のトグル (日本語 / EN)。選んでいる方を色付きにする */
+.lang-toggle {
+  display: flex;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.lang-toggle button {
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lang-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; cursor: default; }
+.lang-toggle button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+
 .icon-btn[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
 
 /* ボタン */

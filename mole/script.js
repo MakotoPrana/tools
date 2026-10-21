@@ -1644,7 +1644,6 @@
       resume: '再開',
       holes: '動物の穴',
       hole: (n) => `穴 ${n}`,
-      langSwitch: 'Switch to English',
       seconds: (n) => `${n}秒`,
       points: (n) => `${n}点`,
       tileCaught: '伝説の動物を捕まえた',
@@ -1727,7 +1726,6 @@
       resume: 'Resume',
       holes: 'Animal holes',
       hole: (n) => `Hole ${n}`,
-      langSwitch: '日本語に切り替え',
       seconds: (n) => `${n}s`,
       points: (n) => `${n} pts`,
       tileCaught: 'legendary animal caught',
@@ -1853,7 +1851,9 @@
     } catch {
       // 保存がなければブラウザの言語から決める
     }
-    return (navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en';
+    // ブラウザの言語設定 (いちばん優先している言語) が日本語なら日本語、それ以外はすべて英語
+    const browser = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    return browser.toLowerCase().startsWith('ja') ? 'ja' : 'en';
   };
 
   let lang = loadLang();
@@ -2651,14 +2651,14 @@
     document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
     document.querySelectorAll('[data-lang]').forEach((el) => { el.hidden = el.dataset.lang !== lang; });
-    // ボタンには切り替え先の言語を表示する
-    langBtn.textContent = lang === 'ja' ? 'EN' : '日本語';
-    langBtn.lang = lang === 'ja' ? 'en' : 'ja';
-    langBtn.setAttribute('aria-label', t('langSwitch'));
+    // 日本語 / EN のトグルで、いま選んでいる方を押された状態にする
+    langBtn.querySelectorAll('[data-set-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.setLang === lang)));
   };
 
-  langBtn.addEventListener('click', () => {
-    lang = lang === 'ja' ? 'en' : 'ja';
+  langBtn.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-set-lang]');
+    if (!b || b.dataset.setLang === lang) return;
+    lang = b.dataset.setLang;
     try {
       localStorage.setItem(LANG_KEY, lang);
     } catch {

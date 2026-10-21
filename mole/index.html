@@ -15,7 +15,10 @@
       <a class="back" href="../" data-i18n="backToTools">‹ ツール一覧</a>
       <h1 data-i18n="gameTitle">モグラたたき</h1>
       <div class="top-btns">
-        <button type="button" id="lang-btn" class="icon-btn text" lang="en" aria-label="Switch to English">EN</button>
+        <div class="lang-toggle" id="lang-btn" role="group" aria-label="言語 / Language">
+          <button type="button" data-set-lang="ja" lang="ja" aria-pressed="true">日本語</button>
+          <button type="button" data-set-lang="en" lang="en" aria-pressed="false">EN</button>
+        </div>
         <button type="button" id="bgm-btn" class="icon-btn text" aria-label="BGM" aria-pressed="true">BGM</button>
         <button type="button" id="sound-btn" class="icon-btn" data-i18n-aria="soundEffects" aria-label="効果音" aria-pressed="true">♪</button>
         <button type="button" id="pause-btn" class="icon-btn" data-i18n-aria="pause" aria-label="一時停止" hidden>Ⅱ</button>
@@ -171,7 +174,7 @@
               <tr><th>テンキー 1〜9</th><td>3×3 のステージで穴の位置に対応 (7 が左上、3 が右下)</td></tr>
               <tr><th>P / Esc</th><td>一時停止</td></tr>
               <tr><th>BGM / ♪ ボタン</th><td>BGM・効果音のオン／オフ</td></tr>
-              <tr><th>EN / 日本語 ボタン</th><td>表示する言語の切り替え</td></tr>
+              <tr><th>日本語 / EN ボタン</th><td>表示する言語の切り替え</td></tr>
             </tbody>
           </table>
         </div>
@@ -230,7 +233,7 @@
               <tr><th>Numpad 1–9</th><td>Matches the hole positions on 3×3 stages (7 is top left, 3 is bottom right)</td></tr>
               <tr><th>P / Esc</th><td>Pause</td></tr>
               <tr><th>BGM / ♪ buttons</th><td>Turn music and sound effects on or off</td></tr>
-              <tr><th>EN / 日本語 button</th><td>Switch the language</td></tr>
+              <tr><th>日本語 / EN button</th><td>Switch the language</td></tr>
             </tbody>
           </table>
         </div>
