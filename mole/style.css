@@ -248,6 +248,7 @@ body {
 }
 
 .tile-scene .art { width: 46px; margin-bottom: -6px; }
+.tile-scene .art.silhouette svg { opacity: 0.45; }
 
 .tile-mark {
   position: absolute;
@@ -423,7 +424,7 @@ body {
 .grid {
   display: grid;
   gap: clamp(4px, 2.5vw, 14px);
-  padding: 5% 4% 4%;
+  padding: 10% 4% 4%; /* 上は空の帯のぶん空ける */
   transition: filter 0.2s;
 }
 

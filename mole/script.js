@@ -733,6 +733,121 @@
   const artEl = (key, { silhouette = false } = {}) => `<span class="art${silhouette ? ' silhouette' : ''}">${artSVG(key)}</span>`;
 
   /* =========================================================
+   * ステージの背景。上に空の帯 (400×64)、地面に小物を散らした模様 (140×140 を敷き詰め)
+   * ========================================================= */
+
+  // 地面の小物 (x, y は小物の中心)
+  const DECOR = {
+    flower: (x, y, c, mid = '#ffd23f') => [0, 72, 144, 216, 288]
+      .map((a) => `<circle cx="${(x + 3.6 * Math.cos((a * Math.PI) / 180)).toFixed(1)}" cy="${(y + 3.6 * Math.sin((a * Math.PI) / 180)).toFixed(1)}" r="3.2" fill="${c}"/>`)
+      .join('') + `<circle cx="${x}" cy="${y}" r="2.4" fill="${mid}"/>`,
+    tuft: (x, y, c) => `<path d="M${x - 6} ${y + 3}Q${x - 5} ${y - 4} ${x - 2} ${y - 6}M${x} ${y + 3}Q${x} ${y - 5} ${x + 1} ${y - 9}M${x + 6} ${y + 3}Q${x + 5} ${y - 4} ${x + 3} ${y - 6}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none"/>`,
+    clover: (x, y, c) => `<circle cx="${x - 3}" cy="${y - 2}" r="3.2" fill="${c}"/><circle cx="${x + 3}" cy="${y - 2}" r="3.2" fill="${c}"/><circle cx="${x}" cy="${y - 6.5}" r="3.2" fill="${c}"/><path d="M${x} ${y}q1 4 3 6" stroke="${c}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`,
+    tulip: (x, y, c) => `<path d="M${x} ${y + 8}V${y}" stroke="#4f9a3a" stroke-width="2"/><path d="M${x - 5} ${y - 7}L${x - 2.5} ${y - 3}L${x} ${y - 8}L${x + 2.5} ${y - 3}L${x + 5} ${y - 7}Q${x + 6} ${y + 2} ${x} ${y + 2}Q${x - 6} ${y + 2} ${x - 5} ${y - 7}Z" fill="${c}"/>`,
+    heart: (x, y, c) => `<path d="M${x} ${y + 4}C${x - 8} ${y - 1} ${x - 4} ${y - 8} ${x} ${y - 3}C${x + 4} ${y - 8} ${x + 8} ${y - 1} ${x} ${y + 4}Z" fill="${c}"/>`,
+    acorn: (x, y) => `<ellipse cx="${x}" cy="${y + 2}" rx="4.5" ry="5.5" fill="#b9773c"/><path d="M${x - 5.5} ${y - 1}Q${x} ${y - 8} ${x + 5.5} ${y - 1}Z" fill="#6e4a2a"/><path d="M${x} ${y - 5}v-3" stroke="#6e4a2a" stroke-width="1.6" stroke-linecap="round"/>`,
+    mushroom: (x, y, c = '#e8594f', dot = '#fff') => `<rect x="${x - 2.5}" y="${y - 1}" width="5" height="7" rx="2" fill="#f6ead6"/><path d="M${x - 8} ${y}Q${x - 8} ${y - 9} ${x} ${y - 9}Q${x + 8} ${y - 9} ${x + 8} ${y}Z" fill="${c}"/><circle cx="${x - 3.5}" cy="${y - 4}" r="1.5" fill="${dot}"/><circle cx="${x + 3}" cy="${y - 5.5}" r="1.2" fill="${dot}"/>`,
+    maple: (x, y, c) => `<polygon points="${spikes(x, y, 3.2, 8, -90, 270, 5)}" fill="${c}"/><path d="M${x} ${y}v7" stroke="${c}" stroke-width="1.6"/>`,
+    leaf: (x, y, c) => `<path d="M${x - 7} ${y + 3}Q${x - 4} ${y - 7} ${x + 7} ${y - 4}Q${x + 3} ${y + 6} ${x - 7} ${y + 3}Z" fill="${c}"/><path d="M${x - 6} ${y + 2}L${x + 5} ${y - 3}" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>`,
+    sprout: (x, y, c) => `<path d="M${x} ${y + 5}V${y - 2}" stroke="${c}" stroke-width="2"/><path d="M${x} ${y - 2}Q${x - 8} ${y - 3} ${x - 7} ${y - 9}Q${x - 1} ${y - 8} ${x} ${y - 2}Z" fill="${c}"/><path d="M${x} ${y - 1}Q${x + 7} ${y - 2} ${x + 7} ${y - 8}Q${x + 1} ${y - 7} ${x} ${y - 1}Z" fill="${c}"/>`,
+    rice: (x, y, c) => `<path d="M${x - 4} ${y + 4}Q${x - 6} ${y - 4} ${x - 9} ${y - 7}M${x} ${y + 4}V${y - 9}M${x + 4} ${y + 4}Q${x + 6} ${y - 4} ${x + 9} ${y - 7}" stroke="${c}" stroke-width="2" stroke-linecap="round" fill="none"/>`,
+    ripple: (x, y) => `<ellipse cx="${x}" cy="${y}" rx="11" ry="4" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.6"/><ellipse cx="${x}" cy="${y}" rx="5" ry="1.8" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.4"/>`,
+    pebble: (x, y, c = 'rgba(255,255,255,0.35)') => `<ellipse cx="${x}" cy="${y}" rx="5" ry="3.4" fill="${c}"/><ellipse cx="${x + 7}" cy="${y + 2}" rx="2.6" ry="2" fill="${c}"/>`,
+    shell: (x, y) => `<path d="M${x - 7} ${y + 3}Q${x} ${y - 11} ${x + 7} ${y + 3}Q${x} ${y + 6} ${x - 7} ${y + 3}Z" fill="#fbe1e4"/><path d="M${x} ${y + 4}V${y - 6}M${x - 3.5} ${y + 3.5}L${x - 2} ${y - 5}M${x + 3.5} ${y + 3.5}L${x + 2} ${y - 5}" stroke="#e7a8b2" stroke-width="1.2"/>`,
+    starfish: (x, y) => `<polygon points="${spikes(x, y, 3, 8.5, -90, 270, 5)}" fill="#f39c5a" stroke="#f39c5a" stroke-width="2" stroke-linejoin="round"/><circle cx="${x}" cy="${y}" r="1.2" fill="#fff3d6"/>`,
+    sand: (x, y) => `<circle cx="${x}" cy="${y}" r="1.4" fill="rgba(140,90,40,0.25)"/><circle cx="${x + 6}" cy="${y + 3}" r="1" fill="rgba(140,90,40,0.25)"/><circle cx="${x - 5}" cy="${y + 4}" r="1.1" fill="rgba(140,90,40,0.25)"/>`,
+    firefly: (x, y) => `<circle cx="${x}" cy="${y}" r="7" fill="#fff6a0" opacity="0.18"/><circle cx="${x}" cy="${y}" r="3.5" fill="#fff6a0" opacity="0.35"/><circle cx="${x}" cy="${y}" r="1.6" fill="#fffbd0"/>`,
+    star: (x, y, c = '#fff6c8') => `<path d="M${x} ${y - 4}L${x + 1.2} ${y - 1.2}L${x + 4} ${y}L${x + 1.2} ${y + 1.2}L${x} ${y + 4}L${x - 1.2} ${y + 1.2}L${x - 4} ${y}L${x - 1.2} ${y - 1.2}Z" fill="${c}"/>`,
+    paving: (x, y) => `<rect x="${x - 12}" y="${y - 6}" width="24" height="12" rx="3" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>`,
+  };
+
+  // 140×140 の中で小物を置く位置 (つなぎ目で切れないよう端から離す)
+  const DECOR_SPOTS = [[20, 22], [72, 14], [118, 30], [44, 52], [98, 64], [18, 92], [66, 96], [118, 104], [40, 126], [90, 126], [56, 74], [124, 66]];
+
+  // ステージごとの背景
+  //   sky: 空の上と地平線の色 / light: 太陽か月 / far: 遠くの景色 / decor: 地面に散らす小物
+  const SCENES = {
+    1: { sky: ['#8fd3ff', '#d9f2ff'], light: 'sun', clouds: true, far: ['hills', '#9fd672'], decor: [['flower', '#ffffff'], ['tuft', '#4f9a3a'], ['flower', '#fff27a', '#f39c12'], ['clover', '#4f9a3a']] },
+    2: { sky: ['#a9dcff', '#fde6f0'], light: 'sun', clouds: true, far: ['hills', '#b9e283'], decor: [['flower', '#ffc2d6'], ['tulip', '#ff8fb1'], ['tuft', '#5ea443'], ['heart', 'rgba(255,255,255,0.7)'], ['flower', '#ffffff', '#ff8fb1'], ['tulip', '#fff07a']] },
+    3: { sky: ['#9fd8f5', '#e3f5e6'], light: 'sun', clouds: true, far: ['trees', '#3f7a33'], decor: [['acorn'], ['mushroom'], ['leaf', '#8cc36a'], ['tuft', '#3d6b2c'], ['acorn'], ['leaf', '#d8b04a']] },
+    4: { sky: ['#9fd2ff', '#fff1d6'], light: 'sun', clouds: true, far: ['mountains', '#8fb36a'], decor: [['sprout', '#5fa447'], ['pebble'], ['sprout', '#5fa447'], ['flower', '#ffffff'], ['pebble'], ['sprout', '#7cbf55']] },
+    5: { sky: ['#a5dcff', '#e9f8ff'], light: 'sun', clouds: true, far: ['mountains', '#9cc4c8'], decor: [['rice', '#4f9a3a'], ['ripple'], ['rice', '#4f9a3a'], ['flower', '#ffffff'], ['ripple'], ['clover', '#4f9a3a']] },
+    6: { sky: ['#ffd2b0', '#fff2df'], light: 'sun', clouds: true, far: ['torii', '#6f8f4f'], decor: [['maple', '#e2523d'], ['tuft', '#3f6a2a'], ['mushroom', '#f2c14e', '#fff6d0'], ['maple', '#f08a3c'], ['pebble'], ['tuft', '#3f6a2a']] },
+    7: { sky: ['#ffd59a', '#fff3dc'], light: 'sun', clouds: true, far: ['autumn', '#e08a2c'], decor: [['maple', '#e2523d'], ['maple', '#f5b83d'], ['acorn'], ['leaf', '#c9692c'], ['maple', '#f08a3c'], ['mushroom']] },
+    8: { sky: ['#ff9e7a', '#ffdca4'], light: 'sunset', clouds: false, far: ['sea', '#5fb4d9'], decor: [['shell'], ['sand'], ['starfish'], ['sand'], ['shell'], ['sand']] },
+    9: { sky: ['#1b2a4a', '#3a5a6e'], light: 'moon', stars: true, far: ['trees', '#1c3326'], decor: [['firefly'], ['tuft', '#1d3a2a'], ['mushroom', '#7fd1c7', '#e9fffb'], ['firefly'], ['tuft', '#1d3a2a'], ['firefly']] },
+    10: { sky: ['#202848', '#4a4f78'], light: 'moon', stars: true, far: ['city', '#2c3150'], decor: [['paving'], ['star', 'rgba(255,246,200,0.5)'], ['paving'], ['leaf', '#6f7aa6'], ['paving'], ['star', 'rgba(255,246,200,0.4)']] },
+  };
+
+  // 顔つきの太陽・月 (かわいく見えるように目とほっぺをつける)
+  const face = (x, y, s, ink) => `<circle cx="${x - 4 * s}" cy="${y - 1 * s}" r="${1.4 * s}" fill="${ink}"/><circle cx="${x + 4 * s}" cy="${y - 1 * s}" r="${1.4 * s}" fill="${ink}"/>`
+    + `<path d="M${x - 2.5 * s} ${y + 3 * s}q${2.5 * s} ${2.5 * s} ${5 * s} 0" stroke="${ink}" stroke-width="${1.3 * s}" fill="none" stroke-linecap="round"/>`
+    + `<circle cx="${x - 7 * s}" cy="${y + 2.5 * s}" r="${1.8 * s}" fill="#ff8f8f" opacity="0.55"/><circle cx="${x + 7 * s}" cy="${y + 2.5 * s}" r="${1.8 * s}" fill="#ff8f8f" opacity="0.55"/>`;
+
+  const cloud = (x, y, s = 1) => `<g fill="#fff" opacity="0.92"><ellipse cx="${x}" cy="${y}" rx="${16 * s}" ry="${7 * s}"/><circle cx="${x - 7 * s}" cy="${y - 4 * s}" r="${7 * s}"/><circle cx="${x + 5 * s}" cy="${y - 6 * s}" r="${9 * s}"/></g>`;
+
+  const FAR = {
+    hills: (c) => `<path d="M0 48Q60 26 130 44T260 40T400 42V64H0Z" fill="${c}"/><path d="M0 54Q90 38 190 52T400 50V64H0Z" fill="${c}" opacity="0.7"/>`,
+    trees: (c) => Array.from({ length: 11 }, (_, i) => {
+      const x = i * 40 + (i % 2 ? 12 : 0);
+      const r = 14 + (i % 3) * 3;
+      return `<rect x="${x - 2}" y="44" width="4" height="12" fill="${c}"/><circle cx="${x}" cy="${46 - r * 0.6}" r="${r}" fill="${c}"/>`;
+    }).join(''),
+    mountains: (c) => `<path d="M-10 60L60 22L120 52L190 18L270 54L330 26L410 60Z" fill="${c}"/><path d="M180 26L190 18L200 26Z M50 28L60 22L70 28Z M320 32L330 26L340 32Z" fill="#fff" opacity="0.8"/>`,
+    torii: (c) => `${FAR.mountains(c)}<g fill="#d6402f"><rect x="296" y="26" width="5" height="30"/><rect x="321" y="26" width="5" height="30"/><rect x="288" y="22" width="46" height="5" rx="2"/><rect x="292" y="31" width="38" height="3"/></g>`,
+    autumn: (c) => Array.from({ length: 11 }, (_, i) => {
+      const x = i * 40 + (i % 2 ? 14 : 0);
+      const r = 14 + (i % 3) * 3;
+      const col = ['#e08a2c', '#d1542f', '#f2b33d'][i % 3];
+      return `<rect x="${x - 2}" y="44" width="4" height="12" fill="#8a5a33"/><circle cx="${x}" cy="${46 - r * 0.6}" r="${r}" fill="${col}"/>`;
+    }).join(''),
+    sea: (c) => `<rect x="0" y="40" width="400" height="24" fill="${c}"/><path d="M0 44q10-3 20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0" stroke="#fff" stroke-width="1.6" fill="none" opacity="0.6"/>`,
+    city: (c) => [[0, 30, 34], [36, 18, 26], [66, 34, 40], [110, 24, 30], [144, 40, 34], [182, 20, 28], [214, 30, 44], [262, 22, 26], [292, 36, 36], [332, 26, 30], [366, 32, 40]]
+      .map(([x, h, w]) => {
+        const top = 58 - h;
+        let win = '';
+        for (let wy = top + 5; wy < 52; wy += 8) for (let wx = x + 5; wx < x + w - 6; wx += 9) if ((wx + wy) % 3) win += `<rect x="${wx}" y="${wy}" width="4" height="4" rx="1" fill="#ffd86b" opacity="0.85"/>`;
+        return `<rect x="${x}" y="${top}" width="${w}" height="${h + 6}" rx="3" fill="${c}"/>${win}`;
+      }).join(''),
+  };
+
+  const svgURL = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+
+  const skySVG = (stage) => {
+    const sc = SCENES[stage.no];
+    let light = '';
+    if (sc.light === 'sun') light = `<circle cx="345" cy="20" r="13" fill="#ffd84d"/>${face(345, 20, 1, '#8a5a1a')}`;
+    if (sc.light === 'sunset') light = `<circle cx="300" cy="40" r="17" fill="#ffb347"/>${face(300, 38, 1.1, '#8a3a1a')}`;
+    if (sc.light === 'moon') light = `<circle cx="345" cy="20" r="12" fill="#fff4c2"/><circle cx="341" cy="15" r="2" fill="#efe0a0"/>${face(346, 22, 0.9, '#6b5a2a')}`;
+    const clouds = sc.clouds ? cloud(70, 22) + cloud(200, 14, 0.8) : '';
+    const stars = sc.stars ? [[30, 10], [90, 24], [150, 8], [210, 20], [260, 6], [300, 28], [390, 12], [120, 36]].map(([x, y]) => DECOR.star(x, y, '#fff6c8')).join('') : '';
+    const [farType, farColor] = sc.far;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 64" preserveAspectRatio="xMidYMax slice">`
+      + `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sc.sky[0]}"/><stop offset="1" stop-color="${sc.sky[1]}"/></linearGradient></defs>`
+      + `<rect width="400" height="64" fill="url(#g)"/>${stars}${light}${clouds}${FAR[farType](farColor)}`
+      + `<path d="M0 58Q50 53 100 58T200 58T300 58T400 58V64H0Z" fill="${stage.ground[0]}"/></svg>`;
+  };
+
+  const decorSVG = (stage) => {
+    const list = SCENES[stage.no].decor;
+    const items = DECOR_SPOTS.map(([x, y], i) => {
+      const [name, ...args] = list[i % list.length];
+      return DECOR[name](x, y, ...args);
+    }).join('');
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140">${items}</svg>`;
+  };
+
+  const sceneCache = {};
+  // 背景の CSS (空 → 地面の小物 → 地面の色、の順に重ねる)
+  const sceneBackground = (stage) => {
+    if (!sceneCache[stage.no]) {
+      sceneCache[stage.no] = `${svgURL(skySVG(stage))} top center / 100% auto no-repeat, `
+        + `${svgURL(decorSVG(stage))} 0 0 / 140px 140px repeat, linear-gradient(${stage.ground[0]}, ${stage.ground[1]})`;
+    }
+    return sceneCache[stage.no];
+  };
+
+  /* =========================================================
    * 効果音 (Web Audio で合成)
    * ========================================================= */
 
@@ -1091,6 +1206,7 @@
   /* タイトル */
 
   $('title-hero').innerHTML = ['mole', 'rabbit', 'tanuki', 'fox', 'squirrel'].map((k) => artEl(k)).join('');
+  $('title-hero').style.background = sceneBackground(STAGES[1]);
   $('title-play').addEventListener('click', () => { Sound.unlock(); openSelect(); });
   $('title-zukan').addEventListener('click', () => openZukan('title'));
 
@@ -1105,7 +1221,7 @@
       const r = stageRecord(s.no);
       const caught = Boolean(legendRecord(s.legend));
       return `<button type="button" class="tile${caught ? ' caught' : ''}" data-stage="${s.no}" aria-label="STAGE ${s.no} ${s.name}${caught ? ' 伝説の動物を捕まえた' : ''}">
-        <span class="tile-scene" style="--g1:${s.ground[0]};--g2:${s.ground[1]}">
+        <span class="tile-scene" style='--g1:${s.ground[0]};--g2:${s.ground[1]};background:${sceneBackground(s)}'>
           ${artEl(s.legend, { silhouette: !caught })}
           <span class="tile-mark">${caught ? '★ 伝説' : '？'}</span>
         </span>
@@ -1140,6 +1256,7 @@
     const preview = $('confirm-preview');
     preview.style.setProperty('--g1', s.ground[0]);
     preview.style.setProperty('--g2', s.ground[1]);
+    preview.style.background = sceneBackground(s);
     preview.innerHTML = animals.slice(-3).map((a) => artEl(a)).join('');
     $('confirm-time').textContent = `${s.duration}秒`;
     $('confirm-target').textContent = `${s.target}点`;
@@ -1220,6 +1337,7 @@
     fieldEl.style.margin = '0 auto';
     fieldEl.style.setProperty('--g1', stage.ground[0]);
     fieldEl.style.setProperty('--g2', stage.ground[1]);
+    fieldEl.style.background = sceneBackground(stage);
     gridEl.innerHTML = '';
     holeEls = [];
     for (let i = 0; i < stage.cols * stage.rows; i++) {
