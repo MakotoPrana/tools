@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Origami Works ロゴアニメーション</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="../assets/favicon.png" type="image/png" />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1f2933;
+      --muted: #6b7785;
+      --border: #dde2e8;
+      --accent: #2c5f82;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #15191e;
+        --text: #e6eaef;
+        --muted: #9aa5b1;
+        --border: #333c46;
+        --accent: #6fa3c9;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+    }
+
+    .view {
+      --oi-text: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 32px 16px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .view .oi-crane { filter: drop-shadow(0 0 16px rgba(160, 200, 230, 0.25)); }
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px 16px;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    button {
+      padding: 8px 18px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.ghost { background: none; color: var(--text); border-color: var(--border); }
+    label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+    input[type="range"] { width: min(60vw, 320px); accent-color: var(--accent); }
+    output { min-width: 3.5em; font-variant-numeric: tabular-nums; color: var(--text); }
+  </style>
+</head>
+<body>
+  <main class="view" id="view"></main>
+
+  <div class="controls">
+    <button type="button" id="replay">もう一度再生</button>
+    <button type="button" class="ghost" id="slow">ゆっくり (1/4)</button>
+    <button type="button" class="ghost" id="overlay">画面全体で再生</button>
+    <label>コマ送り <input type="range" id="scrub" min="0" max="2" step="0.01" value="0" /> <output id="time">0.00秒</output></label>
+  </div>
+
+  <script src="origami-intro.js"></script>
+  <script>
+    const intro = OrigamiIntro.mount(document.getElementById('view'));
+    const scrub = document.getElementById('scrub');
+    const time = document.getElementById('time');
+    const showTime = (t) => { scrub.value = t; time.textContent = `${Number(t).toFixed(2)}秒`; };
+
+    const run = (speed) => {
+      const start = performance.now();
+      const follow = () => {
+        const t = Math.min(intro.duration, ((performance.now() - start) / 1000) * speed);
+        showTime(t);
+        if (t < intro.duration) requestAnimationFrame(follow);
+      };
+      requestAnimationFrame(follow);
+      return intro.play({ speed });
+    };
+
+    document.getElementById('replay').addEventListener('click', () => run(1));
+    document.getElementById('slow').addEventListener('click', () => run(0.25));
+    document.getElementById('overlay').addEventListener('click', () => OrigamiIntro.play());
+    scrub.addEventListener('input', () => {
+      intro.stop();
+      intro.render(Number(scrub.value));
+      showTime(scrub.value);
+    });
+
+    run(1);
+  </script>
+</body>
+</html>
