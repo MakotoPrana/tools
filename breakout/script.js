@@ -35,6 +35,7 @@
   const TARGET_PER_HIT = 0.8;
   const SAVE_KEY = 'brick-siege-save';
   const SOUND_KEY = 'brick-siege-sound';
+  const BGM_KEY = 'brick-siege-bgm';
 
   // 硬さの段階ごとのHPの倍率 (1 がふつうのブロック)
   const TIER_SCALE = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 12 };
@@ -481,6 +482,7 @@
   const actionsEl = $('overlay-actions');
   const pauseBtn = $('pause-btn');
   const soundBtn = $('sound-btn');
+  const bgmBtn = $('bgm-btn');
   const stageEl = $('stage-no');
   const goldEl = $('gold');
   const livesEl = $('lives');
@@ -551,7 +553,7 @@
 
     // 音を出せるようにする。ブラウザが許すのはタップやキー入力の最中だけなので、操作のたびに呼ぶ
     unlock() {
-      if (!this.enabled) return;
+      if (!this.enabled && !Music.enabled) return;
       if (!this.ctx) {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return;
@@ -766,6 +768,274 @@
 
   try {
     Sound.enabled = localStorage.getItem(SOUND_KEY) !== 'off';
+  } catch {
+    // 既定のまま (鳴らす)
+  }
+
+  // ---------- BGM (Web Audio で合成) ----------
+  // 宇宙をイメージした曲。和音ごとに、ゆっくり広がるパッド・低い音 (ベース)・きらめくベル・アルペジオを鳴らし、
+  // 残響とこだまで空間の広さを出す。menu は画面を選んでいる間、play はプレイ中に鳴らす
+  const SONGS = {
+    menu: {
+      tempo: 70,
+      barsPerChord: 2,
+      chords: [
+        { root: 'A1', tones: ['A3', 'C4', 'E4', 'G4', 'B4'] }, // Am9
+        { root: 'F1', tones: ['F3', 'A3', 'C4', 'E4', 'G4'] }, // Fmaj9
+        { root: 'C2', tones: ['C4', 'E4', 'G4', 'B4', 'D5'] }, // Cmaj9
+        { root: 'E1', tones: ['E3', 'G3', 'B3', 'D4', 'F#4'] }, // Em9
+      ],
+      // 16分音符ごとのベルの位置と、使う和音の音 (番号) と高さ (オクターブ上)
+      bell: { 0: [4, 1], 6: [2, 1], 10: [3, 1], 20: [1, 2], 26: [4, 1] },
+      echo: 0.64,
+    },
+    play: {
+      tempo: 112,
+      barsPerChord: 1,
+      chords: [
+        { root: 'A1', tones: ['A3', 'C4', 'E4', 'G4'] }, // Am7
+        { root: 'F1', tones: ['F3', 'A3', 'C4', 'E4'] }, // Fmaj7
+        { root: 'G1', tones: ['G3', 'B3', 'D4', 'F#4'] }, // G
+        { root: 'E1', tones: ['E3', 'G#3', 'B3', 'D4'] }, // E7
+      ],
+      arp: [0, 2, 1, 3, 2, 1, 3, 2, 0, 2, 1, 3, 2, 3, 1, 2],
+      bell: { 0: [3, 2], 10: [1, 2] },
+      echo: 0.4,
+    },
+  };
+
+  const NOTE_INDEX = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+  function noteFreq(name) {
+    const m = /^([A-G])(#?)(\d)$/.exec(name);
+    const midi = (Number(m[3]) + 1) * 12 + NOTE_INDEX[m[1]] + (m[2] ? 1 : 0);
+    return 440 * 2 ** ((midi - 69) / 12);
+  }
+
+  const Music = {
+    enabled: true,
+    key: null,
+    song: null,
+    step: 0,
+    nextTime: 0,
+    timer: null,
+    bus: null, // この曲の音量 (曲を切り替えるときにゆっくり消す)
+    reverb: null,
+    echo: null,
+    tension: 0, // ブロックが防衛ラインに近いほど 1 に近づき、アルペジオの音色が明るくなる
+
+    // 残響とこだまは一度だけ作り、曲が変わっても使い回す
+    setup(ctx) {
+      if (this.reverb) return;
+      this.master = ctx.createGain();
+      this.master.gain.value = 0.48;
+      this.master.connect(ctx.destination);
+      // 残響: だんだん小さくなる雑音を響きの形として使う
+      const len = Math.floor(ctx.sampleRate * 3.5);
+      const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const data = ir.getChannelData(ch);
+        for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+      }
+      this.reverb = ctx.createConvolver();
+      this.reverb.buffer = ir;
+      const wet = ctx.createGain();
+      wet.gain.value = 0.9;
+      this.reverb.connect(wet).connect(this.master);
+      // こだま: 繰り返すたびに高い音が少しずつ丸くなる
+      this.echo = ctx.createDelay(2);
+      const feedback = ctx.createGain();
+      const tone = ctx.createBiquadFilter();
+      feedback.gain.value = 0.42;
+      tone.type = 'lowpass';
+      tone.frequency.value = 2400;
+      this.echo.connect(tone).connect(feedback).connect(this.echo);
+      tone.connect(this.master);
+      tone.connect(this.reverb);
+    },
+
+    play(key) {
+      const ctx = Sound.ctx;
+      if (!ctx || this.key === key) return;
+      this.stop();
+      this.setup(ctx);
+      this.key = key;
+      this.song = SONGS[key];
+      this.bus = ctx.createGain();
+      this.bus.gain.setValueAtTime(0, ctx.currentTime);
+      this.bus.gain.linearRampToValueAtTime(1, ctx.currentTime + 1.5);
+      this.bus.connect(this.master);
+      this.echo.delayTime.setValueAtTime(this.song.echo, ctx.currentTime);
+      this.step = 0;
+      this.nextTime = ctx.currentTime + 0.05;
+      this.timer = setInterval(() => this.tick(), 25);
+      this.tick();
+    },
+
+    stop() {
+      if (this.timer) clearInterval(this.timer);
+      this.timer = null;
+      this.key = null;
+      const ctx = Sound.ctx;
+      const bus = this.bus;
+      this.bus = null;
+      if (!bus || !ctx) return;
+      // 鳴っている音は 0.6 秒ほどで消し、そのあと外す
+      bus.gain.cancelScheduledValues(ctx.currentTime);
+      bus.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
+      setTimeout(() => bus.disconnect(), 1500);
+    },
+
+    tick() {
+      const ctx = Sound.ctx;
+      const stepDur = 60 / this.song.tempo / 4; // 16分音符
+      // タブが裏に回ってタイマーが遅れたときは、まとめて鳴らさずに今から再開する
+      if (this.nextTime < ctx.currentTime - 0.1) this.nextTime = ctx.currentTime + 0.05;
+      while (this.nextTime < ctx.currentTime + 0.15) {
+        this.playStep(this.step, this.nextTime, stepDur);
+        this.nextTime += stepDur;
+        this.step += 1;
+      }
+    },
+
+    playStep(step, t, stepDur) {
+      const song = this.song;
+      const chordSteps = 16 * song.barsPerChord;
+      const chord = song.chords[Math.floor(step / chordSteps) % song.chords.length];
+      const pos = step % chordSteps;
+      const chordDur = chordSteps * stepDur;
+      if (pos === 0) {
+        this.pad(chord.tones, t, chordDur);
+        this.bass(noteFreq(chord.root), t, this.key === 'menu' ? chordDur : stepDur * 1.8);
+      }
+      if (this.key === 'play') {
+        if (pos % 2 === 0 && pos) this.bass(noteFreq(chord.root) * (pos % 8 === 4 ? 2 : 1), t, stepDur * 1.8);
+        this.arp(noteFreq(chord.tones[song.arp[pos % 16]]) * 2, t, stepDur);
+        if (pos % 16 === 0 || pos % 16 === 8) this.kick(t);
+        if (pos % 4 === 2 || (this.tension > 0.5 && pos % 2 === 1)) this.hat(t, pos % 4 === 2 ? 0.05 : 0.025);
+      }
+      const bell = song.bell[pos];
+      if (bell) this.bell(noteFreq(chord.tones[bell[0] % chord.tones.length]) * 2 ** bell[1], t);
+    },
+
+    // ゆっくり広がって消える和音。少しずらした2つののこぎり波で厚みを出す
+    pad(tones, t, dur) {
+      const ctx = Sound.ctx;
+      const g = ctx.createGain();
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(700, t);
+      f.frequency.linearRampToValueAtTime(1600, t + dur * 0.5);
+      f.frequency.linearRampToValueAtTime(700, t + dur);
+      const level = this.key === 'menu' ? 0.045 : 0.03;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(level, t + dur * 0.35);
+      g.gain.linearRampToValueAtTime(level * 0.7, t + dur * 0.8);
+      g.gain.linearRampToValueAtTime(0, t + dur * 1.1);
+      f.connect(g);
+      g.connect(this.bus);
+      g.connect(this.reverb);
+      for (const name of tones) {
+        for (const cents of [-8, 8]) {
+          const o = ctx.createOscillator();
+          o.type = 'sawtooth';
+          o.frequency.value = noteFreq(name);
+          o.detune.value = cents;
+          o.connect(f);
+          o.start(t);
+          o.stop(t + dur * 1.15);
+        }
+      }
+    },
+
+    bass(freq, t, dur) {
+      const ctx = Sound.ctx;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      const vol = this.key === 'menu' ? 0.22 : 0.2;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + (this.key === 'menu' ? 0.8 : 0.01));
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g).connect(this.bus);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    },
+
+    // きらめくベル。高い倍音を少し混ぜ、こだまと残響に多めに送る
+    bell(freq, t) {
+      const ctx = Sound.ctx;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + 1.6);
+      g.connect(this.bus);
+      g.connect(this.echo);
+      g.connect(this.reverb);
+      [[1, 1], [2.01, 0.3], [3.98, 0.12]].forEach(([r, v]) => {
+        const o = ctx.createOscillator();
+        const og = ctx.createGain();
+        o.frequency.value = freq * r;
+        og.gain.value = v;
+        o.connect(og).connect(g);
+        o.start(t);
+        o.stop(t + 1.7);
+      });
+    },
+
+    // プレイ中のアルペジオ。ブロックが迫るほどフィルターが開いて音が明るく鋭くなる
+    arp(freq, t, stepDur) {
+      const ctx = Sound.ctx;
+      const o = ctx.createOscillator();
+      const f = ctx.createBiquadFilter();
+      const g = ctx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.value = freq;
+      f.type = 'lowpass';
+      f.Q.value = 6;
+      f.frequency.setValueAtTime(900 + this.tension * 2600, t);
+      f.frequency.exponentialRampToValueAtTime(400, t + stepDur * 1.5);
+      g.gain.setValueAtTime(0.035, t);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + stepDur * 1.6);
+      o.connect(f).connect(g);
+      g.connect(this.bus);
+      g.connect(this.echo);
+      o.start(t);
+      o.stop(t + stepDur * 1.7);
+    },
+
+    kick(t) {
+      const ctx = Sound.ctx;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.setValueAtTime(120, t);
+      o.frequency.exponentialRampToValueAtTime(40, t + 0.2);
+      g.gain.setValueAtTime(0.3, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      o.connect(g).connect(this.bus);
+      o.start(t);
+      o.stop(t + 0.3);
+    },
+
+    hat(t, vol) {
+      const ctx = Sound.ctx;
+      const src = ctx.createBufferSource();
+      const f = ctx.createBiquadFilter();
+      const g = ctx.createGain();
+      src.buffer = Sound.noiseBuf;
+      f.type = 'highpass';
+      f.frequency.value = 7500;
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+      src.connect(f).connect(g).connect(this.bus);
+      src.start(t, Math.random() * 0.5);
+      src.stop(t + 0.05);
+    },
+  };
+
+  try {
+    Music.enabled = localStorage.getItem(BGM_KEY) !== 'off';
   } catch {
     // 既定のまま (鳴らす)
   }
@@ -2006,10 +2276,15 @@
   }
 
   // 防衛ライン。ブロックが近づくほど、越えられた直後ほど赤く強く光る
+  // ブロックが防衛ラインにどれだけ近いか (0 〜 1)
+  function dangerLevel() {
+    const nearest = bricks.reduce((m, b) => (isHidden(b) ? m : Math.max(m, b.y + b.h)), 0);
+    return Math.min(1, Math.max(0, 1 - (lineY() - nearest) / 120));
+  }
+
   function drawDefenseLine() {
     const y = lineY();
-    const nearest = bricks.reduce((m, b) => (isHidden(b) ? m : Math.max(m, b.y + b.h)), 0);
-    const danger = Math.min(1, Math.max(0, 1 - (y - nearest) / 120));
+    const danger = dangerLevel();
     const alpha = Math.min(1, 0.3 + danger * 0.5 + breachFlash);
     ctx.strokeStyle = `rgba(239, 59, 59, ${alpha})`;
     ctx.lineWidth = breachFlash > 0 ? 2.5 : 1.5;
@@ -2270,6 +2545,35 @@
   });
   updateSoundBtn();
 
+  function updateBgmBtn() {
+    bgmBtn.setAttribute('aria-pressed', String(Music.enabled));
+    bgmBtn.setAttribute('aria-label', Music.enabled ? 'BGM を消す' : 'BGM を鳴らす');
+  }
+
+  bgmBtn.addEventListener('click', () => {
+    bgmBtn.blur();
+    Music.enabled = !Music.enabled;
+    try {
+      localStorage.setItem(BGM_KEY, Music.enabled ? 'on' : 'off');
+    } catch {
+      // 保存できなくても、このページを開いている間は切り替わる
+    }
+    Sound.unlock();
+    updateBgmBtn();
+  });
+  updateBgmBtn();
+
+  // いまの画面に合った BGM を鳴らす。プレイ中は play、一時停止中は止め、それ以外の画面では menu
+  function syncMusic() {
+    let key = null;
+    if (Music.enabled && Sound.ctx && Sound.ctx.state === 'running' && !document.hidden && state !== 'paused') {
+      key = state === 'serve' || state === 'playing' ? 'play' : 'menu';
+    }
+    if (key) Music.play(key);
+    else Music.stop();
+    Music.tension = key === 'play' ? dangerLevel() : 0;
+  }
+
   pauseBtn.addEventListener('click', () => {
     pauseBtn.blur();
     togglePause();
@@ -2293,6 +2597,7 @@
     if (state === 'playing' || state === 'serve') update(dt);
     else if (state === 'title') updateTitleWall(dt);
     if (state !== 'paused') updateParticles(dt);
+    syncMusic();
     draw();
     requestAnimationFrame(frame);
   }

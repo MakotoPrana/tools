@@ -70,7 +70,9 @@ body {
   cursor: pointer;
 }
 
-/* 効果音を消しているとき */
+.icon-btn.text { width: auto; padding: 0 8px; font-size: 0.72rem; letter-spacing: 0.04em; }
+
+/* BGM・効果音を消しているとき */
 .icon-btn[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
 
 /* スコア表示 */
