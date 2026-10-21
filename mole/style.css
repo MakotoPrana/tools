@@ -692,8 +692,113 @@ body {
 .overlay-sub:empty, .overlay-text:empty, .overlay-legend:empty { display: none; }
 .overlay-title { margin: 0; font-size: clamp(1.2rem, 6vw, 1.5rem); font-weight: 800; line-height: 1.3; }
 .overlay-text { margin: 0; font-size: 0.8rem; line-height: 1.6; white-space: pre-line; color: #d5dbe2; }
-.overlay.clear .overlay-title { color: #ffe270; }
-.overlay.fail .overlay-title { color: #ffb4ad; }
+/* 結果画面の演出 */
+.overlay.clear,
+.overlay.fail { background: rgba(8, 12, 18, 0.6); }
+
+.overlay.clear .overlay-title {
+  color: #ffe270;
+  font-size: clamp(1.6rem, 8vw, 2.2rem);
+  text-shadow: 0 0 12px rgba(255, 220, 90, 0.8), 0 3px 0 #b5781a;
+  animation: pop-in 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both, glow 1.6s ease-in-out 0.6s infinite;
+}
+
+.overlay.fail .overlay-title {
+  color: #c9d6ff;
+  font-size: clamp(1.6rem, 8vw, 2.2rem);
+  text-shadow: 0 3px 0 #3b4a7a;
+  animation: drop-in 0.5s cubic-bezier(0.5, 0, 1, 1) both, wobble 0.6s ease-out 0.5s both;
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.2) rotate(-8deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes glow {
+  0%, 100% { text-shadow: 0 0 12px rgba(255, 220, 90, 0.8), 0 3px 0 #b5781a; }
+  50% { text-shadow: 0 0 22px rgba(255, 240, 160, 1), 0 3px 0 #b5781a; }
+}
+
+@keyframes drop-in {
+  0% { opacity: 0; transform: translateY(-160%); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wobble {
+  0% { transform: rotate(0) scale(1.1, 0.85); }
+  25% { transform: rotate(-6deg); }
+  50% { transform: rotate(4deg); }
+  75% { transform: rotate(-2deg); }
+  100% { transform: rotate(0); }
+}
+
+.overlay-stars { display: flex; gap: 6px; font-size: clamp(1.6rem, 8vw, 2.2rem); line-height: 1; }
+.overlay-stars:empty { display: none; }
+.ostar { color: rgba(255, 255, 255, 0.18); }
+
+.ostar.on {
+  color: #ffd23f;
+  text-shadow: 0 0 10px rgba(255, 210, 63, 0.9);
+  animation: star-pop 0.45s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+
+@keyframes star-pop {
+  0% { opacity: 0; transform: scale(0) rotate(-90deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+/* クリア: 一瞬白く光り、紙吹雪が降る */
+.field.flash::after {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  animation: flash-out 0.5s ease-out forwards;
+}
+
+@keyframes flash-out {
+  from { opacity: 0.8; }
+  to { opacity: 0; }
+}
+
+.confetti { position: absolute; z-index: 6; inset: 0; overflow: hidden; pointer-events: none; }
+
+.confetti span {
+  position: absolute;
+  top: -6%;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.3, 0.6, 0.6, 1);
+  animation-fill-mode: both;
+}
+
+@keyframes confetti-fall {
+  from { top: -6%; transform: translateX(0) rotate(0); opacity: 1; }
+  85% { opacity: 1; }
+  to { top: 104%; transform: translateX(var(--dx)) rotate(var(--rot)); opacity: 0; }
+}
+
+/* 失敗: 盤面を暗い青に沈める */
+.field.gloom .grid { filter: saturate(0.35) brightness(0.7) hue-rotate(-15deg); transition: filter 0.6s; }
+
+/* 結果の演出で穴から出てくる動物 */
+.hole.cheer .mole { transform-origin: 50% 100%; animation: cheer 0.6s ease-in-out var(--crowd-delay, 0ms) infinite; }
+.hole.tease .mole { animation: tease 0.9s ease-in-out var(--crowd-delay, 0ms) infinite; }
+
+/* 穴の上は見切れるので、上下ではなく伸び縮みと傾きで跳ねているように見せる */
+@keyframes cheer {
+  0%, 100% { transform: translateY(6%) scale(1.1, 0.88); }
+  35% { transform: translateY(0) scale(0.94, 1.06) rotate(-4deg); }
+  65% { transform: translateY(0) scale(0.94, 1.06) rotate(4deg); }
+}
+
+@keyframes tease {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  25% { transform: translateY(0) rotate(-9deg); }
+  75% { transform: translateY(0) rotate(9deg); }
+}
 
 .overlay-legend {
   display: flex;
@@ -795,6 +900,12 @@ body {
 footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 16px 32px; }
 
 @media (prefers-reduced-motion: reduce) {
+  .overlay.clear .overlay-title,
+  .overlay.fail .overlay-title,
+  .ostar.on,
+  .hole.cheer .mole,
+  .hole.tease .mole { animation: none; }
+  .field.flash::after { display: none; }
   .title-cloud { animation: none; }
   .t-hole .mole { animation: none; transform: translateY(0); }
   .field.shake { animation: none; }
