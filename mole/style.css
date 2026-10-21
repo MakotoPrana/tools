@@ -373,6 +373,62 @@ body {
   font-size: 0.8rem;
 }
 
+/* 章 */
+.chapter + .chapter { margin-top: 20px; }
+
+.chapter-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.chapter-no { color: var(--accent); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; }
+.chapter-stars, .chapter-lock { margin-left: auto; color: var(--muted); font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chapter-lock { display: inline-flex; align-items: center; gap: 4px; }
+.chapter-lock .lock { width: 14px; height: 14px; }
+
+/* 章の最後のステージ */
+.tile.finale { border-color: var(--star); box-shadow: 0 0 0 1px var(--star) inset; }
+
+.tile-final {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--star);
+  color: #1f1600;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+}
+
+/* 体験版で遊べないステージ */
+.tile.locked { cursor: pointer; }
+.tile.locked .tile-scene { filter: grayscale(0.7) brightness(0.85); }
+.tile.locked .tile-name, .tile.locked .tile-no { color: var(--muted); }
+
+.tile-lock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.tile-lock .lock { width: 26px; height: 26px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.modal-lock { padding: 24px 0; color: var(--muted); }
+.modal-lock .lock { width: 56px; height: 56px; }
+.modal-action:empty { display: none; }
+.modal-action { margin-bottom: 10px; }
+.modal-action .btn, .overlay a.btn { text-decoration: none; text-align: center; }
+.overlay-btns.locked a.btn { pointer-events: none; opacity: 0.4; }
+.overlay.chapter .overlay-sub { color: #ffe270; font-size: 1rem; letter-spacing: 0.04em; }
+
 .zukan-tile .tile-scene { height: 96px; background: var(--legend-bg); }
 .zukan-tile .tile-scene .art { width: 64px; margin-bottom: 4px; }
 .zukan-tile:not(.caught) .tile-scene { background: var(--bg); }
@@ -596,6 +652,20 @@ body {
 .hole[data-hurt="2"] .crack2 { display: inline; }
 .hole.legend .mole svg { filter: drop-shadow(0 0 5px rgba(255, 240, 150, 0.95)); }
 .hole.hazard.hit .mole { animation: boom 0.3s ease-out; }
+
+/* カメレオンは背景に溶けこむ (たたかれると姿が見える) */
+.hole.camo .mole svg { opacity: 0.28; transition: opacity 0.15s; }
+.hole.camo.hit .mole svg { opacity: 1; }
+
+/* ハムスターはたたかれるたびにほっぺがしぼむ */
+.hm-cheeks { transform-box: fill-box; transform-origin: center; transition: transform 0.15s; }
+.hole[data-hurt="1"] .hm-cheeks { transform: scale(0.82); }
+.hole[data-hurt="2"] .hm-cheeks { transform: scale(0.64); }
+
+/* パンダの竹は食べるほど短くなる */
+.hole[data-bite="1"] .bs3,
+.hole[data-bite="2"] .bs3,
+.hole[data-bite="2"] .bs2 { display: none; }
 
 @keyframes boom {
   0% { transform: scale(1); filter: brightness(1); }
