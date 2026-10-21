@@ -40,6 +40,8 @@
         </div>
         <p class="title-hint" id="sound-hint" data-i18n="soundHint">画面をタップすると BGM と効果音が鳴ります</p>
       </div>
+      <!-- 体験版だけ、完全版 (tools.e-seventh.com) への案内を出す -->
+      <div class="promo" data-promo="title" hidden></div>
     </section>
 
     <!-- ステージ選択 -->
@@ -53,6 +55,7 @@
         <div><dt data-i18n="stars">星</dt><dd id="sum-stars">0 / 30</dd></div>
         <div><dt data-i18n="zukan">図鑑</dt><dd id="sum-zukan">0 / 10</dd></div>
       </dl>
+      <div class="promo compact" data-promo="select" hidden></div>
       <div id="stage-tiles"></div>
     </section>
 
@@ -116,6 +119,7 @@
         <span class="head-spacer"></span>
       </div>
       <p class="zukan-count"><span id="zukan-count">0 / 10</span><span class="complete" id="zukan-complete" data-i18n="complete" hidden>コンプリート</span></p>
+      <div class="promo compact" data-promo="zukan" hidden></div>
       <div id="zukan-tiles"></div>
     </section>
 

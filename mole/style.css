@@ -270,6 +270,59 @@ body {
   font-size: 0.8rem;
 }
 
+/* 体験版の完全版案内 */
+.promo {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 16px 16px 14px;
+  border: 2px solid var(--star);
+  border-radius: 16px;
+  background: var(--legend-bg);
+  text-align: center;
+}
+
+.promo-badge {
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--star);
+  color: #1f1600;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.7;
+}
+
+.promo-title { margin: 0; font-size: 1.1rem; font-weight: 800; text-wrap: balance; }
+.promo-desc { margin: 0; max-width: 36em; color: var(--muted); font-size: 0.85rem; }
+.promo-btns { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 14px; margin-top: 4px; }
+.promo .btn { text-decoration: none; }
+.nowrap { white-space: nowrap; }
+.promo-site { color: var(--accent); font-size: 0.85rem; font-weight: 700; }
+
+.promo.compact {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  justify-items: start;
+  gap: 8px 12px;
+  margin: 0 0 14px;
+  padding: 8px 10px 8px 14px;
+  text-align: left;
+}
+
+.promo-text { margin: 0; min-width: 0; font-size: 0.85rem; font-weight: 700; }
+
+/* 結果画面の小さなリンク */
+.overlay .promo-link {
+  flex-basis: 100%;
+  margin-top: 2px;
+  color: #ffe270;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* 動物の絵 */
 .art { display: block; }
 .art svg { display: block; width: 100%; height: auto; overflow: visible; }
@@ -452,7 +505,7 @@ body {
 .modal-action:empty { display: none; }
 .modal-action { margin-bottom: 10px; }
 .modal-action .btn, .overlay a.btn { text-decoration: none; text-align: center; }
-.overlay-btns.locked a.btn { pointer-events: none; opacity: 0.4; }
+.overlay-btns.locked a { pointer-events: none; opacity: 0.4; }
 .overlay.chapter .overlay-sub { color: #ffe270; font-size: 1rem; letter-spacing: 0.04em; }
 
 .zukan-tile .tile-scene { height: 96px; background: var(--legend-bg); }

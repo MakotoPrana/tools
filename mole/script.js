@@ -166,7 +166,10 @@
   // 体験版 (itch.io 用) は第1章だけ遊べる。index.html の <meta name="mole-edition" content="demo"> で切り替える
   const EDITION = document.querySelector('meta[name="mole-edition"]')?.content === 'demo' ? 'demo' : 'full';
   const PLAYABLE_STAGES = EDITION === 'demo' ? CHAPTERS[0].to : STAGES.length;
-  const FULL_VERSION_URL = 'https://tools.e-seventh.com/mole/';
+  // 完全版とサイトのトップ。体験版からのリンクには、どこから来たかが分かるよう UTM パラメータをつける
+  const SITE_URL = 'https://tools.e-seventh.com/';
+  const FULL_VERSION_URL = `${SITE_URL}mole/`;
+  const trackedURL = (url, placement) => `${url}?utm_source=itch.io&utm_medium=demo&utm_campaign=mole_demo&utm_content=${placement}`;
   const isPlayable = (no) => no <= PLAYABLE_STAGES;
 
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -1697,6 +1700,13 @@
       demoEnd: '続きの第2章・第3章は完全版で遊べます',
       fxTime: (n) => `+${n}秒`,
       penguinBonus: (n) => `ペンギン全員! +${n}`,
+      promoBadge: '完全版は無料',
+      promoTitle: '全30ステージは完全版で',
+      promoDesc: '第2章「せかいの旅」・第3章「ゆめの国」の20ステージと、20匹の伝説の動物は tools.e-seventh.com の完全版で遊べます。登録不要・無料です。',
+      promoShort: '第2章・第3章の20ステージは、完全版で無料で遊べます',
+      promoBtn: '完全版で遊ぶ',
+      promoSite: 'ほかの無料ゲーム・ツールも見る',
+      resultPromo: '▶ 完全版で全30ステージを遊ぶ (無料)',
     },
     en: {
       pageTitle: 'Whack-a-Mole',
@@ -1779,6 +1789,13 @@
       demoEnd: 'Chapters 2 and 3 continue in the full version',
       fxTime: (n) => `+${n}s`,
       penguinBonus: (n) => `All penguins! +${n}`,
+      promoBadge: 'Full version is free',
+      promoTitle: 'Play all 30 stages in the full version',
+      promoDesc: 'Chapter 2 "Around the World", Chapter 3 "Land of Dreams", 20 more stages and 20 more legendary animals are waiting at tools.e-seventh.com. Free, no sign-up.',
+      promoShort: '20 more stages in Chapters 2 and 3 are free in the full version',
+      promoBtn: 'Play the full version',
+      promoSite: 'See more free games and tools',
+      resultPromo: '▶ Play all 30 stages in the full version (free)',
     },
   };
 
@@ -2015,7 +2032,7 @@
     $('modal-name').textContent = t('fullTitle', PLAYABLE_STAGES + 1, STAGES.length);
     $('modal-desc').textContent = t('fullDesc');
     $('modal-meta').innerHTML = '';
-    $('modal-action').innerHTML = `<a class="btn primary wide" href="${FULL_VERSION_URL}" target="_blank" rel="noopener">${t('openFull')}</a>`;
+    $('modal-action').innerHTML = `<a class="btn primary wide" href="${trackedURL(FULL_VERSION_URL, 'locked_stage')}" target="_blank" rel="noopener">${t('openFull')}</a>`;
     modal.hidden = false;
     $('modal-close').focus({ preventScroll: true });
   };
@@ -2310,7 +2327,7 @@
     legendEl.innerHTML = legend ? legend.html : '';
     const btns = $('overlay-btns');
     btns.innerHTML = '';
-    buttons.forEach(({ label, action, primary, href }) => {
+    buttons.forEach(({ label, action, primary, href, cls: btnCls }) => {
       const b = document.createElement(href ? 'a' : 'button');
       if (href) {
         b.href = href;
@@ -2321,7 +2338,7 @@
         b.disabled = lockMs > 0;
         b.addEventListener('click', action);
       }
-      b.className = `btn${primary ? ' primary' : ''}`;
+      b.className = btnCls || `btn${primary ? ' primary' : ''}`;
       b.textContent = label;
       btns.appendChild(b);
     });
@@ -2457,11 +2474,12 @@
     const demoEnd = next && !isPlayable(next.no);
     if (chapterClear && stage.no === STAGES.length) lines.unshift(t('allClear'));
     if (demoEnd && r.cleared) lines.push('', t('demoEnd'));
-    if (demoEnd) buttons.push({ label: t('playFull'), primary: r.cleared, href: FULL_VERSION_URL });
+    if (demoEnd) buttons.push({ label: t('playFull'), primary: r.cleared, href: trackedURL(FULL_VERSION_URL, 'result_stage10') });
     else if (next) buttons.push({ label: t('nextStage'), primary: r.cleared, action: () => { game = null; hideOverlay(); clearResultFx(); openConfirm(next); } });
     buttons.push({ label: t('retry'), primary: !r.cleared || !next, action: () => startStage(stage) });
     buttons.push({ label: t('toSelect'), action: leavePlay });
     buttons.sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)));
+    if (EDITION === 'demo' && !demoEnd) buttons.push({ label: t('resultPromo'), href: trackedURL(FULL_VERSION_URL, 'result'), cls: 'promo-link' });
 
     showOverlay({
       sub: chapterClear ? t('chapterClear', chapter.no, chapterName(chapter)) : `STAGE ${stage.no}`,
@@ -2643,6 +2661,23 @@
   const langBtn = $('lang-btn');
 
   // HTML に書いた文言 (data-i18n) と、言語ごとの遊び方 (data-lang) を反映する
+  // 体験版の完全版案内。タイトルは大きく、ステージ選択と図鑑は1行で出す
+  const renderPromos = () => {
+    document.querySelectorAll('[data-promo]').forEach((el) => {
+      el.hidden = EDITION !== 'demo';
+      if (el.hidden) return;
+      const place = el.dataset.promo;
+      const full = trackedURL(FULL_VERSION_URL, place);
+      if (el.classList.contains('compact')) {
+        el.innerHTML = `<p class="promo-text">${t('promoShort')}</p><a class="btn primary small" href="${full}" target="_blank" rel="noopener">${t('promoBtn')}</a>`;
+        return;
+      }
+      el.innerHTML = `<span class="promo-badge">${t('promoBadge')}</span><p class="promo-title">${t('promoTitle')}</p><p class="promo-desc">${t('promoDesc').replace('tools.e-seventh.com', '<span class="nowrap">tools.e-seventh.com</span>')}</p>`
+        + `<div class="promo-btns"><a class="btn primary" href="${full}" target="_blank" rel="noopener">${t('promoBtn')}</a>`
+        + `<a class="promo-site" href="${trackedURL(SITE_URL, `${place}_site`)}" target="_blank" rel="noopener">${t('promoSite')}</a></div>`;
+    });
+  };
+
   const applyLang = () => {
     document.documentElement.lang = lang;
     document.title = t('pageTitle');
@@ -2651,6 +2686,7 @@
     document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
     document.querySelectorAll('[data-lang]').forEach((el) => { el.hidden = el.dataset.lang !== lang; });
+    renderPromos();
     // 日本語 / EN のトグルで、いま選んでいる方を押された状態にする
     langBtn.querySelectorAll('[data-set-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.setLang === lang)));
   };
