@@ -73,10 +73,18 @@ body {
   height: 44px;
 }
 
-.top h1 { margin: 0; font-size: 1.05rem; white-space: nowrap; }
-.back { color: var(--muted); text-decoration: none; font-size: 0.85rem; white-space: nowrap; }
+.top h1 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.back { flex: none; color: var(--muted); text-decoration: none; font-size: 0.85rem; white-space: nowrap; }
 .back:hover { color: var(--accent); }
-.top-btns { display: flex; gap: 6px; }
+.top-btns { flex: none; display: flex; gap: 6px; }
+
+@media (max-width: 400px) {
+  .top { gap: 6px; }
+  .top h1 { font-size: 0.95rem; }
+  .top-btns { gap: 4px; }
+  .icon-btn { width: 34px; }
+  .icon-btn.text { padding: 0 6px; }
+}
 
 .icon-btn {
   flex: none;
@@ -124,42 +132,117 @@ body {
 .screen-head > :first-child { justify-self: start; }
 .screen-head > :last-child { justify-self: end; }
 
-/* タイトル */
-.title-screen {
+/* タイトル: 空と丘の一枚絵の上に、ロゴ・穴から顔を出す動物・ボタンを置く */
+.title-screen { padding: 8px 0; }
+
+.title-card {
+  --g1: #7cc35a;
+  --g2: #5ea443;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 16px 0 8px;
+  padding: clamp(28px, 9vw, 48px) 12px 20px;
+  border-radius: 20px;
+  overflow: hidden;
   text-align: center;
+  background: linear-gradient(#8fd3ff, #5ea443);
 }
 
-.title-hero {
+.title-cloud {
+  position: absolute;
+  z-index: 0;
+  width: 72px;
+  opacity: 0.95;
+  pointer-events: none;
+  animation: drift 26s linear infinite;
+}
+
+.title-cloud svg { display: block; width: 100%; height: auto; }
+.title-cloud.c1 { top: 4%; left: -80px; }
+.title-cloud.c2 { top: 13%; left: -80px; width: 52px; animation-duration: 34s; animation-delay: -14s; }
+.title-cloud.c3 { top: 1%; left: -80px; width: 44px; animation-duration: 40s; animation-delay: -28s; }
+
+@keyframes drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(560px + 160px)); }
+}
+
+.title-name {
+  position: relative;
+  margin: 0;
+  color: #8b4f2c;
+  font-size: clamp(1.8rem, 10vw, 3.1rem);
+  font-weight: 900;
+  white-space: nowrap;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  text-wrap: balance;
+  -webkit-text-stroke: 7px #fff;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 rgba(90, 50, 20, 0.25);
+}
+
+.title-sub {
+  position: relative;
+  margin: 2px 0 0;
+  padding: 2px 16px;
+  border-radius: 999px;
+  background: #fff;
+  color: #e0668a;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+}
+
+.title-holes {
+  position: relative;
   display: flex;
   justify-content: center;
-  gap: 4px;
+  gap: 2%;
   width: 100%;
-  max-width: 420px;
-  padding: 12px 8px 0;
-  border-radius: 16px;
-  background: linear-gradient(#7cc35a, #5ea443);
-  overflow: hidden;
+  max-width: 440px;
+  margin-top: clamp(28px, 12vw, 64px);
 }
 
-.title-hero .art { width: 18%; animation: bob 2.4s ease-in-out infinite; }
-.title-hero .art:nth-child(2) { animation-delay: -0.6s; }
-.title-hero .art:nth-child(3) { animation-delay: -1.2s; }
-.title-hero .art:nth-child(4) { animation-delay: -1.8s; }
-.title-hero .art:nth-child(5) { animation-delay: -0.3s; }
-
-@keyframes bob {
-  0%, 100% { transform: translateY(14%); }
-  50% { transform: translateY(0); }
+.t-hole {
+  position: relative;
+  flex: 0 0 18%;
+  aspect-ratio: 1;
+  cursor: pointer;
 }
 
-.title-name { margin: 14px 0 0; font-size: 2rem; font-weight: 800; letter-spacing: 0.04em; }
-.title-sub { margin: 0; color: var(--muted); font-weight: 700; letter-spacing: 0.2em; }
-.title-btns { display: flex; gap: 10px; margin-top: 16px; }
+/* 順番に顔を出したり引っ込んだりする */
+.t-hole .mole { transition: none; animation: peek 4s ease-in-out infinite; }
+.t-hole:nth-child(1) .mole { animation-delay: -0.2s; }
+.t-hole:nth-child(2) .mole { animation-delay: -2.6s; }
+.t-hole:nth-child(3) .mole { animation-delay: -1.2s; }
+.t-hole:nth-child(4) .mole { animation-delay: -3.4s; }
+.t-hole:nth-child(5) .mole { animation-delay: -1.9s; }
+.t-hole.hit .eye { display: none; }
+.t-hole.hit .x { display: inline; }
+
+@keyframes peek {
+  0%, 12% { transform: translateY(110%); }
+  24%, 70% { transform: translateY(0); }
+  82%, 100% { transform: translateY(110%); }
+}
+
+.title-btns { position: relative; display: flex; gap: 10px; margin-top: 18px; }
+.title-btns .btn { padding: 12px 28px; font-size: 1.05rem; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15); }
+.title-btns .btn:not(.primary) { background: #fff; border-color: #fff; color: #1f2933; }
+
+.title-hint {
+  position: relative;
+  margin: 12px 0 0;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 0.8rem;
+}
 
 /* 動物の絵 */
 .art { display: block; }
@@ -247,6 +330,7 @@ body {
 }
 
 .tile-scene .art { width: 46px; margin-bottom: -6px; }
+.tile-scene .art.silhouette svg { opacity: 0.45; }
 
 .tile-mark {
   position: absolute;
@@ -422,7 +506,7 @@ body {
 .grid {
   display: grid;
   gap: clamp(4px, 2.5vw, 14px);
-  padding: 5% 4% 4%;
+  padding: 10% 4% 4%; /* 上は空の帯のぶん空ける */
   transition: filter 0.2s;
 }
 
@@ -627,6 +711,26 @@ body {
 .overlay-legend.missed { background: rgba(255, 255, 255, 0.08); color: #d5dbe2; }
 
 .overlay-btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+.overlay-btns { position: relative; padding-bottom: 8px; }
+.overlay .btn:disabled { opacity: 0.4; cursor: default; }
+
+.overlay-btns.locked::after {
+  content: "";
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  transform-origin: left;
+  animation: lock-bar var(--lock-ms, 2000ms) linear forwards;
+}
+
+@keyframes lock-bar {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
 .overlay .btn { padding: 8px 16px; font-size: 0.9rem; background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.3); color: #fff; }
 .overlay .btn.primary { background: var(--accent); border-color: var(--accent); }
 
@@ -691,6 +795,7 @@ body {
 footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 16px 32px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .title-hero .art { animation: none; }
+  .title-cloud { animation: none; }
+  .t-hole .mole { animation: none; transform: translateY(0); }
   .field.shake { animation: none; }
 }
