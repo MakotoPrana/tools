@@ -166,9 +166,10 @@
   // 体験版 (itch.io 用) は第1章だけ遊べる。index.html の <meta name="mole-edition" content="demo"> で切り替える
   const EDITION = document.querySelector('meta[name="mole-edition"]')?.content === 'demo' ? 'demo' : 'full';
   const PLAYABLE_STAGES = EDITION === 'demo' ? CHAPTERS[0].to : STAGES.length;
-  // 完全版とサイトのトップ。体験版からのリンクには、どこから来たかが分かるよう UTM パラメータをつける
+  // 完全版とゲーム一覧。体験版からのリンクには、どこから来たかが分かるよう UTM パラメータをつける
   const SITE_URL = 'https://tools.e-seventh.com/';
   const FULL_VERSION_URL = `${SITE_URL}games/mole/`;
+  const GAMES_URL = `${SITE_URL}games/`;
   const trackedURL = (url, placement) => `${url}?utm_source=itch.io&utm_medium=demo&utm_campaign=mole_demo&utm_content=${placement}`;
   const isPlayable = (no) => no <= PLAYABLE_STAGES;
 
@@ -1705,7 +1706,7 @@
       promoDesc: '第2章「せかいの旅」・第3章「ゆめの国」の20ステージと、20匹の伝説の動物は tools.e-seventh.com の完全版で遊べます。登録不要・無料です。',
       promoShort: '第2章・第3章の20ステージは、完全版で無料で遊べます',
       promoBtn: '完全版で遊ぶ',
-      promoSite: 'ほかの無料ゲーム・ツールも見る',
+      promoSite: 'ほかの無料ゲームも見る',
       resultPromo: '▶ 完全版で全30ステージを遊ぶ (無料)',
     },
     en: {
@@ -1794,7 +1795,7 @@
       promoDesc: 'Chapter 2 "Around the World", Chapter 3 "Land of Dreams", 20 more stages and 20 more legendary animals are waiting at tools.e-seventh.com. Free, no sign-up.',
       promoShort: '20 more stages in Chapters 2 and 3 are free in the full version',
       promoBtn: 'Play the full version',
-      promoSite: 'See more free games and tools',
+      promoSite: 'See more free games',
       resultPromo: '▶ Play all 30 stages in the full version (free)',
     },
   };
@@ -2674,7 +2675,7 @@
       }
       el.innerHTML = `<span class="promo-badge">${t('promoBadge')}</span><p class="promo-title">${t('promoTitle')}</p><p class="promo-desc">${t('promoDesc').replace('tools.e-seventh.com', '<span class="nowrap">tools.e-seventh.com</span>')}</p>`
         + `<div class="promo-btns"><a class="btn primary" href="${full}" target="_blank" rel="noopener">${t('promoBtn')}</a>`
-        + `<a class="promo-site" href="${trackedURL(SITE_URL, `${place}_site`)}" target="_blank" rel="noopener">${t('promoSite')}</a></div>`;
+        + `<a class="promo-site" href="${trackedURL(GAMES_URL, `${place}_site`)}" target="_blank" rel="noopener">${t('promoSite')}</a></div>`;
     });
   };
 
