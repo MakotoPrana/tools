@@ -6,6 +6,7 @@
    * ========================================================= */
 
   const MOVE_MS = 140; // 穴から出る / 引っ込むアニメーションの時間
+  const LEGEND_MOVE_MS = 90;
   const HIT_MS = 280; // たたかれて目を回している時間
   const HOLE_COOLDOWN = 350; // 引っ込んでから同じ穴に出てくるまでの最短時間
   const COUNTDOWN_MS = 3000;
@@ -14,39 +15,113 @@
   const SAVE_KEY = 'mole-save';
   const SOUND_KEY = 'mole-sound';
 
-  // モグラの種類
-  //   score: たたいたときの基本点 / hp: 必要なたたく回数
-  //   stay: 出ている時間の倍率 / penalty: たたくとコンボが切れる
-  const MOLE_TYPES = {
-    normal: { label: 'モグラ', score: 10, hp: 1, stay: 1 },
-    helmet: { label: 'ヘルメット', score: 30, hp: 2, stay: 1.5 },
-    gold: { label: '金のモグラ', score: 50, hp: 1, stay: 0.55 },
-    bomb: { label: '爆弾', score: -30, hp: 1, stay: 1.2, penalty: true },
+  const LEGEND_SCORE = 500;
+  const LEGEND_GLINT_MS = 500; // 伝説の動物が出る前に穴が光る時間
+  const LEGEND_STAY_MS = 400; // 伝説の動物が顔を出している時間
+  const LEGEND_WINDOW = [0.2, 0.8]; // 制限時間のどこで出るか
+
+  const STONE_PENALTY_SEC = 3;
+  const HIVE_STUN_MS = 2000;
+  const SPIKE_PENALTY = 10;
+  const HIT_EXTEND_MS = 250; // 何回もたたく動物は、たたかれると少し長く居座る
+  const OWL_FRONT_MS = 650;
+  const OWL_BACK_MS = 450;
+
+  // 動物
+  //   score: 基本点 / hp: たたく回数 / stay: 出ている時間の倍率
+  const ANIMALS = {
+    mole: { name: 'モグラ', score: 10, hp: 1, stay: 1 },
+    rabbit: { name: 'ウサギ', score: 15, hp: 1, stay: 0.5 },
+    squirrel: { name: 'リス', score: 15, hp: 1, stay: 0.9, pair: true },
+    tanuki: { name: 'タヌキ', score: 25, hp: 2, stay: 1.3 },
+    frog: { name: 'カエル', score: 15, hp: 1, stay: 0.8, jump: true },
+    fox: { name: 'キツネ', score: 20, hp: 1, stay: 1.1, move: true },
+    hedgehog: { name: 'ハリネズミ', score: 25, hp: 1, stay: 1.3, spiky: true },
+    turtle: { name: 'カメ', score: 40, hp: 3, stay: 1.8 },
+    owl: { name: 'フクロウ', score: 25, hp: 1, stay: 1.4, turn: true },
+    raccoon: { name: 'アライグマ', score: 30, hp: 1, stay: 1, steal: 20 },
   };
 
-  // ステージ定義。start → end へ時間経過で線形に難しくなる
+  const ANIMAL_ORDER = Object.keys(ANIMALS);
+
+  // じゃまもの
+  const HAZARDS = {
+    bomb: { name: '爆弾', stage: 1, stay: 1.2, share: 0.5, score: -30 },
+    stone: { name: '石', stage: 3, stay: 1.3, share: 0.3, timePenalty: STONE_PENALTY_SEC },
+    hive: { name: 'ハチの巣', stage: 6, stay: 1.3, share: 0.2, stun: HIVE_STUN_MS },
+  };
+
+  // 伝説の動物 (ステージごとに1匹)
+  const LEGENDS = {
+    'gold-mole': { name: '黄金のモグラ', animal: 'mole', desc: '全身が金色に光るモグラ。見た者には幸運が訪れるという。' },
+    'moon-rabbit': { name: '月のウサギ', animal: 'rabbit', desc: '満月の夜にだけ地上へ降りてくる、白く光るウサギ。' },
+    'rainbow-squirrel': { name: '虹色のリス', animal: 'squirrel', desc: 'しっぽが七色に輝くリス。どんぐりを宝石に変えるらしい。' },
+    'chagama-tanuki': { name: '茶釜のタヌキ', animal: 'tanuki', desc: '茶釜に化けたまま戻れなくなったタヌキ。顔だけ出してくる。' },
+    'ogama': { name: '大ガマ', animal: 'frog', desc: '何百年も生きた大きなカエル。ひと跳びで山を越える。' },
+    'kyubi-fox': { name: '九尾のキツネ', animal: 'fox', desc: '九本のしっぽを持つキツネ。化けるのがとてもうまい。' },
+    'silver-hedgehog': { name: '白銀のハリネズミ', animal: 'hedgehog', desc: 'トゲが銀色に輝くハリネズミ。トゲは月の光でできている。' },
+    'ryugu-turtle': { name: '竜宮のカメ', animal: 'turtle', desc: '海の底の竜宮城から来たカメ。小さな玉手箱を背負っている。' },
+    'wise-owl': { name: '森の賢者フクロウ', animal: 'owl', desc: '森のすべてを知っているフクロウ。めったに姿を見せない。' },
+    'thief-raccoon': { name: '怪盗アライグマ', animal: 'raccoon', desc: '黒いマントの大どろぼう。盗んだお菓子は数知れず。' },
+  };
+
+  // 穴に出てくるものすべて
+  const KINDS = {};
+  Object.entries(ANIMALS).forEach(([k, v]) => { KINDS[k] = { ...v, animal: true }; });
+  Object.entries(HAZARDS).forEach(([k, v]) => { KINDS[k] = { ...v, hp: 1, hazard: true }; });
+  Object.entries(LEGENDS).forEach(([k, v]) => { KINDS[k] = { ...v, hp: 1, score: LEGEND_SCORE, legend: true }; });
+
+  // ステージ。穴の数は cols (横) × rows (縦)
   const STAGES = [
-    {
-      id: 'proto',
-      no: 1,
-      name: 'はじまりの草原',
-      cols: 3,
-      rows: 3,
-      duration: 45,
-      target: 600,
-      interval: { start: 950, end: 420 }, // 次のモグラが出るまでの間隔 (ms)
-      stay: { start: 1200, end: 650 }, // モグラが出ている時間 (ms)
-      maxActive: { start: 1, end: 3 }, // 同時に出ているモグラの最大数
-      weights: {
-        start: { normal: 85, helmet: 5, gold: 5, bomb: 5 },
-        end: { normal: 55, helmet: 15, gold: 10, bomb: 20 },
-      },
-    },
+    { no: 1, name: 'はじまりの草原', cols: 3, rows: 3, duration: 45, target: 600, animal: 'mole', legend: 'gold-mole', ground: ['#7cc35a', '#5ea443'] },
+    { no: 2, name: 'うさぎの野原', cols: 3, rows: 3, duration: 45, target: 800, animal: 'rabbit', legend: 'moon-rabbit', ground: ['#a3d36a', '#7fb44c'] },
+    { no: 3, name: 'どんぐりの森', cols: 3, rows: 3, duration: 50, target: 1000, animal: 'squirrel', legend: 'rainbow-squirrel', ground: ['#6a9a4a', '#4d7a36'] },
+    { no: 4, name: '里山の畑', cols: 3, rows: 4, duration: 50, target: 1200, animal: 'tanuki', legend: 'chagama-tanuki', ground: ['#b59262', '#8f6c42'] },
+    { no: 5, name: '田んぼのあぜ道', cols: 3, rows: 4, duration: 50, target: 1400, animal: 'frog', legend: 'ogama', ground: ['#8fbf6a', '#5f9a52'] },
+    { no: 6, name: 'いなり山', cols: 3, rows: 4, duration: 55, target: 1600, animal: 'fox', legend: 'kyubi-fox', ground: ['#7a9a52', '#5b7a3a'] },
+    { no: 7, name: '落ち葉の林', cols: 4, rows: 4, duration: 55, target: 1800, animal: 'hedgehog', legend: 'silver-hedgehog', ground: ['#d39a4c', '#a8702e'] },
+    { no: 8, name: '夕暮れの浜辺', cols: 4, rows: 4, duration: 55, target: 2000, animal: 'turtle', legend: 'ryugu-turtle', ground: ['#f0cf93', '#d6a868'] },
+    { no: 9, name: '夜の森', cols: 4, rows: 4, duration: 60, target: 2300, animal: 'owl', legend: 'wise-owl', ground: ['#36574a', '#243c32'] },
+    { no: 10, name: '月夜の町', cols: 4, rows: 4, duration: 60, target: 2600, animal: 'raccoon', legend: 'thief-raccoon', ground: ['#565b74', '#3b3f55'] },
   ];
 
   const lerp = (a, b, t) => a + (b - a) * t;
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
   const comboMultiplier = (combo) => Math.min(3, 1 + Math.floor(combo / 5) * 0.5);
+  const range = (start, end) => ({ start, end });
+
+  const stageAnimals = (stage) => ANIMAL_ORDER.slice(0, stage.no);
+  const stageHazards = (stage) => Object.keys(HAZARDS).filter((h) => HAZARDS[h].stage <= stage.no);
+
+  // ステージ番号から難しさを決める。start → end へ時間経過で線形に難しくなる
+  const stageParams = (stage) => {
+    const k = (stage.no - 1) / (STAGES.length - 1);
+    const animals = stageAnimals(stage);
+    const hazards = stageHazards(stage);
+    const weights = {};
+
+    // 新しい動物は出やすく、それ以外は均等
+    animals.forEach((a) => {
+      weights[a] = a === stage.animal ? range(40, 28) : range(12, 12);
+    });
+    const animalTotal = (key) => animals.reduce((sum, a) => sum + weights[a][key], 0);
+
+    // じゃまもの全体の割合を決め、種類ごとに分ける
+    const hazardShare = range(0.06 + 0.02 * k, 0.16 + 0.04 * k);
+    const shareTotal = hazards.reduce((sum, h) => sum + HAZARDS[h].share, 0);
+    hazards.forEach((h) => {
+      const part = HAZARDS[h].share / shareTotal;
+      const w = (key) => (animalTotal(key) * hazardShare[key] * part) / (1 - hazardShare[key]);
+      weights[h] = range(w('start'), w('end'));
+    });
+
+    return {
+      interval: range(lerp(950, 720, k), lerp(450, 330, k)), // 次が出るまでの間隔 (ms)
+      stay: range(lerp(1200, 950, k), lerp(700, 540, k)), // 出ている時間 (ms)
+      maxActive: range(1 + (stage.no >= 4) + (stage.no >= 8), 3 + Math.round(k * 2)), // 同時に出ている最大数
+      weights,
+    };
+  };
 
   /* =========================================================
    * ゲーム本体 (DOM に依存しないロジック)
@@ -55,15 +130,9 @@
   class MoleGame {
     constructor(stage, emit) {
       this.stage = stage;
+      this.params = stageParams(stage);
       this.emit = emit;
-      this.holes = Array.from({ length: stage.cols * stage.rows }, () => ({
-        state: 'empty', // empty / rising / up / hiding / hit
-        type: null,
-        hp: 0,
-        timer: 0,
-        cooldown: 0,
-        done: false, // たたき終わって引っ込み中
-      }));
+      this.holes = Array.from({ length: stage.cols * stage.rows }, () => ({ state: 'empty', cooldown: 0 }));
       this.phase = 'ready'; // ready / countdown / playing / paused / finished
       this.reset();
     }
@@ -78,9 +147,15 @@
       this.hits = 0;
       this.misses = 0;
       this.escaped = 0;
-      this.bombsHit = 0;
+      this.hazardsHit = 0;
+      this.stun = 0;
       this.lastSpurt = false;
-      this.holes.forEach((h, i) => this.clearHole(i));
+      const [a, b] = LEGEND_WINDOW;
+      this.legendAt = this.stage.duration * 1000 * lerp(a, b, Math.random());
+      this.legendState = 'waiting'; // waiting / glint / out / caught / gone
+      this.legendHole = -1;
+      this.legendTimer = 0;
+      this.holes.forEach((h, i) => this.clearHole(i, false));
     }
 
     get timeLeft() {
@@ -93,7 +168,7 @@
     }
 
     param(name) {
-      const p = this.stage[name];
+      const p = this.params[name];
       return lerp(p.start, p.end, this.progress);
     }
 
@@ -102,7 +177,6 @@
       this.phase = 'countdown';
       this.countdown = COUNTDOWN_MS;
       this.emit('countdown', { count: 3 });
-      this.emit('status');
     }
 
     pause() {
@@ -117,6 +191,12 @@
       if (this.phase !== 'paused') return;
       this.phase = this.resumePhase;
       this.emit('resumed');
+    }
+
+    // 途中でやめる (結果は出さない)
+    abort() {
+      this.phase = 'finished';
+      this.holes.forEach((h, i) => this.clearHole(i, false));
     }
 
     update(dt) {
@@ -141,7 +221,13 @@
         this.emit('lastSpurt');
       }
 
+      if (this.stun > 0) {
+        this.stun -= dt;
+        if (this.stun <= 0) this.emit('stunEnd');
+      }
+
       this.holes.forEach((h, i) => this.updateHole(h, i, dt));
+      this.updateLegend(dt);
 
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
@@ -158,6 +244,40 @@
         return;
       }
       h.timer -= dt;
+      const kind = KINDS[h.kind];
+
+      if (h.state === 'up' || h.state === 'rising') {
+        // フクロウは前と後ろを交互に向く
+        if (kind.turn) {
+          h.turnTimer -= dt;
+          if (h.turnTimer <= 0) {
+            h.turned = !h.turned;
+            h.turnTimer = h.turned ? OWL_BACK_MS : OWL_FRONT_MS;
+            this.emit('hole', { index: i, hole: h });
+          }
+        }
+      }
+
+      if (h.state === 'up') {
+        // ハリネズミは途中で丸まってトゲを出す
+        if (kind.spiky && !h.spiky && h.timer <= h.stayMs * 0.5) {
+          h.spiky = true;
+          this.emit('hole', { index: i, hole: h });
+        }
+        // キツネは途中で隣の穴へ移る
+        if (kind.move && !h.moved && h.timer <= h.stayMs * 0.55) {
+          h.moved = true;
+          const j = this.freeHole({ near: i });
+          if (j >= 0) {
+            const remain = h.timer;
+            h.done = true;
+            this.setHole(i, 'hiding', MOVE_MS);
+            this.spawnKind(j, h.kind, { moved: true, stayMs: remain + MOVE_MS });
+            return;
+          }
+        }
+      }
+
       if (h.timer > 0) return;
 
       switch (h.state) {
@@ -165,54 +285,138 @@
           this.setHole(i, 'up', h.stayMs);
           break;
         case 'up':
-          this.setHole(i, 'hiding', MOVE_MS);
+          this.setHole(i, 'hiding', h.moveMs);
           break;
         case 'hit':
           h.done = true;
-          this.setHole(i, 'hiding', MOVE_MS);
+          this.setHole(i, 'hiding', h.moveMs);
           break;
-        case 'hiding': {
-          const escaped = !h.done && !MOLE_TYPES[h.type].penalty;
-          this.clearHole(i);
-          if (escaped) {
-            this.escaped++;
-            this.breakCombo();
-            this.emit('escape', { index: i });
-          }
+        case 'hiding':
+          this.onHidden(h, i, kind);
           break;
+      }
+    }
+
+    // 引っ込み終わったとき
+    onHidden(h, i, kind) {
+      const escaped = !h.done && kind.animal;
+      const kindKey = h.kind;
+      const jumped = h.jumped;
+      this.clearHole(i);
+
+      if (kind.legend && this.legendState === 'out') {
+        this.legendState = 'gone';
+        this.emit('legendEscape', { index: i });
+      }
+      if (!escaped) return;
+
+      // カエルは別の穴から1回だけ跳び出てくる
+      if (kind.jump && !jumped) {
+        const j = this.freeHole({ exclude: i });
+        if (j >= 0) {
+          this.spawnKind(j, kindKey, { jumped: true });
+          return;
         }
       }
+
+      this.escaped++;
+      this.breakCombo();
+      if (kind.steal) {
+        this.score = Math.max(0, this.score - kind.steal);
+        this.emit('steal', { index: i, points: -kind.steal });
+      } else {
+        this.emit('escape', { index: i });
+      }
+    }
+
+    updateLegend(dt) {
+      if (this.legendState === 'waiting' && this.elapsed >= this.legendAt) {
+        // 空いている穴を予約して光らせる。空きがなければ次のフレームで再挑戦
+        const j = this.freeHole({ anyCooldown: this.progress > 0.85 });
+        if (j < 0) return;
+        this.legendState = 'glint';
+        this.legendHole = j;
+        this.legendTimer = LEGEND_GLINT_MS;
+        this.holes[j].reserved = true;
+        this.emit('glint', { index: j, on: true });
+      } else if (this.legendState === 'glint') {
+        this.legendTimer -= dt;
+        if (this.legendTimer > 0) return;
+        const j = this.legendHole;
+        this.holes[j].reserved = false;
+        this.emit('glint', { index: j, on: false });
+        this.legendState = 'out';
+        this.spawnKind(j, this.stage.legend, { stayMs: LEGEND_STAY_MS, moveMs: LEGEND_MOVE_MS });
+        this.emit('legendAppear', { index: j });
+      }
+    }
+
+    neighbors(i) {
+      const { cols, rows } = this.stage;
+      const x = i % cols;
+      const y = Math.floor(i / cols);
+      const list = [];
+      if (x > 0) list.push(i - 1);
+      if (x < cols - 1) list.push(i + 1);
+      if (y > 0) list.push(i - cols);
+      if (y < rows - 1) list.push(i + cols);
+      return list;
+    }
+
+    // 空いている穴を1つ選ぶ。なければ -1
+    freeHole({ near = -1, exclude = -1, anyCooldown = false } = {}) {
+      const candidates = near >= 0 ? this.neighbors(near) : this.holes.map((_, i) => i);
+      const free = candidates.filter((i) => {
+        const h = this.holes[i];
+        return i !== exclude && h.state === 'empty' && !h.reserved && (anyCooldown || h.cooldown <= 0);
+      });
+      return free.length ? free[Math.floor(Math.random() * free.length)] : -1;
     }
 
     spawn() {
       const active = this.holes.filter((h) => h.state !== 'empty').length;
       if (active >= Math.round(this.param('maxActive'))) return;
 
-      const free = [];
-      this.holes.forEach((h, i) => {
-        if (h.state === 'empty' && h.cooldown <= 0) free.push(i);
-      });
-      if (!free.length) return;
+      const index = this.freeHole();
+      if (index < 0) return;
+      const kind = this.pickKind();
+      this.spawnKind(index, kind);
 
-      const index = free[Math.floor(Math.random() * free.length)];
-      const type = this.pickType();
-      const h = this.holes[index];
-      h.type = type;
-      h.hp = MOLE_TYPES[type].hp;
-      h.done = false;
-      h.stayMs = this.param('stay') * MOLE_TYPES[type].stay;
-      this.setHole(index, 'rising', MOVE_MS);
+      // リスは隣の穴にもう1匹
+      if (KINDS[kind].pair) {
+        const j = this.freeHole({ near: index });
+        if (j >= 0) this.spawnKind(j, kind);
+      }
     }
 
-    pickType() {
-      const { start, end } = this.stage.weights;
-      const entries = Object.keys(MOLE_TYPES).map((t) => [t, lerp(start[t] || 0, end[t] || 0, this.progress)]);
+    pickKind() {
+      const entries = Object.entries(this.params.weights).map(([k, w]) => [k, lerp(w.start, w.end, this.progress)]);
       let r = Math.random() * entries.reduce((sum, [, w]) => sum + w, 0);
-      for (const [type, w] of entries) {
+      for (const [kind, w] of entries) {
         r -= w;
-        if (r < 0) return type;
+        if (r < 0) return kind;
       }
-      return 'normal';
+      return this.stage.animal;
+    }
+
+    spawnKind(index, kindKey, opts = {}) {
+      const kind = KINDS[kindKey];
+      const h = this.holes[index];
+      Object.assign(h, {
+        kind: kindKey,
+        hp: kind.hp,
+        hurt: 0,
+        done: false,
+        spiky: false,
+        turned: false,
+        turnTimer: OWL_FRONT_MS,
+        moved: false,
+        jumped: false,
+        moveMs: MOVE_MS,
+        stayMs: this.param('stay') * (kind.stay || 1),
+        ...opts,
+      });
+      this.setHole(index, 'rising', h.moveMs);
     }
 
     setHole(index, state, timer) {
@@ -222,14 +426,11 @@
       this.emit('hole', { index, hole: h });
     }
 
-    clearHole(index) {
+    clearHole(index, cooldown = true) {
       const h = this.holes[index];
       const wasActive = h.state !== 'empty';
-      h.state = 'empty';
-      h.type = null;
-      h.done = false;
-      h.timer = 0;
-      h.cooldown = wasActive ? HOLE_COOLDOWN : 0;
+      Object.assign(h, { state: 'empty', kind: null, done: false, timer: 0, reserved: false, spiky: false, turned: false, hurt: 0 });
+      h.cooldown = cooldown && wasActive ? HOLE_COOLDOWN : 0;
       this.emit('hole', { index, hole: h });
     }
 
@@ -238,8 +439,9 @@
       if (this.phase !== 'playing') return null;
       const h = this.holes[index];
       if (!h) return null;
+      if (this.stun > 0) return { kind: 'stunned' };
 
-      // 目を回している最中や引っ込み中のモグラを重ねてたたいても空振り扱いにしない
+      // 目を回している最中や引っ込み中のものを重ねてたたいても空振り扱いにしない
       if (h.state === 'hit' || h.done) return null;
 
       if (h.state === 'empty') {
@@ -249,33 +451,48 @@
         return { kind: 'miss' };
       }
 
-      const def = MOLE_TYPES[h.type];
-      h.hp--;
+      const kind = KINDS[h.kind];
 
-      if (h.hp > 0) {
-        // ヘルメットにひびが入っただけ。少し長く居座る
-        h.timer += 300;
-        this.emit('crack', { index, hole: h });
-        return { kind: 'crack' };
+      if (kind.legend) {
+        this.score += LEGEND_SCORE;
+        this.legendState = 'caught';
+        this.setHole(index, 'hit', HIT_MS);
+        return { kind: 'legend', id: h.kind, points: LEGEND_SCORE };
       }
 
-      let points;
-      if (def.penalty) {
-        this.bombsHit++;
+      if (kind.hazard) {
+        this.hazardsHit++;
         this.breakCombo();
-        points = def.score;
-      } else {
-        this.hits++;
-        this.combo++;
-        this.maxCombo = Math.max(this.maxCombo, this.combo);
-        points = Math.round(def.score * comboMultiplier(this.combo));
+        this.setHole(index, 'hit', HIT_MS);
+        if (kind.score) this.score = Math.max(0, this.score + kind.score);
+        if (kind.timePenalty) this.elapsed = Math.min(this.stage.duration * 1000, this.elapsed + kind.timePenalty * 1000);
+        if (kind.stun) this.stun = kind.stun;
+        return { kind: h.kind, points: kind.score || 0 };
       }
-      this.score = Math.max(0, this.score + points);
-      this.setHole(index, 'hit', HIT_MS);
 
-      const result = { kind: def.penalty ? 'bomb' : 'hit', index, type: h.type, points, combo: this.combo };
-      this.emit('score', result);
-      return result;
+      if (h.turned) return { kind: 'dodge' };
+
+      if (h.spiky) {
+        this.score = Math.max(0, this.score - SPIKE_PENALTY);
+        this.breakCombo();
+        return { kind: 'spike', points: -SPIKE_PENALTY };
+      }
+
+      h.hp--;
+      if (h.hp > 0) {
+        h.hurt++;
+        if (h.state === 'up') h.timer += HIT_EXTEND_MS;
+        this.emit('hole', { index, hole: h });
+        return { kind: 'hurt', animal: h.kind };
+      }
+
+      this.hits++;
+      this.combo++;
+      this.maxCombo = Math.max(this.maxCombo, this.combo);
+      const points = Math.round(kind.score * comboMultiplier(this.combo));
+      this.score += points;
+      this.setHole(index, 'hit', HIT_MS);
+      return { kind: 'hit', animal: h.kind, points, combo: this.combo };
     }
 
     breakCombo() {
@@ -285,16 +502,17 @@
 
     finish() {
       this.phase = 'finished';
-      this.holes.forEach((h, i) => this.clearHole(i));
-      const attempts = this.hits + this.misses + this.bombsHit;
+      this.holes.forEach((h, i) => this.clearHole(i, false));
+      const attempts = this.hits + this.misses + this.hazardsHit;
       this.emit('end', {
         score: this.score,
         cleared: this.score >= this.stage.target,
         stars: this.stars(),
+        legendCaught: this.legendState === 'caught',
         hits: this.hits,
         misses: this.misses,
         escaped: this.escaped,
-        bombsHit: this.bombsHit,
+        hazardsHit: this.hazardsHit,
         maxCombo: this.maxCombo,
         accuracy: attempts ? this.hits / attempts : 0,
       });
@@ -309,6 +527,207 @@
       return 0;
     }
   }
+
+  /* =========================================================
+   * 動物の絵 (SVG)。viewBox は 0 -30 100 130、y=100 が穴のふち
+   * ========================================================= */
+
+  const INK = '#1b1b1b';
+
+  const eyePair = (y, dx, r, { ring = false, xColor = INK } = {}) => {
+    const xs = [50 - dx, 50 + dx];
+    const eyes = xs
+      .map((x) => (ring ? `<circle cx="${x}" cy="${y}" r="${r + 2.5}" fill="#fff"/>` : '')
+        + `<circle cx="${x}" cy="${y}" r="${r}" fill="${INK}"/><circle cx="${x + r * 0.35}" cy="${y - r * 0.35}" r="${r * 0.35}" fill="#fff"/>`)
+      .join('');
+    const marks = xs.map((x) => `M${x - 5} ${y - 5}l10 10M${x + 5} ${y - 5}l-10 10`).join('');
+    return `<g class="eye">${eyes}</g><path class="x" d="${marks}" stroke="${xColor}" stroke-width="4" stroke-linecap="round" fill="none"/>`;
+  };
+
+  const cheeks = (y, dx = 24) => `<ellipse cx="${50 - dx}" cy="${y}" rx="6" ry="4" fill="#f29aa6" opacity="0.6"/><ellipse cx="${50 + dx}" cy="${y}" rx="6" ry="4" fill="#f29aa6" opacity="0.6"/>`;
+  const bodyShape = (fill) => `<rect x="8" y="8" width="84" height="120" rx="42" fill="${fill}"/>`;
+  const belly = (fill) => `<ellipse cx="50" cy="92" rx="27" ry="24" fill="${fill}"/>`;
+  const paws = (fill) => `<ellipse cx="30" cy="96" rx="9" ry="6" fill="${fill}"/><ellipse cx="70" cy="96" rx="9" ry="6" fill="${fill}"/>`;
+  const sparkle = (x, y, s = 1) => `<path d="M${x} ${y - 7 * s}L${x + 2 * s} ${y - 2 * s}L${x + 7 * s} ${y}L${x + 2 * s} ${y + 2 * s}L${x} ${y + 7 * s}L${x - 2 * s} ${y + 2 * s}L${x - 7 * s} ${y}L${x - 2 * s} ${y - 2 * s}Z" fill="#fff6b0"/>`;
+
+  // 中心 (cx, cy) のまわりにトゲを並べた多角形
+  const spikes = (cx, cy, r1, r2, from, to, n) => {
+    const pts = [];
+    for (let i = 0; i <= n * 2; i++) {
+      const a = ((from + ((to - from) * i) / (n * 2)) * Math.PI) / 180;
+      const r = i % 2 ? r2 : r1;
+      pts.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+    }
+    return pts.join(' ');
+  };
+
+  const DRAW = {
+    mole: (p = {}) => {
+      p = { body: '#8b5a3c', belly: '#d9b48f', nose: '#e86b7a', paw: '#f0c7a8', ...p };
+      return `${p.behind || ''}${bodyShape(p.body)}${belly(p.belly)}${eyePair(46, 14, 4.5)}${cheeks(60)}<ellipse cx="50" cy="60" rx="9" ry="7" fill="${p.nose}"/>${paws(p.paw)}${p.extra || ''}`;
+    },
+
+    rabbit: (p = {}) => {
+      p = { body: '#efebe6', inner: '#f4b6c2', belly: '#ffffff', nose: '#e86b7a', ...p };
+      const ear = (x, rot, cx) => `<g transform="rotate(${rot} ${cx} 24)"><rect x="${x}" y="-26" width="17" height="54" rx="8.5" fill="${p.body}"/><rect x="${x + 4.5}" y="-20" width="8" height="40" rx="4" fill="${p.inner}"/></g>`;
+      return `${p.behind || ''}${ear(22, -8, 30)}${ear(61, 8, 70)}${bodyShape(p.body)}${belly(p.belly)}${eyePair(44, 15, 5)}${cheeks(58)}`
+        + `<path d="M45.5 54h9l-4.5 4.5z" fill="${p.nose}"/><path d="M50 58.5q-4 6-9 3M50 58.5q4 6 9 3" stroke="#7a5a4a" stroke-width="2" fill="none" stroke-linecap="round"/>${p.extra || ''}`;
+    },
+
+    squirrel: (p = {}) => {
+      p = { body: '#c8793f', belly: '#f3dcb8', tail: '#b0662f', ...p };
+      const tailPath = 'M80 100C112 86 112 26 86 12C72 4 62 18 72 28C86 42 84 70 70 90Z';
+      const tail = p.rainbow
+        ? ['#e74c3c', '#f39c12', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6']
+          .map((c, i) => `<path d="${tailPath}" fill="${c}" transform="translate(84 56) scale(${1 - i * 0.14}) translate(-84 -56)"/>`).join('')
+        : `<path d="${tailPath}" fill="${p.tail}"/>`;
+      return `${tail}<path d="M18 26L24 -2L38 18Z" fill="${p.body}"/><path d="M82 26L76 -2L62 18Z" fill="${p.body}"/>`
+        + `${bodyShape(p.body)}${belly(p.belly)}${eyePair(44, 15, 6)}${cheeks(58)}<ellipse cx="50" cy="56" rx="4.5" ry="3.5" fill="#3a2414"/>`
+        + `<rect x="46.5" y="61" width="7" height="8" rx="1.5" fill="#fff"/>${p.extra || ''}`;
+    },
+
+    tanuki: (p = {}) => {
+      p = { body: '#9a7350', dark: '#4a3626', belly: '#e3cfae', muzzle: '#e8d6b6', ...p };
+      return `<circle cx="24" cy="16" r="11" fill="${p.dark}"/><circle cx="76" cy="16" r="11" fill="${p.dark}"/>${bodyShape(p.body)}`
+        + `${p.belly ? belly(p.belly) : ''}<ellipse cx="35" cy="48" rx="13" ry="10" fill="${p.dark}" transform="rotate(15 35 48)"/>`
+        + `<ellipse cx="65" cy="48" rx="13" ry="10" fill="${p.dark}" transform="rotate(-15 65 48)"/>${eyePair(47, 15, 4, { ring: true, xColor: '#fff' })}`
+        + `<ellipse cx="50" cy="63" rx="14" ry="10" fill="${p.muzzle}"/><ellipse cx="50" cy="58" rx="6" ry="4.5" fill="#2a1d14"/>${p.extra || ''}`;
+    },
+
+    frog: (p = {}) => {
+      p = { body: '#6dbb4b', belly: '#d8efb0', dark: '#2f6b22', ...p };
+      return `<ellipse cx="50" cy="88" rx="46" ry="62" fill="${p.body}"/><circle cx="28" cy="22" r="16" fill="${p.body}"/><circle cx="72" cy="22" r="16" fill="${p.body}"/>`
+        + `<circle cx="28" cy="22" r="11" fill="#fff"/><circle cx="72" cy="22" r="11" fill="#fff"/>${eyePair(22, 22, 5.5)}`
+        + `<ellipse cx="50" cy="94" rx="30" ry="24" fill="${p.belly}"/><circle cx="45" cy="42" r="1.8" fill="${p.dark}"/><circle cx="55" cy="42" r="1.8" fill="${p.dark}"/>`
+        + `<path d="M24 52Q50 70 76 52" stroke="${p.dark}" stroke-width="3" fill="none" stroke-linecap="round"/>${cheeks(58, 30)}${p.extra || ''}`;
+    },
+
+    fox: (p = {}) => {
+      p = { body: '#e58a3a', inner: '#5a3a26', white: '#fbf3e6', ...p };
+      return `${p.behind || ''}<path d="M12 34L20 -16L46 14Z" fill="${p.body}"/><path d="M20 26L23 -4L38 14Z" fill="${p.inner}"/>`
+        + `<path d="M88 34L80 -16L54 14Z" fill="${p.body}"/><path d="M80 26L77 -4L62 14Z" fill="${p.inner}"/>${bodyShape(p.body)}`
+        + `<path d="M8 56Q50 44 92 56Q88 100 50 104Q12 100 8 56Z" fill="${p.white}"/>${eyePair(45, 15, 4)}`
+        + `<ellipse cx="50" cy="60" rx="5.5" ry="4" fill="${INK}"/><path d="M50 64q-4 4-8 2M50 64q4 4 8 2" stroke="#7a5a4a" stroke-width="2" fill="none" stroke-linecap="round"/>${p.extra || ''}`;
+    },
+
+    hedgehog: (p = {}) => {
+      p = { spine: '#7a5a43', face: '#ecd3ac', ...p };
+      const front = `<polygon points="${spikes(50, 58, 40, 56, 180, 360, 12)}" fill="${p.spine}"/><ellipse cx="50" cy="68" rx="36" ry="44" fill="${p.face}"/>`
+        + `<path d="M14 58Q50 6 86 58Q50 40 14 58Z" fill="${p.spine}"/>${eyePair(58, 13, 4.5)}${cheeks(72, 22)}<ellipse cx="50" cy="72" rx="5" ry="4" fill="${INK}"/>`;
+      const ball = `<polygon points="${spikes(50, 62, 34, 50, 0, 360, 22)}" fill="${p.spine}"/><circle cx="50" cy="62" r="36" fill="${p.spine}"/>`
+        + `<path d="M30 50l8 6M44 40l4 8M60 42l-3 8M70 56l-8 3" stroke="${p.face}" stroke-width="3" stroke-linecap="round" opacity="0.6"/>`;
+      return `<g class="front">${front}</g><g class="ball">${ball}</g>${p.extra || ''}`;
+    },
+
+    turtle: (p = {}) => {
+      p = { shell: '#6e8b3d', line: '#4a6128', rim: '#556b2f', skin: '#9cc46a', ...p };
+      return `${p.behind || ''}<path d="M2 78Q2 4 50 4Q98 4 98 78Z" fill="${p.shell}"/>`
+        + `<path d="M50 4V30M28 16L36 34M72 16L64 34M36 34H64L72 56H28ZM6 56H28M94 56H72" stroke="${p.line}" stroke-width="2.5" fill="none" stroke-linejoin="round"/>`
+        + '<path class="crack1" d="M40 8l6 10-6 8 8 10" stroke="#2a2a2a" stroke-width="3" fill="none" stroke-linecap="round"/>'
+        + '<path class="crack2" d="M72 16l-6 10 8 6-4 12" stroke="#2a2a2a" stroke-width="3" fill="none" stroke-linecap="round"/>'
+        + `<rect x="0" y="70" width="100" height="10" rx="5" fill="${p.rim}"/><ellipse cx="50" cy="82" rx="22" ry="20" fill="${p.skin}"/>`
+        + `${eyePair(78, 9, 3.8)}<path d="M44 90q6 4 12 0" stroke="#3b5a22" stroke-width="2" fill="none" stroke-linecap="round"/>${p.extra || ''}`;
+    },
+
+    owl: (p = {}) => {
+      p = { body: '#8a6f52', face: '#e8d6b8', dark: '#5e4a36', ...p };
+      const front = `<ellipse cx="50" cy="90" rx="26" ry="22" fill="${p.face}" opacity="0.7"/><path d="M38 84l4 4 4-4M54 84l4 4 4-4M46 94l4 4 4-4" stroke="${p.dark}" stroke-width="2" fill="none"/>`
+        + `<circle cx="34" cy="44" r="17" fill="${p.face}"/><circle cx="66" cy="44" r="17" fill="${p.face}"/>`
+        + `<circle cx="34" cy="44" r="10" fill="#f5c518"/><circle cx="66" cy="44" r="10" fill="#f5c518"/>${eyePair(44, 16, 5)}`
+        + `<path d="M44 55H56L50 67Z" fill="#e89a2c"/>${p.frontExtra || ''}`;
+      const back = `<path d="M22 34Q50 22 78 34" stroke="${p.dark}" stroke-width="3" fill="none" stroke-linecap="round"/>`
+        + `<path d="M22 54q7 7 14 0q7 7 14 0q7 7 14 0q7 7 14 0M26 72q6 6 12 0q6 6 12 0q6 6 12 0q6 6 12 0" stroke="${p.dark}" stroke-width="2.5" fill="none"/>`;
+      return `<path d="M10 30L14 -4L36 14Z" fill="${p.body}"/><path d="M90 30L86 -4L64 14Z" fill="${p.body}"/>${bodyShape(p.body)}`
+        + `<g class="front">${front}</g><g class="back-side">${back}</g>${p.extra || ''}`;
+    },
+
+    raccoon: (p = {}) => {
+      p = { body: '#8d8f94', face: '#eeece8', mask: '#2b2b2e', belly: '#c9c9cc', ...p };
+      return `<circle cx="22" cy="18" r="12" fill="${p.mask}"/><circle cx="22" cy="18" r="6.5" fill="${p.face}"/><circle cx="78" cy="18" r="12" fill="${p.mask}"/><circle cx="78" cy="18" r="6.5" fill="${p.face}"/>`
+        + `${bodyShape(p.body)}${belly(p.belly)}<ellipse cx="50" cy="56" rx="38" ry="26" fill="${p.face}"/>`
+        + `<path d="M50 12V38" stroke="${p.mask}" stroke-width="6" stroke-linecap="round"/>`
+        + `<path d="M12 48Q30 30 50 46Q70 30 88 48Q72 62 50 54Q28 62 12 48Z" fill="${p.mask}"/>${eyePair(47, 16, 4, { ring: true, xColor: '#fff' })}`
+        + `<ellipse cx="50" cy="63" rx="6" ry="4.5" fill="${INK}"/>${p.extra || ''}`;
+    },
+
+    // じゃまもの
+    bomb: () => '<path d="M58 26q10-16 24-12" fill="none" stroke="#a87b4f" stroke-width="4" stroke-linecap="round"/><circle cx="84" cy="12" r="6" fill="#ffb627"/>'
+      + '<circle cx="84" cy="12" r="3" fill="#fff4c2"/><rect x="42" y="20" width="18" height="12" rx="2" fill="#555"/><circle cx="50" cy="64" r="38" fill="#262a30"/>'
+      + '<ellipse cx="36" cy="48" rx="9" ry="6" fill="#fff" opacity="0.25" transform="rotate(-35 36 48)"/>',
+
+    stone: () => '<path d="M8 104L4 70Q6 40 30 30Q50 20 70 28Q94 38 96 66L92 104Z" fill="#8d9298"/>'
+      + '<path d="M24 46Q34 36 48 36" stroke="#c4c8cd" stroke-width="5" stroke-linecap="round" fill="none"/>'
+      + '<path d="M62 44l-6 14 8 10M30 70l10 6" stroke="#5f6469" stroke-width="3" stroke-linecap="round" fill="none"/>'
+      + '<ellipse cx="78" cy="40" rx="8" ry="4" fill="#6f9e44"/><ellipse cx="72" cy="36" rx="5" ry="3" fill="#86b85a"/>',
+
+    hive: () => '<path d="M50 4V22" stroke="#6b4a1e" stroke-width="4"/><ellipse cx="50" cy="66" rx="40" ry="46" fill="#e3a83b"/>'
+      + '<path d="M14 44Q50 36 86 44M10 64Q50 56 90 64M14 84Q50 76 86 84" stroke="#b07a1f" stroke-width="4" fill="none"/>'
+      + '<ellipse cx="50" cy="72" rx="9" ry="8" fill="#3a2410"/>'
+      + '<g transform="translate(84 24)"><ellipse cx="-4" cy="-8" rx="6" ry="4" fill="#fff" opacity="0.8"/><ellipse cx="4" cy="-8" rx="6" ry="4" fill="#fff" opacity="0.8"/>'
+      + '<ellipse cx="0" cy="0" rx="9" ry="7" fill="#f5c518"/><path d="M-3 -6v12M3 -6v12" stroke="#222" stroke-width="2.5"/></g>',
+  };
+
+  const CROWN = '<polygon points="30,12 34,-8 42,4 50,-12 58,4 66,-8 70,12" fill="#ffd23f" stroke="#c99a0a" stroke-width="2"/>';
+
+  const LEGEND_DRAW = {
+    'gold-mole': () => DRAW.mole({ body: '#e8b923', belly: '#fbe38a', paw: '#fff0b0', extra: CROWN + sparkle(14, 20) + sparkle(88, 34, 0.7) }),
+    'moon-rabbit': () => DRAW.rabbit({
+      body: '#fffdf2',
+      inner: '#ffd1dc',
+      extra: '<path d="M44 -6A14 14 0 1 0 62 14A11 11 0 1 1 44 -6Z" fill="#ffe36e"/>' + sparkle(10, 40, 0.7) + sparkle(90, 50, 0.8),
+    }),
+    'rainbow-squirrel': () => DRAW.squirrel({ body: '#d98a4a', rainbow: true, extra: sparkle(12, 30, 0.7) }),
+    'chagama-tanuki': () => DRAW.tanuki({
+      body: '#5d6168',
+      belly: null,
+      muzzle: '#d9c3a0',
+      dark: '#3a2b20',
+      extra: '<path d="M90 74Q108 68 112 52L105 50Q101 62 91 64Z" fill="#5d6168"/><ellipse cx="50" cy="12" rx="30" ry="7" fill="#3e4147"/>'
+        + '<circle cx="50" cy="3" r="5" fill="#3e4147"/><path d="M12 82H88" stroke="#3e4147" stroke-width="5"/>',
+    }),
+    'ogama': () => DRAW.frog({
+      body: '#7d6a4a',
+      belly: '#cdbb8a',
+      dark: '#3c2f1e',
+      extra: '<path d="M14 6q14-10 28 0M58 6q14-10 28 0" stroke="#c0392b" stroke-width="4" fill="none" stroke-linecap="round"/>'
+        + '<circle cx="16" cy="70" r="3" fill="#5e4e34"/><circle cx="84" cy="66" r="3.5" fill="#5e4e34"/><circle cx="22" cy="86" r="2.5" fill="#5e4e34"/><circle cx="80" cy="84" r="2.5" fill="#5e4e34"/>',
+    }),
+    'kyubi-fox': () => {
+      const tails = Array.from({ length: 9 }, (_, i) => {
+        const a = -80 + i * 20;
+        return `<g transform="rotate(${a} 50 100)"><ellipse cx="50" cy="34" rx="10" ry="40" fill="#fbf6ea" stroke="#e6c46b" stroke-width="2"/><ellipse cx="50" cy="0" rx="6" ry="9" fill="#f2c14e"/></g>`;
+      }).join('');
+      return DRAW.fox({ body: '#fbf6ea', inner: '#f0b6c4', white: '#ffffff', behind: tails, extra: '<path d="M44 24Q50 14 56 24Q50 30 44 24Z" fill="#d6304a"/>' });
+    },
+    'silver-hedgehog': () => DRAW.hedgehog({ spine: '#b9c3cf', face: '#fbf3e6', extra: sparkle(14, 18, 0.8) + sparkle(86, 26, 0.6) }),
+    'ryugu-turtle': () => DRAW.turtle({
+      shell: '#c0392b',
+      line: '#f2c14e',
+      rim: '#8e2a20',
+      extra: '<rect x="38" y="-14" width="24" height="18" rx="2" fill="#1f1f1f"/><path d="M38 -5H62M50 -14V4" stroke="#e74c3c" stroke-width="3"/>',
+    }),
+    'wise-owl': () => DRAW.owl({
+      body: '#f1ede4',
+      face: '#ffffff',
+      dark: '#a99f8e',
+      frontExtra: '<circle cx="34" cy="44" r="13" fill="none" stroke="#c99a0a" stroke-width="3"/><circle cx="66" cy="44" r="13" fill="none" stroke="#c99a0a" stroke-width="3"/><path d="M47 44H53" stroke="#c99a0a" stroke-width="3"/>',
+    }),
+    'thief-raccoon': () => DRAW.raccoon({
+      extra: '<rect x="30" y="-22" width="40" height="30" rx="3" fill="#1d1d1f"/><rect x="18" y="4" width="64" height="7" rx="3" fill="#1d1d1f"/>'
+        + '<rect x="30" y="-2" width="40" height="5" fill="#b8322a"/><path d="M14 100Q50 82 86 100" stroke="#b8322a" stroke-width="8" fill="none"/>',
+    }),
+  };
+
+  const artCache = {};
+  const artSVG = (key) => {
+    if (!artCache[key]) {
+      const inner = LEGEND_DRAW[key] ? LEGEND_DRAW[key]() : DRAW[key]();
+      artCache[key] = `<svg viewBox="0 -30 100 130" aria-hidden="true">${inner}</svg>`;
+    }
+    return artCache[key];
+  };
+
+  const artEl = (key, { silhouette = false } = {}) => `<span class="art${silhouette ? ' silhouette' : ''}">${artSVG(key)}</span>`;
 
   /* =========================================================
    * 効果音 (Web Audio で合成)
@@ -357,9 +776,13 @@
     },
 
     hit(combo) { this.tone(420 + Math.min(combo, 20) * 25, 0.09, { slide: -200 }); },
-    gold() { [784, 988, 1319].forEach((f, i) => this.tone(f, 0.12, { type: 'triangle', vol: 0.15, delay: i * 0.06 })); },
-    crack() { this.tone(900, 0.05, { type: 'triangle', vol: 0.1 }); },
+    hurt() { this.tone(300, 0.07, { type: 'triangle', vol: 0.12 }); },
+    legend() { [784, 988, 1175, 1568].forEach((f, i) => this.tone(f, 0.16, { type: 'triangle', vol: 0.16, delay: i * 0.07 })); },
+    glint() { this.tone(1760, 0.08, { type: 'sine', vol: 0.08 }); this.tone(2349, 0.1, { type: 'sine', vol: 0.06, delay: 0.08 }); },
     bomb() { this.noise(0.35); this.tone(140, 0.3, { type: 'sawtooth', slide: -100, vol: 0.15 }); },
+    stone() { this.tone(110, 0.15, { type: 'square', vol: 0.15, slide: -40 }); },
+    hive() { this.tone(220, 0.4, { type: 'sawtooth', vol: 0.06 }); this.tone(233, 0.4, { type: 'sawtooth', vol: 0.06 }); },
+    spike() { this.tone(1200, 0.05, { type: 'square', vol: 0.08, slide: 400 }); },
     miss() { this.tone(180, 0.06, { type: 'triangle', vol: 0.08 }); },
     count(go) { this.tone(go ? 880 : 520, go ? 0.25 : 0.12, { type: 'triangle', vol: 0.15 }); },
     end(cleared) {
@@ -370,14 +793,26 @@
 
   /* =========================================================
    * 保存データ
+   *   stages: { [ステージ番号]: { best, stars, legend } }
+   *   zukan:  { [伝説の動物]: { first: 'YYYY-MM-DD', count } }
    * ========================================================= */
 
   const loadSave = () => {
+    const data = { stages: {}, zukan: {} };
+    let raw = null;
     try {
-      return JSON.parse(localStorage.getItem(SAVE_KEY)) || {};
+      raw = JSON.parse(localStorage.getItem(SAVE_KEY));
     } catch {
-      return {};
+      // 読めなければ新しく始める
     }
+    if (raw && raw.stages) {
+      Object.assign(data.stages, raw.stages);
+      Object.assign(data.zukan, raw.zukan || {});
+    } else if (raw && raw.proto) {
+      // プロトタイプの記録を STAGE 1 に引き継ぐ
+      data.stages[1] = { best: raw.proto.best || 0, stars: raw.proto.stars || 0, legend: false };
+    }
+    return data;
   };
 
   const save = loadSave();
@@ -390,7 +825,15 @@
     }
   };
 
-  const stageRecord = (id) => save[id] || { best: 0, stars: 0 };
+  const stageRecord = (no) => save.stages[no] || { best: 0, stars: 0, legend: false };
+  const legendRecord = (id) => save.zukan[id] || null;
+  const legendStage = (id) => STAGES.find((s) => s.legend === id);
+  const zukanCount = () => Object.keys(LEGENDS).filter((id) => legendRecord(id)).length;
+
+  const today = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
 
   try {
     Sound.enabled = localStorage.getItem(SOUND_KEY) !== 'off';
@@ -403,6 +846,14 @@
    * ========================================================= */
 
   const $ = (id) => document.getElementById(id);
+  const screens = {
+    title: $('screen-title'),
+    select: $('screen-select'),
+    confirm: $('screen-confirm'),
+    play: $('screen-play'),
+    zukan: $('screen-zukan'),
+  };
+  const helpEl = $('help');
   const fieldEl = $('field');
   const gridEl = $('grid');
   const scoreEl = $('score');
@@ -413,51 +864,160 @@
   const goalText = $('goal-text');
   const toastEl = $('toast');
   const overlay = $('overlay');
-  const overlaySub = $('overlay-sub');
-  const overlayTitle = $('overlay-title');
-  const overlayText = $('overlay-text');
-  const startBtn = $('start-btn');
   const pauseBtn = $('pause-btn');
   const soundBtn = $('sound-btn');
+  const modal = $('modal');
 
-  const MOLE_SVG = `
-    <svg viewBox="0 0 100 100" aria-hidden="true">
-      <g class="m-mole">
-        <polygon class="m-crown" points="30,12 34,-6 42,6 50,-10 58,6 66,-6 70,12" fill="#ffd23f" stroke="#c99a0a" stroke-width="2" />
-        <rect class="m-body" x="8" y="8" width="84" height="120" rx="42" />
-        <ellipse class="m-belly" cx="50" cy="92" rx="27" ry="24" />
-        <circle class="m-eye" cx="36" cy="46" r="5" />
-        <circle class="m-eye" cx="64" cy="46" r="5" />
-        <path class="m-x" d="M31 41 l10 10 M41 41 l-10 10 M59 41 l10 10 M69 41 l-10 10" />
-        <ellipse class="m-cheek" cx="26" cy="60" rx="6" ry="4" />
-        <ellipse class="m-cheek" cx="74" cy="60" rx="6" ry="4" />
-        <ellipse class="m-nose" cx="50" cy="60" rx="9" ry="7" />
-        <g class="m-helmet">
-          <path d="M6 36 Q50 -16 94 36 Z" fill="#a8b2bd" stroke="#6f7a86" stroke-width="2" />
-          <rect x="4" y="32" width="92" height="7" rx="3" fill="#7d8894" />
-          <path class="m-crack" d="M44 6 l6 9 -5 6 7 10" fill="none" stroke="#3b4048" stroke-width="2.5" stroke-linecap="round" />
-        </g>
-      </g>
-      <g class="m-bomb">
-        <path d="M58 26 q10 -16 24 -12" fill="none" stroke="#a87b4f" stroke-width="4" stroke-linecap="round" />
-        <circle cx="84" cy="12" r="6" fill="#ffb627" />
-        <circle cx="84" cy="12" r="3" fill="#fff4c2" />
-        <rect x="42" y="20" width="18" height="12" rx="2" fill="#555" />
-        <circle cx="50" cy="64" r="38" fill="#262a30" />
-        <ellipse cx="36" cy="48" rx="9" ry="6" fill="#fff" opacity="0.25" transform="rotate(-35 36 48)" />
-      </g>
-    </svg>`;
+  const starText = (n) => `${'★'.repeat(n)}<span class="off">${'★'.repeat(3 - n)}</span>`;
+  const escapeHTML = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+  let current = 'title';
+  let zukanReturn = 'select';
   let stage = STAGES[0];
   let game = null;
   let holeEls = [];
-  let overlayAction = null;
   let lastFrame = 0;
+
+  const show = (name) => {
+    current = name;
+    Object.entries(screens).forEach(([key, el]) => { el.hidden = key !== name; });
+    pauseBtn.hidden = name !== 'play';
+    helpEl.hidden = name !== 'title' && name !== 'select';
+    window.scrollTo(0, 0);
+  };
+
+  /* タイトル */
+
+  $('title-hero').innerHTML = ['mole', 'rabbit', 'tanuki', 'fox', 'squirrel'].map((k) => artEl(k)).join('');
+  $('title-play').addEventListener('click', () => { Sound.unlock(); openSelect(); });
+  $('title-zukan').addEventListener('click', () => openZukan('title'));
+
+  /* ステージ選択 */
+
+  const openSelect = () => {
+    const stars = STAGES.reduce((sum, s) => sum + stageRecord(s.no).stars, 0);
+    $('sum-stars').textContent = `${stars} / ${STAGES.length * 3}`;
+    $('sum-zukan').textContent = `${zukanCount()} / ${STAGES.length}`;
+
+    $('stage-tiles').innerHTML = STAGES.map((s) => {
+      const r = stageRecord(s.no);
+      const caught = Boolean(legendRecord(s.legend));
+      return `<button type="button" class="tile${caught ? ' caught' : ''}" data-stage="${s.no}" aria-label="STAGE ${s.no} ${s.name}${caught ? ' 伝説の動物を捕まえた' : ''}">
+        <span class="tile-scene" style="--g1:${s.ground[0]};--g2:${s.ground[1]}">
+          ${artEl(s.legend, { silhouette: !caught })}
+          <span class="tile-mark">${caught ? '★ 伝説' : '？'}</span>
+        </span>
+        <span class="tile-body">
+          <span class="tile-no">STAGE ${s.no}</span>
+          <span class="tile-name">${s.name}</span>
+          <span class="tile-stars" aria-label="星 ${r.stars} 個">${starText(r.stars)}</span>
+          <span class="tile-best">ベスト ${r.best}点</span>
+        </span>
+      </button>`;
+    }).join('');
+    show('select');
+  };
+
+  $('stage-tiles').addEventListener('click', (e) => {
+    const tile = e.target.closest('[data-stage]');
+    if (tile) openConfirm(STAGES[Number(tile.dataset.stage) - 1]);
+  });
+  $('select-back').addEventListener('click', () => show('title'));
+  $('select-zukan').addEventListener('click', () => openZukan('select'));
+
+  /* ステージ開始前の確認 */
+
+  const openConfirm = (s) => {
+    stage = s;
+    const r = stageRecord(s.no);
+    const caught = legendRecord(s.legend);
+    const animals = stageAnimals(s);
+
+    $('confirm-no').textContent = `STAGE ${s.no}`;
+    $('confirm-name').textContent = s.name;
+    const preview = $('confirm-preview');
+    preview.style.setProperty('--g1', s.ground[0]);
+    preview.style.setProperty('--g2', s.ground[1]);
+    preview.innerHTML = animals.slice(-3).map((a) => artEl(a)).join('');
+    $('confirm-time').textContent = `${s.duration}秒`;
+    $('confirm-target').textContent = `${s.target}点`;
+    $('confirm-best').innerHTML = `${r.best}点 <span class="tile-stars">${starText(r.stars)}</span>`;
+
+    $('confirm-animals').innerHTML = animals.map((a) => {
+      const isNew = a === s.animal;
+      return `<span class="icon${isNew ? ' new' : ''}">${artEl(a)}${ANIMALS[a].name}${isNew ? '<span class="new-badge">NEW</span>' : ''}</span>`;
+    }).join('');
+    $('confirm-hazards').innerHTML = stageHazards(s).map((h) => {
+      const isNew = HAZARDS[h].stage === s.no && s.no > 1;
+      return `<span class="icon${isNew ? ' new' : ''}">${artEl(h)}${HAZARDS[h].name}${isNew ? '<span class="new-badge">NEW</span>' : ''}</span>`;
+    }).join('');
+
+    $('confirm-legend').innerHTML = caught
+      ? `${artEl(s.legend)}<div><p class="legend-name">${LEGENDS[s.legend].name}</p><p class="legend-note">捕まえた回数 ${caught.count}回</p></div>`
+      : `${artEl(s.legend, { silhouette: true })}<div><p class="legend-name">？？？</p><p class="legend-note">プレイ中に一度だけ、一瞬だけ顔を出す</p></div>`;
+    show('confirm');
+  };
+
+  $('confirm-back').addEventListener('click', openSelect);
+  $('confirm-start').addEventListener('click', () => startStage(stage));
+
+  /* 図鑑 */
+
+  const openZukan = (from) => {
+    zukanReturn = from;
+    const n = zukanCount();
+    $('zukan-count').textContent = `${n} / ${STAGES.length}`;
+    $('zukan-complete').hidden = n < STAGES.length;
+    $('zukan-tiles').innerHTML = STAGES.map((s) => {
+      const rec = legendRecord(s.legend);
+      return `<button type="button" class="tile zukan-tile${rec ? ' caught' : ''}" data-legend="${s.legend}">
+        <span class="tile-scene">${artEl(s.legend, { silhouette: !rec })}</span>
+        <span class="tile-body">
+          <span class="tile-no">No.${s.no}・STAGE ${s.no}</span>
+          <span class="tile-name">${rec ? LEGENDS[s.legend].name : '？？？'}</span>
+          <span class="tile-best">${rec ? `捕まえた回数 ${rec.count}回` : 'まだ捕まえていない'}</span>
+        </span>
+      </button>`;
+    }).join('');
+    show('zukan');
+  };
+
+  const openLegendDetail = (id) => {
+    const rec = legendRecord(id);
+    const s = legendStage(id);
+    const art = $('modal-art');
+    art.className = `modal-art${rec ? '' : ' silhouette'}`;
+    art.innerHTML = artEl(id, { silhouette: !rec });
+    $('modal-name').textContent = rec ? LEGENDS[id].name : '？？？';
+    $('modal-desc').textContent = rec ? LEGENDS[id].desc : `STAGE ${s.no}「${s.name}」に出現するらしい…`;
+    const rows = rec
+      ? [['出現するステージ', `STAGE ${s.no} ${s.name}`], ['初めて捕まえた日', rec.first], ['捕まえた回数', `${rec.count}回`]]
+      : [['出現するステージ', `STAGE ${s.no} ${s.name}`]];
+    $('modal-meta').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHTML(v)}</dd></div>`).join('');
+    modal.hidden = false;
+    $('modal-close').focus({ preventScroll: true });
+  };
+
+  const closeModal = () => { modal.hidden = true; };
+
+  $('zukan-tiles').addEventListener('click', (e) => {
+    const tile = e.target.closest('[data-legend]');
+    if (tile) openLegendDetail(tile.dataset.legend);
+  });
+  $('zukan-back').addEventListener('click', () => (zukanReturn === 'title' ? show('title') : openSelect()));
+  $('modal-close').addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  /* プレイ */
 
   const buildGrid = () => {
     gridEl.style.gridTemplateColumns = `repeat(${stage.cols}, 1fr)`;
-    gridEl.style.aspectRatio = `${stage.cols} / ${stage.rows}`;
     gridEl.style.setProperty('--move-ms', `${MOVE_MS}ms`);
+    // 縦に長いステージでも画面に収まるよう、幅を高さに合わせて絞る
+    fieldEl.style.maxWidth = `min(100%, calc((100svh - 210px) * ${stage.cols / stage.rows}))`;
+    fieldEl.style.margin = '0 auto';
+    fieldEl.style.setProperty('--g1', stage.ground[0]);
+    fieldEl.style.setProperty('--g2', stage.ground[1]);
     gridEl.innerHTML = '';
     holeEls = [];
     for (let i = 0; i < stage.cols * stage.rows; i++) {
@@ -466,7 +1026,7 @@
       el.className = 'hole';
       el.tabIndex = -1;
       el.setAttribute('aria-label', `穴 ${i + 1}`);
-      el.innerHTML = `<span class="hole-back"></span><span class="mole-clip"><span class="mole">${MOLE_SVG}</span></span><span class="hole-front"></span>`;
+      el.innerHTML = '<span class="hole-back"></span><span class="mole-clip"><span class="mole"></span></span><span class="hole-front"></span>';
       el.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         whack(i, e.clientX, e.clientY);
@@ -479,32 +1039,43 @@
   const renderHole = (index, hole) => {
     const el = holeEls[index];
     if (!el) return;
-    if (hole.type) el.dataset.type = hole.type;
-    // 引っ込み終わるまで見た目の種類は残す (途中で姿が変わらないように)
+    // 引っ込み終わるまで絵は残す (途中で姿が変わらないように)
+    if (hole.kind && el.dataset.kind !== hole.kind) {
+      el.dataset.kind = hole.kind;
+      el.querySelector('.mole').innerHTML = artSVG(hole.kind);
+    }
+    const kind = hole.kind ? KINDS[hole.kind] : null;
     el.classList.toggle('up', hole.state === 'rising' || hole.state === 'up');
     el.classList.toggle('hit', hole.state === 'hit');
-    if (hole.state === 'empty') el.classList.remove('cracked');
+    el.classList.toggle('spiky', Boolean(hole.spiky));
+    el.classList.toggle('turned', Boolean(hole.turned));
+    if (kind) {
+      el.classList.toggle('legend', Boolean(kind.legend));
+      el.classList.toggle('hazard', Boolean(kind.hazard));
+      el.classList.toggle('fast', Boolean(kind.legend));
+    }
+    el.dataset.hurt = hole.hurt || 0;
   };
 
   const renderHud = () => {
     if (!game) return;
-    const record = stageRecord(stage.id);
     scoreEl.textContent = game.score;
     const left = Math.ceil(game.timeLeft);
     timeEl.textContent = left;
     timeEl.classList.toggle('low', game.phase === 'playing' && left <= LAST_SPURT_SEC);
     comboEl.textContent = game.combo >= 2 ? `${game.combo} ×${comboMultiplier(game.combo)}` : game.combo;
-    bestEl.textContent = record.best;
+    bestEl.textContent = stageRecord(stage.no).best;
     goalFill.style.width = `${Math.min(100, (game.score / stage.target) * 100)}%`;
     goalFill.classList.toggle('done', game.score >= stage.target);
     goalText.textContent = game.score >= stage.target ? `目標 ${stage.target}点 達成!` : `目標 ${stage.target}点まで あと ${stage.target - game.score}点`;
   };
 
-  const toast = (text) => {
+  const toast = (text, long = false) => {
     toastEl.textContent = text;
-    toastEl.classList.remove('show');
+    toastEl.classList.remove('show', 'long');
     void toastEl.offsetWidth; // アニメーションをやり直す
     toastEl.classList.add('show');
+    if (long) toastEl.classList.add('long');
   };
 
   // たたいた位置に文字やリングを出す
@@ -534,6 +1105,12 @@
     return [r.left + r.width / 2, r.top + r.height * 0.45];
   };
 
+  const shake = () => {
+    fieldEl.classList.remove('shake');
+    void fieldEl.offsetWidth;
+    fieldEl.classList.add('shake');
+  };
+
   const whack = (index, x, y) => {
     if (!game) return;
     Sound.unlock();
@@ -542,88 +1119,141 @@
     if (x === undefined) [x, y] = holeCenter(index);
 
     switch (result.kind) {
+      case 'stunned':
+        spawnFx(x, y, 'チクチク…', 'soft');
+        break;
       case 'miss':
-        spawnFx(x, y, 'MISS', 'miss');
+        spawnFx(x, y, 'MISS', 'soft');
         Sound.miss();
         break;
-      case 'crack':
-        spawnFx(x, y, 'カン!');
-        Sound.crack();
+      case 'dodge':
+        spawnFx(x, y, 'スカッ', 'soft');
+        Sound.miss();
+        break;
+      case 'spike':
+        spawnFx(x, y, `イタッ ${result.points}`, 'bad');
+        Sound.spike();
+        break;
+      case 'hurt':
+        spawnFx(x, y, result.animal === 'tanuki' ? 'ポン!' : 'コツン!');
+        Sound.hurt();
         break;
       case 'bomb':
         spawnFx(x, y, `${result.points}`, 'bad');
-        fieldEl.classList.remove('shake');
-        void fieldEl.offsetWidth;
-        fieldEl.classList.add('shake');
+        shake();
         Sound.bomb();
         if (navigator.vibrate) navigator.vibrate(120);
         break;
+      case 'stone':
+        spawnFx(x, y, `ガツン! −${STONE_PENALTY_SEC}秒`, 'bad');
+        shake();
+        Sound.stone();
+        break;
+      case 'hive':
+        spawnFx(x, y, 'ブンブン!', 'bad');
+        fieldEl.classList.add('stunned');
+        Sound.hive();
+        break;
+      case 'legend':
+        spawnFx(x, y, `+${result.points}`, 'gold');
+        toast(`伝説の${LEGENDS[result.id].name.replace(/^伝説の/, '')}を捕まえた!`, true);
+        Sound.legend();
+        break;
       case 'hit':
         spawnFx(x, y, `+${result.points}`);
-        if (result.type === 'gold') Sound.gold();
-        else Sound.hit(result.combo);
+        Sound.hit(result.combo);
         if (result.combo > 0 && result.combo % 10 === 0) toast(`${result.combo} COMBO!`);
         break;
     }
     renderHud();
   };
 
-  const showOverlay = ({ sub = '', title, text = '', button, action, cls = '' }) => {
-    overlaySub.textContent = sub;
-    overlayTitle.textContent = title;
-    overlayText.textContent = text;
-    startBtn.textContent = button;
+  const showOverlay = ({ sub = '', title, text = '', legend = '', buttons, cls = '' }) => {
+    $('overlay-sub').textContent = sub;
+    $('overlay-title').textContent = title;
+    $('overlay-text').textContent = text;
+    const legendEl = $('overlay-legend');
+    legendEl.className = `overlay-legend${legend && legend.missed ? ' missed' : ''}`;
+    legendEl.innerHTML = legend ? legend.html : '';
+    const btns = $('overlay-btns');
+    btns.innerHTML = '';
+    buttons.forEach(({ label, action, primary }) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `btn${primary ? ' primary' : ''}`;
+      b.textContent = label;
+      b.addEventListener('click', action);
+      btns.appendChild(b);
+    });
     overlay.className = `overlay ${cls}`.trim();
     overlay.hidden = false;
-    overlayAction = action;
-    startBtn.focus({ preventScroll: true });
+    btns.firstChild.focus({ preventScroll: true });
   };
 
-  const hideOverlay = () => {
-    overlay.hidden = true;
-    overlayAction = null;
-  };
+  const hideOverlay = () => { overlay.hidden = true; };
 
-  const showStageIntro = () => {
-    const record = stageRecord(stage.id);
-    const stars = record.stars ? `\n記録 ${'★'.repeat(record.stars)}${'☆'.repeat(3 - record.stars)}  ベスト ${record.best}点` : '';
-    showOverlay({
-      sub: `STAGE ${stage.no}`,
-      title: stage.name,
-      text: `制限時間 ${stage.duration}秒\n目標 ${stage.target}点${stars}`,
-      button: 'スタート',
-      action: startGame,
-    });
-  };
-
-  const startGame = () => {
+  const startStage = (s) => {
     Sound.unlock();
+    if (game) game.abort();
+    stage = s;
+    $('play-stage').textContent = `STAGE ${s.no}  ${s.name}`;
+    show('play');
+    buildGrid();
+    fieldEl.classList.remove('stunned');
+    game = new MoleGame(stage, onGameEvent);
     hideOverlay();
     game.start();
     renderHud();
   };
 
+  const leavePlay = () => {
+    if (game) game.abort();
+    game = null;
+    hideOverlay();
+    openSelect();
+  };
+
   const onEnd = (r) => {
-    const record = stageRecord(stage.id);
+    const record = stageRecord(stage.no);
     const isBest = r.score > record.best;
-    save[stage.id] = { best: Math.max(record.best, r.score), stars: Math.max(record.stars, r.stars) };
+    const legendId = stage.legend;
+    const legendBefore = legendRecord(legendId);
+    if (r.legendCaught) {
+      save.zukan[legendId] = { first: legendBefore ? legendBefore.first : today(), count: (legendBefore ? legendBefore.count : 0) + 1 };
+    }
+    save.stages[stage.no] = {
+      best: Math.max(record.best, r.score),
+      stars: Math.max(record.stars, r.stars),
+      legend: record.legend || r.legendCaught,
+    };
     writeSave();
+    fieldEl.classList.remove('stunned');
     renderHud();
     Sound.end(r.cleared);
 
     const lines = [
       `${r.score}点${isBest && r.score > 0 ? '  (ベスト更新!)' : ''}`,
-      r.cleared ? `${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}` : `目標まで あと ${stage.target - r.score}点`,
-      '',
+      r.cleared ? '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars) : `目標まで あと ${stage.target - r.score}点`,
       `たたいた数 ${r.hits}  最大コンボ ${r.maxCombo}`,
-      `命中率 ${Math.round(r.accuracy * 100)}%  逃がした数 ${r.escaped}  爆弾 ${r.bombsHit}`,
+      `命中率 ${Math.round(r.accuracy * 100)}%  逃がした数 ${r.escaped}  じゃまもの ${r.hazardsHit}`,
     ];
+    const legend = r.legendCaught
+      ? { html: `${artEl(legendId)}<span>${LEGENDS[legendId].name}を捕まえた!${legendBefore ? '' : '<br>NEW! 図鑑に登録'}</span>` }
+      : { html: `${artEl(legendId, { silhouette: !legendBefore })}<span>伝説の動物を見逃した…</span>`, missed: true };
+
+    const buttons = [];
+    const next = STAGES[stage.no];
+    if (next) buttons.push({ label: '次のステージへ', primary: r.cleared, action: () => { game = null; hideOverlay(); openConfirm(next); } });
+    buttons.push({ label: 'もう一度', primary: !r.cleared || !next, action: () => startStage(stage) });
+    buttons.push({ label: 'ステージ選択へ', action: leavePlay });
+    buttons.sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)));
+
     showOverlay({
       sub: `STAGE ${stage.no}`,
       title: r.cleared ? 'STAGE CLEAR!' : 'TIME UP',
       text: lines.join('\n'),
-      button: 'もう一度',
-      action: startGame,
+      legend,
+      buttons,
       cls: r.cleared ? 'clear' : 'fail',
     });
   };
@@ -633,8 +1263,9 @@
       case 'hole':
         renderHole(data.index, data.hole);
         break;
-      case 'crack':
-        holeEls[data.index].classList.add('cracked');
+      case 'glint':
+        holeEls[data.index].classList.toggle('glint', data.on);
+        if (data.on) Sound.glint();
         break;
       case 'countdown':
         toast(String(data.count));
@@ -647,6 +1278,15 @@
       case 'lastSpurt':
         toast('ラストスパート!');
         break;
+      case 'stunEnd':
+        fieldEl.classList.remove('stunned');
+        break;
+      case 'steal': {
+        const [x, y] = holeCenter(data.index);
+        spawnFx(x, y, `ぬすまれた! ${data.points}`, 'bad');
+        renderHud();
+        break;
+      }
       case 'escape':
       case 'comboBreak':
         renderHud();
@@ -654,7 +1294,14 @@
       case 'paused':
         pauseBtn.textContent = '▶';
         pauseBtn.setAttribute('aria-label', '再開');
-        showOverlay({ title: '一時停止中', button: '再開', action: resumeGame });
+        showOverlay({
+          title: '一時停止中',
+          buttons: [
+            { label: '再開', primary: true, action: resumeGame },
+            { label: 'やり直す', action: () => startStage(stage) },
+            { label: 'ステージ選択へ', action: leavePlay },
+          ],
+        });
         break;
       case 'resumed':
         pauseBtn.textContent = 'Ⅱ';
@@ -668,11 +1315,11 @@
 
   const resumeGame = () => {
     hideOverlay();
-    game.resume();
+    if (game) game.resume();
   };
 
   const togglePause = () => {
-    if (!game) return;
+    if (!game || current !== 'play') return;
     if (game.phase === 'paused') resumeGame();
     else game.pause();
   };
@@ -687,19 +1334,7 @@
     requestAnimationFrame(loop);
   };
 
-  const loadStage = (s) => {
-    stage = s;
-    buildGrid();
-    game = new MoleGame(stage, onGameEvent);
-    renderHud();
-    showStageIntro();
-  };
-
   /* 入力 */
-
-  startBtn.addEventListener('click', () => {
-    if (overlayAction) overlayAction();
-  });
 
   pauseBtn.addEventListener('click', togglePause);
 
@@ -720,6 +1355,11 @@
   const NUMPAD = { 7: 0, 8: 1, 9: 2, 4: 3, 5: 4, 6: 5, 1: 6, 2: 7, 3: 8 };
 
   document.addEventListener('keydown', (e) => {
+    if (!modal.hidden) {
+      if (e.key === 'Escape') closeModal();
+      return;
+    }
+    if (current !== 'play') return;
     if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
       togglePause();
       e.preventDefault();
@@ -738,6 +1378,9 @@
     if (game) game.pause();
   });
 
-  loadStage(STAGES[0]);
+  // テスト用 (ブラウザのコンソールから参照できるように)
+  window.__mole = { MoleGame, STAGES, KINDS, stageParams, get game() { return game; } };
+
+  show('title');
   requestAnimationFrame(loop);
 })();
