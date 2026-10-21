@@ -11,6 +11,7 @@
   const HOLE_COOLDOWN = 350; // 引っ込んでから同じ穴に出てくるまでの最短時間
   const COUNTDOWN_MS = 3000;
   const LAST_SPURT_SEC = 10;
+  const RESULT_LOCK_MS = 2000; // 結果画面のボタンを押せるようになるまでの時間 (たたく勢いで押さないように)
   const MAX_DT = 100; // タブの切り替えなどで dt が跳ねたときの上限
   const SAVE_KEY = 'mole-save';
   const SOUND_KEY = 'mole-sound';
@@ -1240,6 +1241,7 @@
       el.classList.toggle('fast', Boolean(kind.legend));
     }
     el.dataset.hurt = hole.hurt || 0;
+    if (!hole.reserved) el.classList.remove('glint');
   };
 
   const renderHud = () => {
@@ -1353,7 +1355,9 @@
     renderHud();
   };
 
-  const showOverlay = ({ sub = '', title, text = '', legend = '', buttons, cls = '' }) => {
+  let overlayLockTimer = null;
+
+  const showOverlay = ({ sub = '', title, text = '', legend = '', buttons, cls = '', lockMs = 0 }) => {
     $('overlay-sub').textContent = sub;
     $('overlay-title').textContent = title;
     $('overlay-text').textContent = text;
@@ -1367,12 +1371,27 @@
       b.type = 'button';
       b.className = `btn${primary ? ' primary' : ''}`;
       b.textContent = label;
+      b.disabled = lockMs > 0;
       b.addEventListener('click', action);
       btns.appendChild(b);
     });
     overlay.className = `overlay ${cls}`.trim();
     overlay.hidden = false;
-    btns.firstChild.focus({ preventScroll: true });
+
+    clearTimeout(overlayLockTimer);
+    const unlock = () => {
+      btns.classList.remove('locked');
+      btns.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+      btns.firstChild.focus({ preventScroll: true });
+    };
+    if (lockMs > 0) {
+      // しばらく押せないようにし、押せるまでの残り時間をバーで見せる
+      btns.classList.add('locked');
+      btns.style.setProperty('--lock-ms', `${lockMs}ms`);
+      overlayLockTimer = setTimeout(unlock, lockMs);
+    } else {
+      unlock();
+    }
   };
 
   const hideOverlay = () => { overlay.hidden = true; };
@@ -1440,6 +1459,7 @@
       legend,
       buttons,
       cls: r.cleared ? 'clear' : 'fail',
+      lockMs: RESULT_LOCK_MS,
     });
   };
 
