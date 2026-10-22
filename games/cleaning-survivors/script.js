@@ -19,6 +19,11 @@
   const GN = Math.ceil(ROOM / CELL);
   const GAME_TIME = 600; // 10分
   const ROOM_DONE = 0.9; // 部屋の清掃が完了する、きれいな床の割合
+  // 発生源の汚れバリア: まわり (半径 SHIELD_R、同じ部屋) の汚れ具合で、受けるダメージが減る
+  const SHIELD_R = 150;
+  const SHIELD_MIN = 0.08; // いちばん汚れているときに通るダメージの割合
+  // 汚れ具合 d (0 = ピカピカ / 1 = 全部ドロドロ) から、通るダメージの割合を決める
+  const shieldMul = (d) => clamp(1 - ((d - 0.1) / 0.5) * (1 - SHIELD_MIN), SHIELD_MIN, 1);
   const MAX_ENEMIES = 400;
   const MAX_GEMS = 300;
   const MAX_PARTICLES = 700;
@@ -2074,6 +2079,7 @@
           if (isBlocked(x, y) || Math.hypot(x - G.p.x, y - G.p.y) < 180) continue;
           const e = spawnEnemy(kind, x, y, { force: true, danger: r.danger });
           e.room = r.idx;
+          pendingShield.push(e);
           r.src++;
           r.src0++;
           G.srcTotal++;
@@ -2081,6 +2087,25 @@
         }
       });
     }
+    for (const e of pendingShield) e.shield = shieldMul(dirtiness(e.x, e.y, SHIELD_R, e.room));
+    pendingShield.length = 0;
+  }
+
+  // 床ができてから、発生源の汚れバリアの初めの強さを測る
+  const pendingShield = [];
+
+  // (x, y) のまわり半径 r の、部屋 room の床の汚れ具合 (0 = ピカピカ / 1 = 全部ドロドロ)
+  function dirtiness(x, y, r, room) {
+    let sum = 0;
+    let n = 0;
+    const r2 = r * r;
+    forTilesInBox(x - r, y - r, x + r, y + r, (i, cx, cy) => {
+      const v = G.dirt[i];
+      if (v === 255 || G.tileRoom[i] !== room || (cx - x) ** 2 + (cy - y) ** 2 > r2) return;
+      sum += v;
+      n++;
+    });
+    return n ? sum / n / 3 : 0;
   }
 
   const blockAt = (x, y) => clamp(Math.floor(y / BLOCK), 0, BN - 1) * BN + clamp(Math.floor(x / BLOCK), 0, BN - 1);
@@ -2468,6 +2493,8 @@
     e.wx = -1;
     e.wy = -1;
     e.wanderT = 0;
+    e.shield = 1;
+    e.shieldT = 0;
     e.elite = !!opt.elite;
     e.boss = !!def.boss;
     e.alive = true;
@@ -2719,6 +2746,12 @@
           e.dirtyT = 1;
           dirtyCircle(e.x, e.y, 70, 1, e.room);
         }
+        // まわりの汚れ具合を測って、汚れバリアの強さを決める
+        e.shieldT -= dt;
+        if (e.shieldT <= 0) {
+          e.shieldT = 0.5;
+          e.shield = shieldMul(dirtiness(e.x, e.y, SHIELD_R, e.room));
+        }
         continue;
       }
       if (e.flee) {
@@ -2882,6 +2915,14 @@
   function hurtEnemy(e, dmg, kx, ky) {
     if (!e.alive || e.flee) return;
     if (e.def.mold) dmg *= G.stats.moldMul;
+    if (e.def.source) {
+      dmg *= e.shield;
+      // 汚れバリアが強いうちは「かたい!」と知らせる
+      if (e.shield < 0.35 && G.time - (e.hardMsgT || -9) > 1.2) {
+        e.hardMsgT = G.time;
+        addText(e.x, e.y - e.r - 10, 'かたい! まわりを掃除しよう', '#ffb37a');
+      }
+    }
     e.hp -= dmg;
     e.flash = 0.09;
     e.aggro = true;
@@ -3993,6 +4034,27 @@
       ctx.save();
       ctx.translate(e.x, e.y);
       if (e.flee) ctx.globalAlpha = Math.max(0, 1 - G.endT / 1.5);
+      if (e.def.source && e.shield < 0.98) {
+        // 汚れバリア: 強いほど濃く、ぶ厚く見せる
+        const k = (1 - e.shield) / (1 - SHIELD_MIN);
+        const g = ctx.createRadialGradient(0, 0, e.r * 0.6, 0, 0, e.r * (1.5 + k * 0.5));
+        g.addColorStop(0, `rgba(70,50,30,${0.05 + k * 0.25})`);
+        g.addColorStop(0.75, `rgba(90,62,34,${0.15 + k * 0.45})`);
+        g.addColorStop(1, 'rgba(90,62,34,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, e.r * (1.5 + k * 0.5), 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(150,110,60,${0.25 + k * 0.5})`;
+        ctx.lineWidth = 1.5 + k * 3;
+        ctx.beginPath();
+        for (let a = 0; a <= TAU + 0.01; a += TAU / 24) {
+          const rr = e.r * (1.3 + k * 0.35) + Math.sin(a * 5 + e.t * 3) * (2 + k * 3);
+          if (a === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+          else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        }
+        ctx.stroke();
+      }
       if (e.def.source) {
         // 発生源は赤い点線の輪で目立たせる
         ctx.strokeStyle = `rgba(255,90,90,${0.55 + Math.sin(e.t * 5) * 0.25})`;
