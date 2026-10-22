@@ -160,14 +160,26 @@ body {
 }
 
 #board { display: block; width: 100%; height: 100%; cursor: grab; }
+
+/* なぞったスワイプの線。指を離したあと少し残して、投げるときに消す */
+#trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 1;
+}
+#trail.is-fading { opacity: 0; transition: opacity 0.35s; }
 #board:active { cursor: grabbing; }
 
 .hud {
   position: absolute;
   inset: 8px 10px auto;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px 8px;
   pointer-events: none;
 }
 
@@ -180,7 +192,9 @@ body {
   font-size: 0.78rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
+.hud-speed { margin-left: auto !important; }
 .hud p:empty { display: none; }
 
 .hint {

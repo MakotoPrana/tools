@@ -37,6 +37,9 @@
   const MIN_SPEED = 4.5;                   // m/s
   const MAX_SPEED = 10.5;
   const MAX_ANGLE = 0.05;                  // rad
+  const SWIPE_MIN = 0.12;                  // この長さ (画面の高さに対する割合) 以下は最も遅い球
+  const SWIPE_MAX = 0.7;                   // この長さ以上は最も速い球
+  const TRAIL_HOLD_MS = 700;               // スワイプの線を見せてから投げるまで
   const HOOK_FORCE = 5.5;                  // N (カーブ最大のときの横向きの力)
 
   // ---- DOM ----
@@ -55,6 +58,7 @@
   const powerEl = document.getElementById('power');
   const powerFill = document.getElementById('power-fill');
   const soundBtn = document.getElementById('sound-btn');
+  const trailEl = document.getElementById('trail');
 
   const store = {
     get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
@@ -546,6 +550,7 @@
   let inGutter = false;
   let standingBefore = 0;
   let nextTimer = 0;
+  let throwTimer = 0;
 
   function rackPins(onlyStanding) {
     for (const p of pins) {
@@ -611,7 +616,7 @@
   }
 
   function throwBall(speed, angle, spin) {
-    if (state !== 'aim') return;
+    if (state !== 'aim' && state !== 'windup') return;
     initAudio();
     aimAngle = angle;
     hook = spin;
@@ -622,8 +627,9 @@
     throwTime = world.time;
     ballDoneAt = 0;
     standingBefore = countStanding();
+    // スワイプで投げたときは、投げる前に速さとカーブを表示済み
+    if (state !== 'windup') hudSpeed.textContent = `${(speed * 3.6).toFixed(1)} km/h`;
     state = 'rolling';
-    hudSpeed.textContent = `${(speed * 3.6).toFixed(1)} km/h`;
     hintEl.textContent = '';
     powerEl.hidden = true;
   }
@@ -846,7 +852,6 @@
     const dx = e.clientX - gesture.x0;
     const dy = e.clientY - gesture.y0;
     gesture.pts.push({ x: e.clientX, y: e.clientY, t: e.timeStamp });
-    if (gesture.pts.length > 80) gesture.pts.shift();
     if (gesture.mode === 'idle') {
       if (dy < -16 && -dy > Math.abs(dx)) {
         gesture.mode = 'throw';
@@ -859,42 +864,142 @@
       ballBody.position.x = ballX;
     }
     if (gesture.mode === 'throw') {
-      aimAngle = swipeAngle(gesture.pts);
+      const pts = gesture.pts;
+      const swipe = readSwipe(pts);
+      if (swipe) aimAngle = swipe.angle;
+      drawTrail(pts, swipe);
     }
   });
 
-  function swipeAngle(pts) {
+  // スワイプの線を、長さの割合 (0〜1) の位置で切ったときの点
+  function pathPoint(pts, lens, frac) {
+    const target = lens[lens.length - 1] * frac;
+    let i = 1;
+    while (i < lens.length - 1 && lens[i] < target) i++;
+    const seg = lens[i] - lens[i - 1] || 1;
+    const u = clamp((target - lens[i - 1]) / seg, 0, 1);
+    return { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * u, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * u };
+  }
+
+  // 画面の上方向を 0 とした、2点を結ぶ向き (右が +)
+  const dirOf = (p, q) => Math.atan2(q.x - p.x, p.y - q.y);
+
+  // スワイプの線から投げ方を決める
+  //   速さ: 線の長さ (画面の高さに対する割合)
+  //   向き: 線の出だしの向き
+  //   カーブ: 出だしの向きと、終わりの向きの差 (途中で曲げた分)
+  function readSwipe(pts) {
+    const lens = [0];
+    for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+    const total = lens[lens.length - 1];
+    if (total < 1) return null;
     const a = pts[0];
     const b = pts[pts.length - 1];
-    if (a.y - b.y < 10) return aimAngle;
-    return clamp(Math.atan2(b.x - a.x, a.y - b.y) * 0.13, -MAX_ANGLE, MAX_ANGLE);
+    const lenRatio = total / canvas.clientHeight;
+    const speed = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * clamp((lenRatio - SWIPE_MIN) / (SWIPE_MAX - SWIPE_MIN), 0, 1);
+    const startDir = dirOf(a, pathPoint(pts, lens, 0.3));
+    const endDir = dirOf(pathPoint(pts, lens, 0.7), b);
+    let bend = endDir - startDir;
+    // 少しの手ぶれではカーブにしない
+    bend = Math.sign(bend) * Math.max(Math.abs(bend) - 0.1, 0);
+    return {
+      speed,
+      angle: clamp(startDir * 0.13, -MAX_ANGLE, MAX_ANGLE),
+      spin: clamp(bend * 1.6, -1, 1),
+      up: a.y - b.y,
+      lenRatio,
+    };
+  }
+
+  // ---- スワイプの線 ----
+  const trailCtx = trailEl.getContext('2d');
+  function sizeTrail() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    trailEl.width = Math.round(wrap.clientWidth * dpr);
+    trailEl.height = Math.round(wrap.clientHeight * dpr);
+    trailCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawTrail(pts, swipe) {
+    const rect = trailEl.getBoundingClientRect();
+    trailCtx.clearRect(0, 0, rect.width, rect.height);
+    trailEl.classList.remove('is-fading');
+    if (pts.length < 2) return;
+    // 線の長さで色が変わる (短い = 緑、長い = 赤)
+    const power = swipe ? (swipe.speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED) : 0;
+    const hue = 130 - power * 125;
+    trailCtx.lineCap = 'round';
+    trailCtx.lineJoin = 'round';
+    trailCtx.beginPath();
+    pts.forEach((p, i) => trailCtx[i ? 'lineTo' : 'moveTo'](p.x - rect.left, p.y - rect.top));
+    trailCtx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+    trailCtx.lineWidth = 12;
+    trailCtx.stroke();
+    trailCtx.strokeStyle = `hsl(${hue}, 95%, 60%)`;
+    trailCtx.lineWidth = 6;
+    trailCtx.stroke();
+    // 終わりに矢印
+    const b = pts[pts.length - 1];
+    const p = pts[Math.max(0, pts.length - 4)];
+    const ang = Math.atan2(b.y - p.y, b.x - p.x);
+    trailCtx.save();
+    trailCtx.translate(b.x - rect.left, b.y - rect.top);
+    trailCtx.rotate(ang);
+    trailCtx.beginPath();
+    trailCtx.moveTo(10, 0);
+    trailCtx.lineTo(-8, -9);
+    trailCtx.lineTo(-8, 9);
+    trailCtx.closePath();
+    trailCtx.fillStyle = `hsl(${hue}, 95%, 60%)`;
+    trailCtx.fill();
+    trailCtx.restore();
+  }
+
+  function clearTrail(fade) {
+    if (fade) {
+      trailEl.classList.add('is-fading');
+    } else {
+      trailEl.classList.remove('is-fading');
+      trailCtx.clearRect(0, 0, trailEl.width, trailEl.height);
+    }
+  }
+
+  function describeThrow(swipe) {
+    const curve = swipe.spin === 0 ? 'ストレート' : `${swipe.spin < 0 ? '左' : '右'}カーブ ${Math.round(Math.abs(swipe.spin) * 100)}%`;
+    return `${(swipe.speed * 3.6).toFixed(1)} km/h · ${curve}`;
   }
 
   function endGesture(e) {
     if (!gesture || e.pointerId !== gesture.id) return;
     const g = gesture;
     gesture = null;
-    if (g.mode !== 'throw' || state !== 'aim') return;
+    if (g.mode !== 'throw' || state !== 'aim') {
+      clearTrail(false);
+      return;
+    }
     const pts = g.pts;
-    const a = pts[0];
-    const b = pts[pts.length - 1];
-    if (a.y - b.y < 40) return;
-    // はじく速さは最後の 120ms で測る
-    let k = pts.length - 1;
-    while (k > 0 && b.t - pts[k - 1].t < 120) k--;
-    const p = pts[k];
-    const dt = Math.max(b.t - p.t, 16);
-    const v = Math.hypot(b.x - p.x, b.y - p.y) / dt * 1000 / canvas.clientHeight; // 画面の高さ / 秒
-    const speed = clamp(3.4 + v * 1.6, MIN_SPEED, MAX_SPEED);
-    // 弧を描いたスワイプ: 最後の向きが全体の向きよりどちらに曲がったか
-    const chord = Math.atan2(b.x - a.x, a.y - b.y);
-    const tailFrom = pts[Math.floor(pts.length * 0.65)];
-    const tail = Math.atan2(b.x - tailFrom.x, tailFrom.y - b.y + 0.001);
-    const spin = pts.length > 5 ? clamp((tail - chord) * 2.2, -1, 1) : 0;
-    throwBall(speed, swipeAngle(pts), spin);
+    const swipe = readSwipe(pts);
+    if (!swipe || swipe.up < 40) {
+      clearTrail(false);
+      return;
+    }
+    // なぞった線を少し見せてから投げる
+    state = 'windup';
+    aimAngle = swipe.angle;
+    drawTrail(pts, swipe);
+    hudSpeed.textContent = describeThrow(swipe);
+    hintEl.textContent = '';
+    throwTimer = setTimeout(() => {
+      clearTrail(true);
+      throwBall(swipe.speed, swipe.angle, swipe.spin);
+    }, TRAIL_HOLD_MS);
   }
   canvas.addEventListener('pointerup', endGesture);
-  canvas.addEventListener('pointercancel', (e) => { if (gesture && e.pointerId === gesture.id) gesture = null; });
+  canvas.addEventListener('pointercancel', (e) => {
+    if (!gesture || e.pointerId !== gesture.id) return;
+    gesture = null;
+    clearTrail(false);
+  });
 
   // キーボード
   const keys = new Set();
@@ -943,6 +1048,8 @@
 
   startBtn.addEventListener('click', () => {
     clearTimeout(nextTimer);
+    clearTimeout(throwTimer);
+    clearTrail(false);
     hideCallout();
     initAudio();
     startBtn.blur();
@@ -964,7 +1071,7 @@
     camera.fov = w / h < 0.75 ? 52 : 44;
     camera.updateProjectionMatrix();
   }
-  new ResizeObserver(resize).observe(wrap);
+  new ResizeObserver(() => { resize(); sizeTrail(); }).observe(wrap);
   resize();
 
   // オイルの薄い奥のほうで、回転の向きに曲がる (力は物理の1ステップごとに消えるので毎ステップかける)
@@ -1018,7 +1125,7 @@
       const t = performance.now() / 1000;
       tmpV.set(Math.sin(t * 0.25) * 0.6, 1.1, HEAD_Z + 6.5);
       focus.set(0, 0.2, HEAD_Z - 0.3);
-    } else if (state === 'aim') {
+    } else if (state === 'aim' || state === 'windup') {
       tmpV.set(ballX * 0.6, 1.25, START_Z + 2.4);
       focus.set(ballX * 0.25, 0, -12);
     } else if (state === 'rolling' && bp.z > HEAD_Z + 5) {
@@ -1043,7 +1150,7 @@
   }
 
   function updateAimLine() {
-    aimLine.visible = state === 'aim';
+    aimLine.visible = state === 'aim' || state === 'windup';
     if (!aimLine.visible) return;
     aimLine.children.forEach((d, i) => {
       const dist = 0.45 + i * 0.32;

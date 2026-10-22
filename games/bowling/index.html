@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <main class="app">
@@ -34,6 +34,7 @@
 
     <div class="board-wrap" id="board-wrap">
       <canvas id="board" aria-label="ゲーム画面"></canvas>
+      <canvas id="trail" aria-hidden="true"></canvas>
 
       <div class="hud" id="hud">
         <p class="hud-frame" id="hud-frame"></p>
@@ -47,7 +48,7 @@
         <div class="title-screen" id="title-screen">
           <p class="game-logo"><span class="logo-strike">STRIKE</span><span class="logo-lane">LANE</span></p>
           <p class="game-kana">ストライク・レーン</p>
-          <p class="overlay-text" id="overlay-text">上にスワイプして投げよう</p>
+          <p class="overlay-text" id="overlay-text">上にスワイプして投げよう。途中で曲げるとカーブ</p>
         </div>
         <div class="overlay-actions">
           <button type="button" class="start-btn" id="start-btn">ゲームスタート</button>
@@ -66,15 +67,16 @@
       <table>
         <tbody>
           <tr><th>左右になぞる</th><td>投げる位置を動かす</td></tr>
-          <tr><th>上にスワイプ</th><td>投げる。速くはじくほどボールが速くなり、斜めにはじくと斜めに転がります</td></tr>
-          <tr><th>弧を描いてスワイプ</th><td>カーブ (フック) がかかります。最後に左へ曲げると、ボールも奥で左へ曲がります</td></tr>
+          <tr><th>上にスワイプ</th><td>投げる。長くなぞるほどボールが速くなり (線の色が緑→黄→赤に変わります)、出だしを斜めにすると斜めに転がります</td></tr>
+          <tr><th>途中で曲げてスワイプ</th><td>カーブ (フック) がかかります。途中から左へ曲げると、ボールも奥で左へ曲がります。大きく曲げるほど強く曲がります</td></tr>
+          <tr><th>指を離したあと</th><td>なぞった線が少しのあいだ表示され、そのあとボールが転がります</td></tr>
         </tbody>
       </table>
 
       <h3>パソコンの操作</h3>
       <table>
         <tbody>
-          <tr><th>マウスでドラッグ</th><td>スマホと同じ (左右で位置、上へはじいて投げる)</td></tr>
+          <tr><th>マウスでドラッグ</th><td>スマホと同じ (左右で位置、上へなぞって投げる)</td></tr>
           <tr><th>← →</th><td>投げる位置を動かす</td></tr>
           <tr><th>A / D</th><td>投げる向きを変える</td></tr>
           <tr><th>Q / E</th><td>カーブの向きと強さを変える</td></tr>
@@ -105,6 +107,6 @@
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
-  <script src="script.js?v=1"></script>
+  <script src="script.js?v=2"></script>
 </body>
 </html>
