@@ -86,14 +86,16 @@
     master: { name: 'ゴミ屋敷の主', hp: 3600, speed: 38, dmg: 20, r: 64, gem: 2, move: 'chase', boss: 'boss', desc: '屋敷の主の間のボス。ゴミ屋敷のすべてを操る。' },
   };
   const ENEMY_ORDER = ['dust', 'hair', 'paper', 'can', 'bottle', 'grease', 'spore', 'bag', 'pile', 'drain', 'nest', 'boxes', 'yokai', 'kaiju', 'master'];
-  const GEM_XP = [1, 5, 20];
+  const GEM_XP = [1, 3, 8];
+  // レベル n から n+1 に必要な経験値 (レベルが上がるほど多く必要になる)
+  const xpFor = (n) => Math.round(12 + 5 * n + 0.4 * n * n);
   const GEM_BOX = [1, 2, 4];
 
   // lv: レベル2〜8で足す値と、その説明
   const WEAPONS = {
     vacuum: {
       name: '超強力掃除機', desc: '近くのゴミに扇形の吸引ノズルを向けて、まとめてダメージを与える', evo: 'blackhole', passive: 'battery', power: 1,
-      base: { dmg: 5, cd: 0.5, range: 85, angle: 70 },
+      base: { dmg: 6, cd: 0.5, range: 85, angle: 70 },
       lv: [
         [{ dmg: 2 }, '攻撃力 +2'], [{ range: 15 }, '吸引距離 +15'], [{ angle: 15 }, '吸引の角度 +15°'], [{ dmg: 3 }, '攻撃力 +3'],
         [{ cd: -0.06 }, '吸引の間隔 -0.06秒'], [{ range: 20 }, '吸引距離 +20'], [{ dmg: 4, angle: 15 }, '攻撃力 +4・角度 +15°'],
@@ -182,8 +184,8 @@
   const DANGER = [
     null,
     { density: 0.6, hp: 0.8, dmg: 0.8, speed: 1, src: 0.7, dirt: -0.35, upgrade: 0, elite: 0, types: ['dust', 'hair', 'paper'] },
-    { density: 0.9, hp: 1, dmg: 1, speed: 1, src: 1, dirt: -0.15, upgrade: 0.05, elite: 0, types: ['dust', 'hair', 'paper', 'can'] },
-    { density: 1.4, hp: 1.6, dmg: 1.6, speed: 1.05, src: 1.3, dirt: 0.05, upgrade: 0.2, elite: 0, types: ['dust', 'hair', 'paper', 'can', 'grease', 'bottle', 'spore'] },
+    { density: 0.9, hp: 0.9, dmg: 0.9, speed: 1, src: 1, dirt: -0.15, upgrade: 0.05, elite: 0, types: ['dust', 'hair', 'paper', 'can'] },
+    { density: 1.3, hp: 1.4, dmg: 1.4, speed: 1.05, src: 1.3, dirt: 0.05, upgrade: 0.2, elite: 0, types: ['dust', 'hair', 'paper', 'can', 'grease', 'bottle', 'spore'] },
     { density: 2.2, hp: 2.6, dmg: 2.4, speed: 1.12, src: 1.8, dirt: 0.2, upgrade: 0.4, elite: 0.01, types: ['dust', 'hair', 'paper', 'can', 'grease', 'bottle', 'spore', 'bag'] },
     { density: 3, hp: 4, dmg: 3.2, speed: 1.2, src: 2.5, dirt: 0.3, upgrade: 0.6, elite: 0.03, types: ['dust', 'hair', 'paper', 'can', 'grease', 'bottle', 'spore', 'bag'] },
   ];
@@ -1591,7 +1593,7 @@
       passives: {},
       level: 1,
       xp: 0,
-      xpNext: 9,
+      xpNext: xpFor(1),
       pendingLv: 0,
       rerolls: save.shop.reroll,
       box: 0,
@@ -2200,7 +2202,8 @@
     return e;
   }
 
-  function spawnPos(margin) {
+  // maxDanger を渡すと、それより汚れレベルの高い部屋は選ばない
+  function spawnPos(margin, maxDanger = 5) {
     const R = Math.hypot(view.ww, view.wh) / 2 + margin;
     let best = null;
     let bs = -1;
@@ -2208,7 +2211,7 @@
       const a = rand(0, TAU);
       const x = G.p.x + Math.cos(a) * R;
       const y = G.p.y + Math.sin(a) * R;
-      if (!spawnable(x, y)) continue;
+      if (!spawnable(x, y) || G.rooms[roomAt(x, y)].danger > maxDanger) continue;
       const d = dirtAt(x, y);
       if (d > bs) {
         bs = d;
@@ -2221,7 +2224,7 @@
       const x = rand(20, ROOM - 20);
       const y = rand(20, ROOM - 20);
       if (Math.abs(x - G.p.x) < view.ww / 2 + 30 && Math.abs(y - G.p.y) < view.wh / 2 + 30) continue;
-      if (!spawnable(x, y)) continue;
+      if (!spawnable(x, y) || G.rooms[roomAt(x, y)].danger > maxDanger) continue;
       return [x, y];
     }
     return null;
@@ -2318,11 +2321,11 @@
       for (const e of G.enemies) if (e.alive && e.home < 0 && !e.def.source && !e.boss) roaming++;
       const desired = Math.min(170, (10 + t * 0.3) * G.stage.spawnMul * DANGER[hereDanger].density);
       const n = Math.min(3, Math.ceil(desired - roaming));
+      // 住みかのないゴミの強さは、今いる部屋の汚れレベルに合わせる (★の多い部屋からは湧かせない)
       for (let i = 0; i < n && G.enemies.length < MAX_ENEMIES - 20; i++) {
-        const pos = spawnPos(40);
+        const pos = spawnPos(40, hereDanger);
         if (!pos) break;
-        const r = G.rooms[roomAt(pos[0], pos[1])];
-        spawnGroup(pos[0], pos[1], r ? r.danger : 1, null, -1, null);
+        spawnGroup(pos[0], pos[1], hereDanger, null, -1, null);
       }
     }
     // 大群ラッシュ: ホコリの大波が四方から
@@ -2446,7 +2449,7 @@
           e.vy *= -1;
         }
         // 転がり去ったら消える (ダストは落とさない)
-        if (e.life > 9 || (!def.bounce && (e.x <= e.r || e.y <= e.r || e.x >= ROOM - e.r || e.y >= ROOM - e.r)) || (hit && !def.bounce)) {
+        if (e.life > 9 || (e.home >= 0 && !e.aggro && roomAt(e.x, e.y) !== e.home) || (!def.bounce && (e.x <= e.r || e.y <= e.r || e.x >= ROOM - e.r || e.y >= ROOM - e.r)) || (hit && !def.bounce)) {
           e.alive = false;
           removeBoss(e);
         }
@@ -2465,9 +2468,9 @@
       if (e.boss) bossAct(e, dt, d);
       if (e.home >= 0 && !e.boss) {
         if (!e.aggro) {
-          // 壁ごしには気づかない (ドアを通る道のりで 5 マス以内か、同じ部屋に入ってきたら追いかける)
+          // 壁ごしには気づかない (ドアを通る道のりで 4 マス以内か、同じ部屋に入ってきたら追いかける)
           const fd = G.flow[blockAt(e.x, e.y)];
-          if ((fd >= 0 && fd <= 5) || G.curRoom === e.home) e.aggro = true;
+          if ((fd >= 0 && fd <= 4) || G.curRoom === e.home) e.aggro = true;
         } else if (d > 750 && G.curRoom !== e.home) {
           e.aggro = false;
         }
@@ -2617,7 +2620,7 @@
       if (G.bosses.every((b) => !b.boss)) Sound.bgm('main');
     } else if (def.source) {
       // 発生源を潰した
-      for (let i = 0; i < 4; i++) dropGem(e.x + rand(-30, 30), e.y + rand(-30, 30), 2);
+      for (let i = 0; i < 2; i++) dropGem(e.x + rand(-30, 30), e.y + rand(-30, 30), 2);
       if (Math.random() < 0.3) G.items.push({ kind: 'heal', x: e.x + 20, y: e.y, t: 0 });
       puff(e.x, e.y, '#8a6a44', 30);
       G.roomCoins += 5;
@@ -3164,7 +3167,7 @@
     while (G.xp >= G.xpNext) {
       G.xp -= G.xpNext;
       G.level++;
-      G.xpNext = 5 + G.level * 4;
+      G.xpNext = xpFor(G.level);
       G.pendingLv++;
     }
   }
