@@ -19,6 +19,11 @@
   const GN = Math.ceil(ROOM / CELL);
   const GAME_TIME = 600; // 10分
   const ROOM_DONE = 0.9; // 部屋の清掃が完了する、きれいな床の割合
+  // 発生源の汚れバリア: まわり (半径 SHIELD_R、同じ部屋) の汚れ具合で、受けるダメージが減る
+  const SHIELD_R = 150;
+  const SHIELD_MIN = 0.08; // いちばん汚れているときに通るダメージの割合
+  // 汚れ具合 d (0 = ピカピカ / 1 = 全部ドロドロ) から、通るダメージの割合を決める
+  const shieldMul = (d) => clamp(1 - ((d - 0.1) / 0.5) * (1 - SHIELD_MIN), SHIELD_MIN, 1);
   const MAX_ENEMIES = 400;
   const MAX_GEMS = 300;
   const MAX_PARTICLES = 700;
@@ -26,6 +31,21 @@
   const SAVE_KEY = 'cleaning-survivors-save';
   // テスト版は <meta name="cs-test-unlock"> で全部屋・全主人公を開放する
   const TEST_UNLOCK = !!document.querySelector('meta[name="cs-test-unlock"]');
+
+  // 言語: 日本語と英語。保存がなければ、ブラウザの言語が日本語なら日本語、それ以外は英語
+  const LANG_KEY = 'cleaning-survivors-lang';
+  const LANGS = ['ja', 'en'];
+  const loadLang = () => {
+    try {
+      const saved = localStorage.getItem(LANG_KEY);
+      if (LANGS.includes(saved)) return saved;
+    } catch (e) { /* 保存がなければブラウザの言語から決める */ }
+    const browser = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    return browser.toLowerCase().startsWith('ja') ? 'ja' : 'en';
+  };
+  let lang = loadLang();
+  // データの名前や説明: 英語のときは .en にある方を使う
+  const L = (o, f) => (lang === 'en' && o.en && o.en[f] != null ? o.en[f] : o[f]);
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const randInt = (a, b) => Math.floor(rand(a, b + 1));
@@ -87,6 +107,8 @@
   };
   const ENEMY_ORDER = ['dust', 'hair', 'paper', 'can', 'bottle', 'grease', 'spore', 'bag', 'pile', 'drain', 'nest', 'boxes', 'yokai', 'kaiju', 'master'];
   const GEM_XP = [1, 3, 8];
+  const ELITE_MAX = 2;
+  const ELITE_CHEST_GAP = 35;
   // レベル n から n+1 に必要な経験値 (レベルが上がるほど多く必要になる)
   const xpFor = (n) => Math.round(12 + 5 * n + 0.4 * n * n);
   const GEM_BOX = [1, 2, 4];
@@ -133,6 +155,38 @@
         [{ width: 8 }, '幅 +8'], [{ dmg: 4 }, '攻撃力 +4'], [{ count: 1 }, 'ローラー +1個'],
       ],
     },
+    mop: {
+      name: 'モップ', desc: '前方を大きくなぎ払い、ゴミを弾き飛ばす。通った床もしっかり磨く', evo: 'tornado', passive: 'gloves', power: 2,
+      base: { dmg: 11, cd: 1.3, range: 78, angle: 150 },
+      lv: [
+        [{ dmg: 4 }, '攻撃力 +4'], [{ range: 12 }, 'なぎ払う距離 +12'], [{ cd: -0.12 }, '間隔 -0.12秒'], [{ dmg: 5 }, '攻撃力 +5'],
+        [{ angle: 40 }, 'なぎ払う角度 +40°'], [{ range: 16 }, 'なぎ払う距離 +16'], [{ dmg: 6, cd: -0.1 }, '攻撃力 +6・間隔 -0.1秒'],
+      ],
+    },
+    duster: {
+      name: 'はたき', desc: 'ブーメランのように投げて、行きと帰りでゴミを払う。貫通する', evo: 'gale', passive: 'boots', power: 1,
+      base: { dmg: 7, cd: 1.6, len: 210, size: 14, count: 1 },
+      lv: [
+        [{ dmg: 3 }, '攻撃力 +3'], [{ count: 1 }, 'はたき +1本'], [{ len: 40 }, '飛ぶ距離 +40'], [{ size: 4, dmg: 3 }, '大きさ +4・攻撃力 +3'],
+        [{ count: 1 }, 'はたき +1本'], [{ cd: -0.25 }, '間隔 -0.25秒'], [{ dmg: 5, count: 1 }, '攻撃力 +5・はたき +1本'],
+      ],
+    },
+    bomb: {
+      name: '洗剤ボム', desc: 'ゴミの集まりに洗剤を投げこみ、はじける泡でまとめて片付ける', evo: 'foam', passive: 'dustpack', power: 3,
+      base: { dmg: 18, cd: 2.6, radius: 52, count: 1 },
+      lv: [
+        [{ dmg: 6 }, '攻撃力 +6'], [{ radius: 10 }, '爆発の大きさ +10'], [{ count: 1 }, 'ボム +1個'], [{ cd: -0.3 }, '間隔 -0.3秒'],
+        [{ dmg: 8 }, '攻撃力 +8'], [{ radius: 12 }, '爆発の大きさ +12'], [{ count: 1, dmg: 6 }, 'ボム +1個・攻撃力 +6'],
+      ],
+    },
+    sponge: {
+      name: 'メラミンスポンジ', desc: '壁で跳ね返りながら部屋を飛び回り、ゴミと汚れをこすり落とす', evo: 'meteor', passive: 'wax', power: 2,
+      base: { dmg: 6, cd: 3.2, size: 10, dur: 3, speed: 300, count: 1 },
+      lv: [
+        [{ dmg: 3 }, '攻撃力 +3'], [{ count: 1 }, 'スポンジ +1個'], [{ dur: 1 }, '飛ぶ時間 +1秒'], [{ size: 4 }, '大きさ +4'],
+        [{ dmg: 4, speed: 60 }, '攻撃力 +4・速さアップ'], [{ count: 1 }, 'スポンジ +1個'], [{ dmg: 5, dur: 1 }, '攻撃力 +5・飛ぶ時間 +1秒'],
+      ],
+    },
   };
   const WEAPON_IDS = Object.keys(WEAPONS);
   const MAX_WEAPON_LV = 8;
@@ -143,20 +197,27 @@
     army: { name: 'お掃除ロボ軍団', desc: 'ロボが自分で汚れとゴミを探して部屋を巡回する' },
     acid: { name: '酸性雨ミスト', desc: '画面中に除菌の雨を降らせる' },
     giant: { name: '巨大圧雪ローラー', desc: '太いローラーで通り道を全部ピカピカにし、ゴミを潰す' },
+    tornado: { name: '竜巻モップ', desc: 'まわり全部を高速でなぎ払い続ける' },
+    gale: { name: '風神はたき', desc: '大きなはたきが何本も飛び、通り道のダストを集めてくる' },
+    foam: { name: '泡の大爆発', desc: '大爆発のあとに泡が残り、しばらくゴミを溶かし続ける' },
+    meteor: { name: 'メラミン流星群', desc: '大きなスポンジが何個も長く跳ね回り、部屋じゅうを磨き上げる' },
   };
 
   const PASSIVES = {
     battery: { name: 'バッテリー増設', max: 5, desc: 'ギアの攻撃間隔 -8%' },
     boiler: { name: '温水ボイラー', max: 5, desc: 'ギアの攻撃力 +10%' },
-    roomba: { name: 'ルンバ増設', max: 2, desc: '水流・ロボ・ミストの数 +1' },
+    roomba: { name: 'ルンバ増設', max: 2, desc: 'ギアの数 +1 (水流・ロボ・ミスト・はたき・ボム・スポンジ)' },
     bleach: { name: '強力漂白剤', max: 5, desc: '攻撃範囲 +10%' },
     tape: { name: '超強力粘着テープ', max: 5, desc: '効果時間 +10%' },
     dustpack: { name: '大容量ダストパック', max: 5, desc: 'ダストボックスの容量 +40・回収範囲 +20%' },
     boots: { name: '防水ブーツ', max: 3, desc: '汚れた床での減速を半分にする・体力 +20' },
     gloves: { name: 'ゴム手袋', max: 3, desc: '受けるダメージ -1' },
+    wax: { name: 'フロアワックス', max: 5, desc: '移動速度 +6%・ギアの弾の速さ +10%' },
   };
   const PASSIVE_IDS = Object.keys(PASSIVES);
-  const MAX_SLOTS = 6;
+  // 1回のプレイで持てるギアとパッシブの数。全部は持てないので、どれを組み合わせるかでビルドが決まる
+  const MAX_GEARS = 4;
+  const MAX_PASSIVES = 4;
 
   // 清掃員。unlock: その番号のステージの宝物を見つけると仲間になる (-1 は最初から)
   //   mods: 個性 (scrub: 歩いて磨く範囲 / might: 攻撃力 / noDirtSlow: 汚れた床で遅くならない / magnet: 回収範囲 /
@@ -382,6 +443,439 @@
   ];
   const shopCost = (item, lv) => item.cost * (lv + 1);
 
+  // ---- 英語の名前と説明 (日本語はそれぞれのデータに書いてある) ----
+  const EN_ENEMIES = {
+    dust: ['Dust Bunny', 'Weak, but swarms in huge numbers. Found in every room.'],
+    hair: ['Hairball', 'Mixed in with the dust. Getting tangled up slows you down a little.'],
+    paper: ['Paper Wad', 'The most ordinary trash. Chases you straight on.'],
+    can: ['Empty Can', 'Rolls in and rams you. It hurts.'],
+    bottle: ['Plastic Bottle', 'Faster and tougher than a can. Bounces off walls.'],
+    grease: ['Sticky Grease', 'A gooey slime. Turns the floor filthy and slows you a lot on contact.'],
+    spore: ['Mold Spore', 'Keeps its distance and scatters spores. Breathing them in causes an allergy that drains HP.'],
+    bag: ['Garbage Bag', 'Bursts when cleared, spilling the trash inside.'],
+    pile: ['Trash Heap', 'A source that keeps spawning trash and dirtying the floor until you destroy it.'],
+    drain: ['Overflowing Drain', 'A source that spews sticky grease and hair.'],
+    nest: ['Mold Nest', 'A source of mold spores. Sanitizer spray works well on it.'],
+    boxes: ['Box Pile', 'A source that rolls out paper wads and cans.'],
+    yokai: ['Garbage Ghoul', 'The mid-boss that appears at 5:00. Scatters trash as it closes in.'],
+    kaiju: ['Mold Monster', 'The boss that appears at 9:00. Covers the floor in mold and fires spore shots.'],
+    master: ['Lord of the Trash House', 'The boss of the Master\'s Hall. Controls everything in the trash house.'],
+  };
+  const EN_WEAPONS = {
+    vacuum: ['Turbo Vacuum', 'Points a cone-shaped nozzle at nearby trash and damages everything in it.',
+      ['Damage +2', 'Suction range +15', 'Suction angle +15°', 'Damage +3', 'Suction interval −0.06s', 'Suction range +20', 'Damage +4, angle +15°']],
+    washer: ['Pressure Washer', 'Fires a water jet at nearby trash, piercing and knocking it back.',
+      ['Jets +1', 'Damage +5', 'Jet width +5', 'Jets +1', 'Damage +6', 'Range +80, interval −0.2s', 'Jets +1, damage +6']],
+    robot: ['Cleaning Robot', 'Spins around you, smashing trash and polishing the floor.',
+      ['Robots +1', 'Damage +3', 'Orbit radius +16', 'Robots +1', 'Faster spin, damage +3', 'Robot size +4', 'Robots +1']],
+    spray: ['Sanitizer Spray', 'Leaves a lingering sanitizing mist around you. Double damage to mold.',
+      ['Mists +1', 'Mist size +8', 'Damage +2', 'Duration +0.6s', 'Mists +1', 'Mist size +10', 'Damage +3, mists +1']],
+    roller: ['Lint Roller', 'Follows behind you, rolling up trash and dirt along your path.',
+      ['Damage +3', 'Width +8', 'Damage +3', 'Rollers +1', 'Width +8', 'Damage +4', 'Rollers +1']],
+    mop: ['Mop', 'Sweeps a wide arc ahead, knocking trash away and scrubbing the floor hard.',
+      ['Damage +4', 'Reach +12', 'Interval −0.12s', 'Damage +5', 'Sweep angle +40°', 'Reach +16', 'Damage +6, interval −0.1s']],
+    duster: ['Feather Duster', 'Thrown like a boomerang, it swats trash on the way out and back. Pierces.',
+      ['Damage +3', 'Dusters +1', 'Distance +40', 'Size +4, damage +3', 'Dusters +1', 'Interval −0.25s', 'Damage +5, dusters +1']],
+    bomb: ['Detergent Bomb', 'Lobs detergent into clusters of trash; the bursting foam cleans them all up.',
+      ['Damage +6', 'Blast size +10', 'Bombs +1', 'Interval −0.3s', 'Damage +8', 'Blast size +12', 'Bombs +1, damage +6']],
+    sponge: ['Magic Sponge', 'Bounces off walls as it flies around the room, scrubbing off trash and dirt.',
+      ['Damage +3', 'Sponges +1', 'Flight time +1s', 'Size +4', 'Damage +4, faster', 'Sponges +1', 'Damage +5, flight time +1s']],
+  };
+  const EN_EVOS = {
+    blackhole: ['Black Hole Vacuum', 'Places a suction vortex ahead that damages all trash inside it.'],
+    steam: ['Superheated Steam Cannon', 'A thick, long steam beam that instantly polishes everything along its line.'],
+    army: ['Robot Cleaning Squad', 'Robots seek out dirt and trash on their own and patrol the room.'],
+    acid: ['Acid Rain Mist', 'Rains sanitizer all over the screen.'],
+    giant: ['Giant Steamroller', 'A huge roller that polishes everything along your path and crushes trash.'],
+    tornado: ['Tornado Mop', 'Keeps sweeping all around you at high speed.'],
+    gale: ['Wind God Duster', 'Several big dusters fly out and bring back the dust along their path.'],
+    foam: ['Foam Explosion', 'Huge blasts leave foam behind that keeps dissolving trash for a while.'],
+    meteor: ['Sponge Meteor Shower', 'Many big sponges bounce around for a long time, polishing the whole room.'],
+  };
+  const EN_PASSIVES = {
+    battery: ['Extra Battery', 'Gear attack interval −8%'],
+    boiler: ['Hot Water Boiler', 'Gear damage +10%'],
+    roomba: ['Extra Roomba', 'Gear count +1 (jets, robots, mists, dusters, bombs, sponges)'],
+    bleach: ['Strong Bleach', 'Attack area +10%'],
+    tape: ['Super Sticky Tape', 'Effect duration +10%'],
+    dustpack: ['Big Dust Pack', 'Dust box capacity +40, pickup range +20%'],
+    boots: ['Rain Boots', 'Halves slowdown on dirty floors, HP +20'],
+    gloves: ['Rubber Gloves', 'Damage taken −1'],
+    wax: ['Floor Wax', 'Move speed +6%, gear projectile speed +10%'],
+  };
+  // [名前, 個性, 個性の説明, 紹介]
+  const EN_CHARS = {
+    cleaner: ['Hajime the Cleaner', 'Floor Polishing Pro', 'Polishing radius while walking +40%', 'A legendary cleaner. A serious veteran who never misses a speck of dirt.'],
+    mizuki: ['Mizuki the Washer', 'Pressure Fanatic', 'Damage +15%', 'An impatient washer who loves her pressure washer.'],
+    runta: ['Runta the Robo', 'All-Terrain Wheels', 'Not slowed by dirty floors', 'A cleaning robot built from the blueprints in the storeroom.'],
+    koroko: ['Koroko the Roller', 'Good Picker', 'Pickup range +40%, dust box +40', 'A tidy-loving girl who inherited the legendary lint roller.'],
+    kiyoshi: ['Dr. Kiyoshi', 'Strong Immunity', 'Immune to allergies, +50% damage to mold', 'A doctor devoted to mold research. He was looking for his lost notebook.'],
+    tome: ['Grandma Tome', 'Wisdom of Age', 'Starts with 2 gears, XP +25%', 'The mansion\'s former caretaker. Slow on her feet, but nobody beats her wisdom and experience.'],
+  };
+  const EN_BONUS = {
+    speed: 'Move speed +10%',
+    magnet: 'Pickup range +25%',
+    hp: 'Max HP +20',
+    regen: 'Regenerate 0.5 HP/s',
+    might: 'Damage +10%',
+    cd: 'Attack interval −6%',
+    box: 'Dust box capacity +40',
+    armor: 'Damage taken −1',
+    area: 'Attack area +10%',
+    heal: 'Fully restores HP',
+  };
+  const EN_SHOP = {
+    hp: ['Health', 'Max HP +12'],
+    might: ['Power', 'Damage +8%'],
+    clean: ['Cleaning Power', 'Walking polish radius +12%, gear polish area +6%'],
+    speed: ['Move Speed', 'Move speed +4%'],
+    armor: ['Defense', 'Damage taken −1'],
+    regen: ['Regeneration', 'Regenerate 0.2 HP/s'],
+    magnet: ['Pickup Range', 'Pickup range +10%'],
+    xp: ['Experience', 'XP gained +8%'],
+    box: ['Dust Box', 'Capacity +20'],
+    coin: ['Coins', 'Coins earned +10%'],
+    reroll: ['Reroll', 'Level-up rerolls +1'],
+    choices: ['Choices', 'Level-up choices 3 → 4'],
+  };
+  // ステージごとに [名前, 説明, { 部屋: 名前 }, [宝物の名前, 説明]]
+  const EN_STAGES = [
+    ['The Trash House: 1st Floor', 'Around the living room. Mostly dust, paper and cans.',
+      { genkan: 'Entrance', rouka: 'Hallway', living: 'Living Room', washitsu: 'Tatami Room', dining: 'Dining Room' },
+      ['Family Album', 'An old album of the mansion\'s family, found under the trash.']],
+    ['The Cursed Kitchen', 'Lots of grease and garbage. Drains spew grease and the floor gets filthy fast.',
+      { rouka: 'Hallway', dining: 'Dining Room', kitchen: 'Kitchen', pantry: 'Pantry', laundry: 'Laundry Room', katte: 'Back Door' },
+      ['Golden Faucet', 'A shiny faucet of pure gold. A certain water expert has always wanted one.']],
+    ['The Moldy Washrooms', 'Full of mold spores. The bathroom floor is slippery.',
+      { rouka: 'Hallway', bath: 'Bathroom', datsui: 'Changing Room', toilet: 'Toilet', senmen: 'Washroom' },
+      ['Pearl Soap', 'A mysterious soap whose bubbles shine like pearls.']],
+    ['The Sealed Storeroom & 2nd Floor', 'The storeroom and closet are packed with cardboard, and the paths are narrow.',
+      { kids: 'Kids\' Room', study: 'Study', hall: 'Stair Hall', storage: 'Storeroom', nando: 'Closet' },
+      ['Robot Blueprints', 'Blueprints of a cleaning robot, stashed deep in the storeroom.']],
+    ['The Overgrown Garden', 'A garden divided by hedges. The pond is full of mold.',
+      { gate: 'Gate', path: 'Path', front: 'Front Yard', flower: 'Flower Bed', yard: 'Laundry Yard', shed: 'Shed', pond: 'Pondside' },
+      ['Four-Leaf Clover', 'A lucky four-leaf clover, the only one growing by the pond.']],
+    ['The Dusty Attic', 'An attic swirling with dust and hair. Cardboard everywhere.',
+      { stairs: 'Attic Stairs', passage: 'Passage', oldclothes: 'Old Clothes Room', chests: 'Chest Storage', skylight: 'Skylight Room', nook: 'Nook', secret: 'Secret Room' },
+      ['Legendary Lint Roller', 'A legendary lint roller said to pick up any kind of trash.']],
+    ['The Basement Boiler Room', 'A basement overrun by grease and mold. The boiler room is full of drains.',
+      { under: 'Under the Stairs', corridor: 'Basement Corridor', cellar: 'Wine Cellar', washroom: 'Wash Area', boiler: 'Boiler Room', store: 'Storage' },
+      ['Old Pocket Watch', 'A pocket watch found behind the boiler. It still ticks.']],
+    ['The Junk Garage', 'A garage littered with cans and bottles. The back shed is a mountain of boxes.',
+      { side: 'Side Door', bench: 'Workbench', garage: 'Garage', tools: 'Tool Corner', tires: 'Tire Pile', back: 'Back Shed' },
+      ['Dr. Sanitizer\'s Notebook', 'Notes of a doctor who fought mold for years. Its owner is looking for it.']],
+    ['The Haunted Banquet Hall', 'The great hall after the feast. Heaps of garbage and grease.',
+      { lobby: 'Lobby', cloak: 'Cloakroom', pantry: 'Serving Room', hall: 'Banquet Hall', stage: 'Stage', green: 'Green Room' },
+      ['Silver Candlestick', 'A candlestick left on the stage. The ghosts\' favorite.']],
+    ['The Master\'s Hall', 'The final stage, where every kind of trash appears. The boss is the Lord of the Trash House.',
+      { shoko: 'Library', bedroom: 'Bedroom', closet: 'Wardrobe', hall: 'Great Hall', master: 'Master\'s Room' },
+      ['Mansion Key', 'An old key that opens every door in the mansion. It belonged to the former caretaker.']],
+  ];
+
+  // 英語の名前と説明を、それぞれのデータの .en に入れる
+  for (const k in EN_ENEMIES) ENEMIES[k].en = { name: EN_ENEMIES[k][0], desc: EN_ENEMIES[k][1] };
+  for (const k in EN_WEAPONS) WEAPONS[k].en = { name: EN_WEAPONS[k][0], desc: EN_WEAPONS[k][1], lvText: EN_WEAPONS[k][2] };
+  for (const k in EN_EVOS) EVOS[k].en = { name: EN_EVOS[k][0], desc: EN_EVOS[k][1] };
+  for (const k in EN_PASSIVES) PASSIVES[k].en = { name: EN_PASSIVES[k][0], desc: EN_PASSIVES[k][1] };
+  for (const c of CHARS) {
+    const [name, trait, traitDesc, desc] = EN_CHARS[c.id];
+    c.en = { name, trait, traitDesc, desc };
+  }
+  for (const it of SHOP) it.en = { name: EN_SHOP[it.id][0], desc: EN_SHOP[it.id][1] };
+  MODES.normal.en = { name: 'Normal' };
+  MODES.hard.en = { name: 'Hard' };
+  STAGES.forEach((st, i) => {
+    const [name, desc, rooms, [tName, tDesc]] = EN_STAGES[i];
+    st.en = { name, desc };
+    for (const r of st.rooms) r.en = { name: rooms[r.id] };
+    st.treasure.en = { name: tName, desc: tDesc };
+  });
+  const bonusText = (key) => (lang === 'en' ? EN_BONUS[key] : ROOM_BONUS[key]);
+  // ギアのレベルアップの説明 (レベル lv → lv+1)
+  const lvText = (id, lv) => (lang === 'en' ? WEAPONS[id].en.lvText[lv - 1] : WEAPONS[id].lv[lv - 1][1]);
+
+  // ---- 画面の文言 ----
+  const TEXT = {
+    ja: {
+      pageTitle: 'おそうじサバイバー',
+      pageDesc: '押し寄せるゴミと汚れを、清掃ギアで一気に片付けるヴァンサバ風アクション。全10ステージ・ノーマルとハード。汚れレベルの違う部屋を、10分以内に全部ピカピカにしよう。',
+      gameTitle: 'おそうじサバイバー',
+      backToGames: '‹ ゲーム一覧',
+      pause: '一時停止',
+      compress: 'ゴミ圧縮',
+      board: 'ゲーム画面',
+      // プレイ中
+      warn: (name) => `警報! ${name}が近づいている!`,
+      rush: '大群ラッシュ!',
+      tooTough: 'かたい! まわりを掃除しよう',
+      shieldDmg: (n) => `ダメージ ${n}%`,
+      shieldNone: 'バリアなし',
+      bossDown: (name) => `${name}を片付けた!`,
+      srcLeft: (room, n) => `発生源を潰した! (${room} 残り ${n})`,
+      srcAll: (room) => `${room}の発生源を全部潰した!`,
+      dumped: (c) => `ゴミ捨て完了! +${c} コイン`,
+      compressBang: 'ゴミ圧縮!',
+      roomDone: (room, bonus) => `${room} ピカピカ完了! ${bonus}`,
+      roomTreasure: (room) => `${room} ピカピカ完了! 宝物が現れた!`,
+      timeUp: '時間切れ…',
+      allClean: '全部屋 清掃完了!',
+      dumpLabel: 'ゴミ',
+      hudDone: (room) => `${room} 完了!`,
+      hudRooms: (d, n) => `部屋 ${d}/${n} 完了`,
+      hudSrc: (s, d, n) => `発生源 ${s} ・ 部屋 ${d}/${n} 完了`,
+      hudKills: (k) => `片付け ${k}`,
+      hudHp: (a, b) => `体力 ${a}/${b}`,
+      hudBoxFull: 'ダストボックス 満タン!',
+      hudBox: (a, b) => `ダストボックス ${a}/${b}`,
+      // メニュー
+      completion: '達成率',
+      completionMeta: (c, ct, tr, tt) => `クリア ${c}/${ct} ・ 宝物 ${tr}/${tt}`,
+      logoSmall: 'CLEANING SURVIVORS',
+      logo: 'おそうじ<br>サバイバー',
+      tagline: '押し寄せるゴミと汚れを、清掃ギアで一気に片付けろ!',
+      play: 'はじめる',
+      cleaners: '清掃員',
+      achievements: '実績',
+      achClears: '清掃員ごとのクリア状況 (おまけ)',
+      settings: '設定',
+      stageSelect: 'ステージを選ぶ',
+      recordOf: (name) => `${name} の記録`,
+      coins: 'コイン',
+      hardNote: 'ハード: ゴミの HP ×1.7・ダメージ ×1.5・数 ×1.2、発生源の HP ×1.4。コイン ×1.6。恒久スキルを上げてから挑もう',
+      lockedPrev: '前のステージをノーマルでクリアすると入れる',
+      lockedHard: 'このステージをノーマルでクリアすると挑戦できる',
+      bestRooms: (r, n) => `清掃した部屋 最高 ${r}/${n}`,
+      bestClear: (time) => `最速クリア ${time}`,
+      roomCount: (n) => `${n}部屋`,
+      badgeTreasure: '宝',
+      treasure: '宝物',
+      skills: '恒久スキル',
+      zukan: 'ゴミ図鑑',
+      toTitle: 'タイトルへ',
+      unlockText: (n, stage) => `ステージ${n}「${stage}」の宝物を見つけると仲間になる`,
+      trait: (name, desc) => `個性「${name}」 ${desc}`,
+      charStats: (hp, gears) => `体力 ${hp}・最初のギア: ${gears}`,
+      sep: '・',
+      stageTitle: (n, name) => `ステージ${n} ${name}`,
+      planAlt: '間取り図',
+      briefDesc: '<b>10分以内に全部屋の清掃を完了</b>すればクリア。部屋の<b>発生源</b>（赤い点）を全部潰して床をピカピカにすると、その部屋の清掃が完了し、宝箱と特典がもらえる。<b>★が多い部屋ほど汚れがキツく</b>、ゴミが多くて強い。弱いうちに入るとすぐやられるので、★の少ない部屋から片付けよう。発生源は<b>まわりが汚れているほど硬い</b>ので、まずまわりを磨こう。',
+      srcCount: (n) => `発生源 ${n}`,
+      treasureFoundLine: (name) => `宝物「${name}」 見つけた!`,
+      treasureHint: (st, room) => `宝物: ${st}の部屋「${room}」の清掃を完了すると見つかる`,
+      joined: (name) => `${name}が仲間になった`,
+      willJoin: 'この宝物を見つけると、新しい清掃員が仲間になる',
+      bossNote: (mid, boss) => `5分で中ボス「${mid}」、9分でボス「${boss}」が現れる。`,
+      cleared: 'クリア済み',
+      pickCleaner: '出撃する清掃員',
+      deploy: (mode) => `${mode}で出撃!`,
+      back: '戻る',
+      charsSub: '達成率には入らない、やりこみ用の記録。清掃員を選ぶと、ステージ・モードごとのクリア状況が見られる',
+      treasures: (a, b) => `宝物 (${a}/${b})`,
+      roomsCell: (r, n) => `${r}/${n}部屋`,
+      clears: (a, b) => `クリア ${a}/${b}`,
+      stage: 'ステージ',
+      useCleaner: 'この清掃員にする',
+      planStart: 'スタート',
+      paused: '一時停止',
+      pauseSub: (stage, left, d, n) => `${stage} ・ 残り ${left} ・ 清掃した部屋 ${d}/${n}`,
+      resume: '再開',
+      retry: 'やり直す',
+      toStages: 'ステージ選択へ',
+      onigiri: 'おにぎり',
+      onigiriDesc: '体力を 50 回復する',
+      savings: 'へそくり',
+      savingsDesc: 'コイン +10',
+      evoWith: (p) => `${p}で進化できる`,
+      evoChest: '宝箱を開けると進化!',
+      evoNeed: (p) => `${p}があれば進化できる`,
+      evoFor: (w) => `${w}の進化に必要`,
+      pickOne: '清掃ギアかパッシブを1つ選ぶ',
+      slots: (g, gm, p, pm) => `ギア ${g}/${gm} ・ パッシブ ${p}/${pm}`,
+      slotNote: (g, p) => `清掃ギアは${g}つ、パッシブは${p}つまでしか持てない。どれを組み合わせるかで、戦い方が変わる。`,
+      reroll: (n) => `選び直す (残り ${n})`,
+      treasureNew: '宝物を見つけた!',
+      owned: '（もう持っている）',
+      joinedBang: (name) => `${name}が仲間になった!`,
+      evolved: '進化!!',
+      evolvedText: (w, e, d) => `${w}が「${e}」に進化した! ${d}`,
+      chest: '宝箱',
+      coins30: 'コイン +30',
+      noteAllRooms: '全部屋の清掃を完了した!',
+      noteTreasure: (name) => `宝物「${name}」を見つけた!`,
+      noteStage: (n, name) => `ステージ${n}「${name}」に入れるようになった!`,
+      noteHard: 'このステージのハードに挑戦できるようになった!',
+      noteAll: '屋敷じゅうをピカピカにした! おめでとう!',
+      noteFirst: (c, m) => `${c}で${m}を初クリア!`,
+      wornOut: '力尽きた…',
+      resultSub: (n, stage, mode, c) => `ステージ${n} ${stage} ・ ${mode} ・ ${c}`,
+      clearTime: 'クリアタイム',
+      playTime: 'プレイした時間',
+      roomsCleaned: '清掃した部屋',
+      houseClean: '清掃度 (家全体)',
+      kills: '片付けたゴミ',
+      level: 'レベル',
+      coinKills: 'コイン (片付け)',
+      coinClean: 'コイン (清掃度)',
+      coinDump: 'コイン (ゴミ捨て・宝箱)',
+      coinRoom: 'コイン (部屋・発生源)',
+      coinBoss: 'コイン (ボス)',
+      coinClear: 'コイン (クリア)',
+      coinMul: (hard) => `倍率 (${hard ? 'ハード・' : ''}恒久スキル)`,
+      total: '合計',
+      nextStage: '次のステージへ',
+      again: 'もう一度',
+      shopSub: 'どの清掃員にも、次のプレイからずっと効く',
+      max: '最大',
+      cost: (c) => `${c} コイン`,
+      killed: (n) => `片付けた数 ${n}`,
+      se: '効果音',
+      bgm: 'BGM',
+      shake: '画面の揺れ・フラッシュ',
+      haze: '汚れの靄',
+    },
+    en: {
+      pageTitle: 'Cleaning Survivors',
+      pageDesc: 'A Vampire Survivors-style action game: wipe out waves of trash and grime with auto-firing cleaning gear. 10 stages in Normal and Hard. Clean every room within 10 minutes.',
+      gameTitle: 'Cleaning Survivors',
+      backToGames: '‹ All games',
+      pause: 'Pause',
+      compress: 'Compress',
+      board: 'Game screen',
+      warn: (name) => `Warning! ${name} is approaching!`,
+      rush: 'Swarm rush!',
+      tooTough: 'Too tough! Clean around it',
+      shieldDmg: (n) => `DMG ${n}%`,
+      shieldNone: 'No barrier',
+      bossDown: (name) => `${name} cleaned up!`,
+      srcLeft: (room, n) => `Source destroyed! (${room}: ${n} left)`,
+      srcAll: (room) => `All sources in the ${room} destroyed!`,
+      dumped: (c) => `Trash dumped! +${c} coins`,
+      compressBang: 'Compress!',
+      roomDone: (room, bonus) => `${room} sparkling clean! ${bonus}`,
+      roomTreasure: (room) => `${room} sparkling clean! A treasure appeared!`,
+      timeUp: 'Time\'s up…',
+      allClean: 'All rooms cleaned!',
+      dumpLabel: 'TRASH',
+      hudDone: (room) => `${room} done!`,
+      hudRooms: (d, n) => `Rooms ${d}/${n} done`,
+      hudSrc: (s, d, n) => `Sources ${s} · Rooms ${d}/${n} done`,
+      hudKills: (k) => `Cleared ${k}`,
+      hudHp: (a, b) => `HP ${a}/${b}`,
+      hudBoxFull: 'Dust box FULL!',
+      hudBox: (a, b) => `Dust box ${a}/${b}`,
+      completion: 'Completion',
+      completionMeta: (c, ct, tr, tt) => `Clears ${c}/${ct} · Treasures ${tr}/${tt}`,
+      logoSmall: 'SCRUB · SWEEP · SURVIVE',
+      logo: 'CLEANING<br>SURVIVORS',
+      tagline: 'Wipe out waves of trash and grime with your cleaning gear!',
+      play: 'Play',
+      cleaners: 'Cleaners',
+      achievements: 'Achievements',
+      achClears: 'Clears by cleaner (bonus)',
+      settings: 'Settings',
+      stageSelect: 'Select a Stage',
+      recordOf: (name) => `${name}'s records`,
+      coins: 'Coins',
+      hardNote: 'Hard: trash HP ×1.7, damage ×1.5, count ×1.2; source HP ×1.4. Coins ×1.6. Raise your permanent skills first.',
+      lockedPrev: 'Clear the previous stage on Normal to enter',
+      lockedHard: 'Clear this stage on Normal to unlock Hard',
+      bestRooms: (r, n) => `Best rooms cleaned ${r}/${n}`,
+      bestClear: (time) => `Best clear ${time}`,
+      roomCount: (n) => `${n} rooms`,
+      badgeTreasure: 'T',
+      treasure: 'Treasure',
+      skills: 'Skills',
+      zukan: 'Trash Guide',
+      toTitle: 'Title',
+      unlockText: (n, stage) => `Joins when you find the treasure of Stage ${n}, "${stage}"`,
+      trait: (name, desc) => `Trait "${name}": ${desc}`,
+      charStats: (hp, gears) => `HP ${hp} · Starting gear: ${gears}`,
+      sep: ', ',
+      stageTitle: (n, name) => `Stage ${n}: ${name}`,
+      planAlt: 'Floor plan',
+      briefDesc: '<b>Clean every room within 10 minutes</b> to clear the stage. Destroy all the <b>sources</b> (red dots) in a room and polish its floor to finish that room and earn a chest and a bonus. <b>Rooms with more ★ are filthier</b>, with more and tougher trash. Enter them too early and you\'ll be overwhelmed, so start with the rooms with fewer ★. Sources <b>get tougher the dirtier their surroundings are</b>, so scrub around them first.',
+      srcCount: (n) => `Sources ${n}`,
+      treasureFoundLine: (name) => `Treasure "${name}" found!`,
+      treasureHint: (st, room) => `Treasure: finish cleaning the ${st} room "${room}" to find it`,
+      joined: (name) => `${name} has joined`,
+      willJoin: 'Finding this treasure unlocks a new cleaner',
+      bossNote: (mid, boss) => `The mid-boss "${mid}" appears at 5:00, and the boss "${boss}" at 9:00.`,
+      cleared: 'Cleared',
+      pickCleaner: 'Choose your cleaner',
+      deploy: (mode) => `Start (${mode})`,
+      back: 'Back',
+      charsSub: 'Extra records for completionists; they don\'t count toward completion. Select a cleaner to see their clears for each stage and mode',
+      treasures: (a, b) => `Treasures (${a}/${b})`,
+      roomsCell: (r, n) => `${r}/${n} rooms`,
+      clears: (a, b) => `Clears ${a}/${b}`,
+      stage: 'Stage',
+      useCleaner: 'Use this cleaner',
+      planStart: 'START',
+      paused: 'Paused',
+      pauseSub: (stage, left, d, n) => `${stage} · ${left} left · Rooms cleaned ${d}/${n}`,
+      resume: 'Resume',
+      retry: 'Restart',
+      toStages: 'Stage select',
+      onigiri: 'Rice Ball',
+      onigiriDesc: 'Restores 50 HP',
+      savings: 'Secret Savings',
+      savingsDesc: 'Coins +10',
+      evoWith: (p) => `Evolves with ${p}`,
+      evoChest: 'Open a chest to evolve!',
+      evoNeed: (p) => `Can evolve if you have ${p}`,
+      evoFor: (w) => `Needed to evolve the ${w}`,
+      pickOne: 'Choose a gear or a passive',
+      slots: (g, gm, p, pm) => `Gear ${g}/${gm} · Passives ${p}/${pm}`,
+      slotNote: (g, p) => `You can carry only ${g} pieces of gear and ${p} passives, so your combination decides how you fight.`,
+      reroll: (n) => `Reroll (${n} left)`,
+      treasureNew: 'Treasure found!',
+      owned: ' (already owned)',
+      joinedBang: (name) => `${name} has joined the team!`,
+      evolved: 'EVOLVED!!',
+      evolvedText: (w, e, d) => `The ${w} evolved into the "${e}"! ${d}`,
+      chest: 'Chest',
+      coins30: 'Coins +30',
+      noteAllRooms: 'Cleaned every room!',
+      noteTreasure: (name) => `Found the treasure "${name}"!`,
+      noteStage: (n, name) => `Stage ${n}, "${name}", is now open!`,
+      noteHard: 'Hard mode is now open for this stage!',
+      noteAll: 'The whole mansion is sparkling clean! Congratulations!',
+      noteFirst: (c, m) => `First ${m} clear with ${c}!`,
+      wornOut: 'Worn out…',
+      resultSub: (n, stage, mode, c) => `Stage ${n}: ${stage} · ${mode} · ${c}`,
+      clearTime: 'Clear time',
+      playTime: 'Play time',
+      roomsCleaned: 'Rooms cleaned',
+      houseClean: 'Cleanliness (whole house)',
+      kills: 'Trash cleared',
+      level: 'Level',
+      coinKills: 'Coins (trash)',
+      coinClean: 'Coins (cleanliness)',
+      coinDump: 'Coins (dumps & chests)',
+      coinRoom: 'Coins (rooms & sources)',
+      coinBoss: 'Coins (bosses)',
+      coinClear: 'Coins (clear)',
+      coinMul: (hard) => `Multiplier (${hard ? 'Hard, ' : ''}skills)`,
+      total: 'Total',
+      nextStage: 'Next stage',
+      again: 'Try again',
+      shopSub: 'Applies to every cleaner, from your next run on',
+      max: 'MAX',
+      cost: (c) => `${c} coins`,
+      killed: (n) => `Cleared ${n}`,
+      se: 'Sound effects',
+      bgm: 'Music',
+      shake: 'Screen shake & flash',
+      haze: 'Grime haze',
+    },
+  };
+
+  // 文言を取り出す。関数の文言は引数を渡して組み立てる
+  const t = (key, ...args) => {
+    const v = TEXT[lang][key] ?? TEXT.ja[key];
+    return typeof v === 'function' ? v(...args) : v;
+  };
+
   // 時間で起こること
   const EVENTS = [
     { t: 120, kind: 'elite' },
@@ -406,7 +900,7 @@
     rec: {},
     treasures: STAGES.map(() => false),
     kills: {},
-    settings: { se: 70, bgm: 50, shake: true },
+    settings: { se: 70, bgm: 50, shake: true, haze: true },
     char: 'cleaner',
     mode: 'normal',
   });
@@ -460,12 +954,13 @@
   const hardUnlocked = (i) => TEST_UNLOCK || stageCleared(i, 'normal');
   const charUnlocked = (c) => TEST_UNLOCK || c.unlock < 0 || save.treasures[c.unlock];
 
-  // 達成率 = (清掃員ごとの各ステージ・各モードのクリア + 宝物) ÷ その総数
+  // 達成率 = (各ステージ・各モードのクリア + 宝物) ÷ その総数。クリアはどの清掃員でもよい
+  // (清掃員ごとのクリア状況は、実績画面のおまけとして見せるだけで達成率には入れない)
   function completion() {
     let clears = 0;
-    for (const c of CHARS) for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (peekRec(c.id, i, m).c) clears++;
+    for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (stageCleared(i, m)) clears++;
     const tre = save.treasures.filter(Boolean).length;
-    const clearTotal = CHARS.length * STAGES.length * Object.keys(MODES).length;
+    const clearTotal = STAGES.length * Object.keys(MODES).length;
     return { pct: ((clears + tre) / (clearTotal + STAGES.length)) * 100, clears, clearTotal, tre, treTotal: STAGES.length };
   }
 
@@ -484,7 +979,7 @@
     let bgmGain;
     let noiseBuf;
     const last = {};
-    const GAP = { pop: 0.035, kyu: 0.06, hit: 0.045, suck: 0.09, shot: 0.08, hurt: 0.15, dump: 0.3 };
+    const GAP = { swing: 0.12, throw: 0.12, boom: 0.08, pop: 0.035, kyu: 0.06, hit: 0.045, suck: 0.09, shot: 0.08, hurt: 0.15, dump: 0.3 };
 
     function init() {
       if (ac) {
@@ -558,6 +1053,9 @@
         case 'hit': noise(0.05, 0.08, 'bandpass', 1800, 900, 0, 2); break;
         case 'suck': noise(0.14, 0.12, 'bandpass', 2600, 500, 0, 3); tone(300, 900, 0.1, 'triangle', 0.04); break;
         case 'shot': noise(0.18, 0.1, 'highpass', 3000, 1500, 0, 0.7); break;
+        case 'swing': noise(0.16, 0.1, 'bandpass', 700, 2400, 0, 1.5); break;
+        case 'throw': noise(0.12, 0.06, 'bandpass', 1400, 3200, 0, 2); break;
+        case 'boom': tone(160, 60, 0.2, 'sine', 0.1); noise(0.22, 0.1, 'lowpass', 2600, 300, 0, 1); break;
         case 'hurt': tone(220, 90, 0.18, 'sawtooth', 0.09); break;
         case 'level':
           [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0, 0.14, 'square', 0.05, i * 0.06));
@@ -1406,6 +1904,115 @@
         }
         break;
       }
+      case 'mop':
+      case 'tornado':
+        if (id === 'tornado') {
+          glow('rgba(110,220,255,0.7)');
+          c.strokeStyle = 'rgba(200,245,255,0.9)';
+          c.lineWidth = 3;
+          for (let k = 0; k < 3; k++) {
+            c.beginPath();
+            c.ellipse(32, 44 - k * 12, 26 - k * 6, 6, 0, 0.3, TAU - 0.3);
+            c.stroke();
+          }
+        }
+        c.strokeStyle = '#8a5a2b';
+        c.lineWidth = 5;
+        c.beginPath();
+        c.moveTo(48, 6);
+        c.lineTo(30, 40);
+        c.stroke();
+        c.fillStyle = '#f2f2ee';
+        for (let k = 0; k < 7; k++) {
+          c.beginPath();
+          c.roundRect(14 + k * 4.5, 40, 5, 18 - Math.abs(k - 3) * 1.5, 2.5);
+          c.fill();
+        }
+        c.fillStyle = '#3a8dde';
+        c.fillRect(16, 37, 30, 6);
+        break;
+      case 'duster':
+      case 'gale': {
+        if (id === 'gale') glow('rgba(255,200,90,0.7)');
+        c.strokeStyle = '#8a5a2b';
+        c.lineWidth = 5;
+        c.beginPath();
+        c.moveTo(52, 56);
+        c.lineTo(32, 32);
+        c.stroke();
+        const cols = id === 'gale' ? ['#ffcf4a', '#ff8ad8', '#7fc8ff'] : ['#ff9ab0', '#ffe08a', '#a8e6ff'];
+        for (let k = 0; k < 9; k++) {
+          const a = -2.4 + (k / 8) * 2.2;
+          c.fillStyle = cols[k % 3];
+          c.beginPath();
+          c.ellipse(28 + Math.cos(a) * 12, 28 + Math.sin(a) * 12, 13, 5, a, 0, TAU);
+          c.fill();
+        }
+        break;
+      }
+      case 'bomb':
+      case 'foam':
+        if (id === 'foam') glow('rgba(255,150,220,0.7)');
+        c.strokeStyle = id === 'foam' ? '#ffd1f0' : '#bfe9ff';
+        c.lineWidth = 2;
+        [[48, 16, 7], [56, 30, 5], [42, 8, 4], [14, 14, 5]].forEach(([x, y, r]) => {
+          c.beginPath();
+          c.arc(x, y, r, 0, TAU);
+          c.stroke();
+        });
+        c.fillStyle = id === 'foam' ? '#ff8ad8' : '#4fb6ff';
+        c.beginPath();
+        c.roundRect(18, 24, 26, 34, 7);
+        c.fill();
+        c.fillStyle = '#f4f6f8';
+        c.fillRect(25, 12, 12, 13);
+        c.fillStyle = 'rgba(255,255,255,0.85)';
+        c.fillRect(22, 36, 18, 10);
+        break;
+      case 'sponge':
+      case 'meteor':
+        if (id === 'meteor') {
+          glow('rgba(255,180,80,0.7)');
+          c.strokeStyle = 'rgba(255,220,140,0.8)';
+          c.lineWidth = 4;
+          c.beginPath();
+          c.moveTo(4, 8);
+          c.lineTo(22, 22);
+          c.moveTo(4, 26);
+          c.lineTo(18, 34);
+          c.stroke();
+        }
+        c.save();
+        c.translate(36, 36);
+        c.rotate(-0.35);
+        c.fillStyle = id === 'meteor' ? '#ffcf4a' : '#f6f3ea';
+        c.beginPath();
+        c.roundRect(-20, -14, 40, 28, 5);
+        c.fill();
+        c.fillStyle = id === 'meteor' ? '#ff8a5c' : '#6fd3a8';
+        c.fillRect(-20, 3, 40, 11);
+        c.restore();
+        break;
+      case 'wax':
+        c.fillStyle = '#e8c35a';
+        c.beginPath();
+        c.roundRect(16, 16, 32, 42, 6);
+        c.fill();
+        c.fillStyle = '#9a7a2a';
+        c.fillRect(24, 6, 16, 11);
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.beginPath();
+        c.moveTo(32, 26);
+        c.lineTo(35, 34);
+        c.lineTo(43, 37);
+        c.lineTo(35, 40);
+        c.lineTo(32, 48);
+        c.lineTo(29, 40);
+        c.lineTo(21, 37);
+        c.lineTo(29, 34);
+        c.closePath();
+        c.fill();
+        break;
       case 'battery':
         c.fillStyle = '#2f3a46';
         c.beginPath();
@@ -1742,6 +2349,7 @@
   const ctx = canvas.getContext('2d');
   const overlay = document.getElementById('overlay');
   const pauseBtn = document.getElementById('pause-btn');
+  const langBtn = document.getElementById('lang-btn');
   const bombBtn = document.getElementById('bomb-btn');
 
   const view = { w: 0, h: 0, dpr: 1, zoom: 1, ww: 0, wh: 0 };
@@ -1894,6 +2502,11 @@
       bullets: [],
       clouds: [],
       beams: [],
+      swings: [],
+      booms: [],
+      bombs: [],
+      blasts: [],
+      sponges: [],
       parts: [],
       trail: [],
       dumps: [],
@@ -1914,6 +2527,9 @@
       hitstop: 0,
       sparkBudget: 0,
       kyuStreak: 0,
+      eliteChestT: -99,
+      haze: 1,
+      hazeT: 0,
       kyuLast: -1,
       cam: { x: ROOM / 2, y: ROOM / 2 },
     };
@@ -2074,6 +2690,7 @@
           if (isBlocked(x, y) || Math.hypot(x - G.p.x, y - G.p.y) < 180) continue;
           const e = spawnEnemy(kind, x, y, { force: true, danger: r.danger });
           e.room = r.idx;
+          pendingShield.push(e);
           r.src++;
           r.src0++;
           G.srcTotal++;
@@ -2081,6 +2698,25 @@
         }
       });
     }
+    for (const e of pendingShield) e.shield = shieldMul(dirtiness(e.x, e.y, SHIELD_R, e.room));
+    pendingShield.length = 0;
+  }
+
+  // 床ができてから、発生源の汚れバリアの初めの強さを測る
+  const pendingShield = [];
+
+  // (x, y) のまわり半径 r の、部屋 room の床の汚れ具合 (0 = ピカピカ / 1 = 全部ドロドロ)
+  function dirtiness(x, y, r, room) {
+    let sum = 0;
+    let n = 0;
+    const r2 = r * r;
+    forTilesInBox(x - r, y - r, x + r, y + r, (i, cx, cy) => {
+      const v = G.dirt[i];
+      if (v === 255 || G.tileRoom[i] !== room || (cx - x) ** 2 + (cy - y) ** 2 > r2) return;
+      sum += v;
+      n++;
+    });
+    return n ? sum / n / 3 : 0;
   }
 
   const blockAt = (x, y) => clamp(Math.floor(y / BLOCK), 0, BN - 1) * BN + clamp(Math.floor(x / BLOCK), 0, BN - 1);
@@ -2342,7 +2978,8 @@
     const bn = G.bonus; // 清掃が完了した部屋の特典
     const cm = G.ch.mods; // 清掃員の個性
     s.maxHp = G.ch.hp + sh.hp * 12 + lv('boots') * 20 + bn.hp;
-    s.speed = 118 * G.ch.speed * (1 + sh.speed * 0.04 + bn.speed);
+    s.speed = 118 * G.ch.speed * (1 + sh.speed * 0.04 + bn.speed + lv('wax') * 0.06);
+    s.projSpeed = 1 + lv('wax') * 0.1;
     s.might = 1 + sh.might * 0.08 + lv('boiler') * 0.1 + bn.might + (cm.might || 0);
     s.cd = 1 - lv('battery') * 0.08 - bn.cd;
     s.area = 1 + lv('bleach') * 0.1 + bn.area;
@@ -2425,6 +3062,50 @@
           s.power = 3;
         }
         break;
+      case 'mop':
+        s.range *= st.area;
+        if (w.evo) {
+          s.angle = 360;
+          s.range += 24;
+          s.dmg *= 1.4;
+          s.cd = Math.max(0.35, s.cd * 0.55);
+          s.power = 3;
+        }
+        break;
+      case 'duster':
+        s.size *= st.area;
+        s.speed = 430 * st.projSpeed;
+        if (w.evo) {
+          s.count += 2;
+          s.size += 12;
+          s.len += 90;
+          s.dmg *= 1.5;
+          s.power = 2;
+        }
+        break;
+      case 'bomb':
+        s.radius *= st.area;
+        if (w.evo) {
+          s.radius += 24;
+          s.dmg *= 1.4;
+          s.count += 1;
+          s.foamR = s.radius * 0.85;
+          s.foamDur = 2.5 * st.dur;
+          s.foamDmg = s.dmg * 0.18;
+        }
+        break;
+      case 'sponge':
+        s.size *= Math.sqrt(st.area);
+        s.dur *= st.dur;
+        s.speed *= st.projSpeed;
+        if (w.evo) {
+          s.count += 2;
+          s.size += 8;
+          s.dur += 2;
+          s.dmg *= 1.6;
+          s.power = 3;
+        }
+        break;
       default: break;
     }
     return s;
@@ -2437,7 +3118,7 @@
     return w;
   }
 
-  const weaponName = (w) => (w.evo ? EVOS[WEAPONS[w.id].evo].name : WEAPONS[w.id].name);
+  const weaponName = (w) => (w.evo ? L(EVOS[WEAPONS[w.id].evo], 'name') : L(WEAPONS[w.id], 'name'));
   const weaponIcon = (w) => (w.evo ? WEAPONS[w.id].evo : w.id);
   const boxFull = () => G.box >= G.stats.boxCap;
   const dmgMul = () => (boxFull() ? 0.7 : 1);
@@ -2468,7 +3149,10 @@
     e.wx = -1;
     e.wy = -1;
     e.wanderT = 0;
+    e.shield = 1;
+    e.shieldT = 0;
     e.elite = !!opt.elite;
+    e.eventElite = !!opt.event;
     e.boss = !!def.boss;
     e.alive = true;
     e.flee = false;
@@ -2571,7 +3255,8 @@
   // ゴミを1つ (ホコリなら3つ) 湧かせる。home は住みかの部屋 (-1 は住みかなし = いつも追いかけてくる)
   function spawnGroup(x, y, danger, kind, home, src) {
     const type = pickWeighted(typeWeights(danger, kind));
-    const elite = Math.random() < DANGER[danger].elite;
+    // 金色のふちのゴミは、同時に ELITE_MAX 体まで (汚れのキツい部屋で群れて出て、宝箱が出過ぎないように)
+    const elite = Math.random() < DANGER[danger].elite && G.bosses.filter((b) => b.alive && b.elite && !b.eventElite).length < ELITE_MAX;
     const n = type === 'dust' && !elite ? 3 : 1;
     for (let k = 0; k < n; k++) {
       const e = spawnEnemy(type, x + (n > 1 ? rand(-14, 14) : 0), y + (n > 1 ? rand(-14, 14) : 0), { danger, elite, home });
@@ -2641,12 +3326,12 @@
     while (G.eventIdx < EVENTS.length && G.time >= EVENTS[G.eventIdx].t) {
       const ev = EVENTS[G.eventIdx++];
       if (ev.kind === 'warn') {
-        const name = ev.boss === 'yokai' ? ENEMIES.yokai.name : ENEMIES[G.stage.boss].name;
-        showBanner(`警報! ${name}が近づいている!`, '#ff6b6b', 2.5);
+        const name = L(ENEMIES[ev.boss === 'yokai' ? 'yokai' : G.stage.boss], 'name');
+        showBanner(t('warn', name), '#ff6b6b', 2.5);
         Sound.play('warn');
       } else if (ev.kind === 'elite') {
         const pos = spawnPos(60);
-        if (pos) spawnEnemy(pick(G.time < 200 ? ['paper', 'can'] : ['grease', 'bag', 'paper']), pos[0], pos[1], { elite: true, force: true });
+        if (pos) spawnEnemy(pick(G.time < 200 ? ['paper', 'can'] : ['grease', 'bag', 'paper']), pos[0], pos[1], { elite: true, force: true, event: true });
       } else if (ev.kind === 'midboss') {
         const pos = spawnPos(80);
         if (pos) spawnEnemy('yokai', pos[0], pos[1], { force: true });
@@ -2657,7 +3342,7 @@
       } else if (ev.kind === 'rush') {
         G.rushUntil = 540;
         G.rushT = 0;
-        showBanner('大群ラッシュ!', '#ffcf4a', 2);
+        showBanner(t('rush'), '#ffcf4a', 2);
       }
     }
   }
@@ -2718,6 +3403,12 @@
         if (e.dirtyT <= 0 && !e.flee) {
           e.dirtyT = 1;
           dirtyCircle(e.x, e.y, 70, 1, e.room);
+        }
+        // まわりの汚れ具合を測って、汚れバリアの強さを決める
+        e.shieldT -= dt;
+        if (e.shieldT <= 0) {
+          e.shieldT = 0.5;
+          e.shield = shieldMul(dirtiness(e.x, e.y, SHIELD_R, e.room));
         }
         continue;
       }
@@ -2882,6 +3573,14 @@
   function hurtEnemy(e, dmg, kx, ky) {
     if (!e.alive || e.flee) return;
     if (e.def.mold) dmg *= G.stats.moldMul;
+    if (e.def.source) {
+      dmg *= e.shield;
+      // 汚れバリアが強いうちは「かたい!」と知らせる
+      if (e.shield < 0.35 && G.time - (e.hardMsgT || -9) > 1.2) {
+        e.hardMsgT = G.time;
+        addText(e.x, e.y - e.r - 10, t('tooTough'), '#ffb37a');
+      }
+    }
     e.hp -= dmg;
     e.flash = 0.09;
     e.aggro = true;
@@ -2908,7 +3607,7 @@
       G.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 });
       G.items.push({ kind: 'heal', x: e.x + 40, y: e.y, t: 0 });
       G.bossCoins += def.boss === 'boss' ? 40 : 20;
-      showBanner(`${def.name}を片付けた!`, '#4fe0b6', 2.5);
+      showBanner(t('bossDown', L(def, 'name')), '#4fe0b6', 2.5);
       Sound.play('boss-down');
       G.shake = Math.max(G.shake, 14);
       if (G.bosses.every((b) => !b.boss)) Sound.bgm('main');
@@ -2921,13 +3620,21 @@
       const room = G.rooms[e.room];
       if (room) {
         room.src--;
-        showBanner(room.src > 0 ? `発生源を潰した! (${room.name} 残り ${room.src})` : `${room.name}の発生源を全部潰した!`, '#ffcf4a', 2);
+        showBanner(room.src > 0 ? t('srcLeft', L(room, 'name'), room.src) : t('srcAll', L(room, 'name')), '#ffcf4a', 2);
       }
       Sound.play('crush');
       G.shake = Math.max(G.shake, 8);
     } else if (e.elite) {
       dropGem(e.x, e.y, 2);
-      G.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 });
+      // 宝箱は、決まった時間に出るものは必ず、部屋で湧いたものは前の宝箱から ELITE_CHEST_GAP 秒たっていれば落とす
+      if (e.eventElite || G.time - G.eliteChestT >= ELITE_CHEST_GAP) {
+        G.eliteChestT = G.time;
+        G.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 });
+      } else {
+        dropGem(e.x + 12, e.y, 2);
+        dropGem(e.x - 12, e.y, 2);
+        if (Math.random() < 0.3) G.items.push({ kind: 'heal', x: e.x, y: e.y + 12, t: 0 });
+      }
     } else {
       dropGem(e.x, e.y, Math.min(2, def.gem + (Math.random() < DANGER[e.danger].upgrade ? 1 : 0)));
       if (def.gem === 2 && Math.random() < 0.04) G.items.push({ kind: 'heal', x: e.x + 10, y: e.y, t: 0 });
@@ -2960,6 +3667,10 @@
         case 'robot': updateRobot(w, s, dt, p); break;
         case 'spray': updateSpray(w, s, dt, p); break;
         case 'roller': updateRoller(w, s, dt, p); break;
+        case 'mop': updateMop(w, s, dt, p); break;
+        case 'duster': updateDuster(w, s, dt, p); break;
+        case 'bomb': updateBomb(w, s, dt, p); break;
+        case 'sponge': updateSponge(w, s, dt, p); break;
         default: break;
       }
     }
@@ -3209,6 +3920,224 @@
     w.rollers.length = s.count;
   }
 
+  // いちばん近いゴミの方向 (いなければ進む方向)
+  function aimNearest(p, r) {
+    let aim = p.face;
+    let best = r * r;
+    const n = query(p.x, p.y, r);
+    for (let k = 0; k < n; k++) {
+      const e = qbuf[k];
+      const d2 = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
+      if (d2 < best) {
+        best = d2;
+        aim = Math.atan2(e.y - p.y, e.x - p.x);
+      }
+    }
+    return aim;
+  }
+
+  function updateMop(w, s, dt, p) {
+    w.t -= dt;
+    if (w.t > 0) return;
+    w.t = s.cd;
+    const full = s.angle >= 360;
+    const aim = full ? w.ang + 2 : aimNearest(p, s.range * 1.8);
+    w.ang = aim;
+    const half = full ? Math.PI : ((s.angle / 2) * Math.PI) / 180;
+    const dmg = s.dmg * dmgMul();
+    const n = query(p.x, p.y, s.range + 70);
+    for (let k = 0; k < n; k++) {
+      const e = qbuf[k];
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d > s.range + e.r) continue;
+      if (!full && d > e.r && Math.abs(angleDiff(Math.atan2(dy, dx), aim)) > half + e.r / d) continue;
+      hurtEnemy(e, dmg, (dx / d) * 260, (dy / d) * 260);
+    }
+    cleanCone(p.x, p.y, aim, half, s.range, s.power);
+    // 振るたびに左右を入れ替えて、なぎ払う向きを見せる
+    w.side = -(w.side || 1);
+    G.swings.push({ x: p.x, y: p.y, a: aim, half, r: s.range, side: w.side, life: 0.22, max: 0.22, evo: w.evo });
+    Sound.play('swing');
+  }
+
+  function updateDuster(w, s, dt, p) {
+    w.t -= dt;
+    if (w.t > 0) return;
+    w.t = s.cd;
+    const base = aimNearest(p, s.len + 60);
+    for (let i = 0; i < s.count; i++) {
+      const a = base + (i - (s.count - 1) / 2) * 0.45;
+      G.booms.push({ x: p.x, y: p.y, a, d: 0, back: false, s, evo: w.evo, spin: rand(0, TAU), hits: new Set() });
+    }
+    Sound.play('throw');
+  }
+
+  function updateBomb(w, s, dt, p) {
+    w.t -= dt;
+    if (w.t > 0) return;
+    w.t = s.cd;
+    // ゴミがかたまっている所をねらう (候補をいくつか見て、まわりの数がいちばん多い所)
+    const n = query(p.x, p.y, 320);
+    for (let i = 0; i < s.count; i++) {
+      let tx = p.x + Math.cos(p.face) * 120;
+      let ty = p.y + Math.sin(p.face) * 120;
+      if (n) {
+        let best = -1;
+        for (let k = 0; k < 6; k++) {
+          const e = qbuf[(Math.random() * n) | 0];
+          let c = 0;
+          for (let j = 0; j < n; j++) if ((qbuf[j].x - e.x) ** 2 + (qbuf[j].y - e.y) ** 2 < s.radius * s.radius) c++;
+          if (c > best) {
+            best = c;
+            tx = e.x;
+            ty = e.y;
+          }
+        }
+      }
+      tx += rand(-12, 12) * i;
+      ty += rand(-12, 12) * i;
+      G.bombs.push({ x0: p.x, y0: p.y, x: p.x, y: p.y, tx: clamp(tx, 10, ROOM - 10), ty: clamp(ty, 10, ROOM - 10), t: 0, dur: 0.5 + i * 0.08, s, evo: w.evo });
+    }
+    Sound.play('throw');
+  }
+
+  function updateSponge(w, s, dt, p) {
+    w.t -= dt;
+    if (w.t > 0) return;
+    w.t = s.cd;
+    for (let i = 0; i < s.count; i++) {
+      const a = rand(0, TAU);
+      G.sponges.push({ x: p.x, y: p.y, vx: Math.cos(a) * s.speed, vy: Math.sin(a) * s.speed, life: s.dur, s, evo: w.evo, cleanT: 0, rot: 0 });
+    }
+  }
+
+  // はたき・洗剤ボム・スポンジ・モップのなぎ払い
+  function updateProjectiles(dt) {
+    const p = G.p;
+    for (let i = G.swings.length - 1; i >= 0; i--) {
+      G.swings[i].life -= dt;
+      if (G.swings[i].life <= 0) G.swings.splice(i, 1);
+    }
+    // はたき: 飛んでいって、戻ってくる
+    for (let i = G.booms.length - 1; i >= 0; i--) {
+      const b = G.booms[i];
+      const s = b.s;
+      b.spin += dt * 14;
+      if (!b.back) {
+        b.d += s.speed * dt;
+        b.x += Math.cos(b.a) * s.speed * dt;
+        b.y += Math.sin(b.a) * s.speed * dt;
+        if (b.d >= s.len || isBlocked(b.x, b.y)) {
+          b.back = true;
+          b.hits.clear(); // 帰りも当たる
+        }
+      } else {
+        const dx = p.x - b.x;
+        const dy = p.y - b.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < 16) {
+          G.booms.splice(i, 1);
+          continue;
+        }
+        const sp = s.speed * 1.15 * dt;
+        b.x += (dx / d) * Math.min(d, sp);
+        b.y += (dy / d) * Math.min(d, sp);
+      }
+      const dmg = s.dmg * dmgMul();
+      const m = query(b.x, b.y, s.size + 70);
+      for (let k = 0; k < m; k++) {
+        const e = qbuf[k];
+        if (b.hits.has(e)) continue;
+        const dx = e.x - b.x;
+        const dy = e.y - b.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d > s.size + e.r) continue;
+        b.hits.add(e);
+        hurtEnemy(e, dmg, (dx / d) * 120, (dy / d) * 120);
+      }
+      cleanCircle(b.x, b.y, s.size, s.power);
+      // 進化すると、通り道のダストを主人公へ送る
+      if (b.evo) {
+        const rr = (s.size + 20) ** 2;
+        for (const g of G.gems) if (!g.homing && (g.x - b.x) ** 2 + (g.y - b.y) ** 2 < rr) g.homing = true;
+      }
+    }
+    // 洗剤ボム: 弧を描いて飛び、着地ではじける
+    for (let i = G.bombs.length - 1; i >= 0; i--) {
+      const b = G.bombs[i];
+      b.t += dt;
+      const k = Math.min(1, b.t / b.dur);
+      b.x = b.x0 + (b.tx - b.x0) * k;
+      b.y = b.y0 + (b.ty - b.y0) * k;
+      b.h = Math.sin(k * Math.PI) * 50;
+      if (k < 1) continue;
+      G.bombs.splice(i, 1);
+      const s = b.s;
+      const dmg = s.dmg * dmgMul();
+      const m = query(b.x, b.y, s.radius + 70);
+      for (let q = 0; q < m; q++) {
+        const e = qbuf[q];
+        const dx = e.x - b.x;
+        const dy = e.y - b.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d > s.radius + e.r) continue;
+        hurtEnemy(e, dmg, (dx / d) * 200, (dy / d) * 200);
+      }
+      cleanCircle(b.x, b.y, s.radius, s.power);
+      G.blasts.push({ x: b.x, y: b.y, r: s.radius, life: 0.3, max: 0.3, evo: b.evo });
+      for (let q = 0; q < 10; q++) addPart(b.x, b.y, rand(-160, 160), rand(-160, 160), 0.5, rand(3, 6), b.evo ? '#ffd1f0' : '#d8f4ff', 'dot');
+      if (b.evo) G.zones.push({ kind: 'foam', x: b.x, y: b.y, r: s.foamR, life: s.foamDur, max: s.foamDur, tick: 0.2, dmg: s.foamDmg, power: 2 });
+      G.shake = Math.max(G.shake, 2);
+      Sound.play('boom');
+    }
+    for (let i = G.blasts.length - 1; i >= 0; i--) {
+      G.blasts[i].life -= dt;
+      if (G.blasts[i].life <= 0) G.blasts.splice(i, 1);
+    }
+    // スポンジ: 壁で跳ね返りながら飛び回る
+    for (let i = G.sponges.length - 1; i >= 0; i--) {
+      const b = G.sponges[i];
+      const s = b.s;
+      b.life -= dt;
+      if (b.life <= 0) {
+        G.sponges.splice(i, 1);
+        continue;
+      }
+      b.rot += dt * 6;
+      const nx = b.x + b.vx * dt;
+      const ny = b.y + b.vy * dt;
+      if (nx < s.size || nx > ROOM - s.size || isBlocked(nx, b.y)) b.vx = -b.vx;
+      else b.x = nx;
+      if (ny < s.size || ny > ROOM - s.size || isBlocked(b.x, ny)) b.vy = -b.vy;
+      else b.y = ny;
+      // 主人公から離れすぎたら、主人公の方へ跳ね返る
+      if (Math.hypot(b.x - p.x, b.y - p.y) > 420) {
+        const a = Math.atan2(p.y - b.y, p.x - b.x) + rand(-0.5, 0.5);
+        b.vx = Math.cos(a) * s.speed;
+        b.vy = Math.sin(a) * s.speed;
+      }
+      const dmg = s.dmg * dmgMul();
+      const m = query(b.x, b.y, s.size + 70);
+      for (let k = 0; k < m; k++) {
+        const e = qbuf[k];
+        if (e.spongeHit > G.time) continue;
+        const dx = e.x - b.x;
+        const dy = e.y - b.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d > s.size + e.r) continue;
+        e.spongeHit = G.time + 0.3;
+        hurtEnemy(e, dmg, (dx / d) * 80, (dy / d) * 80);
+      }
+      b.cleanT -= dt;
+      if (b.cleanT <= 0) {
+        b.cleanT = 0.06;
+        cleanCircle(b.x, b.y, s.size + 6, s.power);
+      }
+    }
+  }
+
   // 主人公が通った道のりで、dist だけ後ろの点
   function trailPoint(dist) {
     const tr = G.trail;
@@ -3245,7 +4174,7 @@
       }
       z.tick -= dt;
       if (z.tick > 0) continue;
-      z.tick = z.kind === 'vortex' ? 0.25 : 0.4;
+      z.tick = z.kind === 'vortex' ? 0.25 : z.kind === 'foam' ? 0.3 : 0.4;
       const dmg = z.dmg * dmgMul();
       const n = query(z.x, z.y, z.r + 70);
       for (let k = 0; k < n; k++) {
@@ -3253,7 +4182,7 @@
         const dx = e.x - z.x;
         const dy = e.y - z.y;
         if (dx * dx + dy * dy > (z.r + e.r) ** 2) continue;
-        const mul = z.kind !== 'vortex' && e.def.mold ? 2 : 1;
+        const mul = (z.kind === 'spray' || z.kind === 'acid') && e.def.mold ? 2 : 1;
         hurtEnemy(e, dmg * mul, 0, 0);
       }
       cleanCircle(z.x, z.y, z.kind === 'vortex' ? z.r * 0.7 : z.r, z.power);
@@ -3490,7 +4419,7 @@
       G.dumpCoins += coins;
       G.box = 0;
       Sound.play('dump');
-      showBanner(`ゴミ捨て完了! +${coins} コイン`, '#ffcf4a', 1.6);
+      showBanner(t('dumped', coins), '#ffcf4a', 1.6);
       puff(d.x, d.y, '#c7b48a', 14);
     }
   }
@@ -3521,7 +4450,7 @@
       const sp = rand(150, 420);
       addPart(p.x, p.y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.4, 0.8), rand(4, 8), pick(['#c7b48a', '#8a7a58', '#d8d2c6']), 'cube');
     }
-    showBanner('ゴミ圧縮!', '#ffcf4a', 1.2);
+    showBanner(t('compressBang'), '#ffcf4a', 1.2);
   }
 
   // ===================================================================
@@ -3583,6 +4512,19 @@
     }
   }
 
+  // 汚れの靄: いる部屋のまわりの汚れ (6割) と、家全体の汚れ (4割) で濃さが決まる。きれいにすると晴れていく
+  function updateHaze(dt) {
+    G.hazeT -= dt;
+    if (G.hazeT <= 0) {
+      G.hazeT = 0.25;
+      const p = G.p;
+      const local = dirtiness(p.x, p.y, 320, roomAt(p.x, p.y));
+      const house = 1 - cleanPct() / 100;
+      G.hazeTarget = clamp((local * 0.6 + house * 0.4 - 0.08) / 0.6, 0, 1);
+    }
+    G.haze += ((G.hazeTarget ?? G.haze) - G.haze) * Math.min(1, dt * 0.9);
+  }
+
   // ===================================================================
   // 1フレームの更新
   // ===================================================================
@@ -3604,6 +4546,7 @@
         buildFlow();
       }
       updateSpawns(dt);
+      updateHaze(dt);
     } else {
       G.endT += dt;
     }
@@ -3627,6 +4570,7 @@
     separate();
     if (G.state === 'play') {
       updateWeapons(dt);
+      updateProjectiles(dt);
       updateZones(dt);
       updateHazards(dt);
       playerContacts();
@@ -3693,7 +4637,7 @@
       G.items.push({ kind: 'treasure', x: spot.x, y: spot.y, t: 0 });
       for (let k = 0; k < 30; k++) addPart(spot.x, spot.y, rand(-120, 120), rand(-160, -20), rand(0.6, 1.2), rand(3, 6), pick(['#ffd34a', '#fff3b0', '#ffffff']), 'twinkle');
     }
-    showBanner(r.id === G.stage.treasure.room ? `${r.name} ピカピカ完了! 宝物が現れた!` : `${r.name} ピカピカ完了! ${ROOM_BONUS[r.bonus]}`, '#4fe0b6', 3);
+    showBanner(r.id === G.stage.treasure.room ? t('roomTreasure', L(r, 'name')) : t('roomDone', L(r, 'name'), bonusText(r.bonus)), '#4fe0b6', 3);
     Sound.play('room-clear');
     G.shake = Math.max(G.shake, 6);
   }
@@ -3703,7 +4647,7 @@
     G.timeUp = true;
     G.endT = 0;
     G.time = GAME_TIME;
-    showBanner('時間切れ…', '#ff6b6b', 2);
+    showBanner(t('timeUp'), '#ff6b6b', 2);
     Sound.bgm(null);
     Sound.play('lose');
   }
@@ -3717,7 +4661,7 @@
     }
     G.bullets.length = 0;
     G.clouds.length = 0;
-    showBanner('全部屋 清掃完了!', '#4fe0b6', 2.6);
+    showBanner(t('allClean'), '#4fe0b6', 2.6);
     Sound.bgm(null);
     Sound.play('win');
   }
@@ -3732,7 +4676,7 @@
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (!G) return;
     const p = G.p;
-    const t = now / 1000;
+    const tm = now / 1000;
     // カメラ
     const cam = G.cam;
     cam.x = view.ww >= ROOM ? ROOM / 2 : clamp(p.x, view.ww / 2, ROOM - view.ww / 2);
@@ -3782,7 +4726,7 @@
       const [cx, cy] = roomPoint(r.rect, 0.5, 0.5);
       if (!inView(cx, cy, 200)) continue;
       ctx.fillStyle = r.done ? 'rgba(79,224,182,0.35)' : 'rgba(0,0,0,0.16)';
-      ctx.fillText(r.done ? `${r.name} ✓` : r.name, cx, cy);
+      ctx.fillText(r.done ? `${L(r, 'name')} ✓` : L(r, 'name'), cx, cy);
       if (!r.done) {
         ctx.font = '900 22px system-ui, sans-serif';
         ctx.fillStyle = r.danger >= 4 ? 'rgba(160,20,20,0.3)' : 'rgba(0,0,0,0.16)';
@@ -3857,7 +4801,7 @@
       ctx.fillStyle = '#fff';
       ctx.font = '700 9px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('ゴミ', d.x, d.y + 4);
+      ctx.fillText(t('dumpLabel'), d.x, d.y + 4);
       if (d.t > 0) {
         ctx.strokeStyle = '#ffcf4a';
         ctx.lineWidth = 5;
@@ -3900,7 +4844,23 @@
         ctx.lineWidth = 2;
         for (let k = 0; k < 3; k++) {
           ctx.beginPath();
-          ctx.arc(zn.x, zn.y, zn.r * (0.3 + k * 0.22), t * 6 + k * 2, t * 6 + k * 2 + 2.2);
+          ctx.arc(zn.x, zn.y, zn.r * (0.3 + k * 0.22), tm * 6 + k * 2, tm * 6 + k * 2 + 2.2);
+          ctx.stroke();
+        }
+      } else if (zn.kind === 'foam') {
+        // 泡: 白とピンクの泡がふくらんだりしぼんだりする
+        ctx.fillStyle = `rgba(255,240,250,${0.18 * a})`;
+        ctx.beginPath();
+        ctx.arc(zn.x, zn.y, zn.r, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255,200,235,${0.75 * a})`;
+        ctx.lineWidth = 1.5;
+        for (let k = 0; k < 9; k++) {
+          const ang = k * 2.4;
+          const rr = zn.r * (0.15 + ((k * 0.37) % 0.75));
+          const br = 4 + ((k * 3) % 5) + Math.sin(tm * 4 + k) * 1.5;
+          ctx.beginPath();
+          ctx.arc(zn.x + Math.cos(ang) * rr, zn.y + Math.sin(ang) * rr, br, 0, TAU);
           ctx.stroke();
         }
       } else {
@@ -3913,8 +4873,8 @@
         ctx.lineWidth = 1.5;
         ctx.stroke();
         for (let k = 0; k < 4; k++) {
-          const ang = k * 1.7 + t * 1.5;
-          const rr = zn.r * (0.3 + ((k * 0.23 + t * 0.4) % 0.6));
+          const ang = k * 1.7 + tm * 1.5;
+          const rr = zn.r * (0.3 + ((k * 0.23 + tm * 0.4) % 0.6));
           ctx.beginPath();
           ctx.arc(zn.x + Math.cos(ang) * rr, zn.y + Math.sin(ang) * rr, 2.5, 0, TAU);
           ctx.stroke();
@@ -3993,6 +4953,27 @@
       ctx.save();
       ctx.translate(e.x, e.y);
       if (e.flee) ctx.globalAlpha = Math.max(0, 1 - G.endT / 1.5);
+      if (e.def.source && e.shield < 0.98) {
+        // 汚れバリア: 強いほど濃く、ぶ厚く見せる
+        const k = (1 - e.shield) / (1 - SHIELD_MIN);
+        const g = ctx.createRadialGradient(0, 0, e.r * 0.6, 0, 0, e.r * (1.5 + k * 0.5));
+        g.addColorStop(0, `rgba(70,50,30,${0.05 + k * 0.25})`);
+        g.addColorStop(0.75, `rgba(90,62,34,${0.15 + k * 0.45})`);
+        g.addColorStop(1, 'rgba(90,62,34,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, e.r * (1.5 + k * 0.5), 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(150,110,60,${0.25 + k * 0.5})`;
+        ctx.lineWidth = 1.5 + k * 3;
+        ctx.beginPath();
+        for (let a = 0; a <= TAU + 0.01; a += TAU / 24) {
+          const rr = e.r * (1.3 + k * 0.35) + Math.sin(a * 5 + e.t * 3) * (2 + k * 3);
+          if (a === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+          else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        }
+        ctx.stroke();
+      }
       if (e.def.source) {
         // 発生源は赤い点線の輪で目立たせる
         ctx.strokeStyle = `rgba(255,90,90,${0.55 + Math.sin(e.t * 5) * 0.25})`;
@@ -4022,6 +5003,7 @@
         ctx.fillStyle = '#ff6b6b';
         ctx.fillRect(e.x - e.r, e.y - e.r * 1.3 - 6, e.r * 2 * Math.max(0, e.hp / e.maxHp), 4);
       }
+      if (e.def.source && !e.flee) drawShieldBadge(e);
     }
     // 掃除機の吸引範囲
     for (const w of G.weapons) {
@@ -4049,7 +5031,7 @@
     if (G.state !== 'dead' || G.timeUp || G.endT < 0.3) {
       ctx.save();
       ctx.translate(p.x, p.y);
-      if (p.inv > 0 && Math.floor(t * 20) % 2) ctx.globalAlpha = 0.6;
+      if (p.inv > 0 && Math.floor(tm * 20) % 2) ctx.globalAlpha = 0.6;
       const vac = G.ch.id === 'cleaner' && G.weapons.find((w) => w.id === 'vacuum');
       drawPlayerBody(ctx, G.ch.id, vac ? vac.ang : p.face, p.anim, p.moving, p.hurtT > 0);
       if (p.allergyT > 0) {
@@ -4067,7 +5049,7 @@
       for (const b of w.bots) {
         ctx.save();
         ctx.translate(b.x, b.y);
-        ctx.rotate(t * 4);
+        ctx.rotate(tm * 4);
         const r = w.s.size;
         ctx.fillStyle = '#3a4350';
         ctx.beginPath();
@@ -4092,6 +5074,98 @@
         ctx.fill();
         ctx.restore();
       }
+    }
+
+    // モップのなぎ払い
+    for (const sw of G.swings) {
+      const a = sw.life / sw.max;
+      const prog = 1 - a;
+      ctx.strokeStyle = sw.evo ? `rgba(120,230,255,${0.7 * a})` : `rgba(235,245,255,${0.6 * a})`;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 14;
+      ctx.beginPath();
+      if (sw.half >= Math.PI) {
+        ctx.arc(sw.x, sw.y, sw.r * 0.8, sw.a, sw.a + TAU * prog);
+      } else {
+        // 片側から反対側へ振り抜く
+        const from = sw.a - sw.half * sw.side;
+        const to = from + 2 * sw.half * sw.side * prog;
+        ctx.arc(sw.x, sw.y, sw.r * 0.8, Math.min(from, to), Math.max(from, to));
+      }
+      ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = `rgba(255,255,255,${0.8 * a})`;
+      ctx.stroke();
+    }
+
+    // はたき
+    for (const b of G.booms) {
+      if (!inView(b.x, b.y, 30)) continue;
+      const sz = b.s.size;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.spin);
+      ctx.strokeStyle = '#8a5a2b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-sz * 1.1, 0);
+      ctx.lineTo(0, 0);
+      ctx.stroke();
+      const cols = b.evo ? ['#ffcf4a', '#ff8ad8', '#7fc8ff'] : ['#ff9ab0', '#ffe08a', '#a8e6ff'];
+      for (let k = 0; k < 7; k++) {
+        const fa = (k / 7) * TAU;
+        ctx.fillStyle = cols[k % 3];
+        ctx.beginPath();
+        ctx.ellipse(Math.cos(fa) * sz * 0.45, Math.sin(fa) * sz * 0.45, sz * 0.55, sz * 0.25, fa, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 洗剤ボム (影と、弧を描くボトル)
+    for (const b of G.bombs) {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(b.x, b.y + 4, 8, 4, 0, 0, TAU);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(b.x, b.y - b.h);
+      ctx.rotate(b.t * 12);
+      ctx.fillStyle = b.evo ? '#ff8ad8' : '#4fb6ff';
+      ctx.beginPath();
+      ctx.roundRect(-6, -8, 12, 16, 3);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(-3, -12, 6, 5);
+      ctx.restore();
+    }
+    for (const bl of G.blasts) {
+      const a = bl.life / bl.max;
+      const r = bl.r * (1.1 - a * 0.4);
+      ctx.fillStyle = bl.evo ? `rgba(255,200,240,${0.45 * a})` : `rgba(200,240,255,${0.45 * a})`;
+      ctx.beginPath();
+      ctx.arc(bl.x, bl.y, r, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255,255,255,${0.9 * a})`;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // スポンジ
+    for (const b of G.sponges) {
+      if (!inView(b.x, b.y, 30)) continue;
+      const sz = b.s.size;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.globalAlpha = Math.min(1, b.life / 0.3);
+      ctx.fillStyle = b.evo ? '#ffcf4a' : '#f6f3ea';
+      ctx.beginPath();
+      ctx.roundRect(-sz, -sz * 0.7, sz * 2, sz * 1.4, 3);
+      ctx.fill();
+      ctx.fillStyle = b.evo ? '#ff8a5c' : '#6fd3a8';
+      ctx.fillRect(-sz, sz * 0.15, sz * 2, sz * 0.55);
+      ctx.restore();
     }
 
     // 水流
@@ -4176,6 +5250,7 @@
 
     // ここから画面の座標
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (save.settings.haze && G.haze > 0.02) drawHaze(tm, (p.x - cam.x) * view.zoom + view.w / 2, (p.y - cam.y) * view.zoom + view.h / 2);
     if (G.flash > 0 && save.settings.shake) {
       ctx.fillStyle = `rgba(255,255,255,${G.flash * 1.6})`;
       ctx.fillRect(0, 0, view.w, view.h);
@@ -4192,7 +5267,121 @@
     for (const it of G.items) {
       if ((it.kind === 'chest' || it.kind === 'treasure') && !inView(it.x, it.y, 0)) offscreenArrow(it.x, it.y, '#ffcf4a');
     }
-    drawHud(t);
+    drawHud(tm);
+  }
+
+  // ---- 汚れの靄 ----
+  // 茶色がかったもやの模様 (つなぎ目が目立たないように、はみ出した分を反対側にも描く)
+  let hazeTex = null;
+  function hazeTexture() {
+    if (hazeTex) return hazeTex;
+    const S = 256;
+    hazeTex = document.createElement('canvas');
+    hazeTex.width = hazeTex.height = S;
+    const c = hazeTex.getContext('2d');
+    for (let i = 0; i < 70; i++) {
+      const x = rand(0, S);
+      const y = rand(0, S);
+      const r = rand(18, 70);
+      const a = rand(0.08, 0.22);
+      for (const ox of [-S, 0, S]) {
+        for (const oy of [-S, 0, S]) {
+          const g = c.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+          g.addColorStop(0, `rgba(150,128,96,${a})`);
+          g.addColorStop(1, 'rgba(150,128,96,0)');
+          c.fillStyle = g;
+          c.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+        }
+      }
+    }
+    return hazeTex;
+  }
+
+  // 靄は小さなキャンバスに描いてから引き伸ばす (軽くするため)。主人公のまわりは少し薄くして、足元が見えるようにする
+  const hazeCv = document.createElement('canvas');
+  const hazeCtx = hazeCv.getContext('2d');
+  function drawHaze(tm, px, py) {
+    const k = 4;
+    const w = Math.ceil(view.w / k);
+    const h = Math.ceil(view.h / k);
+    if (hazeCv.width !== w || hazeCv.height !== h) {
+      hazeCv.width = w;
+      hazeCv.height = h;
+    }
+    const c = hazeCtx;
+    c.globalCompositeOperation = 'source-over';
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = 'rgba(120,102,78,0.55)';
+    c.fillRect(0, 0, w, h);
+    // ゆっくり流れる2枚のもや (カメラに少しついてくる)
+    const pat = c.createPattern(hazeTexture(), 'repeat');
+    c.fillStyle = pat;
+    for (const [sp, sc, al] of [[6, 0.5, 1], [-4, 0.75, 0.8]]) {
+      const ox = (tm * sp - G.cam.x * 0.15) * sc;
+      const oy = (tm * sp * 0.4 - G.cam.y * 0.15) * sc;
+      c.save();
+      c.globalAlpha = al;
+      c.scale(sc, sc);
+      c.translate(ox % 256, oy % 256);
+      c.fillRect(-256, -256, w / sc + 512, h / sc + 512);
+      c.restore();
+    }
+    c.globalCompositeOperation = 'destination-out';
+    const rr = Math.min(w, h) * 0.42;
+    const g = c.createRadialGradient(px / k, py / k, 0, px / k, py / k, rr);
+    g.addColorStop(0, 'rgba(0,0,0,0.75)');
+    g.addColorStop(0.55, 'rgba(0,0,0,0.4)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'source-over';
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, G.haze) * 0.72;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(hazeCv, 0, 0, view.w, view.h);
+    ctx.restore();
+  }
+
+  // 発生源の上に、汚れバリアの強さ (5段階) と、いま通るダメージの割合を出す
+  const SHIELD_COLORS = ['#4fe0b6', '#a6e05a', '#ffd84a', '#ffa23a', '#ff5a4a'];
+  const shieldLevel = (e) => Math.ceil(((1 - e.shield) / (1 - SHIELD_MIN)) * 5 - 0.05);
+  function drawShieldBadge(e) {
+    const lvl = clamp(shieldLevel(e), 0, 5);
+    const col = lvl ? SHIELD_COLORS[lvl - 1] : '#4fe0b6';
+    const label = lvl ? t('shieldDmg', Math.round(e.shield * 100)) : t('shieldNone');
+    ctx.font = '800 10px system-ui, sans-serif';
+    const tw = ctx.measureText(label).width;
+    const segW = 7;
+    const w = 18 + segW * 5 + 4 + tw + 8;
+    const h = 16;
+    const x = e.x - w / 2;
+    const y = e.y - e.r * 1.3 - 26;
+    ctx.fillStyle = 'rgba(20,16,12,0.78)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 8);
+    ctx.fill();
+    // 盾のマーク
+    const sx = x + 9;
+    const sy = y + 3;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(sx - 5, sy);
+    ctx.lineTo(sx + 5, sy);
+    ctx.lineTo(sx + 5, sy + 5);
+    ctx.quadraticCurveTo(sx + 4, sy + 9, sx, sy + 11);
+    ctx.quadraticCurveTo(sx - 4, sy + 9, sx - 5, sy + 5);
+    ctx.closePath();
+    ctx.fill();
+    // 5段階のゲージ。段階が上がるほど赤くなる
+    for (let k = 0; k < 5; k++) {
+      ctx.fillStyle = k < lvl ? SHIELD_COLORS[k] : 'rgba(255,255,255,0.18)';
+      ctx.fillRect(x + 17 + k * segW, y + 4 + (4 - k) * 1.2, segW - 2, 8 - (4 - k) * 1.2);
+    }
+    ctx.fillStyle = col;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + 18 + segW * 5 + 4, y + h / 2 + 0.5);
+    ctx.textBaseline = 'alphabetic';
   }
 
   function offscreenArrow(wx, wy, color) {
@@ -4304,7 +5493,7 @@
     dot(G.p.x, G.p.y, 3, '#ffffff');
   }
 
-  function drawHud(t) {
+  function drawHud(tm) {
     const w = view.w;
     const h = view.h;
     const p = G.p;
@@ -4316,22 +5505,23 @@
     hudText(`Lv ${G.level}`, 10, 30, 16);
     if (G.mode === 'hard') hudText('HARD', 62, 30, 12, 'left', '#ff6b6b');
     const left = GAME_TIME - G.time;
-    hudText(fmtTime(Math.ceil(left)), w / 2, 34, 24, 'center', left <= 60 && Math.floor(t * 2) % 2 ? '#ff6b6b' : left <= 60 ? '#ffb3b3' : '#ffffff');
+    hudText(fmtTime(Math.ceil(left)), w / 2, 34, 24, 'center', left <= 60 && Math.floor(tm * 2) % 2 ? '#ff6b6b' : left <= 60 ? '#ffb3b3' : '#ffffff');
     // 今いる部屋
     const here = G.rooms[G.curRoom];
     const doneN = G.rooms.filter((r) => r.done).length;
     if (here) {
       const pct = Math.min(100, (here.clean / here.total) * 100);
-      hudText(here.done ? `${here.name} 完了!` : `${here.name} ${Math.floor(pct)}%`, w - 10, 28, 15, 'right', here.done ? '#4fe0b6' : '#ffffff');
+      const hereName = L(here, 'name');
+      hudText(here.done ? t('hudDone', hereName) : `${hereName} ${Math.floor(pct)}%`, w - 10, 28, 15, 'right', here.done ? '#4fe0b6' : '#ffffff');
       if (!here.done) {
         ctx.font = '800 15px system-ui, -apple-system, "Hiragino Sans", sans-serif';
-        const nameW = ctx.measureText(`${here.name} ${Math.floor(pct)}%`).width;
+        const nameW = ctx.measureText(`${hereName} ${Math.floor(pct)}%`).width;
         hudText('★'.repeat(here.danger), w - 16 - nameW, 28, 12, 'right', DANGER_COLOR[here.danger]);
       }
-      hudText(here.done ? `部屋 ${doneN}/${G.rooms.length} 完了` : `発生源 ${here.src} ・ 部屋 ${doneN}/${G.rooms.length} 完了`, w - 10, 46, 12, 'right', here.src > 0 ? '#ffb3b3' : '#d9e2ec');
+      hudText(here.done ? t('hudRooms', doneN, G.rooms.length) : t('hudSrc', here.src, doneN, G.rooms.length), w - 10, 46, 12, 'right', here.src > 0 ? '#ffb3b3' : '#d9e2ec');
     }
-    hudText(`片付け ${G.kills}`, w - 10, 62, 11, 'right', '#c5d0dc');
-    drawMinimap(t);
+    hudText(t('hudKills', G.kills), w - 10, 62, 11, 'right', '#c5d0dc');
+    drawMinimap(tm);
 
     // ボスの体力
     const boss = G.bosses.find((e) => e.boss && e.alive);
@@ -4340,7 +5530,7 @@
       const left = 10 + clamp(Math.min(view.w, view.h) * 0.22, 84, 140) + 14;
       const bw = Math.min(360, w - left - 12);
       const cx = (left + w - 12) / 2;
-      hudText(boss.def.name, cx, 80, 12, 'center', '#ffb3b3');
+      hudText(L(boss.def, 'name'), cx, 80, 12, 'center', '#ffb3b3');
       bar(cx - bw / 2, 86, bw, 8, boss.hp / boss.maxHp, '#ff6b6b');
     }
 
@@ -4348,12 +5538,12 @@
     const by = h - 22;
     const hpW = Math.min(220, w * 0.42);
     bar(12, by, hpW, 12, p.hp / G.stats.maxHp, p.hp / G.stats.maxHp < 0.3 ? '#ff6b6b' : '#7dff9a');
-    hudText(`体力 ${Math.ceil(p.hp)}/${G.stats.maxHp}`, 14, by - 5, 11);
+    hudText(t('hudHp', Math.ceil(p.hp), G.stats.maxHp), 14, by - 5, 11);
     const boxW = Math.min(180, w * 0.34);
     const full = boxFull();
     const ratio = G.box / G.stats.boxCap;
-    bar(w - 12 - boxW, by, boxW, 12, ratio, full ? (Math.floor(t * 4) % 2 ? '#ff6b6b' : '#ffcf4a') : ratio >= 0.5 ? '#ffcf4a' : '#c7b48a');
-    hudText(full ? 'ダストボックス 満タン!' : `ダストボックス ${Math.floor(G.box)}/${G.stats.boxCap}`, w - 12, by - 5, 11, 'right', full ? '#ff8a8a' : '#fff');
+    bar(w - 12 - boxW, by, boxW, 12, ratio, full ? (Math.floor(tm * 4) % 2 ? '#ff6b6b' : '#ffcf4a') : ratio >= 0.5 ? '#ffcf4a' : '#c7b48a');
+    hudText(full ? t('hudBoxFull') : t('hudBox', Math.floor(G.box), G.stats.boxCap), w - 12, by - 5, 11, 'right', full ? '#ff8a8a' : '#fff');
 
     // ギアとパッシブ
     let ix = 12;
@@ -4459,6 +5649,8 @@
     if (f) f.focus({ preventScroll: true });
     pauseBtn.style.visibility = 'hidden';
     bombBtn.hidden = true;
+    // 言語はメニューでだけ切り替えられる (プレイ中の一時停止やレベルアップでは隠す)
+    if (langBtn) langBtn.hidden = !!G;
     joy.id = null;
     keys.clear();
   }
@@ -4490,40 +5682,53 @@
     overlay.innerHTML = '';
     pauseBtn.style.visibility = 'visible';
     bombBtn.hidden = false;
+    if (langBtn) langBtn.hidden = true;
     lastTime = performance.now();
   }
+
+  // 言語を切り替えたときに、いま開いている画面を描き直すための関数
+  let rerender = null;
 
   function completionHtml() {
     const c = completion();
     return `<div class="completion">
-      <div class="completion-head"><span>達成率</span><b>${c.pct.toFixed(1)}%</b></div>
+      <div class="completion-head"><span>${t('completion')}</span><b>${c.pct.toFixed(1)}%</b></div>
       <div class="completion-bar"><i style="width:${c.pct.toFixed(1)}%"></i></div>
-      <div class="completion-meta">クリア ${c.clears}/${c.clearTotal} ・ 宝物 ${c.tre}/${c.treTotal}</div>
+      <div class="completion-meta">${t('completionMeta', c.clears, c.clearTotal, c.tre, c.treTotal)}</div>
     </div>`;
   }
 
   function showTitle() {
     G = null;
+    rerender = showTitle;
     Sound.bgm(null);
     show('title', `
       <div class="panel bare">
-        <p class="logo"><small>CLEANING SURVIVORS</small>おそうじ<br>サバイバー</p>
-        <p class="tagline">押し寄せるゴミと汚れを、清掃ギアで一気に片付けろ!</p>
-        <div class="title-cast"><img src="${charThumb('cleaner')}" alt="">${['dust', 'paper', 'can', 'grease', 'spore', 'bag'].map((t) => `<img src="${enemyThumb(t)}" alt="">`).join('')}</div>
+        <p class="logo${lang === 'en' ? ' en' : ''}"><small>${t('logoSmall')}</small>${t('logo')}</p>
+        <p class="tagline">${t('tagline')}</p>
+        <div class="title-cast"><img src="${charThumb('cleaner')}" alt="">${['dust', 'paper', 'can', 'grease', 'spore', 'bag'].map((k) => `<img src="${enemyThumb(k)}" alt="">`).join('')}</div>
         ${completionHtml()}
         <div class="actions">
-          <button type="button" class="btn primary" data-act="rooms" data-focus>はじめる</button>
-          <button type="button" class="btn" data-act="chars" data-arg="title">清掃員</button>
-          <button type="button" class="btn" data-act="settings" data-arg="title">設定</button>
+          <button type="button" class="btn primary" data-act="rooms" data-focus>${t('play')}</button>
+          <button type="button" class="btn trophy" data-act="chars" data-arg="title"><span aria-hidden="true">🏆</span> ${t('achievements')}</button>
+          <button type="button" class="btn" data-act="settings" data-arg="title">${t('settings')}</button>
         </div>
       </div>`);
   }
 
+  // 画面の上の見出し。左に「‹ 戻る」(Esc でも戻る)、右は見出しを真ん中に置くための空き
+  const panelHead = (title, act, arg = '', focus = false) => `<div class="panel-head">
+      <button type="button" class="back-btn" data-act="${act}"${arg ? ` data-arg="${arg}"` : ''} data-back${focus ? ' data-focus' : ''}>‹ ${t('back')}</button>
+      <h2>${title}</h2>
+      <span class="back-btn ghost" aria-hidden="true">‹ ${t('back')}</span>
+    </div>`;
+
   const curChar = () => CHARS.find((c) => c.id === save.char && charUnlocked(c)) || CHARS[0];
-  const modeTabs = (act) => `<div class="mode-tabs" role="tablist">${Object.keys(MODES).map((m) => `<button type="button" role="tab" class="mode-tab ${m}${save.mode === m ? ' on' : ''}" aria-selected="${save.mode === m}" data-act="${act}" data-arg="${m}">${MODES[m].name}</button>`).join('')}</div>`;
+  const modeTabs = (act) => `<div class="mode-tabs" role="tablist">${Object.keys(MODES).map((m) => `<button type="button" role="tab" class="mode-tab ${m}${save.mode === m ? ' on' : ''}" aria-selected="${save.mode === m}" data-act="${act}" data-arg="${m}">${L(MODES[m], 'name')}</button>`).join('')}</div>`;
 
   function showRooms() {
     G = null;
+    rerender = showRooms;
     Sound.bgm(null);
     const ch = curChar();
     const hard = save.mode === 'hard';
@@ -4533,41 +5738,41 @@
       const nOk = peekRec(ch.id, i, 'normal').c;
       const hOk = peekRec(ch.id, i, 'hard').c;
       let meta;
-      if (!stageUnlocked(i)) meta = '前のステージをノーマルでクリアすると入れる';
-      else if (hard && !hardUnlocked(i)) meta = 'このステージをノーマルでクリアすると挑戦できる';
-      else if (rec.r) meta = `清掃した部屋 最高 ${rec.r}/${r.rooms.length}${rec.t ? ` ・ 最速クリア ${fmtTime(rec.t)}` : ''}`;
-      else meta = `${r.rooms.length}部屋 ・ ${r.desc}`;
-      const badges = stageUnlocked(i) ? `<span class="badges"><span class="badge n${nOk ? ' on' : ''}">N</span><span class="badge h${hOk ? ' on' : ''}">H</span><span class="badge t${save.treasures[i] ? ' on' : ''}" title="宝物">宝</span></span>` : '';
+      if (!stageUnlocked(i)) meta = t('lockedPrev');
+      else if (hard && !hardUnlocked(i)) meta = t('lockedHard');
+      else if (rec.r) meta = t('bestRooms', rec.r, r.rooms.length) + (rec.t ? `${t('sep')}${t('bestClear', fmtTime(rec.t))}` : '');
+      else meta = `${t('roomCount', r.rooms.length)}${t('sep')}${L(r, 'desc')}`;
+      const badges = stageUnlocked(i) ? `<span class="badges"><span class="badge n${nOk ? ' on' : ''}">N</span><span class="badge h${hOk ? ' on' : ''}">H</span><span class="badge t${save.treasures[i] ? ' on' : ''}" title="${t('treasure')}">${t('badgeTreasure')}</span></span>` : '';
       return `<button type="button" class="room${rec.c ? ' cleared' : ''}" data-act="brief" data-arg="${i}" ${ok ? '' : 'disabled'}>
         <span class="room-no">${stageUnlocked(i) ? i + 1 : '🔒'}</span>
-        <span class="room-body"><span class="room-name">${stageUnlocked(i) ? esc(r.name) : '？？？'}</span>${badges}<br><span class="room-meta">${esc(meta)}</span></span>
+        <span class="room-body"><span class="room-name">${stageUnlocked(i) ? esc(L(r, 'name')) : '？？？'}</span>${badges}<br><span class="room-meta">${esc(meta)}</span></span>
       </button>`;
     }).join('');
     show('rooms', `
       <div class="panel">
-        <h2>ステージを選ぶ</h2>
-        <p class="sub">${esc(ch.name)} の記録 ・ コイン <span class="coins">${save.coins}</span></p>
+        ${panelHead(t('stageSelect'), 'title')}
+        <p class="sub">${esc(t('recordOf', L(ch, 'name')))}${t('sep')}${t('coins')} <span class="coins">${save.coins}</span></p>
         ${modeTabs('mode')}
-        ${hard ? '<p class="mode-note">ハード: ゴミの HP ×1.7・ダメージ ×1.5・数 ×1.2、発生源の HP ×1.4。コイン ×1.6。恒久スキルを上げてから挑もう</p>' : ''}
+        ${hard ? `<p class="mode-note">${t('hardNote')}</p>` : ''}
         <div class="rooms">${rooms}</div>
         <div class="menu-row">
-          <button type="button" class="btn small" data-act="shop">恒久スキル</button>
-          <button type="button" class="btn small" data-act="chars" data-arg="rooms">清掃員</button>
-          <button type="button" class="btn small" data-act="zukan">ゴミ図鑑</button>
-          <button type="button" class="btn small" data-act="settings" data-arg="rooms">設定</button>
-          <button type="button" class="btn small" data-act="title" data-back>タイトルへ</button>
+          <button type="button" class="btn small" data-act="shop">${t('skills')}</button>
+          <button type="button" class="btn small" data-act="chars" data-arg="rooms"><span aria-hidden="true">🏆</span> ${t('achievements')}</button>
+          <button type="button" class="btn small" data-act="zukan">${t('zukan')}</button>
+          <button type="button" class="btn small" data-act="settings" data-arg="rooms">${t('settings')}</button>
         </div>
       </div>`);
   }
 
-  const unlockText = (c) => `ステージ${c.unlock + 1}「${STAGES[c.unlock].name}」の宝物を見つけると仲間になる`;
+  const unlockText = (c) => t('unlockText', c.unlock + 1, L(STAGES[c.unlock], 'name'));
+  const traitText = (c) => t('trait', L(c, 'trait'), L(c, 'traitDesc'));
 
   function charCard(c, act, on) {
     const ok = charUnlocked(c);
     return `<button type="button" class="char${on ? ' on' : ''}" data-act="${act}" data-arg="${c.id}" ${ok || act === 'charRec' ? '' : 'disabled'}>
       <img src="${charThumb(c.id, !ok)}" alt="">
-      <span class="char-name">${ok ? esc(c.name) : '？？？'}</span><br>
-      ${ok ? `<span class="char-trait">個性「${esc(c.trait)}」 ${esc(c.traitDesc)}</span><br><span class="char-desc">${esc(c.desc)} 体力 ${c.hp}・最初のギア: ${c.weapons.map((w) => esc(WEAPONS[w].name)).join('・')}</span>`
+      <span class="char-name">${ok ? esc(L(c, 'name')) : '？？？'}</span><br>
+      ${ok ? `<span class="char-trait">${esc(traitText(c))}</span><br><span class="char-desc">${esc(L(c, 'desc'))} ${esc(t('charStats', c.hp, c.weapons.map((w) => L(WEAPONS[w], 'name')).join(t('sep'))))}</span>`
         : `<span class="char-desc">${esc(unlockText(c))}</span>`}
     </button>`;
   }
@@ -4575,38 +5780,40 @@
   let briefRoom = 0;
   function showBrief(i) {
     briefRoom = Number(i);
+    rerender = () => showBrief(briefRoom);
     if (save.mode === 'hard' && !hardUnlocked(briefRoom)) save.mode = 'normal';
     const r = STAGES[briefRoom];
     const ch = curChar();
     const rec = peekRec(ch.id, briefRoom, save.mode);
     const chars = CHARS.map((c) => charCard(c, 'char', c.id === ch.id)).join('');
-    const roomList = [...r.rooms].sort((a, c) => a.danger - c.danger).map((rm) => `<li><b>${esc(rm.name)}</b><span class="danger d${rm.danger}">${stars(rm.danger)}</span><span>発生源 ${rm.src.length}</span><span class="bonus">${esc(ROOM_BONUS[rm.bonus])}</span></li>`).join('');
+    const roomList = [...r.rooms].sort((a, c) => a.danger - c.danger).map((rm) => `<li><b>${esc(L(rm, 'name'))}</b><span class="danger d${rm.danger}">${stars(rm.danger)}</span><span>${t('srcCount', rm.src.length)}</span><span class="bonus">${esc(bonusText(rm.bonus))}</span></li>`).join('');
     const tRoom = r.rooms.find((q) => q.id === r.treasure.room);
     const found = save.treasures[briefRoom];
     const unlocks = CHARS.find((c) => c.unlock === briefRoom);
+    const modeName = L(MODES[save.mode], 'name');
     show('brief', `
       <div class="panel wide">
-        <h2>ステージ${briefRoom + 1} ${esc(r.name)}</h2>
-        <p class="sub">${esc(r.desc)}</p>
+        ${panelHead(esc(t('stageTitle', briefRoom + 1, L(r, 'name'))), 'rooms')}
+        <p class="sub">${esc(L(r, 'desc'))}</p>
         ${hardUnlocked(briefRoom) ? modeTabs('briefMode') : ''}
         <div class="plan">
-          <img class="plan-img" src="${planImage(briefRoom)}" alt="間取り図">
+          <img class="plan-img" src="${planImage(briefRoom)}" alt="${t('planAlt')}">
           <div class="plan-side">
-            <p class="brief-desc"><b>10分以内に全部屋の清掃を完了</b>すればクリア。部屋の<b>発生源</b>（赤い点）を全部潰して床をピカピカにすると、その部屋の清掃が完了し、宝箱と特典がもらえる。<b>★が多い部屋ほど汚れがキツく</b>、ゴミが多くて強い。弱いうちに入るとすぐやられるので、★の少ない部屋から片付けよう。</p>
+            <p class="brief-desc">${t('briefDesc')}</p>
             <ul class="room-list">${roomList}</ul>
           </div>
         </div>
         <div class="treasure-line${found ? ' found' : ''}">
           <img src="${iconURL('treasure')}" alt="">
-          <span>${found ? `宝物「${esc(r.treasure.name)}」 見つけた!` : `宝物: ${stars(tRoom.danger).replace(/☆/g, '')}の部屋「${esc(tRoom.name)}」の清掃を完了すると見つかる`}${unlocks ? `<br><small>${found ? `${esc(unlocks.name)}が仲間になった` : 'この宝物を見つけると、新しい清掃員が仲間になる'}</small>` : ''}</span>
+          <span>${found ? esc(t('treasureFoundLine', L(r.treasure, 'name'))) : esc(t('treasureHint', '★'.repeat(tRoom.danger), L(tRoom, 'name')))}${unlocks ? `<br><small>${found ? esc(t('joined', L(unlocks, 'name'))) : t('willJoin')}</small>` : ''}</span>
         </div>
-        <p class="brief-note">5分で中ボス「${ENEMIES.yokai.name}」、9分でボス「${esc(ENEMIES[r.boss].name)}」が現れる。</p>
-        <div class="records"><span>${esc(ch.name)} ・ ${MODES[save.mode].name}</span><span>清掃した部屋 最高 <b>${rec.r}/${r.rooms.length}</b></span>${rec.t ? `<span>最速クリア <b>${fmtTime(rec.t)}</b></span>` : ''}${rec.c ? '<span><b>クリア済み</b></span>' : ''}</div>
-        <h3>出撃する清掃員</h3>
+        <p class="brief-note">${esc(t('slotNote', MAX_GEARS, MAX_PASSIVES))}</p>
+        <p class="brief-note">${esc(t('bossNote', L(ENEMIES.yokai, 'name'), L(ENEMIES[r.boss], 'name')))}</p>
+        <div class="records"><span>${esc(L(ch, 'name'))}${t('sep')}${modeName}</span><span>${t('bestRooms', `<b>${rec.r}`, `${r.rooms.length}</b>`)}</span>${rec.t ? `<span>${t('bestClear', `<b>${fmtTime(rec.t)}</b>`)}</span>` : ''}${rec.c ? `<span><b>${t('cleared')}</b></span>` : ''}</div>
+        <h3>${t('pickCleaner')}</h3>
         <div class="chars">${chars}</div>
         <div class="actions">
-          <button type="button" class="btn primary" data-act="start" data-focus>${MODES[save.mode].name}で出撃!</button>
-          <button type="button" class="btn" data-act="rooms" data-back>戻る</button>
+          <button type="button" class="btn primary" data-act="start" data-focus>${t('deploy', modeName)}</button>
         </div>
       </div>`);
   }
@@ -4615,41 +5822,43 @@
   let charsBack = 'title';
   function showChars(from) {
     if (from) charsBack = from;
+    rerender = () => showChars();
     const list = CHARS.map((c) => charCard(c, 'charRec', false)).join('');
-    const tre = STAGES.map((st, i) => `<li class="${save.treasures[i] ? 'found' : ''}"><img src="${iconURL('treasure')}" alt=""><span><b>${save.treasures[i] ? esc(st.treasure.name) : '？？？'}</b><br><small>ステージ${i + 1} ${stageUnlocked(i) ? esc(st.name) : '？？？'}${save.treasures[i] ? ` ・ ${esc(st.treasure.desc)}` : ''}</small></span></li>`).join('');
+    const tre = STAGES.map((st, i) => `<li class="${save.treasures[i] ? 'found' : ''}"><img src="${iconURL('treasure')}" alt=""><span><b>${save.treasures[i] ? esc(L(st.treasure, 'name')) : '？？？'}</b><br><small>${esc(t('stageTitle', i + 1, stageUnlocked(i) ? L(st, 'name') : '？？？'))}${save.treasures[i] ? `${t('sep')}${esc(L(st.treasure, 'desc'))}` : ''}</small></span></li>`).join('');
     show('chars', `
       <div class="panel wide">
-        <h2>清掃員</h2>
+        ${panelHead(t('achievements'), charsBack, '', true)}
         ${completionHtml()}
-        <p class="sub">清掃員を選ぶと、ステージごとのクリア状況が見られる</p>
+        <h3>${t('achClears')}</h3>
+        <p class="sub left">${t('charsSub')}</p>
         <div class="chars">${list}</div>
-        <h3>宝物 (${save.treasures.filter(Boolean).length}/${STAGES.length})</h3>
+        <h3>${t('treasures', save.treasures.filter(Boolean).length, STAGES.length)}</h3>
         <ul class="treasure-list">${tre}</ul>
-        <div class="actions"><button type="button" class="btn" data-act="${charsBack}" data-back data-focus>戻る</button></div>
       </div>`);
   }
 
   function showCharRec(id) {
+    rerender = () => showCharRec(id);
     const c = CHARS.find((q) => q.id === id);
     const ok = charUnlocked(c);
     const cell = (i, m) => {
       const r = peekRec(c.id, i, m);
       if (r.c) return `<td class="ok">✓ ${fmtTime(r.t)}</td>`;
-      if (r.r) return `<td class="part">${r.r}/${STAGES[i].rooms.length}部屋</td>`;
+      if (r.r) return `<td class="part">${t('roomsCell', r.r, STAGES[i].rooms.length)}</td>`;
       return '<td class="none">—</td>';
     };
-    const rows = STAGES.map((st, i) => `<tr><th>${i + 1}. ${stageUnlocked(i) ? esc(st.name) : '？？？'}</th>${cell(i, 'normal')}${cell(i, 'hard')}</tr>`).join('');
+    const rows = STAGES.map((st, i) => `<tr><th>${i + 1}. ${stageUnlocked(i) ? esc(L(st, 'name')) : '？？？'}</th>${cell(i, 'normal')}${cell(i, 'hard')}</tr>`).join('');
     let n = 0;
     for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (peekRec(c.id, i, m).c) n++;
     show('charRec', `
       <div class="panel wide">
-        <div class="rec-head"><img src="${charThumb(c.id, !ok)}" alt=""><div><h2>${ok ? esc(c.name) : '？？？'}</h2>
-        <p class="sub">${ok ? `個性「${esc(c.trait)}」 ${esc(c.traitDesc)}` : esc(unlockText(c))}</p></div></div>
-        <p class="sub">クリア ${n}/${STAGES.length * 2}</p>
-        <div class="rec-wrap"><table class="rec-table"><thead><tr><th>ステージ</th><th>ノーマル</th><th>ハード</th></tr></thead><tbody>${rows}</tbody></table></div>
+        ${panelHead(t('achievements'), 'chars', '', true)}
+        <div class="rec-head"><img src="${charThumb(c.id, !ok)}" alt=""><div><h2>${ok ? esc(L(c, 'name')) : '？？？'}</h2>
+        <p class="sub">${esc(ok ? traitText(c) : unlockText(c))}</p></div></div>
+        <p class="sub">${t('clears', n, STAGES.length * 2)}</p>
+        <div class="rec-wrap"><table class="rec-table"><thead><tr><th>${t('stage')}</th><th>${L(MODES.normal, 'name')}</th><th>${L(MODES.hard, 'name')}</th></tr></thead><tbody>${rows}</tbody></table></div>
         <div class="actions">
-          ${ok ? `<button type="button" class="btn primary" data-act="pickChar" data-arg="${c.id}">この清掃員にする</button>` : ''}
-          <button type="button" class="btn" data-act="chars" data-back data-focus>戻る</button>
+          ${ok ? `<button type="button" class="btn primary" data-act="pickChar" data-arg="${c.id}">${t('useCleaner')}</button>` : ''}
         </div>
       </div>`);
   }
@@ -4658,7 +5867,8 @@
   const FLOOR_COLOR = { wood: '#d6b183', tatami: '#d3cf93', stone: '#aaa69e', kitchen: '#ddd6c6', bath: '#cfe3ea', concrete: '#b3aea5', carpet: '#9a3a4a', grass: '#7fae5a', attic: '#8f6f4c' };
   const planCache = {};
   function planImage(idx) {
-    if (planCache[idx]) return planCache[idx];
+    const key = `${idx}-${lang}`;
+    if (planCache[key]) return planCache[key];
     const stage = STAGES[idx];
     const { roomGrid, blocked } = buildLayout(stage, idx);
     const S = 7; // 1マスの大きさ (px)
@@ -4681,16 +5891,22 @@
         c.arc((x + w * SPOTS[k][0]) * S, (y + h * SPOTS[k][1]) * S, 6, 0, TAU);
         c.fill();
       });
-      c.font = '800 15px system-ui, -apple-system, "Hiragino Sans", sans-serif';
+      // 部屋の幅に収まる大きさで名前を書く
+      const name = L(r, 'name');
+      let size = 15;
+      c.font = `800 ${size}px system-ui, -apple-system, "Hiragino Sans", sans-serif`;
+      const tw = c.measureText(name).width;
+      if (tw > w * S - 6) size = Math.max(9, Math.floor((size * (w * S - 6)) / tw));
+      c.font = `800 ${size}px system-ui, -apple-system, "Hiragino Sans", sans-serif`;
       c.lineWidth = 3;
       c.strokeStyle = 'rgba(255,255,255,0.85)';
-      c.strokeText(r.name, (x + w / 2) * S, (y + h / 2) * S);
+      c.strokeText(name, (x + w / 2) * S, (y + h / 2) * S);
       c.fillStyle = '#1f2933';
-      c.fillText(r.name, (x + w / 2) * S, (y + h / 2) * S);
+      c.fillText(name, (x + w / 2) * S, (y + h / 2) * S);
       if (r.id === stage.start) {
         c.fillStyle = '#2f6fb3';
         c.font = '800 11px system-ui, sans-serif';
-        c.fillText('スタート', (x + w / 2) * S, (y + h / 2) * S + 16);
+        c.fillText(t('planStart'), (x + w / 2) * S, (y + h / 2) * S + 16);
       }
     }
     for (const [id, fx, fy] of stage.dumps) {
@@ -4698,16 +5914,17 @@
       c.fillStyle = '#2e9d6b';
       c.fillRect((r.rect[0] + r.rect[2] * fx) * S - 6, (r.rect[1] + r.rect[3] * fy) * S - 6, 12, 12);
     }
-    planCache[idx] = cv.toDataURL();
-    return planCache[idx];
+    planCache[key] = cv.toDataURL();
+    return planCache[key];
   }
 
   function startGame(stageIdx) {
     Sound.init();
     newGame(stageIdx);
+    rerender = null;
     hide();
     Sound.bgm('main');
-    showBanner(STAGES[stageIdx].name, '#ffffff', 2);
+    showBanner(L(STAGES[stageIdx], 'name'), '#ffffff', 2);
   }
 
   function pauseGame() {
@@ -4716,19 +5933,19 @@
     Sound.bgm(null);
     const gear = [
       ...G.weapons.map((w) => `<div class="gear" title="${esc(weaponName(w))}"><img src="${iconURL(weaponIcon(w))}" alt="${esc(weaponName(w))}"><span>${w.evo ? '★' : w.lv}</span></div>`),
-      ...Object.keys(G.passives).map((id) => `<div class="gear" title="${esc(PASSIVES[id].name)}"><img src="${iconURL(id)}" alt="${esc(PASSIVES[id].name)}"><span>${G.passives[id]}</span></div>`),
+      ...Object.keys(G.passives).map((id) => `<div class="gear" title="${esc(L(PASSIVES[id], 'name'))}"><img src="${iconURL(id)}" alt="${esc(L(PASSIVES[id], 'name'))}"><span>${G.passives[id]}</span></div>`),
     ].join('');
     show('pause', `
       <div class="panel">
-        <h2>一時停止</h2>
-        <p class="sub">${esc(G.stage.name)} ・ 残り ${fmtTime(Math.ceil(GAME_TIME - G.time))} ・ 清掃した部屋 ${G.rooms.filter((r) => r.done).length}/${G.rooms.length}</p>
+        <h2>${t('paused')}</h2>
+        <p class="sub">${esc(t('pauseSub', L(G.stage, 'name'), fmtTime(Math.ceil(GAME_TIME - G.time)), G.rooms.filter((r) => r.done).length, G.rooms.length))}</p>
         <div class="gear-list">${gear}</div>
         <div class="actions">
-          <button type="button" class="btn primary" data-act="resume" data-back data-focus>再開</button>
-          <button type="button" class="btn" data-act="retry">やり直す</button>
-          <button type="button" class="btn" data-act="quit">ステージ選択へ</button>
+          <button type="button" class="btn primary" data-act="resume" data-back data-focus>${t('resume')}</button>
+          <button type="button" class="btn" data-act="retry">${t('retry')}</button>
+          <button type="button" class="btn" data-act="quit">${t('toStages')}</button>
         </div>
-        <h3>設定</h3>
+        <h3>${t('settings')}</h3>
         ${settingsHtml()}
       </div>`, false);
   }
@@ -4746,29 +5963,30 @@
     const opts = [];
     for (const w of G.weapons) if (!w.evo && w.lv < MAX_WEAPON_LV) opts.push({ kind: 'w', id: w.id });
     for (const id of Object.keys(G.passives)) if (G.passives[id] < PASSIVES[id].max) opts.push({ kind: 'p', id });
-    if (G.weapons.length < MAX_SLOTS) for (const id of WEAPON_IDS) if (!G.weapons.some((w) => w.id === id)) opts.push({ kind: 'w', id, isNew: true });
-    if (Object.keys(G.passives).length < MAX_SLOTS) for (const id of PASSIVE_IDS) if (!G.passives[id]) opts.push({ kind: 'p', id, isNew: true });
+    if (G.weapons.length < MAX_GEARS) for (const id of WEAPON_IDS) if (!G.weapons.some((w) => w.id === id)) opts.push({ kind: 'w', id, isNew: true });
+    if (Object.keys(G.passives).length < MAX_PASSIVES) for (const id of PASSIVE_IDS) if (!G.passives[id]) opts.push({ kind: 'p', id, isNew: true });
     const n = 3 + save.shop.choices;
     if (!opts.length) return [{ kind: 'heal' }, { kind: 'coin' }];
     return shuffle(opts).slice(0, n);
   }
 
   function choiceInfo(o) {
-    if (o.kind === 'heal') return { icon: 'heal', name: 'おにぎり', lv: '', desc: '体力を 50 回復する' };
-    if (o.kind === 'coin') return { icon: 'coin', name: 'へそくり', lv: '', desc: 'コイン +10' };
+    if (o.kind === 'heal') return { icon: 'heal', name: t('onigiri'), lv: '', desc: t('onigiriDesc') };
+    if (o.kind === 'coin') return { icon: 'coin', name: t('savings'), lv: '', desc: t('savingsDesc') };
     if (o.kind === 'w') {
       const d = WEAPONS[o.id];
       const w = G.weapons.find((x) => x.id === o.id);
-      const hint = !w && G.passives[d.passive] ? `${PASSIVES[d.passive].name}で進化できる` : '';
-      if (o.isNew) return { icon: o.id, name: d.name, lv: 'NEW', isNew: true, desc: d.desc, hint };
-      const evoHint = w.lv + 1 === MAX_WEAPON_LV ? (G.passives[d.passive] ? '宝箱を開けると進化!' : `${PASSIVES[d.passive].name}があれば進化できる`) : '';
-      return { icon: o.id, name: d.name, lv: `Lv ${w.lv} → ${w.lv + 1}`, desc: d.lv[w.lv - 1][1], hint: evoHint };
+      const pName = L(PASSIVES[d.passive], 'name');
+      const hint = !w && G.passives[d.passive] ? t('evoWith', pName) : '';
+      if (o.isNew) return { icon: o.id, name: L(d, 'name'), lv: 'NEW', isNew: true, desc: L(d, 'desc'), hint };
+      const evoHint = w.lv + 1 === MAX_WEAPON_LV ? (G.passives[d.passive] ? t('evoChest') : t('evoNeed', pName)) : '';
+      return { icon: o.id, name: L(d, 'name'), lv: `Lv ${w.lv} → ${w.lv + 1}`, desc: lvText(o.id, w.lv), hint: evoHint };
     }
     const d = PASSIVES[o.id];
     const cur = G.passives[o.id] || 0;
     const pair = WEAPON_IDS.find((id) => WEAPONS[id].passive === o.id);
-    const hint = pair && G.weapons.some((w) => w.id === pair && !w.evo) ? `${WEAPONS[pair].name}の進化に必要` : '';
-    return { icon: o.id, name: d.name, lv: o.isNew ? 'NEW' : `Lv ${cur} → ${cur + 1}`, isNew: o.isNew, desc: d.desc, hint };
+    const hint = pair && G.weapons.some((w) => w.id === pair && !w.evo) ? t('evoFor', L(WEAPONS[pair], 'name')) : '';
+    return { icon: o.id, name: L(d, 'name'), lv: o.isNew ? 'NEW' : `Lv ${cur} → ${cur + 1}`, isNew: o.isNew, desc: L(d, 'desc'), hint };
   }
 
   function showLevelUp() {
@@ -4792,9 +6010,9 @@
       <div class="panel reward">
         <p class="reward-title">LEVEL UP!</p>
         <p class="lv-badge">Lv ${G.level - G.pendingLv}</p>
-        <p class="sub">清掃ギアかパッシブを1つ選ぶ</p>
+        <p class="sub">${t('pickOne')}<br><span class="slots">${t('slots', G.weapons.length, MAX_GEARS, Object.keys(G.passives).length, MAX_PASSIVES)}</span></p>
         <div class="cards">${cards}</div>
-        ${G.rerolls > 0 ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">選び直す (残り ${G.rerolls})</button></div>` : ''}
+        ${G.rerolls > 0 ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button></div>` : ''}
       </div>`, false, { kind: 'level', lock: 450 });
   }
 
@@ -4819,7 +6037,7 @@
   // ---- 宝物 ----
   function foundTreasure() {
     const i = G.stageIdx;
-    const t = G.stage.treasure;
+    const tr = G.stage.treasure;
     const isNew = !save.treasures[i];
     save.treasures[i] = true;
     persist(); // 力尽きても記録が残るように、拾ったその場で保存する
@@ -4835,10 +6053,10 @@
           <img class="chest-reward" src="${iconURL('treasure')}" alt="">
         </div>
         <div class="chest-text">
-          <p class="reward-title">${isNew ? '宝物を見つけた!' : '宝物'}</p>
-          <p class="treasure-name">${esc(t.name)}</p>
-          <p class="sub">${esc(t.desc)}${isNew ? '' : '（もう持っている）'}</p>
-          ${unlock ? `<p class="result-note">${esc(unlock.name)}が仲間になった!</p>` : ''}
+          <p class="reward-title">${isNew ? t('treasureNew') : t('treasure')}</p>
+          <p class="treasure-name">${esc(L(tr, 'name'))}</p>
+          <p class="sub">${esc(L(tr, 'desc'))}${isNew ? '' : t('owned')}</p>
+          ${unlock ? `<p class="result-note">${esc(t('joinedBang', L(unlock, 'name')))}</p>` : ''}
         </div>
         <div class="actions chest-ok"><button type="button" class="btn primary" data-act="treasureOk" data-focus>OK</button></div>
       </div>`, false, { kind: 'evo', lock: 1000 });
@@ -4854,8 +6072,8 @@
       evolvable.evo = true;
       recalcStats();
       icon = WEAPONS[evolvable.id].evo;
-      title = '進化!!';
-      text = `${WEAPONS[evolvable.id].name}が「${EVOS[icon].name}」に進化した! ${EVOS[icon].desc}`;
+      title = t('evolved');
+      text = t('evolvedText', L(WEAPONS[evolvable.id], 'name'), L(EVOS[icon], 'name'), L(EVOS[icon], 'desc'));
     } else {
       const opts = [];
       for (const w of G.weapons) if (!w.evo && w.lv < MAX_WEAPON_LV) opts.push({ kind: 'w', id: w.id });
@@ -4865,13 +6083,13 @@
         const info = choiceInfo(o);
         applyChoice(o);
         icon = info.icon;
-        title = '宝箱';
+        title = t('chest');
         text = `${info.name} ${info.lv} (${info.desc})`;
       } else {
         G.dumpCoins += 30;
         icon = 'coin';
-        title = '宝箱';
-        text = 'コイン +30';
+        title = t('chest');
+        text = t('coins30');
       }
     }
     Sound.play(evolvable ? 'chest-evo' : 'chest-open');
@@ -4891,16 +6109,15 @@
   }
 
   // ---- 結果 ----
+  // 記録とコインをまとめてから、表示は renderResult に任せる (言語を切り替えたら描き直せるように)
   function showResult(win) {
     const g = G;
     const i = g.stageIdx;
     const pct = cleanPct();
     const doneN = g.rooms.filter((r) => r.done).length;
-    const allDone = doneN === g.rooms.length;
     const killCoins = Math.floor(g.kills / 20);
     const cleanCoins = Math.floor(pct);
-    const winCoins = win ? 50 : 0;
-    const base = killCoins + cleanCoins + winCoins + g.dumpCoins + g.bossCoins + g.roomCoins;
+    const base = killCoins + cleanCoins + (win ? 50 : 0) + g.dumpCoins + g.bossCoins + g.roomCoins;
     const mul = g.md.coin * (1 + save.shop.coin * 0.1);
     const total = Math.round(base * mul);
     save.coins += total;
@@ -4915,49 +6132,71 @@
     }
     for (const k in g.killsByType) save.kills[k] = (save.kills[k] || 0) + g.killsByType[k];
     persist();
+    // お知らせは、あとで言語に合わせて文にする
     const notes = [];
-    if (allDone) notes.push('全部屋の清掃を完了した!');
-    if (g.treasureNew) notes.push(`宝物「${STAGES[i].treasure.name}」を見つけた!`);
-    if (g.newChar) notes.push(`${g.newChar.name}が仲間になった!`);
+    if (doneN === g.rooms.length) notes.push(['noteAllRooms']);
+    if (g.treasureNew) notes.push(['noteTreasure', i]);
+    if (g.newChar) notes.push(['noteJoined', g.newChar.id]);
     if (win && g.mode === 'normal' && !wasStageCleared) {
-      if (i + 1 < STAGES.length) notes.push(`ステージ${i + 2}「${STAGES[i + 1].name}」に入れるようになった!`);
-      notes.push('このステージのハードに挑戦できるようになった!');
-      if (i === STAGES.length - 1) notes.push('屋敷じゅうをピカピカにした! おめでとう!');
+      if (i + 1 < STAGES.length) notes.push(['noteStage', i + 1]);
+      notes.push(['noteHard']);
+      if (i === STAGES.length - 1) notes.push(['noteAll']);
     }
-    if (firstForChar) notes.push(`${g.ch.name}で${MODES[g.mode].name}を初クリア!`);
+    if (firstForChar) notes.push(['noteFirst', g.ch.id, g.mode]);
+    const res = {
+      win, i, timeUp: !!g.timeUp, mode: g.mode, ch: g.ch.id, time: g.time, doneN, rooms: g.rooms.length, pct, kills: g.kills, level: g.level,
+      killCoins, cleanCoins, dumpCoins: g.dumpCoins, roomCoins: g.roomCoins, bossCoins: g.bossCoins, mul, total, notes,
+    };
     G = null;
+    briefRoom = i;
+    renderResult(res);
+  }
+
+  function noteText([key, a, b]) {
+    switch (key) {
+      case 'noteTreasure': return t('noteTreasure', L(STAGES[a].treasure, 'name'));
+      case 'noteJoined': return t('joinedBang', L(CHARS.find((c) => c.id === a), 'name'));
+      case 'noteStage': return t('noteStage', a + 1, L(STAGES[a], 'name'));
+      case 'noteFirst': return t('noteFirst', L(CHARS.find((c) => c.id === a), 'name'), L(MODES[b], 'name'));
+      default: return t(key);
+    }
+  }
+
+  function renderResult(r) {
+    rerender = () => renderResult(r);
+    const next = r.win && r.i + 1 < STAGES.length;
     show('result', `
       <div class="panel">
-        <h2 class="result-title ${win ? 'win' : 'lose'}">${win ? '全部屋 清掃完了!' : g.timeUp ? '時間切れ…' : '力尽きた…'}</h2>
-        <p class="sub">ステージ${i + 1} ${esc(STAGES[i].name)} ・ ${MODES[g.mode].name} ・ ${esc(g.ch.name)}</p>
+        <h2 class="result-title ${r.win ? 'win' : 'lose'}">${r.win ? t('allClean') : r.timeUp ? t('timeUp') : t('wornOut')}</h2>
+        <p class="sub">${esc(t('resultSub', r.i + 1, L(STAGES[r.i], 'name'), L(MODES[r.mode], 'name'), L(CHARS.find((c) => c.id === r.ch), 'name')))}</p>
         <dl class="stat-list">
-          <dt>${win ? 'クリアタイム' : 'プレイした時間'}</dt><dd>${fmtTime(g.time)}</dd>
-          <dt>清掃した部屋</dt><dd>${doneN}/${g.rooms.length}</dd>
-          <dt>清掃度 (家全体)</dt><dd>${pct.toFixed(1)}%</dd>
-          <dt>片付けたゴミ</dt><dd>${g.kills}</dd>
-          <dt>レベル</dt><dd>${g.level}</dd>
-          <dt>コイン (片付け)</dt><dd>+${killCoins}</dd>
-          <dt>コイン (清掃度)</dt><dd>+${cleanCoins}</dd>
-          <dt>コイン (ゴミ捨て・宝箱)</dt><dd>+${g.dumpCoins}</dd>
-          <dt>コイン (部屋・発生源)</dt><dd>+${g.roomCoins}</dd>
-          <dt>コイン (ボス)</dt><dd>+${g.bossCoins}</dd>
-          ${win ? '<dt>コイン (クリア)</dt><dd>+50</dd>' : ''}
-          ${mul !== 1 ? `<dt>倍率 (${g.mode === 'hard' ? 'ハード・' : ''}恒久スキル)</dt><dd>×${mul.toFixed(2)}</dd>` : ''}
-          <dt class="total">合計</dt><dd class="total">+${total}</dd>
+          <dt>${r.win ? t('clearTime') : t('playTime')}</dt><dd>${fmtTime(r.time)}</dd>
+          <dt>${t('roomsCleaned')}</dt><dd>${r.doneN}/${r.rooms}</dd>
+          <dt>${t('houseClean')}</dt><dd>${r.pct.toFixed(1)}%</dd>
+          <dt>${t('kills')}</dt><dd>${r.kills}</dd>
+          <dt>${t('level')}</dt><dd>${r.level}</dd>
+          <dt>${t('coinKills')}</dt><dd>+${r.killCoins}</dd>
+          <dt>${t('coinClean')}</dt><dd>+${r.cleanCoins}</dd>
+          <dt>${t('coinDump')}</dt><dd>+${r.dumpCoins}</dd>
+          <dt>${t('coinRoom')}</dt><dd>+${r.roomCoins}</dd>
+          <dt>${t('coinBoss')}</dt><dd>+${r.bossCoins}</dd>
+          ${r.win ? `<dt>${t('coinClear')}</dt><dd>+50</dd>` : ''}
+          ${r.mul !== 1 ? `<dt>${t('coinMul', r.mode === 'hard')}</dt><dd>×${r.mul.toFixed(2)}</dd>` : ''}
+          <dt class="total">${t('total')}</dt><dd class="total">+${r.total}</dd>
         </dl>
-        ${notes.map((n) => `<p class="result-note">${esc(n)}</p>`).join('')}
+        ${r.notes.map((n) => `<p class="result-note">${esc(noteText(n))}</p>`).join('')}
         <div class="actions">
-          ${win && i + 1 < STAGES.length ? `<button type="button" class="btn primary" data-act="brief" data-arg="${i + 1}" data-focus>次のステージへ</button>` : ''}
-          <button type="button" class="btn${win && i + 1 < STAGES.length ? '' : ' primary'}" data-act="start" data-arg="${i}">もう一度</button>
-          <button type="button" class="btn" data-act="rooms" data-back>ステージ選択へ</button>
-          <button type="button" class="btn" data-act="shop">恒久スキル</button>
+          ${next ? `<button type="button" class="btn primary" data-act="brief" data-arg="${r.i + 1}" data-focus>${t('nextStage')}</button>` : ''}
+          <button type="button" class="btn${next ? '' : ' primary'}" data-act="start" data-arg="${r.i}">${t('again')}</button>
+          <button type="button" class="btn" data-act="rooms" data-back>${t('toStages')}</button>
+          <button type="button" class="btn" data-act="shop">${t('skills')}</button>
         </div>
       </div>`);
-    briefRoom = i;
   }
 
   // ---- 恒久スキル ----
   function showShop() {
+    rerender = showShop;
     const items = SHOP.map((it) => {
       const lv = save.shop[it.id];
       const maxed = lv >= it.max;
@@ -4965,16 +6204,15 @@
       const pips = Array.from({ length: it.max }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('');
       return `<div class="shop-item">
         <img src="${iconURL(shopIcon(it.id))}" alt="" width="36" height="36">
-        <div class="shop-body"><span class="shop-name">${esc(it.name)}</span><span class="pips">${pips}</span><br><span class="shop-desc">${esc(it.desc)}</span></div>
-        <button type="button" class="btn small" data-act="buy" data-arg="${it.id}" ${maxed || save.coins < cost ? 'disabled' : ''}>${maxed ? '最大' : `${cost} コイン`}</button>
+        <div class="shop-body"><span class="shop-name">${esc(L(it, 'name'))}</span><span class="pips">${pips}</span><br><span class="shop-desc">${esc(L(it, 'desc'))}</span></div>
+        <button type="button" class="btn small" data-act="buy" data-arg="${it.id}" ${maxed || save.coins < cost ? 'disabled' : ''}>${maxed ? t('max') : t('cost', cost)}</button>
       </div>`;
     }).join('');
     show('shop', `
       <div class="panel">
-        <h2>恒久スキル</h2>
-        <p class="sub">コイン <span class="coins">${save.coins}</span> ・ どの清掃員にも、次のプレイからずっと効く</p>
+        ${panelHead(t('skills'), 'rooms', '', true)}
+        <p class="sub">${t('coins')} <span class="coins">${save.coins}</span>${t('sep')}${t('shopSub')}</p>
         <div class="shop">${items}</div>
-        <div class="actions"><button type="button" class="btn" data-act="rooms" data-back data-focus>戻る</button></div>
       </div>`);
   }
 
@@ -4984,22 +6222,22 @@
 
   // ---- 図鑑 ----
   function showZukan() {
-    const seen = ENEMY_ORDER.filter((t) => save.kills[t] > 0).length;
-    const list = ENEMY_ORDER.map((t) => {
-      const n = save.kills[t] || 0;
-      const d = ENEMIES[t];
+    rerender = showZukan;
+    const seen = ENEMY_ORDER.filter((k) => save.kills[k] > 0).length;
+    const list = ENEMY_ORDER.map((k) => {
+      const n = save.kills[k] || 0;
+      const d = ENEMIES[k];
       return `<div class="zukan-item">
-        <img src="${enemyThumb(t, !n)}" alt="">
-        <div class="zukan-name">${n ? esc(d.name) : '？？？'}</div>
-        ${n ? `<div class="zukan-count">片付けた数 ${n}</div><div class="zukan-desc">${esc(d.desc)}</div>` : ''}
+        <img src="${enemyThumb(k, !n)}" alt="">
+        <div class="zukan-name">${n ? esc(L(d, 'name')) : '？？？'}</div>
+        ${n ? `<div class="zukan-count">${t('killed', n)}</div><div class="zukan-desc">${esc(L(d, 'desc'))}</div>` : ''}
       </div>`;
     }).join('');
     show('zukan', `
       <div class="panel wide">
-        <h2>ゴミ図鑑</h2>
+        ${panelHead(t('zukan'), 'rooms', '', true)}
         <p class="sub">${seen} / ${ENEMY_ORDER.length}</p>
         <div class="zukan">${list}</div>
-        <div class="actions"><button type="button" class="btn" data-act="rooms" data-back data-focus>戻る</button></div>
       </div>`);
   }
 
@@ -5007,20 +6245,48 @@
   function settingsHtml() {
     const st = save.settings;
     return `
-      <label class="setting">効果音<input type="range" min="0" max="100" step="5" value="${st.se}" data-setting="se"></label>
-      <label class="setting">BGM<input type="range" min="0" max="100" step="5" value="${st.bgm}" data-setting="bgm"></label>
-      <label class="setting">画面の揺れ・フラッシュ<input type="checkbox" ${st.shake ? 'checked' : ''} data-setting="shake"></label>`;
+      <label class="setting">${t('se')}<input type="range" min="0" max="100" step="5" value="${st.se}" data-setting="se"></label>
+      <label class="setting">${t('bgm')}<input type="range" min="0" max="100" step="5" value="${st.bgm}" data-setting="bgm"></label>
+      <label class="setting">${t('shake')}<input type="checkbox" ${st.shake ? 'checked' : ''} data-setting="shake"></label>
+      <label class="setting">${t('haze')}<input type="checkbox" ${st.haze ? 'checked' : ''} data-setting="haze"></label>`;
   }
 
   let settingsBack = 'title';
   function showSettings(from) {
-    settingsBack = from || 'title';
+    settingsBack = from || settingsBack;
+    rerender = () => showSettings();
     show('settings', `
       <div class="panel">
-        <h2>設定</h2>
+        ${panelHead(t('settings'), settingsBack, '', true)}
         ${settingsHtml()}
-        <div class="actions"><button type="button" class="btn" data-act="${settingsBack}" data-back data-focus>戻る</button></div>
       </div>`);
+  }
+
+  // ---- 言語の切り替え ----
+  // HTML に書いた文言 (data-i18n) と、言語ごとの遊び方 (data-lang) を反映する
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.title = t('pageTitle');
+    const desc = document.querySelector('meta[name="description"]');
+    if (desc) desc.setAttribute('content', t('pageDesc'));
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
+    document.querySelectorAll('[data-lang]').forEach((el) => { el.hidden = el.dataset.lang !== lang; });
+    // 日本語 / EN のトグルで、いま選んでいる方を押された状態にする
+    if (langBtn) langBtn.querySelectorAll('[data-set-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.setLang === lang)));
+  }
+
+  if (langBtn) {
+    langBtn.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-set-lang]');
+      if (!b || b.dataset.setLang === lang || G) return;
+      lang = b.dataset.setLang;
+      try { localStorage.setItem(LANG_KEY, lang); } catch (err) { /* 保存できなくても切り替え自体は有効 */ }
+      Sound.init();
+      Sound.play('click');
+      applyLang();
+      if (rerender) rerender();
+    });
   }
 
   Object.assign(actions, {
@@ -5084,8 +6350,19 @@
     settings: (from) => showSettings(from),
   });
 
+  applyLang();
   showTitle();
 
   // テスト用 (ブラウザのコンソールから状態を見る)
-  window.__cs = { get G() { return G; }, save, step: (dt) => G && !G.paused && overlay.hidden && update(dt) };
+  window.__cs = {
+    get G() { return G; },
+    save,
+    step: (dt) => G && !G.paused && overlay.hidden && update(dt),
+    give: (id, lv = 1, evo = false) => {
+      const w = G.weapons.find((x) => x.id === id) || addWeapon(id);
+      w.lv = lv;
+      w.evo = evo;
+      recalcStats();
+    },
+  };
 })();

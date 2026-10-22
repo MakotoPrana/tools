@@ -62,7 +62,7 @@
 
 - `games/mole/build-itchio.py` を実行すると、itch.io にアップロードする zip（`games/mole/dist/mole-itchio.zip`）ができる
   - index.html の `<meta name="mole-edition" content="full">` を `demo` に書き換える
-  - ツール一覧へ戻るリンクを外す
+  - ゲーム一覧へ戻るリンクを外す
   - index.html・style.css・script.js を zip の一番上に入れる（itch.io の HTML ゲームの形式）
   - 共通のロゴアニメーション（`games/origami-intro.js`）と、それが使う画像（`assets/origami-crane.png`・`assets/origami-works-wordmark.png`）も zip に入れる
 - 体験版で遊べるのは第1章（STAGE 1〜10）だけ

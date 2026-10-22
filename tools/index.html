@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>ツール | Origami Works</title>
+  <meta name="description" content="ブラウザだけで使える、Origami Works のシンプルな便利ツール集です。登録不要・無料でご利用いただけます。" />
+  <link rel="icon" href="../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5093421396736590"
+     crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --text: #1f2933;
+      --muted: #6b7785;
+      --border: #dde2e8;
+      --accent: #2f7de1;
+      /* ロゴの折り鶴の青 */
+      --brand: #2c5f82;
+      --brand-soft: rgba(44, 95, 130, 0.08);
+      --fold: #d7e3ec;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #15191e;
+        --card: #1f252c;
+        --text: #e6eaef;
+        --muted: #9aa5b1;
+        --border: #333c46;
+        --accent: #5a9cf0;
+        --brand: #6fa3c9;
+        --brand-soft: rgba(111, 163, 201, 0.1);
+        --fold: #2b3d4c;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 12px 16px 48px;
+    }
+
+    .back { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
+    .back:hover { color: var(--accent); }
+
+    /* ヘッダー: 折り紙の面を重ねた背景に、ロゴの折り鶴とワードマーク (ゲーム一覧と同じ形) */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      margin: 12px 0 24px;
+      padding: 28px 20px 26px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background:
+        linear-gradient(135deg, var(--brand-soft) 0 32%, transparent 32%),
+        linear-gradient(225deg, var(--brand-soft) 0 22%, transparent 22%),
+        linear-gradient(20deg, transparent 62%, var(--brand-soft) 62%),
+        var(--card);
+      text-align: center;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -40px;
+      bottom: -56px;
+      width: 220px;
+      aspect-ratio: 354 / 290;
+      background: url("../assets/origami-crane.png") center / contain no-repeat;
+      opacity: 0.08;
+      transform: rotate(-12deg);
+      pointer-events: none;
+    }
+
+    .hero-crane {
+      display: block;
+      width: 112px;
+      height: auto;
+      margin: 0 auto 6px;
+      animation: glide 5s ease-in-out infinite;
+    }
+
+    @keyframes glide {
+      0%, 100% { transform: translateY(0) rotate(0); }
+      50% { transform: translateY(-6px) rotate(-2deg); }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .hero-crane { filter: drop-shadow(0 0 14px rgba(160, 200, 230, 0.25)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-crane { animation: none; }
+    }
+
+    .wordmark {
+      display: block;
+      width: 150px;
+      aspect-ratio: 260 / 101;
+      margin: 0 auto 14px;
+      background: var(--text);
+      -webkit-mask: url("../assets/origami-works-wordmark.png") center / contain no-repeat;
+      mask: url("../assets/origami-works-wordmark.png") center / contain no-repeat;
+    }
+
+    .hero h1 {
+      position: relative;
+      display: inline-block;
+      margin: 0;
+      font-size: 1.6rem;
+      letter-spacing: 0.08em;
+    }
+
+    .hero h1::before,
+    .hero h1::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      background: linear-gradient(135deg, var(--brand) 50%, var(--fold) 50%);
+      transform: translateY(-50%) rotate(45deg);
+    }
+    .hero h1::before { left: -26px; }
+    .hero h1::after { right: -26px; }
+
+    .hero p { position: relative; margin: 8px 0 0; color: var(--muted); font-size: 0.9rem; }
+
+    /* ツールの一覧 */
+    .tools { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+
+    .tool {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: inherit;
+      text-decoration: none;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+
+    .tool:hover, .tool:focus-visible { border-color: var(--brand); transform: translateY(-1px); }
+    .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .tool-icon {
+      flex: none;
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .tool-icon.water { background: #2a9d8f; }
+
+    .tool-body { flex: 1; min-width: 0; }
+    .tool-name { display: block; margin: 0; font-weight: 600; font-size: 1.05rem; }
+    .tool-desc { display: block; margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; }
+    .tool-arrow { flex: none; color: var(--muted); font-size: 1.2rem; }
+
+    footer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 0 16px 32px;
+    }
+    footer img { width: 36px; height: auto; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back" href="../">‹ トップ</a>
+
+    <header class="hero">
+      <img class="hero-crane" src="../assets/origami-crane.png" width="354" height="290" alt="" />
+      <span class="wordmark" role="img" aria-label="Origami Works"></span>
+      <h1>ツール</h1>
+      <p>ブラウザだけで使える、シンプルなツールを集めました。<br />登録不要・無料でご利用いただけます。</p>
+    </header>
+
+    <ul class="tools">
+      <li>
+        <a class="tool" href="bmi/">
+          <span class="tool-icon" aria-hidden="true">BMI</span>
+          <span class="tool-body">
+            <span class="tool-name">BMI計算</span>
+            <span class="tool-desc">身長と体重からBMI・肥満度・適正体重を計算。履歴をグラフで確認できます。</span>
+          </span>
+          <span class="tool-arrow" aria-hidden="true">›</span>
+        </a>
+      </li>
+      <li>
+        <a class="tool" href="water/">
+          <span class="tool-icon water" aria-hidden="true">水</span>
+          <span class="tool-body">
+            <span class="tool-name">水分量・カフェイン計算</span>
+            <span class="tool-desc">体重と運動量から1日に必要な水分量を計算。今日のカフェイン量が上限内かもチェックできます。</span>
+          </span>
+          <span class="tool-arrow" aria-hidden="true">›</span>
+        </a>
+      </li>
+    </ul>
+  </main>
+
+  <footer>
+    <img src="../assets/origami-crane.png" width="354" height="290" alt="" />
+    <span>&copy; tools.e-seventh.com</span>
+  </footer>
+</body>
+</html>
