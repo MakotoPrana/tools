@@ -12,8 +12,9 @@
 
     gtag('config', 'G-4VLZW1VMVC');
   </script>
-  <title>便利ツール集</title>
-  <meta name="description" content="ブラウザだけで使える、シンプルな便利ツール集です。" />
+  <title>Origami Works</title>
+  <meta name="description" content="Origami Works は、ブラウザだけで使える便利ツールと、すぐに遊べるゲームを作っています。登録不要・無料、スマホでも使えます。" />
+  <link rel="icon" href="assets/favicon.png" type="image/png" />
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5093421396736590"
      crossorigin="anonymous"></script>
   <style>
@@ -24,6 +25,10 @@
       --muted: #6b7785;
       --border: #dde2e8;
       --accent: #2f7de1;
+      /* ロゴの折り鶴の青 */
+      --brand: #2c5f82;
+      --brand-soft: rgba(44, 95, 130, 0.08);
+      --fold: #d7e3ec;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -34,6 +39,9 @@
         --muted: #9aa5b1;
         --border: #333c46;
         --accent: #5a9cf0;
+        --brand: #6fa3c9;
+        --brand-soft: rgba(111, 163, 201, 0.1);
+        --fold: #2b3d4c;
       }
     }
 
@@ -48,110 +56,253 @@
     }
 
     .container {
-      max-width: 480px;
+      max-width: 760px;
       margin: 0 auto;
-      padding: 24px 16px 48px;
+      padding: 20px 16px 48px;
     }
 
-    h1 { text-align: center; margin: 0 0 4px; font-size: 1.8rem; }
-    .subtitle { text-align: center; margin: 0 0 20px; color: var(--muted); font-size: 0.9rem; }
+    /* ヘッダー: 折り紙の面を重ねた背景に、大きな折り鶴とワードマーク */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      margin: 0 0 28px;
+      padding: 40px 20px 34px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background:
+        linear-gradient(135deg, var(--brand-soft) 0 32%, transparent 32%),
+        linear-gradient(225deg, var(--brand-soft) 0 22%, transparent 22%),
+        linear-gradient(20deg, transparent 62%, var(--brand-soft) 62%),
+        var(--card);
+      text-align: center;
+    }
 
-    .section { margin: 28px 0 10px; font-size: 1rem; color: var(--muted); }
+    /* 右下に大きく、うすく敷いた折り鶴 */
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -50px;
+      bottom: -70px;
+      width: 280px;
+      aspect-ratio: 354 / 290;
+      background: url("assets/origami-crane.png") center / contain no-repeat;
+      opacity: 0.07;
+      transform: rotate(-12deg);
+      pointer-events: none;
+    }
 
-    .tools { list-style: none; margin: 0; padding: 0; }
+    .hero-crane {
+      display: block;
+      width: 168px;
+      height: auto;
+      margin: 0 auto 8px;
+      animation: glide 5s ease-in-out infinite;
+    }
 
-    .tool {
-      display: flex;
-      align-items: center;
+    @keyframes glide {
+      0%, 100% { transform: translateY(0) rotate(0); }
+      50% { transform: translateY(-7px) rotate(-2deg); }
+    }
+
+    /* 暗い背景では鶴の青が沈むので、うしろをほんのり明るくする */
+    @media (prefers-color-scheme: dark) {
+      .hero-crane { filter: drop-shadow(0 0 16px rgba(160, 200, 230, 0.25)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-crane { animation: none; }
+    }
+
+    /* ワードマークは白抜きの画像をマスクにして、文字色で塗る (ダークモードでも読めるように) */
+    .wordmark {
+      display: block;
+      width: 230px;
+      max-width: 70%;
+      aspect-ratio: 260 / 101;
+      margin: 0 auto;
+      background: var(--text);
+      -webkit-mask: url("assets/origami-works-wordmark.png") center / contain no-repeat;
+      mask: url("assets/origami-works-wordmark.png") center / contain no-repeat;
+    }
+
+    h1 {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .hero p { position: relative; margin: 18px 0 0; color: var(--muted); font-size: 0.95rem; }
+    .nowrap { white-space: nowrap; }
+
+    /* ツールとゲームの入口 */
+    .doors {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 16px;
+    }
+
+    .door {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px 20px;
-      margin-bottom: 12px;
+      border-radius: 16px;
       color: inherit;
       text-decoration: none;
-      transition: border-color 0.15s, transform 0.15s;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
     }
 
-    .tool:hover, .tool:focus-visible { border-color: var(--accent); transform: translateY(-1px); }
-    .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .door:hover, .door:focus-visible {
+      border-color: var(--brand);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    }
+    .door:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    .tool-icon {
-      flex: none;
-      width: 48px;
-      height: 48px;
+    /* 右上の角を折り紙のように折る。ホバーで少し大きく折れる */
+    .door::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(225deg, var(--bg) 50%, var(--fold) 50%, var(--brand) 100%);
+      border-bottom-left-radius: 6px;
+      box-shadow: -2px 2px 4px rgba(0, 0, 0, 0.15);
+      transition: width 0.2s, height 0.2s;
+    }
+    .door:hover::after, .door:focus-visible::after { width: 46px; height: 46px; }
+
+    /* 入口の上の絵 */
+    .door-art {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      height: 150px;
+      padding: 18px;
+      border-bottom: 1px solid var(--border);
+      background:
+        linear-gradient(160deg, var(--brand-soft) 0 45%, transparent 45%),
+        var(--bg);
+    }
+
+    .tool-chip {
       display: grid;
       place-items: center;
-      border-radius: 10px;
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
       background: var(--accent);
       color: #fff;
-      font-weight: 700;
-      font-size: 0.95rem;
+      font-weight: 800;
+      font-size: 1rem;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
     }
+    .tool-chip:nth-child(2) { background: #2a9d8f; transform: rotate(4deg) translateY(6px); }
+    .tool-chip:nth-child(1) { transform: rotate(-4deg); }
 
-    .tool-body { flex: 1; min-width: 0; }
-    .tool-name { display: block; margin: 0; font-weight: 600; font-size: 1.05rem; }
-    .tool-desc { display: block; margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; }
-    .tool-arrow { flex: none; color: var(--muted); font-size: 1.2rem; }
+    .game-thumb {
+      width: 112px;
+      max-width: 30%;
+      height: auto;
+      aspect-ratio: 16 / 10;
+      object-fit: cover;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    }
+    .game-thumb:nth-child(1) { transform: rotate(-5deg) translateY(4px); }
+    .game-thumb:nth-child(2) { transform: translateY(-6px); z-index: 1; }
+    .game-thumb:nth-child(3) { transform: rotate(5deg) translateY(4px); }
 
-    footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 16px 32px; }
+    .door-body { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 16px 18px 18px; }
+    .door-name { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: 0.06em; }
+    .door-desc { margin: 0; color: var(--muted); font-size: 0.88rem; }
+    .door-list { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+    .door-list li {
+      padding: 1px 10px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .door-go { margin-top: auto; padding-top: 8px; color: var(--brand); font-weight: 700; font-size: 0.9rem; }
+
+    footer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 0 16px 32px;
+    }
+    footer img { width: 36px; height: auto; opacity: 0.8; }
   </style>
 </head>
 <body>
   <main class="container">
-    <h1>便利ツール集</h1>
-    <p class="subtitle">ブラウザだけで使える、シンプルなツールを集めました。<br />登録不要・無料でご利用いただけます。</p>
+    <header class="hero">
+      <img class="hero-crane" src="assets/origami-crane.png" width="354" height="290" alt="" />
+      <span class="wordmark" role="img" aria-label="Origami Works"></span>
+      <h1>Origami Works</h1>
+      <p>ブラウザですぐに使える、<span class="nowrap">ちいさなツールとゲーム。</span><br />登録不要・無料、スマホでも使えます。</p>
+    </header>
 
-    <h2 class="section">ツール</h2>
-    <ul class="tools">
+    <ul class="doors">
       <li>
-        <a class="tool" href="tools/bmi/">
-          <span class="tool-icon" aria-hidden="true">BMI</span>
-          <span class="tool-body">
-            <span class="tool-name">BMI計算</span>
-            <span class="tool-desc">身長と体重からBMI・肥満度・適正体重を計算。履歴をグラフで確認できます。</span>
-          </span>
-          <span class="tool-arrow" aria-hidden="true">›</span>
+        <a class="door" href="tools/">
+          <div class="door-art" aria-hidden="true">
+            <span class="tool-chip">BMI</span>
+            <span class="tool-chip">水</span>
+          </div>
+          <div class="door-body">
+            <h2 class="door-name">ツール</h2>
+            <p class="door-desc">毎日の健康管理に役立つ、計算ツール。入力するとすぐに結果がわかります。</p>
+            <ul class="door-list">
+              <li>BMI計算</li>
+              <li>水分量・カフェイン計算</li>
+            </ul>
+            <span class="door-go">ツール一覧へ ›</span>
+          </div>
         </a>
       </li>
       <li>
-        <a class="tool" href="tools/water/">
-          <span class="tool-icon" aria-hidden="true">水</span>
-          <span class="tool-body">
-            <span class="tool-name">水分量・カフェイン計算</span>
-            <span class="tool-desc">体重と運動量から1日に必要な水分量を計算。今日のカフェイン量が上限内かもチェックできます。</span>
-          </span>
-          <span class="tool-arrow" aria-hidden="true">›</span>
-        </a>
-      </li>
-    </ul>
-
-    <h2 class="section">ゲーム</h2>
-    <ul class="tools">
-      <li>
-        <a class="tool" href="games/breakout/">
-          <span class="tool-icon" aria-hidden="true">崩</span>
-          <span class="tool-body">
-            <span class="tool-name">BRICK SIEGE</span>
-            <span class="tool-desc">迫りくるブロックから防衛ラインを守り抜く、タワーディフェンス風のブロック崩し。スマホは指でなぞって操作できます。</span>
-          </span>
-          <span class="tool-arrow" aria-hidden="true">›</span>
-        </a>
-      </li>
-      <li>
-        <a class="tool" href="games/mole/">
-          <span class="tool-icon" aria-hidden="true">叩</span>
-          <span class="tool-body">
-            <span class="tool-name">モグラたたき</span>
-            <span class="tool-desc">モグラやウサギ、パンダなど15種類の動物が出てくるモグラたたき。全30ステージで、伝説の動物を捕まえて図鑑を埋めよう。</span>
-          </span>
-          <span class="tool-arrow" aria-hidden="true">›</span>
+        <a class="door" href="games/">
+          <div class="door-art" aria-hidden="true">
+            <img class="game-thumb" src="games/breakout/thumb.svg" width="320" height="200" alt="" />
+            <img class="game-thumb" src="games/cleaning-survivors/thumb.svg" width="320" height="200" alt="" />
+            <img class="game-thumb" src="games/mole/thumb.svg" width="320" height="200" alt="" />
+          </div>
+          <div class="door-body">
+            <h2 class="door-name">ゲーム</h2>
+            <p class="door-desc">ブラウザですぐに遊べるゲーム。スマホでもパソコンでも遊べます。</p>
+            <ul class="door-list">
+              <li>BRICK SIEGE</li>
+              <li>おそうじサバイバー</li>
+              <li>モグラたたき</li>
+            </ul>
+            <span class="door-go">ゲーム一覧へ ›</span>
+          </div>
         </a>
       </li>
     </ul>
   </main>
 
-  <footer>&copy; tools.e-seventh.com</footer>
+  <footer>
+    <img src="assets/origami-crane.png" width="354" height="290" alt="" />
+    <span>&copy; tools.e-seventh.com</span>
+  </footer>
 </body>
 </html>

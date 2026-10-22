@@ -210,3 +210,8 @@ button[type="submit"]:hover { filter: brightness(1.1); }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
 th { color: var(--muted); font-weight: 600; }
+
+/* ツール一覧へ戻るリンク */
+.back { margin: 0 0 8px; font-size: 0.85rem; }
+.back a { color: var(--muted); text-decoration: none; }
+.back a:hover { color: var(--accent); }
