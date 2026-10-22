@@ -107,6 +107,8 @@
   };
   const ENEMY_ORDER = ['dust', 'hair', 'paper', 'can', 'bottle', 'grease', 'spore', 'bag', 'pile', 'drain', 'nest', 'boxes', 'yokai', 'kaiju', 'master'];
   const GEM_XP = [1, 3, 8];
+  const ELITE_MAX = 2;
+  const ELITE_CHEST_GAP = 35;
   // レベル n から n+1 に必要な経験値 (レベルが上がるほど多く必要になる)
   const xpFor = (n) => Math.round(12 + 5 * n + 0.4 * n * n);
   const GEM_BOX = [1, 2, 4];
@@ -729,6 +731,7 @@
       se: '効果音',
       bgm: 'BGM',
       shake: '画面の揺れ・フラッシュ',
+      haze: '汚れの靄',
     },
     en: {
       pageTitle: 'Cleaning Survivors',
@@ -863,6 +866,7 @@
       se: 'Sound effects',
       bgm: 'Music',
       shake: 'Screen shake & flash',
+      haze: 'Grime haze',
     },
   };
 
@@ -896,7 +900,7 @@
     rec: {},
     treasures: STAGES.map(() => false),
     kills: {},
-    settings: { se: 70, bgm: 50, shake: true },
+    settings: { se: 70, bgm: 50, shake: true, haze: true },
     char: 'cleaner',
     mode: 'normal',
   });
@@ -2523,6 +2527,9 @@
       hitstop: 0,
       sparkBudget: 0,
       kyuStreak: 0,
+      eliteChestT: -99,
+      haze: 1,
+      hazeT: 0,
       kyuLast: -1,
       cam: { x: ROOM / 2, y: ROOM / 2 },
     };
@@ -3145,6 +3152,7 @@
     e.shield = 1;
     e.shieldT = 0;
     e.elite = !!opt.elite;
+    e.eventElite = !!opt.event;
     e.boss = !!def.boss;
     e.alive = true;
     e.flee = false;
@@ -3247,7 +3255,8 @@
   // ゴミを1つ (ホコリなら3つ) 湧かせる。home は住みかの部屋 (-1 は住みかなし = いつも追いかけてくる)
   function spawnGroup(x, y, danger, kind, home, src) {
     const type = pickWeighted(typeWeights(danger, kind));
-    const elite = Math.random() < DANGER[danger].elite;
+    // 金色のふちのゴミは、同時に ELITE_MAX 体まで (汚れのキツい部屋で群れて出て、宝箱が出過ぎないように)
+    const elite = Math.random() < DANGER[danger].elite && G.bosses.filter((b) => b.alive && b.elite && !b.eventElite).length < ELITE_MAX;
     const n = type === 'dust' && !elite ? 3 : 1;
     for (let k = 0; k < n; k++) {
       const e = spawnEnemy(type, x + (n > 1 ? rand(-14, 14) : 0), y + (n > 1 ? rand(-14, 14) : 0), { danger, elite, home });
@@ -3322,7 +3331,7 @@
         Sound.play('warn');
       } else if (ev.kind === 'elite') {
         const pos = spawnPos(60);
-        if (pos) spawnEnemy(pick(G.time < 200 ? ['paper', 'can'] : ['grease', 'bag', 'paper']), pos[0], pos[1], { elite: true, force: true });
+        if (pos) spawnEnemy(pick(G.time < 200 ? ['paper', 'can'] : ['grease', 'bag', 'paper']), pos[0], pos[1], { elite: true, force: true, event: true });
       } else if (ev.kind === 'midboss') {
         const pos = spawnPos(80);
         if (pos) spawnEnemy('yokai', pos[0], pos[1], { force: true });
@@ -3617,7 +3626,15 @@
       G.shake = Math.max(G.shake, 8);
     } else if (e.elite) {
       dropGem(e.x, e.y, 2);
-      G.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 });
+      // 宝箱は、決まった時間に出るものは必ず、部屋で湧いたものは前の宝箱から ELITE_CHEST_GAP 秒たっていれば落とす
+      if (e.eventElite || G.time - G.eliteChestT >= ELITE_CHEST_GAP) {
+        G.eliteChestT = G.time;
+        G.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 });
+      } else {
+        dropGem(e.x + 12, e.y, 2);
+        dropGem(e.x - 12, e.y, 2);
+        if (Math.random() < 0.3) G.items.push({ kind: 'heal', x: e.x, y: e.y + 12, t: 0 });
+      }
     } else {
       dropGem(e.x, e.y, Math.min(2, def.gem + (Math.random() < DANGER[e.danger].upgrade ? 1 : 0)));
       if (def.gem === 2 && Math.random() < 0.04) G.items.push({ kind: 'heal', x: e.x + 10, y: e.y, t: 0 });
@@ -4495,6 +4512,19 @@
     }
   }
 
+  // 汚れの靄: いる部屋のまわりの汚れ (6割) と、家全体の汚れ (4割) で濃さが決まる。きれいにすると晴れていく
+  function updateHaze(dt) {
+    G.hazeT -= dt;
+    if (G.hazeT <= 0) {
+      G.hazeT = 0.25;
+      const p = G.p;
+      const local = dirtiness(p.x, p.y, 320, roomAt(p.x, p.y));
+      const house = 1 - cleanPct() / 100;
+      G.hazeTarget = clamp((local * 0.6 + house * 0.4 - 0.08) / 0.6, 0, 1);
+    }
+    G.haze += ((G.hazeTarget ?? G.haze) - G.haze) * Math.min(1, dt * 0.9);
+  }
+
   // ===================================================================
   // 1フレームの更新
   // ===================================================================
@@ -4516,6 +4546,7 @@
         buildFlow();
       }
       updateSpawns(dt);
+      updateHaze(dt);
     } else {
       G.endT += dt;
     }
@@ -5219,6 +5250,7 @@
 
     // ここから画面の座標
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (save.settings.haze && G.haze > 0.02) drawHaze(tm, (p.x - cam.x) * view.zoom + view.w / 2, (p.y - cam.y) * view.zoom + view.h / 2);
     if (G.flash > 0 && save.settings.shake) {
       ctx.fillStyle = `rgba(255,255,255,${G.flash * 1.6})`;
       ctx.fillRect(0, 0, view.w, view.h);
@@ -5236,6 +5268,78 @@
       if ((it.kind === 'chest' || it.kind === 'treasure') && !inView(it.x, it.y, 0)) offscreenArrow(it.x, it.y, '#ffcf4a');
     }
     drawHud(tm);
+  }
+
+  // ---- 汚れの靄 ----
+  // 茶色がかったもやの模様 (つなぎ目が目立たないように、はみ出した分を反対側にも描く)
+  let hazeTex = null;
+  function hazeTexture() {
+    if (hazeTex) return hazeTex;
+    const S = 256;
+    hazeTex = document.createElement('canvas');
+    hazeTex.width = hazeTex.height = S;
+    const c = hazeTex.getContext('2d');
+    for (let i = 0; i < 70; i++) {
+      const x = rand(0, S);
+      const y = rand(0, S);
+      const r = rand(18, 70);
+      const a = rand(0.08, 0.22);
+      for (const ox of [-S, 0, S]) {
+        for (const oy of [-S, 0, S]) {
+          const g = c.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+          g.addColorStop(0, `rgba(150,128,96,${a})`);
+          g.addColorStop(1, 'rgba(150,128,96,0)');
+          c.fillStyle = g;
+          c.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+        }
+      }
+    }
+    return hazeTex;
+  }
+
+  // 靄は小さなキャンバスに描いてから引き伸ばす (軽くするため)。主人公のまわりは少し薄くして、足元が見えるようにする
+  const hazeCv = document.createElement('canvas');
+  const hazeCtx = hazeCv.getContext('2d');
+  function drawHaze(tm, px, py) {
+    const k = 4;
+    const w = Math.ceil(view.w / k);
+    const h = Math.ceil(view.h / k);
+    if (hazeCv.width !== w || hazeCv.height !== h) {
+      hazeCv.width = w;
+      hazeCv.height = h;
+    }
+    const c = hazeCtx;
+    c.globalCompositeOperation = 'source-over';
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = 'rgba(120,102,78,0.55)';
+    c.fillRect(0, 0, w, h);
+    // ゆっくり流れる2枚のもや (カメラに少しついてくる)
+    const pat = c.createPattern(hazeTexture(), 'repeat');
+    c.fillStyle = pat;
+    for (const [sp, sc, al] of [[6, 0.5, 1], [-4, 0.75, 0.8]]) {
+      const ox = (tm * sp - G.cam.x * 0.15) * sc;
+      const oy = (tm * sp * 0.4 - G.cam.y * 0.15) * sc;
+      c.save();
+      c.globalAlpha = al;
+      c.scale(sc, sc);
+      c.translate(ox % 256, oy % 256);
+      c.fillRect(-256, -256, w / sc + 512, h / sc + 512);
+      c.restore();
+    }
+    c.globalCompositeOperation = 'destination-out';
+    const rr = Math.min(w, h) * 0.42;
+    const g = c.createRadialGradient(px / k, py / k, 0, px / k, py / k, rr);
+    g.addColorStop(0, 'rgba(0,0,0,0.75)');
+    g.addColorStop(0.55, 'rgba(0,0,0,0.4)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'source-over';
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, G.haze) * 0.72;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(hazeCv, 0, 0, view.w, view.h);
+    ctx.restore();
   }
 
   // 発生源の上に、汚れバリアの強さ (5段階) と、いま通るダメージの割合を出す
@@ -6143,7 +6247,8 @@
     return `
       <label class="setting">${t('se')}<input type="range" min="0" max="100" step="5" value="${st.se}" data-setting="se"></label>
       <label class="setting">${t('bgm')}<input type="range" min="0" max="100" step="5" value="${st.bgm}" data-setting="bgm"></label>
-      <label class="setting">${t('shake')}<input type="checkbox" ${st.shake ? 'checked' : ''} data-setting="shake"></label>`;
+      <label class="setting">${t('shake')}<input type="checkbox" ${st.shake ? 'checked' : ''} data-setting="shake"></label>
+      <label class="setting">${t('haze')}<input type="checkbox" ${st.haze ? 'checked' : ''} data-setting="haze"></label>`;
   }
 
   let settingsBack = 'title';
