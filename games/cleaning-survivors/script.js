@@ -656,6 +656,11 @@
       play: 'はじめる',
       cleaners: '清掃員',
       tutorial: 'チュートリアル',
+      tutAskTitle: 'はじめての方へ',
+      tutAskText: 'まずは<b>チュートリアル</b>で遊び方を覚えませんか? 3部屋だけの小さな家を、ヒントを見ながら<b>2〜3分</b>で片付けます。',
+      tutAskPlay: 'チュートリアルを遊ぶ',
+      tutAskSkip: 'スキップ',
+      tutAskNote: 'スキップすると、この案内はもう出ません。チュートリアルはタイトルとステージ選択からいつでも遊べます。',
       tutorialMeta: '2〜3分で遊び方を覚える、3部屋だけの小さな家',
       recommended: 'はじめての方に',
       toStage1: 'ステージ1へ',
@@ -806,6 +811,11 @@
       play: 'Play',
       cleaners: 'Cleaners',
       tutorial: 'Tutorial',
+      tutAskTitle: 'New to the game?',
+      tutAskText: 'Want to learn the basics in the <b>tutorial</b> first? You\'ll clean a tiny three-room house in <b>2–3 minutes</b> with hints along the way.',
+      tutAskPlay: 'Play the tutorial',
+      tutAskSkip: 'Skip',
+      tutAskNote: 'If you skip, this message won\'t appear again. You can play the tutorial anytime from the title screen or stage select.',
       tutorialMeta: 'A tiny three-room house to learn the basics in 2–3 minutes',
       recommended: 'New players',
       toStage1: 'Go to Stage 1',
@@ -954,6 +964,7 @@
     char: 'cleaner',
     mode: 'normal',
     tutorialDone: false,
+    tutorialSeen: false, // チュートリアルを始めたか、案内でスキップを選んだ (もう案内を出さない)
   });
 
   function loadSave() {
@@ -969,6 +980,7 @@
       if (CHARS.some((c) => c.id === d.char)) s.char = d.char;
       if (MODES[d.mode]) s.mode = d.mode;
       s.tutorialDone = !!d.tutorialDone;
+      s.tutorialSeen = !!d.tutorialSeen || s.tutorialDone;
       if (d.v === 2) {
         if (d.rec && typeof d.rec === 'object') s.rec = d.rec;
         if (Array.isArray(d.treasures)) d.treasures.forEach((v, i) => { if (i < s.treasures.length) s.treasures[i] = !!v; });
@@ -5913,7 +5925,7 @@
         <div class="title-cast"><img src="${charThumb('cleaner')}" alt="">${['dust', 'paper', 'can', 'grease', 'spore', 'bag'].map((k) => `<img src="${enemyThumb(k)}" alt="">`).join('')}</div>
         ${completionHtml()}
         <div class="actions">
-          <button type="button" class="btn primary" data-act="rooms" data-focus>${t('play')}</button>
+          <button type="button" class="btn primary" data-act="play" data-focus>${t('play')}</button>
           <button type="button" class="btn${save.tutorialDone ? '' : ' tut-btn'}" data-act="start" data-arg="${TUT}">${t('tutorial')}</button>
           <button type="button" class="btn trophy" data-act="chars" data-arg="title"><span aria-hidden="true">🏆</span> ${t('achievements')}</button>
           <button type="button" class="btn" data-act="settings" data-arg="title">${t('settings')}</button>
@@ -5972,6 +5984,21 @@
           <button type="button" class="btn small" data-act="zukan">${t('zukan')}</button>
           <button type="button" class="btn small" data-act="settings" data-arg="rooms">${t('settings')}</button>
         </div>
+      </div>`);
+  }
+
+  // はじめて「はじめる」を押したときの、チュートリアルの案内
+  function showTutorialAsk() {
+    rerender = showTutorialAsk;
+    show('tutAsk', `
+      <div class="panel tut-ask">
+        ${panelHead(t('tutAskTitle'), 'title')}
+        <p class="tut-ask-text">${t('tutAskText')}</p>
+        <div class="actions">
+          <button type="button" class="btn primary" data-act="start" data-arg="${TUT}" data-focus>${t('tutAskPlay')}</button>
+          <button type="button" class="btn" data-act="skipTutorial">${t('tutAskSkip')}</button>
+        </div>
+        <p class="tut-ask-note">${t('tutAskNote')}</p>
       </div>`);
   }
 
@@ -6130,6 +6157,10 @@
   }
 
   function startGame(stageIdx) {
+    if (stageIdx === TUT && !save.tutorialSeen) {
+      save.tutorialSeen = true;
+      persist();
+    }
     Sound.init();
     newGame(stageIdx);
     rerender = null;
@@ -6519,6 +6550,12 @@
 
   Object.assign(actions, {
     title: showTitle,
+    play: () => (save.tutorialSeen ? showRooms() : showTutorialAsk()),
+    skipTutorial: () => {
+      save.tutorialSeen = true;
+      persist();
+      showRooms();
+    },
     rooms: showRooms,
     brief: (i) => showBrief(i),
     char: (id) => {
