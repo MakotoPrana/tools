@@ -510,3 +510,58 @@ body {
 .help th { background: var(--card); font-weight: 600; width: 45%; }
 
 footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 16px 32px; }
+
+/* 達成率 */
+.completion { width: min(360px, 100%); margin: 18px auto 0; text-align: left; }
+.completion-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; }
+.completion-head b { color: var(--gold); font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.completion-bar { height: 8px; margin: 4px 0; border-radius: 999px; background: var(--panel-3); overflow: hidden; }
+.completion-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--mint), var(--gold)); }
+.completion-meta { font-size: 0.78rem; color: var(--panel-muted); }
+.panel:not(.bare) .completion { margin-top: 4px; margin-bottom: 10px; }
+
+/* モードの切り替え */
+.mode-tabs { display: flex; justify-content: center; gap: 0; margin: 4px auto 12px; width: fit-content; border-radius: 999px; background: var(--panel-2); padding: 3px; }
+.mode-tab { min-width: 110px; padding: 6px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--panel-muted); font: inherit; font-weight: 800; cursor: pointer; }
+.mode-tab.on.normal { background: var(--mint); color: #08261d; }
+.mode-tab.on.hard { background: var(--danger); color: #2a0606; }
+.mode-tab:focus-visible { outline: 2px solid var(--gold); }
+.mode-note { margin: -4px 0 10px; font-size: 0.78rem; color: #ffb3b3; text-align: center; }
+
+/* ステージのクリア状況 */
+.badges { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: 2px; }
+.badge { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 4px; border-radius: 4px; background: var(--panel-3); color: var(--panel-muted); font-size: 0.68rem; font-weight: 800; }
+.badge.n.on { background: var(--mint); color: #08261d; }
+.badge.h.on { background: var(--danger); color: #2a0606; }
+.badge.t.on { background: var(--gold); color: #3a2400; }
+
+/* 清掃員 */
+.char-trait { font-size: 0.75rem; color: var(--gold); font-weight: 700; }
+.chars { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+
+/* 宝物 */
+.treasure-line { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--panel-2); font-size: 0.85rem; color: var(--panel-muted); }
+.treasure-line img { flex: none; width: 34px; height: 34px; filter: grayscale(1) brightness(0.6); }
+.treasure-line.found { color: var(--gold); }
+.treasure-line.found img { filter: none; }
+.treasure-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.treasure-list li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: var(--panel-2); font-size: 0.85rem; color: var(--panel-muted); }
+.treasure-list img { flex: none; width: 30px; height: 30px; filter: grayscale(1) brightness(0.5); }
+.treasure-list li.found { color: var(--panel-text); }
+.treasure-list li.found b { color: var(--gold); }
+.treasure-list li.found img { filter: none; }
+.treasure-name { margin: 4px 0 0; text-align: center; font-size: 1.2rem; font-weight: 900; color: var(--gold); }
+
+/* 清掃員ごとの記録 */
+.rec-head { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.rec-head img { width: 64px; height: 64px; }
+.rec-head h2 { text-align: left; }
+.rec-head .sub { text-align: left; margin: 0; }
+.rec-wrap { overflow-x: auto; }
+.rec-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.rec-table th, .rec-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); text-align: left; white-space: nowrap; }
+.rec-table th { color: var(--panel-text); font-weight: 600; }
+.rec-table thead th { color: var(--panel-muted); font-size: 0.78rem; }
+.rec-table td.ok { color: var(--mint); font-weight: 800; }
+.rec-table td.part { color: var(--gold); }
+.rec-table td.none { color: var(--panel-muted); }
