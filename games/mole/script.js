@@ -1623,7 +1623,6 @@
     ja: {
       pageTitle: 'モグラたたき',
       pageDesc: 'モグラやウサギ、パンダなど15種類の動物が出てくるモグラたたき。全30ステージで、伝説の動物を捕まえて図鑑を埋めよう。',
-      backToTools: '‹ ツール一覧',
       gameTitle: 'モグラたたき',
       subtitle: 'どうぶつ大集合',
       soundHint: '画面をタップすると BGM と効果音が鳴ります',
@@ -1712,7 +1711,6 @@
     en: {
       pageTitle: 'Whack-a-Mole',
       pageDesc: 'A whack-a-mole game with 15 kinds of animals, from moles and rabbits to pandas. Play all 30 stages and catch legendary animals to fill your field guide.',
-      backToTools: '‹ All tools',
       gameTitle: 'Whack-a-Mole',
       subtitle: 'Animal Round-Up',
       soundHint: 'Tap the screen to turn on music and sound effects',

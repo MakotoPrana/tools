@@ -21,7 +21,6 @@
 <body>
   <main class="app">
     <header class="top">
-      <a class="back" href="../../" data-i18n="backToTools">‹ ツール一覧</a>
       <h1 data-i18n="gameTitle">モグラたたき</h1>
       <div class="top-btns">
         <div class="lang-toggle" id="lang-btn" role="group" aria-label="言語 / Language">
@@ -51,6 +50,8 @@
       </div>
       <!-- 体験版だけ、完全版 (tools.e-seventh.com) への案内を出す -->
       <div class="promo" data-promo="title" hidden></div>
+      <!-- ほかのゲームへのリンク (games/more-games.js が描く) -->
+      <div data-more-games></div>
     </section>
 
     <!-- ステージ選択 -->
@@ -271,5 +272,6 @@
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
   <script src="script.js"></script>
+  <script src="../more-games.js" data-current="mole"></script>
 </body>
 </html>

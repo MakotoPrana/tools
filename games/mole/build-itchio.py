@@ -9,9 +9,9 @@ games/mole/dist/mole-itchio.zip ができるので、itch.io のプロジェク�
 
 やっていること:
 - index.html の <meta name="mole-edition"> を demo にする (STAGE 11〜30 は鍵つきで表示される)
-- ツール一覧へ戻るリンクを外す (itch.io では行き先がないため)
 - index.html・style.css・script.js を zip の一番上に入れる
 - 共通のロゴアニメーション (games/origami-intro.js) と、それが使う画像 (assets/ の2つ) も入れる
+- ほかのゲームの一覧 (games/more-games.js) も入れ、リンク先を tools.e-seventh.com のゲームにする (UTM つき、新しいタブ)
 """
 
 import re
@@ -33,14 +33,16 @@ def build_index() -> str:
     if n != 1:
         raise SystemExit('index.html に <meta name="mole-edition" content="full" /> が見つかりません')
 
-    html, n = re.subn(r'\s*<a class="back"[^>]*>.*?</a>', '', html)
-    if n != 1:
-        raise SystemExit('index.html にツール一覧へ戻るリンクが見つかりません')
 
     # zip の中ではロゴアニメーションを同じ階層に、画像を assets/ に置く
     html, n = re.subn(r'<script src="\.\./origami-intro\.js"></script>', '<script src="origami-intro.js" data-assets="assets/"></script>', html)
     if n != 1:
         raise SystemExit('index.html に ../origami-intro.js の読み込みが見つかりません')
+
+    html, n = re.subn(r'<script src="\.\./more-games\.js" data-current="mole"></script>',
+                      '<script src="more-games.js" data-current="mole" data-base="https://tools.e-seventh.com/games/" data-utm="itch.io"></script>', html)
+    if n != 1:
+        raise SystemExit('index.html に ../more-games.js の読み込みが見つかりません')
 
     return html
 
@@ -52,6 +54,7 @@ def main() -> None:
         for name in ('style.css', 'script.js'):
             z.write(HERE / name, name)
         z.write(GAMES / 'origami-intro.js', 'origami-intro.js')
+        z.write(GAMES / 'more-games.js', 'more-games.js')
         for name in INTRO_IMAGES:
             z.write(ASSETS / name, f'assets/{name}')
     print(f'作成しました: {OUT_ZIP}')

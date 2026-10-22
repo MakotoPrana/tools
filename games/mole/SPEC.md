@@ -11,6 +11,7 @@
 ## 画面の流れ
 
 - （ロゴ）→ タイトル → ステージ選択 → ステージ開始前の確認画面 → プレイ → 結果画面
+- タイトル画面には「ほかのゲーム」として、ほかのゲームへのリンク（サムネイル・名前・説明）と「すべてのゲームを見る」（ゲーム一覧へ）を出す。一覧は全ゲーム共通の `games/more-games.js` で管理する。ツール一覧へ戻るリンクは置かない
 - ページを開くと、最初に Origami Works のロゴアニメーション（2秒）が流れ、そのあとタイトルが出る。タップかキーで飛ばせる（飛ばした操作はゲームには伝わらない）。アニメーションは全ゲーム共通の `games/origami-intro.js`
 - ステージ選択から「図鑑」画面へ移動でき、「戻る」でステージ選択に戻る
 - 結果画面からは「次のステージへ」「もう一度」「ステージ選択へ」を選べる
@@ -62,7 +63,7 @@
 
 - `games/mole/build-itchio.py` を実行すると、itch.io にアップロードする zip（`games/mole/dist/mole-itchio.zip`）ができる
   - index.html の `<meta name="mole-edition" content="full">` を `demo` に書き換える
-  - ツール一覧へ戻るリンクを外す
+  - ほかのゲームの一覧のリンク先を tools.e-seventh.com のゲームにする（UTM パラメータつき、新しいタブで開く）
   - index.html・style.css・script.js を zip の一番上に入れる（itch.io の HTML ゲームの形式）
   - 共通のロゴアニメーション（`games/origami-intro.js`）と、それが使う画像（`assets/origami-crane.png`・`assets/origami-works-wordmark.png`）も zip に入れる
 - 体験版で遊べるのは第1章（STAGE 1〜10）だけ

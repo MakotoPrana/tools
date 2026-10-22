@@ -22,7 +22,6 @@
 <body>
   <main class="app">
     <header class="top" id="top">
-      <a class="back" href="../../">‹ ツール一覧</a>
       <h1>BRICK SIEGE</h1>
       <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" tabindex="-1">Ⅱ</button>
     </header>
@@ -46,6 +45,8 @@
         <p class="overlay-text" id="overlay-text"></p>
         <div class="panel" id="panel" hidden></div>
         <div class="overlay-actions" id="overlay-actions"></div>
+        <!-- タイトル画面のときだけ、ほかのゲームへのリンクを出す (games/more-games.js が描く) -->
+        <div class="title-more" data-more-games></div>
       </div>
     </div>
 
@@ -120,5 +121,6 @@
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
   <script src="script.js?v=2"></script>
+  <script src="../more-games.js" data-current="breakout"></script>
 </body>
 </html>

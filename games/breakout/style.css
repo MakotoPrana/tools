@@ -178,6 +178,11 @@ body {
   text-shadow: 0 1px 3px #000, 0 0 8px #000;
 }
 
+/* ほかのゲームへのリンクは、タイトル画面が出ているときだけ見せる */
+#title-screen[hidden] ~ .title-more { display: none; }
+.title-more { margin-top: 4px; max-width: 360px; color: #e6eaef; }
+.title-more .more-game { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.25); }
+
 .game-tagline {
   margin: 0;
   color: #ff8f8f;
