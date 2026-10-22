@@ -15,25 +15,31 @@
   <title>おそうじサバイバー</title>
   <meta name="description" content="押し寄せるゴミと汚れを、清掃ギアで一気に片付けるヴァンサバ風アクション。全10ステージ・ノーマルとハード。汚れレベルの違う部屋を、10分以内に全部ピカピカにしよう。" />
   <link rel="icon" href="../../assets/favicon.png" type="image/png" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <main class="app">
     <header class="top">
-      <a class="back" href="../">‹ ゲーム一覧</a>
-      <h1>おそうじサバイバー</h1>
-      <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" tabindex="-1" style="visibility: hidden">Ⅱ</button>
+      <a class="back" href="../" data-i18n="backToGames">‹ ゲーム一覧</a>
+      <h1 data-i18n="gameTitle">おそうじサバイバー</h1>
+      <div class="top-btns">
+        <div class="lang-toggle" id="lang-btn" role="group" aria-label="言語 / Language">
+          <button type="button" data-set-lang="ja" lang="ja" aria-pressed="true">日本語</button>
+          <button type="button" data-set-lang="en" lang="en" aria-pressed="false">EN</button>
+        </div>
+        <button type="button" id="pause-btn" class="icon-btn" data-i18n-aria="pause" aria-label="一時停止" tabindex="-1" style="visibility: hidden">Ⅱ</button>
+      </div>
     </header>
 
     <div class="board-wrap" id="board-wrap">
-      <canvas id="board" aria-label="ゲーム画面"></canvas>
+      <canvas id="board" data-i18n-aria="board" aria-label="ゲーム画面"></canvas>
       <button type="button" id="bomb-btn" class="bomb-btn" tabindex="-1" hidden>
-        <span class="bomb-name">ゴミ圧縮</span><span class="bomb-key">Space</span>
+        <span class="bomb-name" data-i18n="compress">ゴミ圧縮</span><span class="bomb-key">Space</span>
       </button>
       <div class="overlay" id="overlay" hidden></div>
     </div>
 
-    <section class="help">
+    <section class="help" data-lang="ja">
       <h2>遊び方</h2>
       <p>ゴミ屋敷の部屋を、清掃ギアでゴミを片付けながら <b>10分以内に全部ピカピカにする</b>ゲームです。操作するのは移動だけで、清掃ギアは自動で動きます。片付けたゴミはダストを落とし、拾うと経験値になります。レベルアップしたら、新しい清掃ギアやパッシブを1つ選んで強くなりましょう。時間切れか、体力がなくなると失敗です。</p>
 
@@ -95,6 +101,69 @@
         </tbody>
       </table>
     </section>
+
+    <section class="help" data-lang="en" hidden>
+      <h2>How to Play</h2>
+      <p>Clear the trash out of a junk-filled house with your cleaning gear and <b>get every room sparkling clean within 10 minutes</b>. You only control movement: your cleaning gear works automatically. Cleared trash drops dust, which you pick up as experience. When you level up, choose a new piece of cleaning gear or a passive to grow stronger. You fail if time runs out or your HP hits zero.</p>
+
+      <h3>Floor Plans and Sources</h3>
+      <p>There are 10 stages. Each stage is a house of 5–7 rooms divided by walls and doors. Rooms contain "sources" ringed with a red dotted circle (trash piles, drains, mold nests, cardboard heaps), and most of the trash spawns from them. Sources keep dirtying the floor around them until destroyed. Sources are also wrapped in a "grime barrier" (a brown film) that makes them tougher the dirtier the floor around them is. The more you clean around a source, the more your attacks hurt it, so scrub around it first. The more sources you destroy, the less trash spawns. The minimap in the top left shows how dirty each room is and where the sources (red) are.</p>
+
+      <h3>Room Filth Level (★)</h3>
+      <p>Each room has a filth level from ★1 to ★5. The more ★, the filthier the room, with more and tougher sources and far more, far stronger trash (grease and mold appear from ★3, garbage bags from ★4). Trash in a room wanders around inside it until you enter or come close. Walk into a ★5 room at a low level and you'll be wiped out quickly, so start with the rooms with fewer ★ and build up your strength. Trash in high-★ rooms drops bigger dust more often.</p>
+
+      <h3>Finishing a Room</h3>
+      <p>Destroy every source in a room and clean at least 90% of its floor to finish that room (the rest is polished automatically). You get a chest and a room-specific bonus (faster movement, more max HP, and so on), and the room never gets dirty again.</p>
+
+      <h3>Normal and Hard</h3>
+      <p>Every stage has Normal and Hard modes. Clearing a stage on Normal unlocks the next stage and Hard mode for that stage. Hard has more, tougher trash and is almost impossible to clear as you are. Spend coins on "permanent skills" before taking it on (Hard pays 1.6× coins).</p>
+
+      <h3>Permanent Skills</h3>
+      <p>Spend the coins you earn to raise HP, attack, cleaning power (how wide you polish the floor), move speed, defense, regeneration, pickup range, experience, dust box size, coins, rerolls, and the number of level-up choices. They apply to every cleaner from your next run onward.</p>
+
+      <h3>Cleaners and Treasures</h3>
+      <p>There are 6 cleaners, each with different starting gear and a unique trait (polishes a wider area while walking, isn't slowed by dirty floors, can't get allergies, and more). Each stage hides one treasure, which appears when you finish the room with the most ★. Treasures are recorded the moment you pick them up, and finding certain treasures makes a new cleaner join you. On the "Cleaners" screen you can see each cleaner's clears per stage and mode, and the treasures you've collected.</p>
+
+      <h3>Completion</h3>
+      <p>Completion is how many of 130 goals you've achieved: clears of every stage in every mode with every cleaner (6 cleaners × 10 stages × 2 modes = 120) plus the treasures (10).</p>
+
+      <h3>Dirty Floors</h3>
+      <p>The floor is dirty, and the dirtier it is, the slower you walk. Floors your cleaning gear passes over become clean. On sparkling floors you walk faster and pick up dust from farther away. Dirt slowly spreads, and trash leaves dirt where it walks.</p>
+
+      <h3>Dust Box and Compress</h3>
+      <p>The dust you pick up goes into your dust box. When it's full, your cleaning gear does less damage, so stand on a green trash dump in the house to empty it (you earn coins). If your dust box is at least half full, "Compress" uses its contents to deal heavy damage to all trash on screen.</p>
+
+      <h3>Evolution</h3>
+      <p>Raise a piece of cleaning gear to level 8 and open a chest while holding its matching passive to evolve it. Chests are dropped by gold-rimmed trash, mid-bosses and bosses.</p>
+      <table>
+        <tbody>
+          <tr><th>Turbo Vacuum + Extra Battery</th><td>Black Hole Vacuum</td></tr>
+          <tr><th>Pressure Washer + Hot Water Boiler</th><td>Superheated Steam Cannon</td></tr>
+          <tr><th>Cleaning Robot + Extra Roomba</th><td>Robot Cleaning Squad</td></tr>
+          <tr><th>Sanitizer Spray + Strong Bleach</th><td>Acid Rain Mist</td></tr>
+          <tr><th>Lint Roller + Super Sticky Tape</th><td>Giant Steamroller</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Smartphone Controls</h3>
+      <table>
+        <tbody>
+          <tr><th>Touch and drag on the screen</th><td>Move (where you first touch becomes the center of the stick)</td></tr>
+          <tr><th>"Compress" button</th><td>Compress</td></tr>
+          <tr><th>Ⅱ in the top right</th><td>Pause</td></tr>
+        </tbody>
+      </table>
+
+      <h3>PC Controls</h3>
+      <table>
+        <tbody>
+          <tr><th>WASD / Arrow keys</th><td>Move</td></tr>
+          <tr><th>Space</th><td>Compress</td></tr>
+          <tr><th>P / Esc</th><td>Pause (Esc goes back in menus)</td></tr>
+          <tr><th>1–4</th><td>Pick a level-up choice</td></tr>
+        </tbody>
+      </table>
+    </section>
   </main>
 
   <footer>&copy; tools.e-seventh.com</footer>
@@ -102,6 +171,6 @@
   <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
-  <script src="script.js?v=1"></script>
+  <script src="script.js?v=2"></script>
 </body>
 </html>

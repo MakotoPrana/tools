@@ -395,6 +395,37 @@
 - 保存するもの: コイン、恒久スキルの段階、清掃員ごと・ステージごと・モードごとの記録、見つけた宝物、ゴミ図鑑、設定（音量・揺れ）、選んでいる清掃員とモード
 - 保存に失敗しても遊べるようにする（読み書きは try/catch で囲む）
 
+## 言語
+
+- 日本語と英語に対応する (モグラたたきと同じ作り)。画面右上の「日本語｜EN」のトグルで切り替える。選んでいる言語の方を色付きにし、もう一方を押すとその言語に切り替わる
+- 初めて開いたときは、ブラウザの言語設定（いちばん優先している言語）が日本語なら日本語、それ以外はすべて英語にする。切り替えた言語は `cleaning-survivors-lang` に保存し、次に開いたときもその言語にする
+- プレイ中 (一時停止・レベルアップ・宝箱の画面を含む) はトグルを隠し、切り替えられない。メニュー画面では、切り替えるとその画面をその場で描き直す
+- 画面の文言は script.js の `TEXT`、ゴミ・清掃ギア・進化・パッシブ・清掃員・部屋の特典・恒久スキル・ステージ・部屋・宝物の英語は `EN_ENEMIES`・`EN_WEAPONS`・`EN_EVOS`・`EN_PASSIVES`・`EN_CHARS`・`EN_BONUS`・`EN_SHOP`・`EN_STAGES` にまとめる。遊び方は index.html に言語ごとに書く
+- 英語のタイトルは「Cleaning Survivors」
+- 英語名
+
+| 日本語 | 英語 |
+| --- | --- |
+| 清掃員 ハジメ・洗浄屋 ミズキ・お掃除ロボ ルン太・コロコロ使い コロ子・除菌博士 キヨシ | Hajime the Cleaner・Mizuki the Washer・Runta the Robo・Koroko the Roller・Dr. Kiyoshi |
+| 片付け名人 トメ | Grandma Tome |
+| 超強力掃除機・高圧洗浄機・お掃除ロボット・除菌スプレー・コロコロ | Turbo Vacuum・Pressure Washer・Cleaning Robot・Sanitizer Spray・Lint Roller |
+| ブラックホール掃除機・超高温スチームカノン・お掃除ロボ軍団・酸性雨ミスト・巨大圧雪ローラー | Black Hole Vacuum・Superheated Steam Cannon・Robot Cleaning Squad・Acid Rain Mist・Giant Steamroller |
+| バッテリー増設・温水ボイラー・ルンバ増設・強力漂白剤・超強力粘着テープ | Extra Battery・Hot Water Boiler・Extra Roomba・Strong Bleach・Super Sticky Tape |
+| 大容量ダストパック・防水ブーツ・ゴム手袋 | Big Dust Pack・Rain Boots・Rubber Gloves |
+| ホコリ・抜け毛・紙くず・空き缶・ペットボトル | Dust Bunny・Hairball・Paper Wad・Empty Can・Plastic Bottle |
+| 粘着油汚れ・カビの胞子・生ゴミ袋・ゴミの山・あふれた排水口 | Sticky Grease・Mold Spore・Garbage Bag・Trash Heap・Overflowing Drain |
+| カビの巣・段ボールの山・生ゴミ妖怪・カビ怪獣・ゴミ屋敷の主 | Mold Nest・Box Pile・Garbage Ghoul・Mold Monster・Lord of the Trash House |
+| 体力・攻撃力・清掃力・移動速度・防御 | Health・Power・Cleaning Power・Move Speed・Defense |
+| 自然回復・回収範囲・経験値・ダストボックス容量・コイン | Regeneration・Pickup Range・Experience・Dust Box・Coins |
+| リロール・選択肢の数 | Reroll・Choices |
+| ゴミ屋敷の1階・呪われた台所 | The Trash House: 1st Floor・The Cursed Kitchen |
+| カビだらけの水まわり・開かずの物置と2階 | The Moldy Washrooms・The Sealed Storeroom & 2nd Floor |
+| 荒れ果てた庭・ほこりの屋根裏 | The Overgrown Garden・The Dusty Attic |
+| 地下のボイラー室・ガラクタの車庫 | The Basement Boiler Room・The Junk Garage |
+| 幽霊の大宴会場・屋敷の主の間 | The Haunted Banquet Hall・The Master's Hall |
+| 家族のアルバム・金の蛇口・真珠の石けん・ロボットの設計図・四つ葉のクローバー | Family Album・Golden Faucet・Pearl Soap・Robot Blueprints・Four-Leaf Clover |
+| 伝説のコロコロ・古い懐中時計・除菌博士の研究ノート・銀の燭台・屋敷の鍵 | Legendary Lint Roller・Old Pocket Watch・Dr. Sanitizer's Notebook・Silver Candlestick・Mansion Key |
+
 ## ファイル構成
 
 - `games/cleaning-survivors/` に、ほかのゲームと同じく以下を置く

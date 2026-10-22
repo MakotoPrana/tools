@@ -59,9 +59,44 @@ body {
   height: 44px;
 }
 
-.top h1 { margin: 0; font-size: 1.05rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.back { color: var(--muted); text-decoration: none; font-size: 0.85rem; white-space: nowrap; min-width: 88px; }
+.top h1 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 1.05rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.back { flex: none; color: var(--muted); text-decoration: none; font-size: 0.85rem; white-space: nowrap; }
 .back:hover { color: var(--accent); }
+.top-btns { flex: none; display: flex; justify-content: flex-end; gap: 6px; }
+
+@media (max-width: 400px) {
+  .top { gap: 6px; }
+  .top h1 { font-size: 0.95rem; }
+  .top-btns { gap: 4px; }
+  .lang-toggle button { padding: 0 5px; }
+}
+
+/* 言語のトグル (日本語 / EN)。選んでいる方を色付きにする */
+.lang-toggle {
+  display: flex;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.lang-toggle[hidden] { display: none; }
+
+.lang-toggle button {
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lang-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; cursor: default; }
+.lang-toggle button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 
 .icon-btn {
   flex: none;
@@ -209,6 +244,8 @@ body {
   text-shadow: 0 3px 0 #1d8e6f, 0 0 24px rgba(79, 224, 182, 0.55);
 }
 
+/* 英語のロゴは字数が多いので少し小さく */
+.logo.en { font-size: clamp(1.9rem, 8vw, 3.1rem); }
 .logo small { display: block; font-size: 0.42em; color: var(--mint); text-shadow: none; letter-spacing: 0.3em; margin-bottom: 6px; }
 .tagline { margin: 14px 0 0; color: var(--panel-muted); }
 .title-cast { display: flex; justify-content: center; align-items: flex-end; gap: 2px; margin-top: 18px; }
