@@ -158,11 +158,23 @@
   const PASSIVE_IDS = Object.keys(PASSIVES);
   const MAX_SLOTS = 6;
 
+  // 清掃員。unlock: その番号のステージの宝物を見つけると仲間になる (-1 は最初から)
+  //   mods: 個性 (scrub: 歩いて磨く範囲 / might: 攻撃力 / noDirtSlow: 汚れた床で遅くならない / magnet: 回収範囲 /
+  //   box: ダストボックス容量 / allergyImmune: アレルギー無効 / mold: カビ系へのダメージ / xp: 経験値)
   const CHARS = [
-    { id: 'cleaner', name: '清掃員 ハジメ', weapon: 'vacuum', hp: 100, speed: 1, desc: '伝説の清掃員。超強力掃除機で出撃する。', unlockRoom: -1 },
-    { id: 'mizuki', name: '洗浄屋 ミズキ', weapon: 'washer', hp: 90, speed: 1.05, desc: '高圧洗浄機の使い手。少し足が速い。', unlockRoom: 0 },
-    { id: 'runta', name: 'お掃除ロボ ルン太', weapon: 'robot', hp: 95, speed: 1.1, desc: 'お掃除ロボットを従えたロボ。足が速い。', unlockRoom: 1 },
+    { id: 'cleaner', name: '清掃員 ハジメ', weapons: ['vacuum'], hp: 100, speed: 1, unlock: -1, trait: '床みがきの達人', traitDesc: '歩くだけで床を磨く範囲 +40%', desc: '伝説の清掃員。どんな汚れも見逃さない、まじめなベテラン。', mods: { scrub: 0.4 } },
+    { id: 'mizuki', name: '洗浄屋 ミズキ', weapons: ['washer'], hp: 90, speed: 1.05, unlock: 1, trait: '水圧マニア', traitDesc: '攻撃力 +15%', desc: '高圧洗浄機を愛する、せっかちな洗浄屋。', mods: { might: 0.15 } },
+    { id: 'runta', name: 'お掃除ロボ ルン太', weapons: ['robot'], hp: 95, speed: 1.1, unlock: 3, trait: '全地形タイヤ', traitDesc: '汚れた床でも遅くならない', desc: '物置の設計図から生まれたお掃除ロボ。', mods: { noDirtSlow: true } },
+    { id: 'koroko', name: 'コロコロ使い コロ子', weapons: ['roller'], hp: 110, speed: 1, unlock: 5, trait: '拾い上手', traitDesc: '回収範囲 +40%・ダストボックス +40', desc: '伝説のコロコロを受け継いだ、片付け好きの女の子。', mods: { magnet: 0.4, box: 40 } },
+    { id: 'kiyoshi', name: '除菌博士 キヨシ', weapons: ['spray'], hp: 85, speed: 1, unlock: 7, trait: '免疫ばっちり', traitDesc: 'アレルギーにならない・カビ系へのダメージ +50%', desc: 'カビの研究ひとすじの博士。なくした研究ノートを探していた。', mods: { allergyImmune: true, mold: 0.5 } },
+    { id: 'tome', name: '片付け名人 トメ', weapons: ['vacuum', 'roller'], hp: 130, speed: 0.9, unlock: 9, trait: '年の功', traitDesc: '2つのギアで出撃・経験値 +25%', desc: '屋敷の昔の管理人。足は遅いが、知恵と経験は誰にも負けない。', mods: { xp: 0.25 } },
   ];
+
+  // モード。ハードは恒久スキルを上げてから挑む想定
+  const MODES = {
+    normal: { key: 'n', name: 'ノーマル', hp: 1, dmg: 1, density: 1, src: 1, coin: 1 },
+    hard: { key: 'h', name: 'ハード', hp: 1.7, dmg: 1.5, density: 1.2, src: 1.4, coin: 1.6 },
+  };
 
   // 部屋を完全に清掃したときの特典
   const ROOM_BONUS = {
@@ -214,6 +226,7 @@
       ],
       doors: [['genkan', 'rouka'], ['rouka', 'washitsu'], ['rouka', 'living'], ['rouka', 'dining'], ['living', 'dining']],
       start: 'genkan',
+      treasure: { room: 'living', name: '家族のアルバム', desc: 'ゴミの下から出てきた、屋敷の家族の古いアルバム。' },
       dumps: [['rouka', 0.5, 0.5], ['living', 0.3, 0.3]],
     },
     {
@@ -228,6 +241,7 @@
       ],
       doors: [['rouka', 'dining'], ['rouka', 'kitchen'], ['dining', 'kitchen'], ['rouka', 'pantry'], ['rouka', 'laundry'], ['rouka', 'katte']],
       start: 'katte',
+      treasure: { room: 'kitchen', name: '金の蛇口', desc: 'ピカピカに光る純金の蛇口。水の使い手が欲しがっていた。' },
       dumps: [['rouka', 0.2, 0.5], ['rouka', 0.8, 0.5]],
     },
     {
@@ -241,6 +255,7 @@
       ],
       doors: [['rouka', 'bath'], ['rouka', 'datsui'], ['rouka', 'toilet'], ['rouka', 'senmen'], ['bath', 'datsui']],
       start: 'rouka',
+      treasure: { room: 'bath', name: '真珠の石けん', desc: '泡が真珠のように光る、不思議な石けん。' },
       dumps: [['rouka', 0.5, 0.25], ['datsui', 0.5, 0.6]],
     },
     {
@@ -254,10 +269,88 @@
       ],
       doors: [['hall', 'kids'], ['hall', 'study'], ['hall', 'storage'], ['study', 'nando'], ['storage', 'nando']],
       start: 'hall',
+      treasure: { room: 'storage', name: 'ロボットの設計図', desc: '物置の奥にしまわれていた、お掃除ロボの設計図。' },
       dumps: [['hall', 0.5, 0.5], ['study', 0.5, 0.75]],
     },
     {
-      name: '屋敷の主の間', desc: 'すべてのゴミが現れる最後のステージ。ボスは「ゴミ屋敷の主」。', dirt: [52, 40, 46], weights: { grease: 1.5, spore: 1.5, bag: 1.5 }, spawnMul: 1.4, hpMul: 1.75, growth: 1.5, boss: 'master',
+      name: '荒れ果てた庭', desc: '生け垣で区切られた庭。池のまわりはカビだらけ。', dirt: [58, 70, 38], weights: { spore: 1.5, hair: 1.5 }, spawnMul: 1.35, hpMul: 1.65, growth: 1.3, boss: 'kaiju',
+      rooms: [
+        { id: 'gate', name: '門', rect: [16, 32, 8, 8], floor: 'stone', bonus: 'speed', danger: 1, src: ['pile'] },
+        { id: 'path', name: '小道', rect: [16, 14, 8, 18], floor: 'stone', bonus: 'magnet', danger: 1, src: ['pile'] },
+        { id: 'front', name: '前庭', rect: [0, 24, 16, 16], floor: 'grass', bonus: 'regen', danger: 2, src: ['pile'] },
+        { id: 'flower', name: '花壇', rect: [24, 24, 16, 16], floor: 'grass', bonus: 'area', danger: 3, src: ['nest', 'pile'] },
+        { id: 'yard', name: '物干し場', rect: [0, 0, 16, 24], floor: 'grass', bonus: 'might', danger: 3, src: ['pile', 'boxes'] },
+        { id: 'shed', name: '物置小屋', rect: [24, 14, 16, 10], floor: 'concrete', bonus: 'box', danger: 4, src: ['boxes', 'boxes'], boxes: 4 },
+        { id: 'pond', name: '池のほとり', rect: [16, 0, 24, 14], floor: 'grass', bonus: 'cd', danger: 5, src: ['nest', 'nest', 'drain'] },
+      ],
+      doors: [['gate', 'path'], ['gate', 'front'], ['path', 'front'], ['path', 'flower'], ['path', 'shed'], ['path', 'pond'], ['path', 'yard'], ['yard', 'pond'], ['flower', 'shed']],
+      start: 'gate',
+      treasure: { room: 'pond', name: '四つ葉のクローバー', desc: '池のほとりに一本だけ生えていた、幸運の四つ葉。' },
+      dumps: [['path', 0.5, 0.4], ['front', 0.5, 0.5]],
+    },
+    {
+      name: 'ほこりの屋根裏', desc: 'ホコリと抜け毛が舞う屋根裏。段ボールだらけ。', dirt: [84, 76, 66], weights: { dust: 1.8, hair: 1.5, paper: 1.3 }, spawnMul: 1.4, hpMul: 1.75, growth: 1.2, boss: 'kaiju',
+      rooms: [
+        { id: 'stairs', name: '階段口', rect: [16, 30, 8, 10], floor: 'attic', bonus: 'speed', danger: 1, src: ['pile'] },
+        { id: 'passage', name: '通路', rect: [0, 22, 40, 8], floor: 'attic', bonus: 'magnet', danger: 2, src: ['pile'] },
+        { id: 'oldclothes', name: '古着部屋', rect: [0, 0, 14, 22], floor: 'attic', bonus: 'regen', danger: 3, src: ['pile', 'nest'] },
+        { id: 'chests', name: '長持ち置き場', rect: [14, 0, 12, 22], floor: 'attic', bonus: 'box', danger: 4, src: ['boxes', 'boxes'], boxes: 8 },
+        { id: 'skylight', name: '天窓の間', rect: [26, 0, 14, 22], floor: 'attic', bonus: 'might', danger: 3, src: ['pile', 'pile'] },
+        { id: 'nook', name: '物置き', rect: [0, 30, 16, 10], floor: 'attic', bonus: 'armor', danger: 2, src: ['boxes'], boxes: 4 },
+        { id: 'secret', name: '奥の隠し部屋', rect: [24, 30, 16, 10], floor: 'attic', bonus: 'heal', danger: 5, src: ['nest', 'pile', 'boxes'] },
+      ],
+      doors: [['stairs', 'passage'], ['nook', 'passage'], ['secret', 'passage'], ['passage', 'oldclothes'], ['passage', 'chests'], ['passage', 'skylight']],
+      start: 'stairs',
+      treasure: { room: 'secret', name: '伝説のコロコロ', desc: 'どんなゴミでも巻き取るという、伝説の粘着ローラー。' },
+      dumps: [['passage', 0.2, 0.5], ['passage', 0.8, 0.5]],
+    },
+    {
+      name: '地下のボイラー室', desc: '油汚れとカビが広がる地下。ボイラー室は排水口だらけ。', dirt: [62, 56, 44], weights: { grease: 2.5, spore: 1.5 }, spawnMul: 1.5, hpMul: 1.9, growth: 1.6, boss: 'kaiju',
+      rooms: [
+        { id: 'under', name: '階段下', rect: [0, 32, 10, 8], floor: 'concrete', bonus: 'speed', danger: 1, src: ['pile'] },
+        { id: 'corridor', name: '地下通路', rect: [0, 24, 40, 8], floor: 'concrete', bonus: 'magnet', danger: 2, src: ['drain'] },
+        { id: 'cellar', name: 'ワイン蔵', rect: [0, 0, 13, 24], floor: 'stone', bonus: 'regen', danger: 3, src: ['boxes', 'nest'] },
+        { id: 'washroom', name: '洗い場', rect: [13, 0, 14, 24], floor: 'bath', bonus: 'area', danger: 3, src: ['drain', 'drain'], slippery: true },
+        { id: 'boiler', name: 'ボイラー室', rect: [27, 0, 13, 24], floor: 'concrete', bonus: 'might', danger: 5, src: ['drain', 'drain', 'pile'] },
+        { id: 'store', name: '貯蔵庫', rect: [10, 32, 30, 8], floor: 'concrete', bonus: 'box', danger: 4, src: ['boxes', 'pile'], boxes: 6 },
+      ],
+      doors: [['under', 'corridor'], ['store', 'corridor'], ['corridor', 'cellar'], ['corridor', 'washroom'], ['corridor', 'boiler'], ['under', 'store']],
+      start: 'under',
+      treasure: { room: 'boiler', name: '古い懐中時計', desc: 'ボイラーの裏で見つかった、まだ動いている懐中時計。' },
+      dumps: [['corridor', 0.25, 0.5], ['corridor', 0.75, 0.5]],
+    },
+    {
+      name: 'ガラクタの車庫', desc: '空き缶とペットボトルが転がる車庫。物置は段ボールの山。', dirt: [56, 56, 60], weights: { can: 2.5, bottle: 2.5, paper: 1.2 }, spawnMul: 1.55, hpMul: 2.05, growth: 1.3, boss: 'kaiju',
+      rooms: [
+        { id: 'side', name: '通用口', rect: [0, 0, 10, 14], floor: 'stone', bonus: 'speed', danger: 1, src: ['pile'] },
+        { id: 'bench', name: '作業台', rect: [10, 0, 14, 14], floor: 'concrete', bonus: 'cd', danger: 2, src: ['boxes'] },
+        { id: 'garage', name: '車庫', rect: [0, 14, 24, 26], floor: 'concrete', bonus: 'hp', danger: 3, src: ['pile', 'boxes'], boxes: 6 },
+        { id: 'tools', name: '工具置き場', rect: [24, 0, 16, 12], floor: 'concrete', bonus: 'might', danger: 3, src: ['boxes', 'pile'] },
+        { id: 'tires', name: '廃タイヤの山', rect: [24, 12, 16, 14], floor: 'concrete', bonus: 'armor', danger: 4, src: ['pile', 'pile'] },
+        { id: 'back', name: '奥の物置', rect: [24, 26, 16, 14], floor: 'concrete', bonus: 'heal', danger: 5, src: ['boxes', 'boxes', 'drain'], boxes: 8 },
+      ],
+      doors: [['side', 'bench'], ['side', 'garage'], ['bench', 'garage'], ['bench', 'tools'], ['garage', 'tires'], ['tools', 'tires'], ['tires', 'back'], ['garage', 'back']],
+      start: 'side',
+      treasure: { room: 'back', name: '除菌博士の研究ノート', desc: 'カビと戦い続けた博士の研究ノート。持ち主が探している。' },
+      dumps: [['garage', 0.3, 0.3], ['garage', 0.5, 0.85]],
+    },
+    {
+      name: '幽霊の大宴会場', desc: '宴のあとの大広間。生ゴミと油汚れが山盛り。', dirt: [76, 52, 40], weights: { bag: 2, grease: 1.5 }, spawnMul: 1.6, hpMul: 2.2, growth: 1.5, boss: 'kaiju',
+      rooms: [
+        { id: 'lobby', name: 'ロビー', rect: [14, 30, 12, 10], floor: 'carpet', bonus: 'speed', danger: 1, src: ['pile'] },
+        { id: 'cloak', name: 'クローク', rect: [0, 30, 14, 10], floor: 'wood', bonus: 'magnet', danger: 2, src: ['pile'] },
+        { id: 'pantry', name: '配膳室', rect: [26, 30, 14, 10], floor: 'kitchen', bonus: 'regen', danger: 3, src: ['drain', 'pile'] },
+        { id: 'hall', name: '大宴会場', rect: [0, 0, 26, 30], floor: 'carpet', bonus: 'hp', danger: 4, src: ['pile', 'pile', 'boxes', 'drain'] },
+        { id: 'stage', name: '舞台', rect: [26, 0, 14, 16], floor: 'wood', bonus: 'might', danger: 5, src: ['nest', 'pile', 'boxes'] },
+        { id: 'green', name: '楽屋', rect: [26, 16, 14, 14], floor: 'wood', bonus: 'area', danger: 3, src: ['nest'] },
+      ],
+      doors: [['lobby', 'cloak'], ['lobby', 'pantry'], ['lobby', 'hall'], ['cloak', 'hall'], ['hall', 'stage'], ['hall', 'green'], ['green', 'stage'], ['green', 'pantry']],
+      start: 'lobby',
+      treasure: { room: 'stage', name: '銀の燭台', desc: '舞台の上に残されていた、幽霊のお気に入りの燭台。' },
+      dumps: [['hall', 0.3, 0.85], ['lobby', 0.5, 0.5]],
+    },
+    {
+      name: '屋敷の主の間', desc: 'すべてのゴミが現れる最後のステージ。ボスは「ゴミ屋敷の主」。', dirt: [52, 40, 46], weights: { grease: 1.5, spore: 1.5, bag: 1.5 }, spawnMul: 1.7, hpMul: 2.4, growth: 1.5, boss: 'master',
       rooms: [
         { id: 'shoko', name: '書庫', rect: [0, 0, 14, 14], floor: 'carpet', bonus: 'cd', danger: 3, src: ['boxes', 'boxes'] },
         { id: 'bedroom', name: '寝室', rect: [14, 0, 12, 14], floor: 'carpet', bonus: 'regen', danger: 3, src: ['pile', 'nest'] },
@@ -267,18 +360,25 @@
       ],
       doors: [['hall', 'shoko'], ['hall', 'bedroom'], ['shoko', 'bedroom'], ['bedroom', 'closet'], ['closet', 'master'], ['hall', 'master']],
       start: 'hall',
+      treasure: { room: 'master', name: '屋敷の鍵', desc: '屋敷じゅうの扉を開けられる古い鍵。昔の管理人が持っていた。' },
       dumps: [['hall', 0.3, 0.3], ['master', 0.5, 0.85]],
     },
   ];
 
+  // 恒久スキル (コインで上げる。次のプレイからずっと効く)
   const SHOP = [
-    { id: 'hp', name: '体力', desc: '最大体力 +10', max: 5, cost: 60 },
-    { id: 'might', name: '攻撃力', desc: '攻撃力 +5%', max: 5, cost: 80 },
-    { id: 'speed', name: '移動速度', desc: '移動速度 +5%', max: 3, cost: 70 },
-    { id: 'magnet', name: '回収範囲', desc: '回収範囲 +10%', max: 3, cost: 50 },
+    { id: 'hp', name: '体力', desc: '最大体力 +12', max: 10, cost: 40 },
+    { id: 'might', name: '攻撃力', desc: '攻撃力 +8%', max: 10, cost: 60 },
+    { id: 'clean', name: '清掃力', desc: '歩いて磨く範囲 +12%・ギアが床を磨く範囲 +6%', max: 5, cost: 70 },
+    { id: 'speed', name: '移動速度', desc: '移動速度 +4%', max: 5, cost: 60 },
+    { id: 'armor', name: '防御', desc: '受けるダメージ -1', max: 3, cost: 250 },
+    { id: 'regen', name: '自然回復', desc: '体力が毎秒 0.2 回復', max: 3, cost: 150 },
+    { id: 'magnet', name: '回収範囲', desc: '回収範囲 +10%', max: 5, cost: 40 },
+    { id: 'xp', name: '経験値', desc: 'もらえる経験値 +8%', max: 5, cost: 80 },
     { id: 'box', name: 'ダストボックス容量', desc: '容量 +20', max: 3, cost: 50 },
+    { id: 'coin', name: 'コイン', desc: 'もらえるコイン +10%', max: 5, cost: 100 },
     { id: 'reroll', name: 'リロール', desc: 'レベルアップの選び直し +1回', max: 3, cost: 100 },
-    { id: 'choices', name: '選択肢の数', desc: 'レベルアップの候補 3 → 4', max: 1, cost: 400 },
+    { id: 'choices', name: '選択肢の数', desc: 'レベルアップの候補 3 → 4', max: 1, cost: 500 },
   ];
   const shopCost = (item, lv) => item.cost * (lv + 1);
 
@@ -298,14 +398,17 @@
   // ===================================================================
   // 保存
   // ===================================================================
+  // rec[清掃員][ステージ][n|h] = { c: クリアした, t: 最速クリア (秒), r: 清掃した部屋の最高数 }
   const defaultSave = () => ({
+    v: 2,
     coins: 0,
-    shop: { hp: 0, might: 0, speed: 0, magnet: 0, box: 0, reroll: 0, choices: 0 },
-    cleared: [false, false, false, false, false],
-    best: STAGES.map(() => ({ clean: 0, time: 0 })),
+    shop: Object.fromEntries(SHOP.map((it) => [it.id, 0])),
+    rec: {},
+    treasures: STAGES.map(() => false),
     kills: {},
     settings: { se: 70, bgm: 50, shake: true },
     char: 'cleaner',
+    mode: 'normal',
   });
 
   function loadSave() {
@@ -315,14 +418,55 @@
       if (!raw) return s;
       const d = JSON.parse(raw);
       if (typeof d.coins === 'number') s.coins = d.coins;
-      Object.assign(s.shop, d.shop || {});
-      if (Array.isArray(d.cleared)) d.cleared.forEach((v, i) => { if (i < s.cleared.length) s.cleared[i] = !!v; });
-      if (Array.isArray(d.best)) d.best.forEach((v, i) => { if (i < s.best.length && v) Object.assign(s.best[i], v); });
+      for (const it of SHOP) if (d.shop && typeof d.shop[it.id] === 'number') s.shop[it.id] = Math.min(it.max, d.shop[it.id]);
       Object.assign(s.kills, d.kills || {});
       Object.assign(s.settings, d.settings || {});
       if (CHARS.some((c) => c.id === d.char)) s.char = d.char;
+      if (MODES[d.mode]) s.mode = d.mode;
+      if (d.v === 2) {
+        if (d.rec && typeof d.rec === 'object') s.rec = d.rec;
+        if (Array.isArray(d.treasures)) d.treasures.forEach((v, i) => { if (i < s.treasures.length) s.treasures[i] = !!v; });
+      } else if (Array.isArray(d.cleared)) {
+        // 5ステージだったころの記録は、清掃員ハジメのノーマルの記録として引き継ぐ (旧ステージ5 は今のステージ10)
+        const map = [0, 1, 2, 3, 9];
+        d.cleared.forEach((v, i) => {
+          const b = (d.best && d.best[i]) || {};
+          if (map[i] == null || (!v && !b.rooms)) return;
+          const r = recOf(s, 'cleaner', map[i], 'normal');
+          r.c = v ? 1 : 0;
+          if (b.clear) r.t = b.clear;
+          if (b.rooms) r.r = b.rooms;
+        });
+      }
     } catch (e) { /* 壊れていたら初期値で遊ぶ */ }
     return s;
+  }
+
+  function recOf(sv, charId, stageIdx, mode) {
+    const k = MODES[mode].key;
+    const byChar = (sv.rec[charId] = sv.rec[charId] || {});
+    const byStage = (byChar[stageIdx] = byChar[stageIdx] || {});
+    return (byStage[k] = byStage[k] || { c: 0, t: 0, r: 0 });
+  }
+
+  function peekRec(charId, stageIdx, mode) {
+    const r = save.rec[charId] && save.rec[charId][stageIdx] && save.rec[charId][stageIdx][MODES[mode].key];
+    return r || { c: 0, t: 0, r: 0 };
+  }
+
+  // だれかがそのステージ・モードをクリアしたか
+  const stageCleared = (i, mode) => CHARS.some((c) => peekRec(c.id, i, mode).c);
+  const stageUnlocked = (i) => TEST_UNLOCK || i === 0 || stageCleared(i - 1, 'normal');
+  const hardUnlocked = (i) => TEST_UNLOCK || stageCleared(i, 'normal');
+  const charUnlocked = (c) => TEST_UNLOCK || c.unlock < 0 || save.treasures[c.unlock];
+
+  // 達成率 = (清掃員ごとの各ステージ・各モードのクリア + 宝物) ÷ その総数
+  function completion() {
+    let clears = 0;
+    for (const c of CHARS) for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (peekRec(c.id, i, m).c) clears++;
+    const tre = save.treasures.filter(Boolean).length;
+    const clearTotal = CHARS.length * STAGES.length * Object.keys(MODES).length;
+    return { pct: ((clears + tre) / (clearTotal + STAGES.length)) * 100, clears, clearTotal, tre, treTotal: STAGES.length };
   }
 
   function persist() {
@@ -966,43 +1110,101 @@
       c.restore();
       return;
     }
-    const mizuki = charId === 'mizuki';
+    const look = LOOKS[charId] || LOOKS.cleaner;
+    const W = (col) => (hurt ? '#fff' : col);
     // 道具 (後ろ向きのときは体の後ろに描く)
     const tool = () => {
       c.save();
       c.rotate(face);
-      if (mizuki) {
-        c.fillStyle = '#f2c230';
-        c.fillRect(4, -3, 16, 6);
-        c.fillStyle = '#333';
-        c.fillRect(18, -2, 6, 4);
-      } else {
-        c.strokeStyle = '#59616b';
-        c.lineWidth = 4;
-        c.beginPath();
-        c.moveTo(2, 4);
-        c.lineTo(18, 2);
-        c.stroke();
-        c.fillStyle = '#e04f3a';
-        c.fillRect(17, -5, 6, 12);
+      switch (look.tool) {
+        case 'gun':
+          c.fillStyle = '#f2c230';
+          c.fillRect(4, -3, 16, 6);
+          c.fillStyle = '#333';
+          c.fillRect(18, -2, 6, 4);
+          break;
+        case 'roller':
+          c.strokeStyle = '#59616b';
+          c.lineWidth = 3;
+          c.beginPath();
+          c.moveTo(2, 3);
+          c.lineTo(16, 3);
+          c.stroke();
+          c.fillStyle = '#f4f1e6';
+          c.beginPath();
+          c.roundRect(15, -6, 7, 14, 3);
+          c.fill();
+          break;
+        case 'spray':
+          c.fillStyle = '#e8f4f8';
+          c.beginPath();
+          c.roundRect(6, -4, 10, 9, 2);
+          c.fill();
+          c.fillStyle = '#2bb59a';
+          c.fillRect(6, -1, 10, 3);
+          c.fillStyle = '#666';
+          c.fillRect(15, -3, 5, 3);
+          break;
+        case 'broom':
+          c.strokeStyle = '#8a5a2a';
+          c.lineWidth = 3;
+          c.beginPath();
+          c.moveTo(0, 4);
+          c.lineTo(17, 2);
+          c.stroke();
+          c.fillStyle = '#d9b44a';
+          c.beginPath();
+          c.moveTo(16, -4);
+          c.lineTo(25, -7);
+          c.lineTo(25, 10);
+          c.lineTo(16, 7);
+          c.closePath();
+          c.fill();
+          break;
+        default:
+          c.strokeStyle = '#59616b';
+          c.lineWidth = 4;
+          c.beginPath();
+          c.moveTo(2, 4);
+          c.lineTo(18, 2);
+          c.stroke();
+          c.fillStyle = '#e04f3a';
+          c.fillRect(17, -5, 6, 12);
       }
       c.restore();
     };
     if (fy < 0) tool();
-    c.fillStyle = hurt ? '#fff' : mizuki ? '#2a9d8f' : '#2f6fb3';
+    // 体
+    c.fillStyle = W(look.body);
     c.beginPath();
     c.roundRect(-9, -4, 18, 15, 6);
     c.fill();
-    c.fillStyle = hurt ? '#fff' : '#f2c79e';
+    if (look.coat) {
+      c.fillStyle = W('#c9d3dc');
+      c.fillRect(-1, -4, 2, 15);
+    }
+    // 顔
+    c.fillStyle = W('#f2c79e');
     c.beginPath();
     c.arc(0, -8, 8, 0, TAU);
     c.fill();
     // 帽子・髪
-    c.fillStyle = hurt ? '#fff' : mizuki ? '#2b2b33' : '#f08a24';
+    c.fillStyle = W(look.hair);
     c.beginPath();
     c.arc(0, -10, 8.2, Math.PI, TAU);
     c.fill();
-    if (!mizuki) c.fillRect(fx >= 0 ? 0 : -12, -11, 12, 3);
+    if (look.cap) c.fillRect(fx >= 0 ? 0 : -12, -11, 12, 3);
+    if (look.pigtails) {
+      c.beginPath();
+      c.arc(-9, -6, 3.2, 0, TAU);
+      c.arc(9, -6, 3.2, 0, TAU);
+      c.fill();
+    }
+    if (look.bun) {
+      c.beginPath();
+      c.arc(0, -17, 4, 0, TAU);
+      c.fill();
+    }
     // 目
     if (fy > -0.7) {
       c.fillStyle = '#222';
@@ -1010,10 +1212,34 @@
       c.arc(-3 + fx * 2, -7, 1.3, 0, TAU);
       c.arc(3 + fx * 2, -7, 1.3, 0, TAU);
       c.fill();
+      if (look.mask) {
+        c.fillStyle = W('#ffffff');
+        c.beginPath();
+        c.roundRect(-5 + fx * 2, -5, 10, 5, 2);
+        c.fill();
+      }
+      if (look.glasses) {
+        c.strokeStyle = '#333';
+        c.lineWidth = 1;
+        c.beginPath();
+        c.arc(-3 + fx * 2, -7, 2.4, 0, TAU);
+        c.moveTo(5.4 + fx * 2, -7);
+        c.arc(3 + fx * 2, -7, 2.4, 0, TAU);
+        c.stroke();
+      }
     }
     if (fy >= 0) tool();
     c.restore();
   }
+
+  // 清掃員の見た目
+  const LOOKS = {
+    cleaner: { body: '#2f6fb3', hair: '#f08a24', cap: true, tool: 'vacuum' },
+    mizuki: { body: '#2a9d8f', hair: '#2b2b33', tool: 'gun' },
+    koroko: { body: '#e86aa0', hair: '#7a3b1e', pigtails: true, tool: 'roller' },
+    kiyoshi: { body: '#eef2f5', hair: '#5a5f66', coat: true, mask: true, glasses: true, tool: 'spray' },
+    tome: { body: '#7a4a9a', hair: '#d9d9d9', bun: true, tool: 'broom' },
+  };
 
   // アイコン (64×64 を基準に描く)
   function drawIcon(c, id) {
@@ -1303,6 +1529,33 @@
         c.arc(32, 32, 16, 0, TAU);
         c.stroke();
         break;
+      case 'treasure':
+        glow('rgba(255,220,120,0.75)');
+        c.fillStyle = '#ffd34a';
+        c.beginPath();
+        c.moveTo(32, 8);
+        c.lineTo(52, 26);
+        c.lineTo(32, 58);
+        c.lineTo(12, 26);
+        c.closePath();
+        c.fill();
+        c.fillStyle = '#fff3b0';
+        c.beginPath();
+        c.moveTo(32, 8);
+        c.lineTo(40, 26);
+        c.lineTo(24, 26);
+        c.closePath();
+        c.fill();
+        c.fillStyle = '#e0a21a';
+        c.beginPath();
+        c.moveTo(12, 26);
+        c.lineTo(52, 26);
+        c.lineTo(32, 58);
+        c.closePath();
+        c.globalAlpha = 0.45;
+        c.fill();
+        c.globalAlpha = 1;
+        break;
       case 'chest':
         c.fillStyle = '#9a5b2a';
         c.beginPath();
@@ -1348,8 +1601,8 @@
     return thumbCache[key];
   }
 
-  function charThumb(id) {
-    const key = 'char-' + id;
+  function charThumb(id, sil = false) {
+    const key = 'char-' + id + (sil ? '-s' : '');
     if (!thumbCache[key]) {
       const cv = document.createElement('canvas');
       cv.width = cv.height = 64;
@@ -1357,6 +1610,13 @@
       c.translate(32, 34);
       c.scale(1.7, 1.7);
       drawPlayerBody(c, id, 0.5, 0, false, false);
+      if (sil) {
+        // まだ仲間になっていない清掃員はシルエット
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.globalCompositeOperation = 'source-atop';
+        c.fillStyle = '#0d0f12';
+        c.fillRect(0, 0, 64, 64);
+      }
       thumbCache[key] = cv.toDataURL();
     }
     return thumbCache[key];
@@ -1418,6 +1678,28 @@
           for (let x = 0; x < 64; x += 3) c.fillRect(x, k * 32, 1, 32);
           c.fillStyle = '#5a6b3a';
           c.fillRect(0, k * 32, 64, 3);
+        }
+        break;
+      case 'grass':
+        c.fillStyle = '#7fae5a';
+        c.fillRect(0, 0, 64, 64);
+        {
+          const r = mulberry32(11);
+          for (let i = 0; i < 90; i++) {
+            c.fillStyle = r() < 0.5 ? '#6f9e4c' : '#93c26a';
+            c.fillRect(r() * 64, r() * 64, 2, 4);
+          }
+        }
+        break;
+      case 'attic':
+        c.fillStyle = '#8a6a48';
+        c.fillRect(0, 0, 64, 64);
+        for (let row = 0; row < 4; row++) {
+          c.fillStyle = row % 2 ? '#836344' : '#94744f';
+          c.fillRect(0, row * 16, 64, 15);
+          c.fillStyle = '#5e4630';
+          c.fillRect(0, row * 16 + 15, 64, 1);
+          c.fillRect((row * 23) % 64, row * 16, 1, 15);
         }
         break;
       case 'stone':
@@ -1577,11 +1859,14 @@
 
   function newGame(stageIdx) {
     const stage = STAGES[stageIdx];
-    const ch = CHARS.find((c) => c.id === save.char) || CHARS[0];
+    const ch = CHARS.find((c) => c.id === save.char && charUnlocked(c)) || CHARS[0];
+    const mode = save.mode === 'hard' && hardUnlocked(stageIdx) ? 'hard' : 'normal';
     G = {
       stageIdx,
       stage,
       ch,
+      mode,
+      md: MODES[mode],
       state: 'play', // play / win / dead
       paused: false,
       time: 0,
@@ -1634,7 +1919,7 @@
     };
     G.p.face = 0;
     buildHouse();
-    addWeapon(ch.weapon);
+    for (const id of ch.weapons) addWeapon(id);
     recalcStats();
     G.p.hp = G.stats.maxHp;
   }
@@ -1925,6 +2210,7 @@
   }
 
   function cleanCircle(x, y, r, p) {
+    r *= G.stats.cleanArea || 1;
     const r2 = r * r;
     forTilesInBox(x - r, y - r, x + r, y + r, (i, cx, cy) => {
       if ((cx - x) ** 2 + (cy - y) ** 2 <= r2) lowerTile(i, p);
@@ -1932,6 +2218,7 @@
   }
 
   function cleanCone(x, y, ang, half, range, p) {
+    range *= G.stats.cleanArea || 1;
     const r2 = range * range;
     forTilesInBox(x - range, y - range, x + range, y + range, (i, cx, cy) => {
       const dx = cx - x;
@@ -1944,6 +2231,7 @@
   }
 
   function cleanLine(x1, y1, x2, y2, w, p) {
+    w *= G.stats.cleanArea || 1;
     const dx = x2 - x1;
     const dy = y2 - y1;
     const len2 = dx * dx + dy * dy || 1;
@@ -2052,18 +2340,23 @@
     const lv = (id) => G.passives[id] || 0;
     const oldMax = s.maxHp || 0;
     const bn = G.bonus; // 清掃が完了した部屋の特典
-    s.maxHp = G.ch.hp + sh.hp * 10 + lv('boots') * 20 + bn.hp;
-    s.speed = 118 * G.ch.speed * (1 + sh.speed * 0.05 + bn.speed);
-    s.might = 1 + sh.might * 0.05 + lv('boiler') * 0.1 + bn.might;
+    const cm = G.ch.mods; // 清掃員の個性
+    s.maxHp = G.ch.hp + sh.hp * 12 + lv('boots') * 20 + bn.hp;
+    s.speed = 118 * G.ch.speed * (1 + sh.speed * 0.04 + bn.speed);
+    s.might = 1 + sh.might * 0.08 + lv('boiler') * 0.1 + bn.might + (cm.might || 0);
     s.cd = 1 - lv('battery') * 0.08 - bn.cd;
     s.area = 1 + lv('bleach') * 0.1 + bn.area;
     s.dur = 1 + lv('tape') * 0.1;
     s.amount = lv('roomba');
-    s.magnet = 48 * (1 + sh.magnet * 0.1 + lv('dustpack') * 0.2 + bn.magnet);
-    s.boxCap = 100 + sh.box * 20 + lv('dustpack') * 40 + bn.box;
-    s.armor = lv('gloves') + bn.armor;
-    s.regen = bn.regen;
-    s.dirtSlow = lv('boots') > 0 ? 0.5 : 1;
+    s.magnet = 48 * (1 + sh.magnet * 0.1 + lv('dustpack') * 0.2 + bn.magnet + (cm.magnet || 0));
+    s.boxCap = 100 + sh.box * 20 + lv('dustpack') * 40 + bn.box + (cm.box || 0);
+    s.armor = lv('gloves') + bn.armor + sh.armor;
+    s.regen = bn.regen + sh.regen * 0.2;
+    s.scrub = 30 * (1 + sh.clean * 0.12 + (cm.scrub || 0));
+    s.cleanArea = 1 + sh.clean * 0.06;
+    s.xpMul = 1 + sh.xp * 0.08 + (cm.xp || 0);
+    s.moldMul = 1 + (cm.mold || 0);
+    s.dirtSlow = G.ch.mods.noDirtSlow ? 0 : lv('boots') > 0 ? 0.5 : 1;
     if (oldMax && s.maxHp > oldMax) G.p.hp += s.maxHp - oldMax;
     for (const w of G.weapons) w.s = weaponStats(w);
   }
@@ -2158,15 +2451,15 @@
     const e = G.pool.pop() || {};
     const tScale = def.boss || def.source ? 1 : 1 + G.time / 400;
     const dg = DANGER[opt.danger || 1];
-    const dHp = def.boss ? 1 : def.source ? dg.src : dg.hp;
+    const dHp = (def.boss ? 1 : def.source ? dg.src : dg.hp) * (def.source ? G.md.src : G.md.hp);
     e.type = type;
     e.def = def;
     e.x = x;
     e.y = y;
     e.r = def.r * (opt.elite ? 1.6 : 1);
-    e.maxHp = e.hp = def.hp * tScale * dHp * G.stage.hpMul * (opt.elite ? 10 : 1) * (def.boss && G.stageIdx === 4 && type !== 'master' ? 1.3 : 1);
+    e.maxHp = e.hp = def.hp * tScale * dHp * G.stage.hpMul * (opt.elite ? 10 : 1) * (def.boss && G.stageIdx === STAGES.length - 1 && type !== 'master' ? 1.3 : 1);
     e.speed = def.speed * (1 + G.time / 1200) * rand(0.9, 1.1) * (opt.elite ? 0.9 : 1) * (def.boss ? 1 : DANGER[opt.danger || 1].speed);
-    e.dmg = def.boss ? def.dmg : Math.round(def.dmg * (1 + G.time / 600) * dg.dmg);
+    e.dmg = Math.round((def.boss ? def.dmg : def.dmg * (1 + G.time / 600) * dg.dmg) * G.md.dmg);
     e.danger = opt.danger || 1;
     e.home = opt.home != null ? opt.home : -1;
     e.aggro = false;
@@ -2304,7 +2597,7 @@
       // 発生源: それぞれが自分の部屋に住むゴミを、汚れレベルに応じた数まで湧かせる
       for (const src of G.enemies) {
         if (!src.alive || !src.def.source) continue;
-        const cap = (6 + t * 0.07) * G.stage.spawnMul * DANGER[src.danger].density;
+        const cap = (6 + t * 0.07) * G.stage.spawnMul * DANGER[src.danger].density * G.md.density;
         if (src.brood >= cap || Math.random() > 0.35) continue;
         const a = rand(0, TAU);
         const d = src.r + rand(10, 26);
@@ -2319,7 +2612,7 @@
       const hereDanger = !here || here.done ? 1 : here.danger;
       let roaming = 0;
       for (const e of G.enemies) if (e.alive && e.home < 0 && !e.def.source && !e.boss) roaming++;
-      const desired = Math.min(170, (10 + t * 0.3) * G.stage.spawnMul * DANGER[hereDanger].density);
+      const desired = Math.min(170, (10 + t * 0.3) * G.stage.spawnMul * DANGER[hereDanger].density * G.md.density);
       const n = Math.min(3, Math.ceil(desired - roaming));
       // 住みかのないゴミの強さは、今いる部屋の汚れレベルに合わせる (★の多い部屋からは湧かせない)
       for (let i = 0; i < n && G.enemies.length < MAX_ENEMIES - 20; i++) {
@@ -2588,6 +2881,7 @@
 
   function hurtEnemy(e, dmg, kx, ky) {
     if (!e.alive || e.flee) return;
+    if (e.def.mold) dmg *= G.stats.moldMul;
     e.hp -= dmg;
     e.flash = 0.09;
     e.aggro = true;
@@ -3002,7 +3296,7 @@
     p.scrubT = (p.scrubT || 0) - dt;
     if (p.scrubT <= 0) {
       p.scrubT = 0.12;
-      cleanCircle(p.x, p.y, 30, 1);
+      cleanCircle(p.x, p.y, s.scrub / G.stats.cleanArea, 1);
     }
     // 通った道を記録 (コロコロ用)
     const tr = G.trail;
@@ -3015,7 +3309,8 @@
     if (p.hurtT > 0) p.hurtT -= dt;
     if (p.allergyT > 0) {
       p.allergyT -= dt;
-      damagePlayer(2 * dt, true);
+      if (G.ch.mods.allergyImmune) p.allergyT = 0;
+      else damagePlayer(2 * dt, true);
     }
     if (s.regen > 0 && p.hp > 0) p.hp = Math.min(s.maxHp, p.hp + s.regen * dt);
   }
@@ -3157,13 +3452,16 @@
         } else if (it.kind === 'chest') {
           openChest();
           return;
+        } else if (it.kind === 'treasure') {
+          foundTreasure();
+          return;
         }
       }
     }
   }
 
   function gainXp(v) {
-    G.xp += v;
+    G.xp += v * G.stats.xpMul;
     while (G.xp >= G.xpNext) {
       G.xp -= G.xpNext;
       G.level++;
@@ -3387,7 +3685,15 @@
     if (r.bonus === 'heal') G.p.hp = G.stats.maxHp;
     G.roomCoins += 15 * r.danger;
     G.items.push({ kind: 'chest', x: G.p.x + 26, y: G.p.y, t: 0 });
-    showBanner(`${r.name} ピカピカ完了! ${ROOM_BONUS[r.bonus]}`, '#4fe0b6', 3);
+    // 宝物の部屋なら、部屋のまん中に宝物が現れる
+    if (r.id === G.stage.treasure.room) {
+      const [tx, ty] = roomPoint(r.rect, 0.5, 0.5);
+      const spot = { x: tx, y: ty };
+      pushOut(spot, 16);
+      G.items.push({ kind: 'treasure', x: spot.x, y: spot.y, t: 0 });
+      for (let k = 0; k < 30; k++) addPart(spot.x, spot.y, rand(-120, 120), rand(-160, -20), rand(0.6, 1.2), rand(3, 6), pick(['#ffd34a', '#fff3b0', '#ffffff']), 'twinkle');
+    }
+    showBanner(r.id === G.stage.treasure.room ? `${r.name} ピカピカ完了! 宝物が現れた!` : `${r.name} ピカピカ完了! ${ROOM_BONUS[r.bonus]}`, '#4fe0b6', 3);
     Sound.play('room-clear');
     G.shake = Math.max(G.shake, 6);
   }
@@ -3670,13 +3976,15 @@
       if (!inView(it.x, it.y, 30)) continue;
       const s = 26;
       const bob = Math.sin(it.t * 4) * 3;
-      if (it.kind === 'chest') {
+      const big = it.kind === 'treasure';
+      if (it.kind === 'chest' || big) {
         ctx.fillStyle = `rgba(255,207,74,${0.25 + Math.sin(it.t * 6) * 0.1})`;
         ctx.beginPath();
-        ctx.arc(it.x, it.y, 24, 0, TAU);
+        ctx.arc(it.x, it.y, big ? 34 : 24, 0, TAU);
         ctx.fill();
       }
-      ctx.drawImage(iconCanvas(it.kind), it.x - s / 2, it.y - s / 2 + bob, s, s);
+      const sz = big ? 40 : s;
+      ctx.drawImage(iconCanvas(it.kind), it.x - sz / 2, it.y - sz / 2 + bob, sz, sz);
     }
 
     // ゴミ
@@ -3882,7 +4190,7 @@
       offscreenArrow(e.x, e.y, e.boss ? '#ff6b6b' : '#ffcf4a');
     }
     for (const it of G.items) {
-      if (it.kind === 'chest' && !inView(it.x, it.y, 0)) offscreenArrow(it.x, it.y, '#ffcf4a');
+      if ((it.kind === 'chest' || it.kind === 'treasure') && !inView(it.x, it.y, 0)) offscreenArrow(it.x, it.y, '#ffcf4a');
     }
     drawHud(t);
   }
@@ -3992,7 +4300,7 @@
       if (e.def.source) dot(e.x, e.y, 3, blink ? '#ff5a5a' : '#c23a3a');
       else if (e.boss) dot(e.x, e.y, 4, '#ff3b3b');
     }
-    for (const it of G.items) if (it.kind === 'chest') dot(it.x, it.y, 2.5, '#ffcf4a');
+    for (const it of G.items) if (it.kind === 'chest' || it.kind === 'treasure') dot(it.x, it.y, it.kind === 'treasure' ? 4 : 2.5, '#ffcf4a');
     dot(G.p.x, G.p.y, 3, '#ffffff');
   }
 
@@ -4006,6 +4314,7 @@
     ctx.fillStyle = '#4fc3ff';
     ctx.fillRect(0, 0, w * (G.xp / G.xpNext), 8);
     hudText(`Lv ${G.level}`, 10, 30, 16);
+    if (G.mode === 'hard') hudText('HARD', 62, 30, 12, 'left', '#ff6b6b');
     const left = GAME_TIME - G.time;
     hudText(fmtTime(Math.ceil(left)), w / 2, 34, 24, 'center', left <= 60 && Math.floor(t * 2) % 2 ? '#ff6b6b' : left <= 60 ? '#ffb3b3' : '#ffffff');
     // 今いる部屋
@@ -4184,6 +4493,15 @@
     lastTime = performance.now();
   }
 
+  function completionHtml() {
+    const c = completion();
+    return `<div class="completion">
+      <div class="completion-head"><span>達成率</span><b>${c.pct.toFixed(1)}%</b></div>
+      <div class="completion-bar"><i style="width:${c.pct.toFixed(1)}%"></i></div>
+      <div class="completion-meta">クリア ${c.clears}/${c.clearTotal} ・ 宝物 ${c.tre}/${c.treTotal}</div>
+    </div>`;
+  }
+
   function showTitle() {
     G = null;
     Sound.bgm(null);
@@ -4192,36 +4510,49 @@
         <p class="logo"><small>CLEANING SURVIVORS</small>おそうじ<br>サバイバー</p>
         <p class="tagline">押し寄せるゴミと汚れを、清掃ギアで一気に片付けろ!</p>
         <div class="title-cast"><img src="${charThumb('cleaner')}" alt="">${['dust', 'paper', 'can', 'grease', 'spore', 'bag'].map((t) => `<img src="${enemyThumb(t)}" alt="">`).join('')}</div>
+        ${completionHtml()}
         <div class="actions">
           <button type="button" class="btn primary" data-act="rooms" data-focus>はじめる</button>
+          <button type="button" class="btn" data-act="chars" data-arg="title">清掃員</button>
           <button type="button" class="btn" data-act="settings" data-arg="title">設定</button>
         </div>
       </div>`);
   }
 
-  function roomUnlocked(i) {
-    return TEST_UNLOCK || i === 0 || save.cleared[i - 1];
-  }
+  const curChar = () => CHARS.find((c) => c.id === save.char && charUnlocked(c)) || CHARS[0];
+  const modeTabs = (act) => `<div class="mode-tabs" role="tablist">${Object.keys(MODES).map((m) => `<button type="button" role="tab" class="mode-tab ${m}${save.mode === m ? ' on' : ''}" aria-selected="${save.mode === m}" data-act="${act}" data-arg="${m}">${MODES[m].name}</button>`).join('')}</div>`;
 
   function showRooms() {
     G = null;
     Sound.bgm(null);
+    const ch = curChar();
+    const hard = save.mode === 'hard';
     const rooms = STAGES.map((r, i) => {
-      const ok = roomUnlocked(i);
-      const b = save.best[i];
-      const meta = !ok ? '前のステージをクリアすると入れる' : b.time > 0 ? `清掃した部屋 最高 ${b.rooms || 0}/${r.rooms.length}${b.clear ? ` ・ 最速クリア ${fmtTime(b.clear)}` : ''}` : `${r.rooms.length}部屋 ・ ${r.desc}`;
-      return `<button type="button" class="room${save.cleared[i] ? ' cleared' : ''}" data-act="brief" data-arg="${i}" ${ok ? '' : 'disabled'}>
-        <span class="room-no">${ok ? i + 1 : '🔒'}</span>
-        <span class="room-body"><span class="room-name">${ok ? esc(r.name) : '？？？'}</span><br><span class="room-meta">${esc(meta)}</span></span>
+      const ok = stageUnlocked(i) && (!hard || hardUnlocked(i));
+      const rec = peekRec(ch.id, i, save.mode);
+      const nOk = peekRec(ch.id, i, 'normal').c;
+      const hOk = peekRec(ch.id, i, 'hard').c;
+      let meta;
+      if (!stageUnlocked(i)) meta = '前のステージをノーマルでクリアすると入れる';
+      else if (hard && !hardUnlocked(i)) meta = 'このステージをノーマルでクリアすると挑戦できる';
+      else if (rec.r) meta = `清掃した部屋 最高 ${rec.r}/${r.rooms.length}${rec.t ? ` ・ 最速クリア ${fmtTime(rec.t)}` : ''}`;
+      else meta = `${r.rooms.length}部屋 ・ ${r.desc}`;
+      const badges = stageUnlocked(i) ? `<span class="badges"><span class="badge n${nOk ? ' on' : ''}">N</span><span class="badge h${hOk ? ' on' : ''}">H</span><span class="badge t${save.treasures[i] ? ' on' : ''}" title="宝物">宝</span></span>` : '';
+      return `<button type="button" class="room${rec.c ? ' cleared' : ''}" data-act="brief" data-arg="${i}" ${ok ? '' : 'disabled'}>
+        <span class="room-no">${stageUnlocked(i) ? i + 1 : '🔒'}</span>
+        <span class="room-body"><span class="room-name">${stageUnlocked(i) ? esc(r.name) : '？？？'}</span>${badges}<br><span class="room-meta">${esc(meta)}</span></span>
       </button>`;
     }).join('');
     show('rooms', `
       <div class="panel">
         <h2>ステージを選ぶ</h2>
-        <p class="sub">コイン <span class="coins">${save.coins}</span></p>
+        <p class="sub">${esc(ch.name)} の記録 ・ コイン <span class="coins">${save.coins}</span></p>
+        ${modeTabs('mode')}
+        ${hard ? '<p class="mode-note">ハード: ゴミの HP ×1.7・ダメージ ×1.5・数 ×1.2、発生源の HP ×1.4。コイン ×1.6。恒久スキルを上げてから挑もう</p>' : ''}
         <div class="rooms">${rooms}</div>
         <div class="menu-row">
-          <button type="button" class="btn small" data-act="shop">強化</button>
+          <button type="button" class="btn small" data-act="shop">恒久スキル</button>
+          <button type="button" class="btn small" data-act="chars" data-arg="rooms">清掃員</button>
           <button type="button" class="btn small" data-act="zukan">ゴミ図鑑</button>
           <button type="button" class="btn small" data-act="settings" data-arg="rooms">設定</button>
           <button type="button" class="btn small" data-act="title" data-back>タイトルへ</button>
@@ -4229,24 +4560,35 @@
       </div>`);
   }
 
+  const unlockText = (c) => `ステージ${c.unlock + 1}「${STAGES[c.unlock].name}」の宝物を見つけると仲間になる`;
+
+  function charCard(c, act, on) {
+    const ok = charUnlocked(c);
+    return `<button type="button" class="char${on ? ' on' : ''}" data-act="${act}" data-arg="${c.id}" ${ok || act === 'charRec' ? '' : 'disabled'}>
+      <img src="${charThumb(c.id, !ok)}" alt="">
+      <span class="char-name">${ok ? esc(c.name) : '？？？'}</span><br>
+      ${ok ? `<span class="char-trait">個性「${esc(c.trait)}」 ${esc(c.traitDesc)}</span><br><span class="char-desc">${esc(c.desc)} 体力 ${c.hp}・最初のギア: ${c.weapons.map((w) => esc(WEAPONS[w].name)).join('・')}</span>`
+        : `<span class="char-desc">${esc(unlockText(c))}</span>`}
+    </button>`;
+  }
+
   let briefRoom = 0;
   function showBrief(i) {
     briefRoom = Number(i);
+    if (save.mode === 'hard' && !hardUnlocked(briefRoom)) save.mode = 'normal';
     const r = STAGES[briefRoom];
-    const b = save.best[briefRoom];
-    const chars = CHARS.map((c) => {
-      const ok = TEST_UNLOCK || c.unlockRoom < 0 || save.cleared[c.unlockRoom];
-      return `<button type="button" class="char${save.char === c.id ? ' on' : ''}" data-act="char" data-arg="${c.id}" ${ok ? '' : 'disabled'}>
-        <img src="${charThumb(c.id)}" alt="">
-        <span class="char-name">${ok ? esc(c.name) : '？？？'}</span><br>
-        <span class="char-desc">${ok ? `${esc(c.desc)} 最初のギア: ${esc(WEAPONS[c.weapon].name)}` : `ステージ${c.unlockRoom + 1}をクリアすると仲間になる`}</span>
-      </button>`;
-    }).join('');
+    const ch = curChar();
+    const rec = peekRec(ch.id, briefRoom, save.mode);
+    const chars = CHARS.map((c) => charCard(c, 'char', c.id === ch.id)).join('');
     const roomList = [...r.rooms].sort((a, c) => a.danger - c.danger).map((rm) => `<li><b>${esc(rm.name)}</b><span class="danger d${rm.danger}">${stars(rm.danger)}</span><span>発生源 ${rm.src.length}</span><span class="bonus">${esc(ROOM_BONUS[rm.bonus])}</span></li>`).join('');
+    const tRoom = r.rooms.find((q) => q.id === r.treasure.room);
+    const found = save.treasures[briefRoom];
+    const unlocks = CHARS.find((c) => c.unlock === briefRoom);
     show('brief', `
       <div class="panel wide">
         <h2>ステージ${briefRoom + 1} ${esc(r.name)}</h2>
         <p class="sub">${esc(r.desc)}</p>
+        ${hardUnlocked(briefRoom) ? modeTabs('briefMode') : ''}
         <div class="plan">
           <img class="plan-img" src="${planImage(briefRoom)}" alt="間取り図">
           <div class="plan-side">
@@ -4254,19 +4596,66 @@
             <ul class="room-list">${roomList}</ul>
           </div>
         </div>
+        <div class="treasure-line${found ? ' found' : ''}">
+          <img src="${iconURL('treasure')}" alt="">
+          <span>${found ? `宝物「${esc(r.treasure.name)}」 見つけた!` : `宝物: ${stars(tRoom.danger).replace(/☆/g, '')}の部屋「${esc(tRoom.name)}」の清掃を完了すると見つかる`}${unlocks ? `<br><small>${found ? `${esc(unlocks.name)}が仲間になった` : 'この宝物を見つけると、新しい清掃員が仲間になる'}</small>` : ''}</span>
+        </div>
         <p class="brief-note">5分で中ボス「${ENEMIES.yokai.name}」、9分でボス「${esc(ENEMIES[r.boss].name)}」が現れる。</p>
-        <div class="records"><span>清掃した部屋 最高 <b>${b.rooms || 0}/${r.rooms.length}</b></span>${b.clear ? `<span>最速クリア <b>${fmtTime(b.clear)}</b></span>` : ''}${save.cleared[briefRoom] ? '<span><b>クリア済み</b></span>' : ''}</div>
+        <div class="records"><span>${esc(ch.name)} ・ ${MODES[save.mode].name}</span><span>清掃した部屋 最高 <b>${rec.r}/${r.rooms.length}</b></span>${rec.t ? `<span>最速クリア <b>${fmtTime(rec.t)}</b></span>` : ''}${rec.c ? '<span><b>クリア済み</b></span>' : ''}</div>
         <h3>出撃する清掃員</h3>
         <div class="chars">${chars}</div>
         <div class="actions">
-          <button type="button" class="btn primary" data-act="start" data-focus>出撃!</button>
+          <button type="button" class="btn primary" data-act="start" data-focus>${MODES[save.mode].name}で出撃!</button>
           <button type="button" class="btn" data-act="rooms" data-back>戻る</button>
         </div>
       </div>`);
   }
 
+  // ---- 清掃員と記録 ----
+  let charsBack = 'title';
+  function showChars(from) {
+    if (from) charsBack = from;
+    const list = CHARS.map((c) => charCard(c, 'charRec', false)).join('');
+    const tre = STAGES.map((st, i) => `<li class="${save.treasures[i] ? 'found' : ''}"><img src="${iconURL('treasure')}" alt=""><span><b>${save.treasures[i] ? esc(st.treasure.name) : '？？？'}</b><br><small>ステージ${i + 1} ${stageUnlocked(i) ? esc(st.name) : '？？？'}${save.treasures[i] ? ` ・ ${esc(st.treasure.desc)}` : ''}</small></span></li>`).join('');
+    show('chars', `
+      <div class="panel wide">
+        <h2>清掃員</h2>
+        ${completionHtml()}
+        <p class="sub">清掃員を選ぶと、ステージごとのクリア状況が見られる</p>
+        <div class="chars">${list}</div>
+        <h3>宝物 (${save.treasures.filter(Boolean).length}/${STAGES.length})</h3>
+        <ul class="treasure-list">${tre}</ul>
+        <div class="actions"><button type="button" class="btn" data-act="${charsBack}" data-back data-focus>戻る</button></div>
+      </div>`);
+  }
+
+  function showCharRec(id) {
+    const c = CHARS.find((q) => q.id === id);
+    const ok = charUnlocked(c);
+    const cell = (i, m) => {
+      const r = peekRec(c.id, i, m);
+      if (r.c) return `<td class="ok">✓ ${fmtTime(r.t)}</td>`;
+      if (r.r) return `<td class="part">${r.r}/${STAGES[i].rooms.length}部屋</td>`;
+      return '<td class="none">—</td>';
+    };
+    const rows = STAGES.map((st, i) => `<tr><th>${i + 1}. ${stageUnlocked(i) ? esc(st.name) : '？？？'}</th>${cell(i, 'normal')}${cell(i, 'hard')}</tr>`).join('');
+    let n = 0;
+    for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (peekRec(c.id, i, m).c) n++;
+    show('charRec', `
+      <div class="panel wide">
+        <div class="rec-head"><img src="${charThumb(c.id, !ok)}" alt=""><div><h2>${ok ? esc(c.name) : '？？？'}</h2>
+        <p class="sub">${ok ? `個性「${esc(c.trait)}」 ${esc(c.traitDesc)}` : esc(unlockText(c))}</p></div></div>
+        <p class="sub">クリア ${n}/${STAGES.length * 2}</p>
+        <div class="rec-wrap"><table class="rec-table"><thead><tr><th>ステージ</th><th>ノーマル</th><th>ハード</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="actions">
+          ${ok ? `<button type="button" class="btn primary" data-act="pickChar" data-arg="${c.id}">この清掃員にする</button>` : ''}
+          <button type="button" class="btn" data-act="chars" data-back data-focus>戻る</button>
+        </div>
+      </div>`);
+  }
+
   // 出撃前に見せる間取り図
-  const FLOOR_COLOR = { wood: '#d6b183', tatami: '#d3cf93', stone: '#aaa69e', kitchen: '#ddd6c6', bath: '#cfe3ea', concrete: '#b3aea5', carpet: '#9a3a4a' };
+  const FLOOR_COLOR = { wood: '#d6b183', tatami: '#d3cf93', stone: '#aaa69e', kitchen: '#ddd6c6', bath: '#cfe3ea', concrete: '#b3aea5', carpet: '#9a3a4a', grass: '#7fae5a', attic: '#8f6f4c' };
   const planCache = {};
   function planImage(idx) {
     if (planCache[idx]) return planCache[idx];
@@ -4427,6 +4816,34 @@
     else hide();
   }
 
+  // ---- 宝物 ----
+  function foundTreasure() {
+    const i = G.stageIdx;
+    const t = G.stage.treasure;
+    const isNew = !save.treasures[i];
+    save.treasures[i] = true;
+    persist(); // 力尽きても記録が残るように、拾ったその場で保存する
+    const unlock = isNew ? CHARS.find((c) => c.unlock === i) : null;
+    if (isNew) G.treasureNew = true;
+    if (unlock) G.newChar = unlock;
+    Sound.play('chest-evo');
+    show('treasure', `
+      <div class="panel reward">
+        <div class="chest-stage">
+          <span class="chest-flash"></span>
+          <img class="chest-box" src="${iconURL('chest')}" alt="">
+          <img class="chest-reward" src="${iconURL('treasure')}" alt="">
+        </div>
+        <div class="chest-text">
+          <p class="reward-title">${isNew ? '宝物を見つけた!' : '宝物'}</p>
+          <p class="treasure-name">${esc(t.name)}</p>
+          <p class="sub">${esc(t.desc)}${isNew ? '' : '（もう持っている）'}</p>
+          ${unlock ? `<p class="result-note">${esc(unlock.name)}が仲間になった!</p>` : ''}
+        </div>
+        <div class="actions chest-ok"><button type="button" class="btn primary" data-act="treasureOk" data-focus>OK</button></div>
+      </div>`, false, { kind: 'evo', lock: 1000 });
+  }
+
   // ---- 宝箱 ----
   function openChest() {
     let icon;
@@ -4483,28 +4900,36 @@
     const killCoins = Math.floor(g.kills / 20);
     const cleanCoins = Math.floor(pct);
     const winCoins = win ? 50 : 0;
-    const total = killCoins + cleanCoins + winCoins + g.dumpCoins + g.bossCoins + g.roomCoins;
+    const base = killCoins + cleanCoins + winCoins + g.dumpCoins + g.bossCoins + g.roomCoins;
+    const mul = g.md.coin * (1 + save.shop.coin * 0.1);
+    const total = Math.round(base * mul);
     save.coins += total;
-    const best = save.best[i];
-    best.clean = Math.max(best.clean, pct);
-    best.rooms = Math.max(best.rooms || 0, doneN);
-    if (win) best.clear = best.clear ? Math.min(best.clear, g.time) : g.time;
-    best.time = Math.max(best.time, g.time);
-    const firstClear = win && !save.cleared[i];
-    if (win) save.cleared[i] = true;
+    // 記録 (清掃員ごと・モードごと)
+    const wasStageCleared = stageCleared(i, 'normal');
+    const rec = recOf(save, g.ch.id, i, g.mode);
+    const firstForChar = win && !rec.c;
+    rec.r = Math.max(rec.r, doneN);
+    if (win) {
+      rec.c = 1;
+      rec.t = rec.t ? Math.min(rec.t, Math.round(g.time)) : Math.round(g.time);
+    }
     for (const k in g.killsByType) save.kills[k] = (save.kills[k] || 0) + g.killsByType[k];
     persist();
-    const newChar = firstClear ? CHARS.find((c) => c.unlockRoom === i) : null;
     const notes = [];
     if (allDone) notes.push('全部屋の清掃を完了した!');
-    if (firstClear && i + 1 < STAGES.length) notes.push(`ステージ${i + 2}「${STAGES[i + 1].name}」に入れるようになった!`);
-    if (firstClear && i === STAGES.length - 1) notes.push('屋敷じゅうをピカピカにした! おめでとう!');
-    if (newChar) notes.push(`${newChar.name}が仲間になった!`);
+    if (g.treasureNew) notes.push(`宝物「${STAGES[i].treasure.name}」を見つけた!`);
+    if (g.newChar) notes.push(`${g.newChar.name}が仲間になった!`);
+    if (win && g.mode === 'normal' && !wasStageCleared) {
+      if (i + 1 < STAGES.length) notes.push(`ステージ${i + 2}「${STAGES[i + 1].name}」に入れるようになった!`);
+      notes.push('このステージのハードに挑戦できるようになった!');
+      if (i === STAGES.length - 1) notes.push('屋敷じゅうをピカピカにした! おめでとう!');
+    }
+    if (firstForChar) notes.push(`${g.ch.name}で${MODES[g.mode].name}を初クリア!`);
     G = null;
     show('result', `
       <div class="panel">
         <h2 class="result-title ${win ? 'win' : 'lose'}">${win ? '全部屋 清掃完了!' : g.timeUp ? '時間切れ…' : '力尽きた…'}</h2>
-        <p class="sub">ステージ${i + 1} ${esc(STAGES[i].name)}</p>
+        <p class="sub">ステージ${i + 1} ${esc(STAGES[i].name)} ・ ${MODES[g.mode].name} ・ ${esc(g.ch.name)}</p>
         <dl class="stat-list">
           <dt>${win ? 'クリアタイム' : 'プレイした時間'}</dt><dd>${fmtTime(g.time)}</dd>
           <dt>清掃した部屋</dt><dd>${doneN}/${g.rooms.length}</dd>
@@ -4517,6 +4942,7 @@
           <dt>コイン (部屋・発生源)</dt><dd>+${g.roomCoins}</dd>
           <dt>コイン (ボス)</dt><dd>+${g.bossCoins}</dd>
           ${win ? '<dt>コイン (クリア)</dt><dd>+50</dd>' : ''}
+          ${mul !== 1 ? `<dt>倍率 (${g.mode === 'hard' ? 'ハード・' : ''}恒久スキル)</dt><dd>×${mul.toFixed(2)}</dd>` : ''}
           <dt class="total">合計</dt><dd class="total">+${total}</dd>
         </dl>
         ${notes.map((n) => `<p class="result-note">${esc(n)}</p>`).join('')}
@@ -4524,13 +4950,13 @@
           ${win && i + 1 < STAGES.length ? `<button type="button" class="btn primary" data-act="brief" data-arg="${i + 1}" data-focus>次のステージへ</button>` : ''}
           <button type="button" class="btn${win && i + 1 < STAGES.length ? '' : ' primary'}" data-act="start" data-arg="${i}">もう一度</button>
           <button type="button" class="btn" data-act="rooms" data-back>ステージ選択へ</button>
-          <button type="button" class="btn" data-act="shop">強化</button>
+          <button type="button" class="btn" data-act="shop">恒久スキル</button>
         </div>
       </div>`);
     briefRoom = i;
   }
 
-  // ---- 強化 ----
+  // ---- 恒久スキル ----
   function showShop() {
     const items = SHOP.map((it) => {
       const lv = save.shop[it.id];
@@ -4545,15 +4971,15 @@
     }).join('');
     show('shop', `
       <div class="panel">
-        <h2>強化</h2>
-        <p class="sub">コイン <span class="coins">${save.coins}</span> ・ 次のプレイからずっと効く</p>
+        <h2>恒久スキル</h2>
+        <p class="sub">コイン <span class="coins">${save.coins}</span> ・ どの清掃員にも、次のプレイからずっと効く</p>
         <div class="shop">${items}</div>
         <div class="actions"><button type="button" class="btn" data-act="rooms" data-back data-focus>戻る</button></div>
       </div>`);
   }
 
   function shopIcon(id) {
-    return { hp: 'heal', might: 'boiler', speed: 'boots', magnet: 'dustpack', box: 'dustpack', reroll: 'coin', choices: 'chest' }[id];
+    return { hp: 'heal', might: 'boiler', clean: 'roller', speed: 'boots', armor: 'gloves', regen: 'heal', magnet: 'dustpack', xp: 'battery', box: 'dustpack', coin: 'coin', reroll: 'tape', choices: 'chest' }[id];
   }
 
   // ---- 図鑑 ----
@@ -4606,6 +5032,25 @@
       persist();
       showBrief(briefRoom);
     },
+    mode: (m) => {
+      save.mode = m;
+      persist();
+      showRooms();
+    },
+    briefMode: (m) => {
+      save.mode = m;
+      persist();
+      showBrief(briefRoom);
+    },
+    chars: (from) => showChars(from),
+    charRec: (id) => showCharRec(id),
+    pickChar: (id) => {
+      save.char = id;
+      persist();
+      Sound.play('level');
+      showChars();
+    },
+    treasureOk: afterMenu,
     start: (i) => startGame(i != null ? Number(i) : briefRoom),
     resume,
     retry: () => {
