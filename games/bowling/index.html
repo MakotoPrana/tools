@@ -13,14 +13,14 @@
     gtag('config', 'G-4VLZW1VMVC');
   </script>
   <title>STRIKE LANE</title>
-  <meta name="description" content="スワイプで投げる3Dボウリング。ピンは物理演算で倒れます。10フレームの本格スコアでハイスコアを目指そう。" />
+  <meta name="description" content="仕掛けだらけのレーンでトリックショットを決める3Dボウリング。ジャンプ台、落とし穴、動く壁を越えて全10ステージのピンを倒し、宝物を集めよう。" />
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" />
-  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
   <main class="app">
@@ -30,7 +30,17 @@
       <button type="button" id="sound-btn" class="icon-btn" aria-label="効果音" aria-pressed="true">♪</button>
     </header>
 
-    <div class="sheet" id="sheet" aria-label="スコアシート"></div>
+    <div class="stagebar" id="stagebar">
+      <div class="stagebar-head">
+        <span class="stage-no" id="stage-no">STAGE -</span>
+        <span class="stage-name" id="stage-name">ステージを選んでください</span>
+      </div>
+      <p class="stage-goal" id="stage-goal"></p>
+      <div class="stagebar-actions">
+        <button type="button" class="small-btn" id="retry-btn" disabled>やり直す</button>
+        <button type="button" class="small-btn" id="menu-btn">ステージ選択</button>
+      </div>
+    </div>
 
     <div class="board-wrap" id="board-wrap">
       <canvas id="board" aria-label="ゲーム画面"></canvas>
@@ -38,21 +48,34 @@
 
       <div class="hud" id="hud">
         <p class="hud-frame" id="hud-frame"></p>
+        <p class="hud-treasure" id="hud-treasure"></p>
         <p class="hud-speed" id="hud-speed"></p>
       </div>
       <div class="power" id="power" hidden><span id="power-fill"></span></div>
       <p class="hint" id="hint"></p>
+      <p class="toast" id="toast" aria-live="polite"></p>
       <p class="callout" id="callout" aria-live="polite"></p>
 
       <div class="overlay" id="overlay">
-        <div class="title-screen" id="title-screen">
+        <div class="screen title-screen" id="screen-title">
           <p class="game-logo"><span class="logo-strike">STRIKE</span><span class="logo-lane">LANE</span></p>
           <p class="game-kana">ストライク・レーン</p>
-          <p class="overlay-text" id="overlay-text">上にスワイプして投げよう。途中で曲げるとカーブ</p>
+          <p class="overlay-text">ジャンプ台、落とし穴、動く壁。<br />仕掛けだらけのレーンでトリックショットを決めろ</p>
+          <button type="button" class="start-btn" id="start-btn">あそぶ</button>
         </div>
-        <div class="overlay-actions">
-          <button type="button" class="start-btn" id="start-btn">ゲームスタート</button>
-          <p class="best" id="best"></p>
+
+        <div class="screen select-screen" id="screen-select" hidden>
+          <h2 class="screen-title">ステージ選択</h2>
+          <p class="progress" id="progress"></p>
+          <div class="stage-grid" id="stage-grid"></div>
+          <button type="button" class="text-btn" id="select-back">タイトルへ</button>
+        </div>
+
+        <div class="screen result-screen" id="screen-result" hidden>
+          <p class="result-title" id="result-title"></p>
+          <p class="result-stage" id="result-stage"></p>
+          <p class="result-text" id="result-text"></p>
+          <div class="overlay-actions" id="result-actions"></div>
         </div>
       </div>
 
@@ -61,14 +84,18 @@
 
     <section class="help">
       <h2>遊び方</h2>
-      <p>10フレームで、できるだけ多くのピンを倒すボウリングです。1フレームに2回まで投げられ、1投目で10本すべて倒すとストライク、2投目までに倒しきるとスペアです。ピンは物理演算で動くので、当たる角度によって倒れ方が毎回変わります。</p>
+      <p>仕掛けのあるレーンで、置かれたピンを全部倒すトリックショットのゲームです。各ステージで投げられるのは2投まで。1投目で全部倒せば<strong>ストライククリア</strong>、2投目で残りを倒しきれば<strong>スペアクリア</strong>です。2投で倒しきれなかったら、もう一度挑戦しましょう。ステージをクリアすると次のステージが遊べるようになります。</p>
+      <p>ステージが始まると、まずレーン全体を上から見せます (タップで飛ばせます)。ジャンプ台、落とし穴、動く壁などの仕掛けを確かめてから投げましょう。</p>
+
+      <h3>宝物</h3>
+      <p>各ステージには宝物がひとつ浮かんでいます。ボールで触れると手に入ります。宝物を取っても取らなくても、クリアの条件は変わりません。一度手に入れた宝物は、ステージで半透明になって表示されます。集めた数はステージ選択画面で確かめられます。</p>
 
       <h3>スマホの操作</h3>
       <table>
         <tbody>
           <tr><th>左右になぞる</th><td>投げる位置を動かす</td></tr>
           <tr><th>上にスワイプ</th><td>投げる。長くなぞるほどボールが速くなり (線の色が緑→黄→赤に変わります)、出だしを斜めにすると斜めに転がります</td></tr>
-          <tr><th>途中で曲げてスワイプ</th><td>カーブ (フック) がかかります。途中から左へ曲げると、ボールも奥で左へ曲がります。大きく曲げるほど強く曲がります</td></tr>
+          <tr><th>途中で曲げてスワイプ</th><td>カーブがかかります。途中から左へ曲げると、ボールもレーンの中ほどから左へ曲がります。大きく曲げるほど強く曲がります</td></tr>
           <tr><th>指を離したあと</th><td>なぞった線が少しのあいだ表示され、そのあとボールが転がります</td></tr>
         </tbody>
       </table>
@@ -81,22 +108,20 @@
           <tr><th>A / D</th><td>投げる向きを変える</td></tr>
           <tr><th>Q / E</th><td>カーブの向きと強さを変える</td></tr>
           <tr><th>スペースを押して離す</th><td>押している間にパワーがたまり、離すと投げる</td></tr>
+          <tr><th>R / Esc</th><td>やり直す / ステージ選択へ</td></tr>
         </tbody>
       </table>
 
-      <h3>スコアの数え方</h3>
-      <p>ストライクのフレームは、10本に次の2投で倒した本数を足します。スペアのフレームは、10本に次の1投で倒した本数を足します。10フレーム目でストライクかスペアを取ると、3投目を投げられます。全部ストライクなら300点です。</p>
+      <h3>仕掛け</h3>
       <table>
         <tbody>
-          <tr><th>X</th><td>ストライク</td></tr>
-          <tr><th>/</th><td>スペア</td></tr>
-          <tr><th>-</th><td>1本も倒れなかった投球 (ミス・ガター)</td></tr>
-          <tr><th>赤い数字</th><td>スプリット (ヘッドピンが倒れて、残りのピンが離れて残った状態)</td></tr>
+          <tr><th>ジャンプ台・坂</th><td>速いボールほど高く遠くへ飛びます。坂の上ではカーブはかかりません</td></tr>
+          <tr><th>落とし穴・谷</th><td>ボールが落ちるとその投球は終わりです。飛び越えれば落ちません</td></tr>
+          <tr><th>壁</th><td>ボールを止めてしまいます。カーブやジャンプでよけましょう</td></tr>
+          <tr><th>動く壁</th><td>左右に動き続けています。タイミングを見て投げましょう</td></tr>
+          <tr><th>反射板・バンパー</th><td>ボールをよく跳ね返します。ピンボールのように向きを変えられます</td></tr>
         </tbody>
       </table>
-
-      <h3>ちょっとしたコツ</h3>
-      <p>レーンの手前に並ぶ7つの三角はスパットです。まっすぐ転がすより、少し右から投げて1番ピンと3番ピンの間 (ポケット) に左カーブで入れると、ストライクが出やすくなります。</p>
     </section>
   </main>
 
@@ -107,6 +132,6 @@
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
-  <script src="script.js?v=2"></script>
+  <script src="script.js?v=3"></script>
 </body>
 </html>

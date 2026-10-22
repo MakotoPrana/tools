@@ -1,6 +1,7 @@
 /*
- * STRIKE LANE: 3D ボウリング
+ * STRIKE LANE: 仕掛けのあるレーンでトリックショットを決める 3D ボウリング
  *   描画は three.js、ピンとボールの動きは cannon.js の物理演算。
+ *   ステージは全10。2投までにピンを全部倒すとクリア (1投ならストライク、2投ならスペア)。
  *   長さの単位はメートル。ファウルラインが z = 0 で、ピンは -z の方向 (奥) にある。
  */
 (() => {
@@ -10,6 +11,7 @@
   if (!window.THREE || !window.CANNON) {
     errorEl.hidden = false;
     document.getElementById('start-btn').disabled = true;
+    document.getElementById('menu-btn').disabled = true;
     return;
   }
 
@@ -32,7 +34,8 @@
   const PIN_COM = 0.145;                   // ピンの重心の高さ
   const START_Z = -0.3;
   const BALL_X_MAX = LANE_HALF - BALL_R;
-  const OIL_END_Z = -9;                    // ここより奥はオイルが薄く、カーブがかかり始める
+  const HOOK_START_Z = -5;                 // ここより奥はオイルが薄く、カーブがかかり始める
+  const HOOK_RAMP = 3;                     // カーブの力が最大になるまでの距離
 
   const MIN_SPEED = 4.5;                   // m/s
   const MAX_SPEED = 10.5;
@@ -40,21 +43,38 @@
   const SWIPE_MIN = 0.12;                  // この長さ (画面の高さに対する割合) 以下は最も遅い球
   const SWIPE_MAX = 0.7;                   // この長さ以上は最も速い球
   const TRAIL_HOLD_MS = 700;               // スワイプの線を見せてから投げるまで
-  const HOOK_FORCE = 5.5;                  // N (カーブ最大のときの横向きの力)
+  const HOOK_FORCE = 11;                   // N (カーブ最大のときの横向きの力)
+  const TREASURE_REACH = 0.2;              // ボールの中心からこの距離で宝物を取る
+  const LANE_GROUP = 2;                    // 落とし穴に落ちたボールは、この組の物 (レーン) をすり抜ける
 
   // ---- DOM ----
   const canvas = document.getElementById('board');
   const wrap = document.getElementById('board-wrap');
-  const sheetEl = document.getElementById('sheet');
+  const stageNoEl = document.getElementById('stage-no');
+  const stageNameEl = document.getElementById('stage-name');
+  const stageGoalEl = document.getElementById('stage-goal');
+  const retryBtn = document.getElementById('retry-btn');
+  const menuBtn = document.getElementById('menu-btn');
+  const hudTreasure = document.getElementById('hud-treasure');
+  const toastEl = document.getElementById('toast');
   const hudFrame = document.getElementById('hud-frame');
   const hudSpeed = document.getElementById('hud-speed');
   const hintEl = document.getElementById('hint');
   const calloutEl = document.getElementById('callout');
   const overlay = document.getElementById('overlay');
-  const overlayText = document.getElementById('overlay-text');
-  const titleScreen = document.getElementById('title-screen');
+  const screens = {
+    title: document.getElementById('screen-title'),
+    select: document.getElementById('screen-select'),
+    result: document.getElementById('screen-result'),
+  };
   const startBtn = document.getElementById('start-btn');
-  const bestEl = document.getElementById('best');
+  const progressEl = document.getElementById('progress');
+  const gridEl = document.getElementById('stage-grid');
+  const selectBack = document.getElementById('select-back');
+  const resultTitle = document.getElementById('result-title');
+  const resultStage = document.getElementById('result-stage');
+  const resultText = document.getElementById('result-text');
+  const resultActions = document.getElementById('result-actions');
   const powerEl = document.getElementById('power');
   const powerFill = document.getElementById('power-fill');
   const soundBtn = document.getElementById('sound-btn');
@@ -388,9 +408,82 @@
   }
   scene.add(aimLine);
 
+  // ---- ステージの仕掛けの見た目 ----
+  function stripeTexture(c1, c2, arrow) {
+    const tex = canvasTexture(128, 128, (g, w, h) => {
+      g.fillStyle = c1;
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = c2;
+      if (arrow) {
+        // 奥へ向かう山形 (ジャンプ台の向き)
+        for (let y = -64; y < h + 64; y += 64) {
+          g.beginPath();
+          g.moveTo(0, y + 64);
+          g.lineTo(w / 2, y + 20);
+          g.lineTo(w, y + 64);
+          g.lineTo(w, y + 88);
+          g.lineTo(w / 2, y + 44);
+          g.lineTo(0, y + 88);
+          g.closePath();
+          g.fill();
+        }
+      } else {
+        for (let i = -h; i < w; i += 32) {
+          g.beginPath();
+          g.moveTo(i, h);
+          g.lineTo(i + 16, h);
+          g.lineTo(i + 16 + h, 0);
+          g.lineTo(i + h, 0);
+          g.closePath();
+          g.fill();
+        }
+      }
+    });
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+  const rampTex = stripeTexture('#2a2338', '#ffc24a', true);
+  const hazardTex = stripeTexture('#1b1d21', '#f7d308', false);
+  const rampSideMat = new THREE.MeshPhongMaterial({ color: 0x2a2338, shininess: 30 });
+  const wallMat = new THREE.MeshPhongMaterial({ color: 0x6c4bd8, emissive: 0x1d1240, shininess: 60 });
+  const moverMat = new THREE.MeshPhongMaterial({ map: hazardTex, emissive: 0x2a1a00, shininess: 40 });
+  const deflectMat = new THREE.MeshPhongMaterial({ color: 0x2ec4b6, emissive: 0x0b3a36, shininess: 120 });
+  const railMat = new THREE.MeshPhongMaterial({ color: 0xe8492f, emissive: 0x3a0d06, shininess: 90 });
+  const holeMat = new THREE.MeshBasicMaterial({ color: 0x030306 });
+  const rimMat = new THREE.MeshBasicMaterial({ map: hazardTex });
+
+  const haloTex = canvasTexture(64, 64, (g, w, h) => {
+    const grad = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+    grad.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, h);
+  });
+
+  function starGeometry() {
+    const shape = new THREE.Shape();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 0.035 : 0.08;
+      const a = (i / 10) * Math.PI * 2 + Math.PI / 2;
+      shape[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r);
+    }
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.022, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 1 });
+    geo.center();
+    return geo;
+  }
+  const TREASURE_GEO = {
+    coin: new THREE.CylinderGeometry(0.07, 0.07, 0.016, 28).rotateX(Math.PI / 2),
+    gem: new THREE.OctahedronGeometry(0.07).scale(1, 1.35, 1),
+    pin: pinGeo.clone().scale(0.42, 0.42, 0.42),
+    star: starGeometry(),
+  };
+
   // =====================================================================
   // 物理 (cannon.js)
   // =====================================================================
+  const STEP = 1 / 240;
   const world = new CANNON.World();
   world.gravity.set(0, -9.82, 0);
   world.broadphase = new CANNON.SAPBroadphase(world);
@@ -402,6 +495,7 @@
     ball: new CANNON.Material('ball'),
     pin: new CANNON.Material('pin'),
     wall: new CANNON.Material('wall'),
+    rail: new CANNON.Material('rail'),
   };
   const contact = (a, b, friction, restitution) => world.addContactMaterial(new CANNON.ContactMaterial(a, b, { friction, restitution }));
   contact(M.ball, M.lane, 0.05, 0.02);
@@ -410,6 +504,9 @@
   contact(M.pin, M.pin, 0.2, 0.5);
   contact(M.pin, M.wall, 0.2, 0.35);
   contact(M.ball, M.wall, 0.1, 0.15);
+  // 反射板とバンパーはよく跳ね返す
+  contact(M.ball, M.rail, 0.02, 0.75);
+  contact(M.pin, M.rail, 0.2, 0.6);
 
   function staticBox(material, hx, hy, hz, x, y, z) {
     const body = new CANNON.Body({ mass: 0, material });
@@ -418,11 +515,11 @@
     world.addBody(body);
     return body;
   }
-  // レーン (上面が y = 0)
+  // レーン (上面が y = 0)。落とし穴に落ちたボールだけすり抜けられるよう、組を分けておく
   const laneZ0 = 3;
-  staticBox(M.lane, LANE_HALF, 0.15, (laneZ0 - DECK_END) / 2, 0, -0.15, (laneZ0 + DECK_END) / 2);
+  staticBox(M.lane, LANE_HALF, 0.15, (laneZ0 - DECK_END) / 2, 0, -0.15, (laneZ0 + DECK_END) / 2).collisionFilterGroup = LANE_GROUP;
   // 手前のアプローチ (ガターの上もふさぐ)
-  staticBox(M.lane, WALL_X, 0.15, 1.5 - 0.15, 0, -0.15, 1.5 - 0.15 + 0.0);
+  staticBox(M.lane, WALL_X, 0.15, 1.35, 0, -0.15, 1.35);
   for (const side of [-1, 1]) {
     // ガターの底
     staticBox(M.wall, GUTTER_R, 0.1, -DECK_END / 2, side * (LANE_HALF + GUTTER_R), -GUTTER_R - 0.1, DECK_END / 2);
@@ -448,7 +545,10 @@
     const h = yTop - yBottom;
     body.addShape(new CANNON.Cylinder(rTop, rBottom, h, 10), new CANNON.Vec3(0, (yBottom + yTop) / 2 - PIN_COM, 0), toY);
   }
-  const pins = PIN_SPOTS.map((spot, i) => {
+  // ステージごとに本数が変わるので、多めに作っておいて使う分だけ並べる
+  const MAX_PINS = 12;
+  const pins = [];
+  for (let i = 0; i < MAX_PINS; i++) {
     const body = new CANNON.Body({ mass: PIN_MASS, material: M.pin });
     pinPart(body, 0.026, 0.06, 0, 0.115);
     pinPart(body, 0.06, 0.04, 0.115, 0.22);
@@ -460,9 +560,288 @@
     const mesh = new THREE.Mesh(pinGeo, pinMat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    mesh.visible = false;
     scene.add(mesh);
-    return { no: i + 1, spot, body, mesh, active: false };
-  });
+    pins.push({ body, mesh, active: false, used: false, home: { x: 0, z: 0 }, baseY: 0 });
+  }
+
+  // =====================================================================
+  // ステージ
+  // =====================================================================
+  const PIN = (n) => ({ x: PIN_SPOTS[n - 1].x, z: PIN_SPOTS[n - 1].z });
+  const rack = (...nos) => nos.map(PIN);
+  const deg = (d) => (d * Math.PI) / 180;
+
+  // 座標: x は右が +、z はファウルラインが 0 で奥が - (1番ピンは z = -18.29)
+  //   ramps:     ジャンプ台・坂。z は手前の端、len は斜面の長さ、angle は傾き (度)
+  //   holes:     落とし穴 (r で丸、w と d で四角い谷)
+  //   blocks:    壁。rotY で斜めに置ける。bouncy なら反射板
+  //   movers:    左右に動く壁。range の幅を period 秒で往復する
+  //   platforms: ピンを乗せる台
+  //   rails:     ガターをふさぐバンパー
+  const STAGES = [
+    {
+      name: 'はじめの一投',
+      goal: '3本のピンを倒そう。宝物はレーンの左に浮かんでいる',
+      startX: 0,
+      pins: rack(1, 2, 3),
+      treasure: { x: -0.3, y: 0.16, z: -7, name: '銅のコイン', shape: 'coin', color: 0xd27d46 },
+    },
+    {
+      name: 'たて一列',
+      goal: '一列に並んだピン。宝物を取るなら右から投げて、カーブで真ん中へ戻そう',
+      startX: 0.3,
+      pins: [
+        { x: 0, z: HEAD_Z + 0.4 }, { x: 0, z: HEAD_Z }, { x: 0, z: HEAD_Z - 0.39 }, { x: 0, z: HEAD_Z - 0.78 },
+      ],
+      treasure: { x: 0.35, y: 0.16, z: -9.5, name: '銀のコイン', shape: 'coin', color: 0xd9dee6 },
+    },
+    {
+      name: 'ジャンプ台',
+      goal: '壁はジャンプで飛び越えよう。宝物は高いところ。速い球ほど高く飛ぶ',
+      startX: 0,
+      pins: rack(1, 2, 3, 4, 5, 6),
+      ramps: [{ x: 0, z: -11.5, w: LANE_W, len: 1.2, angle: 12 }],
+      blocks: [{ x: 0, z: -13.7, w: WALL_X * 2, d: 0.12, h: 0.16 }],
+      treasure: { x: 0, y: 0.6, z: -14.6, name: '金のコイン', shape: 'coin', color: 0xffc83a },
+    },
+    {
+      name: '落とし穴',
+      goal: '穴をよけてカーブで抜けよう。落ちたらその投球はおしまい',
+      startX: 0.28,
+      pins: rack(1, 2, 3, 5),
+      holes: [
+        { x: 0, z: -9, r: 0.24 },
+        { x: 0.4, z: -13.5, r: 0.17 },
+        { x: -0.4, z: -13.5, r: 0.17 },
+      ],
+      treasure: { x: 0.3, y: 0.16, z: -11.5, name: 'エメラルド', shape: 'gem', color: 0x2fd27a },
+    },
+    {
+      name: 'スラローム',
+      goal: '左カーブで2つの壁をよけよう。ピンはレーンの途中に立っている',
+      startX: 0.4,
+      pins: [{ x: -0.3, z: -15.7 }, { x: -0.45, z: -16 }, { x: -0.15, z: -16 }, { x: -0.3, z: -16.3 }],
+      blocks: [
+        { x: -0.2, z: -8, w: 0.66, d: 0.15, h: 0.25 },
+        { x: 0.36, z: -13, w: 0.34, d: 0.15, h: 0.25 },
+      ],
+      treasure: { x: 0.42, y: 0.16, z: -10.5, name: 'サファイア', shape: 'gem', color: 0x3a7bff },
+    },
+    {
+      name: '動く壁',
+      goal: '左右に動く壁のすきまを通して、10本のストライクを狙え',
+      startX: 0.15,
+      pins: rack(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+      movers: [{ x: 0, z: -13, w: 0.42, d: 0.15, h: 0.3, range: 0.34, period: 2.4 }],
+      treasure: { x: 0, y: 0.16, z: -15.6, name: 'ルビー', shape: 'gem', color: 0xff3b5c },
+    },
+    {
+      name: 'ピンの島',
+      goal: 'ピンは高い台の上。真ん中の坂を登らないと届かない',
+      startX: 0,
+      pins: rack(1, 2, 3, 4, 5, 6).map((p) => ({ ...p, y: 0.12 })),
+      platforms: [{ x: 0, z: HEAD_Z + 0.015, w: LANE_W, d: 1.77, h: 0.12 }],
+      ramps: [{ x: 0, z: HEAD_Z + 0.9 + 0.9 * Math.cos(Math.asin(0.12 / 0.9)), w: 0.42, len: 0.9, angle: Math.asin(0.12 / 0.9) * 180 / Math.PI }],
+      treasure: { x: 0.36, y: 0.16, z: -9, name: 'アメジスト', shape: 'gem', color: 0xb05cff },
+    },
+    {
+      name: '谷越え',
+      goal: '左のジャンプ台で谷を飛び越えろ。右の宝物は、谷に落ちる覚悟で',
+      startX: -0.25,
+      pins: rack(2, 4, 7, 8),
+      ramps: [{ x: -0.25, z: -11, w: 0.36, len: 1.0, angle: 13 }],
+      holes: [{ x: 0, z: -13.5, w: LANE_W + 0.02, d: 1.6 }],
+      treasure: { x: 0.3, y: 0.16, z: -12.2, name: 'ダイヤモンド', shape: 'gem', color: 0xe6f6ff },
+    },
+    {
+      name: 'ピンボール',
+      goal: 'ピンは壁の裏。右はしをまっすぐ投げて、反射板で横から倒せ',
+      startX: 0.4,
+      pins: [{ x: 0.17, z: HEAD_Z + 0.6 }, { x: -0.05, z: HEAD_Z + 0.6 }, { x: -0.27, z: HEAD_Z + 0.6 }],
+      blocks: [
+        { x: -0.14, z: HEAD_Z + 1.1, w: 0.78, d: 0.1, h: 0.32 },
+        { x: 0.43, z: HEAD_Z + 0.45, w: 0.36, d: 0.05, h: 0.3, rotY: -Math.PI / 4, bouncy: true },
+      ],
+      treasure: { x: -0.47, y: 0.15, z: HEAD_Z + 0.6, name: '金のピン', shape: 'pin', color: 0xffc83a },
+    },
+    {
+      name: 'グランドフィナーレ',
+      goal: 'ジャンプ台、落とし穴、動く壁。全部こえて7本を倒せ',
+      startX: 0,
+      pins: [{ x: 0, z: HEAD_Z + 0.6 }, ...rack(1, 2, 3, 4, 5, 6)],
+      ramps: [{ x: 0, z: -7.5, w: 0.5, len: 1.0, angle: 12 }],
+      holes: [{ x: -0.3, z: -10.5, r: 0.17 }, { x: 0.3, z: -10.5, r: 0.17 }],
+      movers: [{ x: 0, z: -15, w: 0.34, d: 0.12, h: 0.28, range: 0.32, period: 2.2 }],
+      treasure: { x: 0, y: 0.55, z: -9.4, name: '王者の星', shape: 'star', color: 0xffd25e },
+    },
+  ];
+
+  const stageGroup = new THREE.Group();
+  scene.add(stageGroup);
+  let stageBodies = [];
+  let holes = [];
+  let movers = [];
+  let treasure = null;
+  let moverClock = 0;
+
+  function addStatic(body) {
+    world.addBody(body);
+    stageBodies.push(body);
+    return body;
+  }
+
+  function addMesh(mesh) {
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    stageGroup.add(mesh);
+    return mesh;
+  }
+
+  function clearStage() {
+    for (const b of stageBodies) world.remove(b);
+    stageBodies = [];
+    stageGroup.traverse((o) => {
+      if (o.geometry && o.geometry !== pinGeo && !Object.values(TREASURE_GEO).includes(o.geometry)) o.geometry.dispose();
+    });
+    stageGroup.clear();
+    holes = [];
+    movers = [];
+    treasure = null;
+  }
+
+  // 斜面: 手前の端がレーンの面 (y = 0) にそろうように、傾けた板を置く
+  function addRamp(r) {
+    const th = deg(r.angle);
+    const t = 0.02;
+    const top = new THREE.Vector3(r.x, (r.len / 2) * Math.sin(th), r.z - (r.len / 2) * Math.cos(th));
+    const n = new THREE.Vector3(0, Math.cos(th), Math.sin(th));
+    const c = top.addScaledVector(n, -t);
+    const body = new CANNON.Body({ mass: 0, material: M.lane });
+    body.addShape(new CANNON.Box(new CANNON.Vec3(r.w / 2, t, r.len / 2)));
+    body.position.set(c.x, c.y, c.z);
+    body.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), th);
+    addStatic(body);
+
+    const tex = rampTex.clone();
+    tex.needsUpdate = true;
+    tex.repeat.set(Math.max(1, Math.round(r.w / 0.35)), r.len / 0.35);
+    const topMat = new THREE.MeshPhongMaterial({ map: tex, shininess: 50 });
+    const mesh = addMesh(new THREE.Mesh(new THREE.BoxGeometry(r.w, t * 2, r.len), [rampSideMat, rampSideMat, topMat, rampSideMat, rampSideMat, rampSideMat]));
+    mesh.position.copy(c);
+    mesh.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), th);
+
+    // 奥の端を支える柱
+    const h = r.len * Math.sin(th);
+    const zBack = r.z - r.len * Math.cos(th);
+    if (h > 0.05) {
+      const support = new CANNON.Body({ mass: 0, material: M.wall });
+      support.addShape(new CANNON.Box(new CANNON.Vec3(r.w / 2, (h - 0.02) / 2, 0.02)));
+      support.position.set(r.x, (h - 0.02) / 2, zBack + 0.03);
+      addStatic(support);
+      const leg = addMesh(new THREE.Mesh(new THREE.BoxGeometry(r.w, h - 0.02, 0.04), rampSideMat));
+      leg.position.set(r.x, (h - 0.02) / 2, zBack + 0.03);
+    }
+  }
+
+  function addBlock(b, kind) {
+    const body = new CANNON.Body({
+      mass: 0,
+      material: b.bouncy ? M.rail : kind === 'platform' ? M.lane : M.wall,
+      type: kind === 'mover' ? CANNON.Body.KINEMATIC : CANNON.Body.STATIC,
+    });
+    body.addShape(new CANNON.Box(new CANNON.Vec3(b.w / 2, b.h / 2, b.d / 2)));
+    body.position.set(b.x, b.h / 2, b.z);
+    if (b.rotY) body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), b.rotY);
+    addStatic(body);
+
+    let mat = wallMat;
+    if (b.bouncy) mat = deflectMat;
+    if (kind === 'mover') mat = moverMat;
+    if (kind === 'platform') mat = [rampSideMat, rampSideMat, deckMat, rampSideMat, rampSideMat, rampSideMat];
+    const mesh = addMesh(new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), mat));
+    mesh.position.set(b.x, b.h / 2, b.z);
+    if (b.rotY) mesh.rotation.y = b.rotY;
+    if (kind === 'mover') movers.push({ def: b, body, mesh });
+  }
+
+  function addHole(h) {
+    holes.push(h);
+    if (h.r) {
+      const disc = addMesh(new THREE.Mesh(new THREE.CircleGeometry(h.r, 36), holeMat));
+      disc.rotation.x = -Math.PI / 2;
+      disc.position.set(h.x, 0.0015, h.z);
+      const rim = addMesh(new THREE.Mesh(new THREE.RingGeometry(h.r, h.r + 0.022, 36), rimMat));
+      rim.rotation.x = -Math.PI / 2;
+      rim.position.set(h.x, 0.0016, h.z);
+    } else {
+      const pit = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(h.w, h.d), holeMat));
+      pit.rotation.x = -Math.PI / 2;
+      pit.position.set(h.x, 0.0015, h.z);
+      for (const side of [-1, 1]) {
+        const edge = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(h.w, 0.04), rimMat));
+        edge.rotation.x = -Math.PI / 2;
+        edge.position.set(h.x, 0.0016, h.z + side * (h.d / 2 + 0.02));
+      }
+    }
+  }
+
+  function addRail(r) {
+    const len = r.z1 - r.z2;
+    const x = r.side * (LANE_HALF + 0.04);
+    const body = new CANNON.Body({ mass: 0, material: M.rail });
+    body.addShape(new CANNON.Box(new CANNON.Vec3(0.04, 0.13, len / 2)));
+    body.position.set(x, 0.01, (r.z1 + r.z2) / 2);
+    addStatic(body);
+    const mesh = addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.26, len), railMat));
+    mesh.position.set(x, 0.01, (r.z1 + r.z2) / 2);
+  }
+
+  function addTreasure(t, owned) {
+    const mat = new THREE.MeshPhongMaterial({
+      color: t.color,
+      emissive: new THREE.Color(t.color).multiplyScalar(0.35),
+      specular: 0xffffff,
+      shininess: 140,
+      transparent: true,
+      opacity: owned ? 0.4 : 1,
+    });
+    const group = new THREE.Group();
+    const mesh = new THREE.Mesh(TREASURE_GEO[t.shape], mat);
+    if (t.shape === 'pin') mesh.position.y = -0.02;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: t.color, transparent: true, opacity: owned ? 0.25 : 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
+    halo.scale.setScalar(0.42);
+    group.add(halo, mesh);
+    group.position.set(t.x, t.y, t.z);
+    stageGroup.add(group);
+    treasure = { def: t, group, mesh, halo, taken: false, owned, burst: 0 };
+  }
+
+  function setMovers(withVelocity) {
+    for (const m of movers) {
+      const w = (Math.PI * 2) / m.def.period;
+      m.body.position.x = m.def.x + m.def.range * Math.sin(moverClock * w);
+      m.body.velocity.x = withVelocity ? m.def.range * w * Math.cos(moverClock * w) : 0;
+    }
+  }
+
+  function buildStage(st) {
+    clearStage();
+    (st.ramps || []).forEach(addRamp);
+    (st.blocks || []).forEach((b) => addBlock(b, 'block'));
+    (st.platforms || []).forEach((b) => addBlock(b, 'platform'));
+    (st.movers || []).forEach((b) => addBlock(b, 'mover'));
+    (st.holes || []).forEach(addHole);
+    (st.rails || []).forEach(addRail);
+    moverClock = 0;
+    setMovers(false);
+  }
+
+  function inHole(h, x, z) {
+    const m = 0.03; // ボールの中心が少し入りこんだら落ちる
+    if (h.r) return Math.hypot(x - h.x, z - h.z) < h.r - m;
+    return Math.abs(x - h.x) < h.w / 2 - m && Math.abs(z - h.z) < h.d / 2 - m;
+  }
 
   // =====================================================================
   // 効果音 (Web Audio で合成)
@@ -534,33 +913,73 @@
     soundBtn.blur();
   });
 
+  // 宝物を取ったときのきらきら音
+  function chime() {
+    if (!audio || !soundOn) return;
+    const now = audio.currentTime;
+    [1318.5, 1760, 2637].forEach((f, i) => {
+      const o = audio.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      const g = audio.createGain();
+      g.gain.setValueAtTime(0.0001, now + i * 0.07);
+      g.gain.exponentialRampToValueAtTime(0.18, now + i * 0.07 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.35);
+      o.connect(g).connect(audio.destination);
+      o.start(now + i * 0.07);
+      o.stop(now + i * 0.07 + 0.4);
+    });
+  }
+
   // =====================================================================
   // ゲームの進行
   // =====================================================================
-  // state: title → aim → rolling → result → (aim …) → over
+  // state: title / select → preview (レーン全体を見せる) → aim → windup → rolling → result
+  //        → (2投目: aim …) → done (結果画面)
   let state = 'title';
-  let frames = [];          // フレームごとの倒した本数 [[7, 2], [10], …]
-  let splits = [];          // スプリットになった投球 (フレーム番号 → 1投目なら true)
-  let frameIndex = 0;
-  let ballX = 0.18;         // 投げる位置。最初は少し右から
+  let stageIndex = 0;
+  let roll = 1;
+  let ballX = 0;
   let aimAngle = 0;
   let hook = 0;
   let throwTime = 0;
   let ballDoneAt = 0;
   let inGutter = false;
+  let ballFell = false;
   let standingBefore = 0;
+  let previewUntil = 0;
+  const PREVIEW_MS = 2800;
   let nextTimer = 0;
   let throwTimer = 0;
+  let toastTimer = 0;
+
+  // 進み具合: ステージごとに { best: 'strike' | 'spare', treasure: true }
+  let progress = [];
+  try {
+    progress = JSON.parse(store.get('strike-lane-progress')) || [];
+  } catch (e) {
+    progress = [];
+  }
+  if (!Array.isArray(progress)) progress = [];
+  const saveProgress = () => store.set('strike-lane-progress', JSON.stringify(progress));
+  const stageProgress = (i) => progress[i] || (progress[i] = {});
+  const isUnlocked = (i) => i === 0 || Boolean(progress[i - 1] && progress[i - 1].best);
 
   function rackPins(onlyStanding) {
     for (const p of pins) {
-      if (onlyStanding && !p.active) continue;
       const b = p.body;
+      if (!p.used) {
+        if (p.active) world.remove(b);
+        p.active = false;
+        p.mesh.visible = false;
+        continue;
+      }
+      if (onlyStanding && !p.active) continue;
       if (!onlyStanding) {
-        b.position.set(p.spot.x, PIN_COM + 0.002, p.spot.z);
+        b.position.set(p.home.x, p.baseY + PIN_COM + 0.002, p.home.z);
       } else {
         // 立っているピンはその場で起こし直す (機械がつかんで置き直すイメージ)
-        b.position.set(b.position.x, PIN_COM + 0.002, b.position.z);
+        b.position.set(b.position.x, p.baseY + PIN_COM + 0.002, b.position.z);
       }
       b.quaternion.set(0, 0, 0, 1);
       b.velocity.setZero();
@@ -584,11 +1003,12 @@
     }
   }
 
+  const upVec = new CANNON.Vec3();
   function isStanding(p) {
     if (!p.active) return false;
     const b = p.body;
-    const up = b.quaternion.vmult(new CANNON.Vec3(0, 1, 0));
-    return up.y > 0.85 && b.position.y > PIN_COM - 0.04 && b.position.z > DECK_END && Math.abs(b.position.x) < LANE_HALF + 0.02;
+    b.quaternion.vmult(new CANNON.Vec3(0, 1, 0), upVec);
+    return upVec.y > 0.85 && b.position.y > p.baseY + PIN_COM - 0.04 && b.position.z > DECK_END && Math.abs(b.position.x) < LANE_HALF + 0.02;
   }
 
   const countStanding = () => pins.filter(isStanding).length;
@@ -598,20 +1018,56 @@
     ballBody.angularVelocity.setZero();
     ballBody.quaternion.setFromEuler(rand(0, 6), rand(0, 6), 0);
     ballBody.position.set(ballX, BALL_R, START_Z);
+    ballBody.collisionFilterMask = -1;
+    ballMesh.visible = true;
     inGutter = false;
+    ballFell = false;
   }
 
-  function startGame() {
-    frames = [[]];
-    splits = [];
-    frameIndex = 0;
+  function showScreen(name) {
+    for (const [key, el] of Object.entries(screens)) el.hidden = key !== name;
+    overlay.hidden = !name;
+    if (name === 'select') renderSelect();
+  }
+
+  function loadStage(i) {
+    clearTimeout(nextTimer);
+    clearTimeout(throwTimer);
+    clearTrail(false);
+    hideCallout();
+    stageIndex = i;
+    const st = STAGES[i];
+    buildStage(st);
+    pins.forEach((p, k) => {
+      const def = st.pins[k];
+      p.used = Boolean(def);
+      if (def) {
+        p.home = { x: def.x, z: def.z };
+        p.baseY = def.y || 0;
+      }
+    });
     rackPins(false);
-    standingBefore = 10;
+    const owned = Boolean(progress[i] && progress[i].treasure);
+    addTreasure(st.treasure, owned);
+    roll = 1;
+    ballX = st.startX || 0;
+    aimAngle = 0;
+    hook = 0;
     resetBall();
-    overlay.hidden = true;
-    state = 'aim';
+    stageNoEl.textContent = `STAGE ${i + 1}`;
+    stageNameEl.textContent = st.name;
+    stageGoalEl.textContent = st.goal;
+    retryBtn.disabled = false;
     hudSpeed.textContent = '';
-    renderSheet();
+    showScreen(null);
+    state = 'preview';
+    previewUntil = performance.now() + PREVIEW_MS;
+    hintEl.textContent = 'タップでスキップ';
+    updateHud();
+  }
+
+  function startAim() {
+    state = 'aim';
     updateHud();
   }
 
@@ -622,8 +1078,9 @@
     hook = spin;
     ballBody.position.set(ballX, BALL_R, START_Z);
     ballBody.velocity.set(Math.sin(angle) * speed, 0, -Math.cos(angle) * speed);
-    // 転がりながら手を離れる (すべるだけだと摩擦で一気に遅くなる)
-    ballBody.angularVelocity.set(-speed / BALL_R, 0, -spin * 6);
+    // 転がりながら手を離れる (すべるだけだと摩擦で一気に遅くなる)。
+    // 横回転はかけない (かけると手前から曲がり始めてしまう)。カーブは奥でかける力で表す
+    ballBody.angularVelocity.set(-speed / BALL_R, 0, 0);
     throwTime = world.time;
     ballDoneAt = 0;
     standingBefore = countStanding();
@@ -634,95 +1091,23 @@
     powerEl.hidden = true;
   }
 
-  // ---- スコア計算 ----
-  function scoreFrames() {
-    const rolls = frames.flat();
-    const totals = [];
-    let r = 0;
-    let sum = 0;
-    for (let f = 0; f < 10; f++) {
-      const fr = frames[f];
-      if (!fr || fr.length === 0) break;
-      if (f < 9) {
-        if (fr[0] === 10) {
-          if (rolls.length < r + 3) break;
-          sum += 10 + rolls[r + 1] + rolls[r + 2];
-          r += 1;
-        } else {
-          if (fr.length < 2) break;
-          if (fr[0] + fr[1] === 10) {
-            if (rolls.length < r + 3) break;
-            sum += 10 + rolls[r + 2];
-          } else {
-            sum += fr[0] + fr[1];
-          }
-          r += 2;
-        }
-      } else {
-        if (!frameDone(9)) break;
-        sum += fr.reduce((a, b) => a + b, 0);
-      }
-      totals.push(sum);
-    }
-    return totals;
-  }
-
-  function frameDone(f) {
-    const fr = frames[f] || [];
-    if (f < 9) return fr[0] === 10 || fr.length === 2;
-    if (fr.length < 2) return false;
-    if (fr.length === 3) return true;
-    return fr[0] + fr[1] < 10;
-  }
-
-  // 投げた本数を記号にする (X / - 数字)
-  function rollMarks(f) {
-    const fr = frames[f] || [];
-    const marks = [];
-    if (f < 9) {
-      if (fr[0] === 10) return ['', 'X'];
-      marks.push(fr.length > 0 ? digit(fr[0]) : '');
-      marks.push(fr.length > 1 ? (fr[0] + fr[1] === 10 ? '/' : digit(fr[1])) : '');
-      return marks;
-    }
-    for (let i = 0; i < 3; i++) {
-      if (i >= fr.length) { marks.push(''); continue; }
-      const v = fr[i];
-      // 直前の投球が新しいラックでなければ、合わせて10本でスペア
-      const freshRack = i === 0 || (i === 1 && fr[0] === 10) || (i === 2 && (fr[1] === 10 || fr[0] + fr[1] === 10) && !(fr[0] === 10 && fr[1] < 10));
-      if (!freshRack && fr[i - 1] + v === 10) marks.push('/');
-      else if (v === 10) marks.push('X');
-      else marks.push(digit(v));
-    }
-    return marks;
-  }
-  const digit = (v) => (v === 0 ? '-' : String(v));
-
-  function renderSheet() {
-    const totals = scoreFrames();
-    let html = '';
-    for (let f = 0; f < 10; f++) {
-      const marks = rollMarks(f);
-      const now = state !== 'over' && state !== 'title' && f === frameIndex;
-      html += `<div class="frame${f === 9 ? ' frame-10' : ''}${now ? ' is-now' : ''}">`;
-      html += `<span class="frame-no">${f + 1}</span><div class="frame-rolls">`;
-      marks.forEach((m, i) => {
-        const cls = m === 'X' || m === '/' ? 'is-mark' : splits[`${f}-${i}`] ? 'is-split' : '';
-        html += `<span class="${cls}">${m}</span>`;
-      });
-      html += `</div><span class="frame-total">${totals[f] ?? ''}</span></div>`;
-    }
-    const total = totals.length ? totals[totals.length - 1] : 0;
-    html += `<div class="frame frame-sum"><span class="frame-no">TOTAL</span><span class="frame-total">${total}</span></div>`;
-    sheetEl.innerHTML = html;
-  }
-
   function updateHud() {
-    const fr = frames[frameIndex] || [];
-    hudFrame.textContent = `FRAME ${frameIndex + 1} · ${fr.length + 1}投目`;
+    if (state === 'title' || state === 'select') {
+      hudFrame.textContent = '';
+      hudTreasure.textContent = '';
+      hintEl.textContent = '';
+      return;
+    }
+    hudFrame.textContent = `${roll}投目 / 2`;
+    const t = treasure;
+    if (t) {
+      const got = t.taken || t.owned;
+      hudTreasure.textContent = `◆ ${t.taken ? 'ゲット!' : t.owned ? '入手済み' : '宝物あり'}`;
+      hudTreasure.classList.toggle('is-got', got);
+    }
     if (state === 'aim') {
       const touch = matchMedia('(pointer: coarse)').matches;
-      hintEl.textContent = touch ? '左右になぞって位置合わせ、上にスワイプで投球' : 'ドラッグで位置合わせ、上へはじいて投球 (キーボードも使えます)';
+      hintEl.textContent = touch ? '左右になぞって位置合わせ、上にスワイプで投球' : 'ドラッグで位置合わせ、上へなぞって投球 (キーボードも使えます)';
     }
   }
 
@@ -732,108 +1117,139 @@
   }
   const hideCallout = () => calloutEl.classList.remove('is-shown');
 
-  // スプリット: 1番ピンが倒れていて、残ったピンが2つ以上のかたまりに分かれている
-  function isSplit(standingNos) {
-    if (standingNos.includes(1) || standingNos.length < 2) return false;
-    const near = (a, b) => {
-      const pa = PIN_SPOTS[a - 1];
-      const pb = PIN_SPOTS[b - 1];
-      const d = Math.hypot(pa.x - pb.x, pa.z - pb.z);
-      // となり合うピン、または真後ろに隠れたピン (2-8, 3-9 など)
-      return d < PIN_SPACING * 1.05 || (Math.abs(pa.x - pb.x) < 0.01 && d < ROW_DZ * 2.1);
-    };
-    const seen = new Set([standingNos[0]]);
-    const queue = [standingNos[0]];
-    while (queue.length) {
-      const a = queue.shift();
-      for (const b of standingNos) {
-        if (!seen.has(b) && near(a, b)) { seen.add(b); queue.push(b); }
-      }
-    }
-    return seen.size < standingNos.length;
+  function showToast(text) {
+    toastEl.textContent = text;
+    toastEl.classList.add('is-shown');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('is-shown'), 2200);
+  }
+
+  function takeTreasure() {
+    const t = treasure;
+    if (!t || t.taken) return;
+    t.taken = true;
+    t.burst = 0.001;
+    const pr = stageProgress(stageIndex);
+    const first = !pr.treasure;
+    pr.treasure = true;
+    saveProgress();
+    chime();
+    showToast(first ? `宝物ゲット! ${t.def.name}` : `${t.def.name} (入手済み)`);
+    updateHud();
   }
 
   function finishRoll() {
     state = 'result';
     if (rumble) rumble.gain.setTargetAtTime(0, audio.currentTime, 0.05);
-    const standing = pins.filter(isStanding);
-    const knocked = standingBefore - standing.length;
-    const fr = frames[frameIndex];
-    fr.push(knocked);
-    const rollNo = fr.length - 1;
-    const freshRack = standingBefore === 10;
-    const split = freshRack && knocked < 10 && isSplit(standing.map((p) => p.no));
-    if (split) splits[`${frameIndex}-${rollNo}`] = true;
+    const left = countStanding();
+    const knocked = standingBefore - left;
 
-    let main;
-    let sub = '';
-    if (freshRack && knocked === 10) {
-      main = 'STRIKE!';
-      const prev = frames[frameIndex - 1];
-      if (frameIndex === 9 && rollNo > 0 && fr[rollNo - 1] === 10) sub = rollNo === 2 ? 'TURKEY' : 'DOUBLE';
-      else if (prev && prev[0] === 10 && rollNo === 0) sub = frames[frameIndex - 2] && frames[frameIndex - 2][0] === 10 ? 'TURKEY' : 'DOUBLE';
-    } else if (!freshRack && standing.length === 0) {
-      main = 'SPARE!';
-    } else if (knocked === 0) {
-      main = inGutter ? 'GUTTER' : 'MISS';
-    } else {
-      main = `${knocked}<small>${split ? 'SPLIT · ' : ''}${knocked}本倒れた</small>`;
+    if (left === 0) {
+      stageClear(roll === 1 ? 'strike' : 'spare');
+      return;
     }
+    if (roll === 2) {
+      showCallout('MISS', `のこり ${left}本`);
+      nextTimer = setTimeout(() => {
+        hideCallout();
+        showResult(null, left);
+      }, 1500);
+      return;
+    }
+    let main = `${knocked}`;
+    let sub = `のこり ${left}本`;
+    if (ballFell) main = '落ちた!';
+    else if (knocked === 0) main = inGutter ? 'GUTTER' : 'MISS';
     showCallout(main, sub);
-    renderSheet();
-
     nextTimer = setTimeout(() => {
       hideCallout();
-      advance();
-    }, 1700);
+      roll = 2;
+      clearFallen();
+      rackPins(true);
+      resetBall();
+      startAim();
+    }, 1600);
   }
 
-  function advance() {
-    const fr = frames[frameIndex];
-    if (frameIndex < 9) {
-      if (frameDone(frameIndex)) {
-        frameIndex++;
-        frames.push([]);
-        rackPins(false);
-      } else {
-        clearFallen();
-        rackPins(true);
-      }
-    } else if (frameDone(9)) {
-      gameOver();
-      return;
-    } else {
-      // 10フレーム目: ストライクかスペアのあとは新しいラック
-      const last = fr[fr.length - 1];
-      const spare = fr.length === 2 && fr[0] < 10 && fr[0] + fr[1] === 10;
-      if ((last === 10 && countStanding() === 0) || spare) {
-        rackPins(false);
-      } else {
-        clearFallen();
-        rackPins(true);
-      }
-    }
-    standingBefore = countStanding();
-    resetBall();
-    state = 'aim';
-    renderSheet();
-    updateHud();
+  function stageClear(kind) {
+    const pr = stageProgress(stageIndex);
+    if (kind === 'strike' || !pr.best) pr.best = kind;
+    saveProgress();
+    showCallout(kind === 'strike' ? 'STRIKE!' : 'SPARE!', 'STAGE CLEAR');
+    nextTimer = setTimeout(() => {
+      hideCallout();
+      showResult(kind, 0);
+    }, 1600);
   }
 
-  function gameOver() {
-    state = 'over';
-    const totals = scoreFrames();
-    const total = totals[9] ?? 0;
-    const best = Math.max(total, Number(store.get('bowling-best')) || 0);
-    store.set('bowling-best', String(best));
-    renderSheet();
-    hudFrame.textContent = '';
+  function showResult(kind, left) {
+    state = 'done';
+    const st = STAGES[stageIndex];
+    resultTitle.textContent = kind === 'strike' ? 'STRIKE CLEAR' : kind === 'spare' ? 'SPARE CLEAR' : 'もう一歩!';
+    resultTitle.classList.toggle('is-fail', !kind);
+    resultStage.textContent = `STAGE ${stageIndex + 1}  ${st.name}`;
+    const t = treasure;
+    let text = kind ? (kind === 'strike' ? '1投ですべてのピンを倒した!' : '2投ですべてのピンを倒した!') : `ピンが ${left}本 残ってしまった。`;
+    if (t && t.taken && !t.owned) text += `\n宝物「${t.def.name}」を手に入れた!`;
+    else if (t && (t.taken || t.owned)) text += `\n宝物「${t.def.name}」は入手済み`;
+    else text += '\n宝物はまだ。取らなくてもクリアできます';
+    resultText.textContent = text;
+
+    const buttons = [];
+    if (kind && stageIndex < STAGES.length - 1) buttons.push(['next', '次のステージへ', '']);
+    buttons.push(['retry', kind ? 'もう一度' : 'もう一度挑戦', kind && stageIndex < STAGES.length - 1 ? ' is-sub' : '']);
+    buttons.push(['select', 'ステージ選択', ' is-sub']);
+    resultActions.innerHTML = buttons.map(([action, label, cls]) => `<button type="button" class="start-btn${cls}" data-action="${action}">${label}</button>`).join('');
+    showScreen('result');
+    hudSpeed.textContent = '';
     hintEl.textContent = '';
-    titleScreen.hidden = false;
-    overlayText.innerHTML = `スコア<strong>${total}</strong>${total === 300 ? 'パーフェクトゲーム!' : total >= 200 ? 'すばらしい! 200点越え' : ''}`;
-    startBtn.textContent = 'もう一度あそぶ';
-    bestEl.textContent = `ベストスコア ${best}`;
-    overlay.hidden = false;
+    const first = resultActions.querySelector('button');
+    if (first && !matchMedia('(pointer: coarse)').matches) first.focus();
+  }
+
+  resultActions.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action === 'next') loadStage(stageIndex + 1);
+    if (action === 'retry') loadStage(stageIndex);
+    if (action === 'select') openSelect();
+  });
+
+  function renderSelect() {
+    const cleared = STAGES.filter((_, i) => progress[i] && progress[i].best).length;
+    const strikes = STAGES.filter((_, i) => progress[i] && progress[i].best === 'strike').length;
+    const gems = STAGES.filter((_, i) => progress[i] && progress[i].treasure).length;
+    progressEl.textContent = `クリア ${cleared}/${STAGES.length} · ストライク ${strikes}/${STAGES.length} · 宝物 ${gems}/${STAGES.length}`;
+    gridEl.innerHTML = STAGES.map((st, i) => {
+      const pr = progress[i] || {};
+      const locked = !isUnlocked(i);
+      const label = pr.best === 'strike' ? 'STRIKE' : pr.best === 'spare' ? 'SPARE' : '';
+      return `<button type="button" class="stage-tile${pr.best ? ` is-${pr.best}` : ''}" data-stage="${i}"${locked ? ' disabled' : ''}>`
+        + `<span class="tile-no">${i + 1}</span><span class="tile-name">${locked ? '???' : st.name}</span>`
+        + `<span class="tile-badges"><span class="badge-result">${label}</span>`
+        + `<span class="tile-gem${pr.treasure ? ' is-got' : ''}" title="${pr.treasure ? st.treasure.name : '宝物はまだ'}"></span></span></button>`;
+    }).join('');
+  }
+
+  gridEl.addEventListener('click', (e) => {
+    const tile = e.target.closest('button[data-stage]');
+    if (!tile || tile.disabled) return;
+    initAudio();
+    loadStage(Number(tile.dataset.stage));
+  });
+
+  function openSelect() {
+    clearTimeout(nextTimer);
+    clearTimeout(throwTimer);
+    clearTrail(false);
+    hideCallout();
+    powerEl.hidden = true;
+    charging = false;
+    state = 'select';
+    showScreen('select');
+    updateHud();
+    hudSpeed.textContent = '';
   }
 
   // =====================================================================
@@ -842,6 +1258,10 @@
   let gesture = null;
 
   canvas.addEventListener('pointerdown', (e) => {
+    if (state === 'preview') {
+      startAim();
+      return;
+    }
     if (state !== 'aim') return;
     canvas.setPointerCapture(e.pointerId);
     gesture = { id: e.pointerId, x0: e.clientX, y0: e.clientY, startX: ballX, mode: 'idle', pts: [{ x: e.clientX, y: e.clientY, t: e.timeStamp }] };
@@ -870,7 +1290,6 @@
       drawTrail(pts, swipe);
     }
   });
-
   // スワイプの線を、長さの割合 (0〜1) の位置で切ったときの点
   function pathPoint(pts, lens, frac) {
     const target = lens[lens.length - 1] * frac;
@@ -1009,21 +1428,33 @@
   window.addEventListener('keydown', (e) => {
     // ボタンやリンクにフォーカスがあるときは、そちらの操作に任せる
     if (e.target.closest && e.target.closest('button, a')) return;
-    if (['ArrowLeft', 'ArrowRight', ' '].includes(e.key) && state !== 'title' && state !== 'over') e.preventDefault();
-    if ((e.key === 'Enter' || e.key === ' ') && !overlay.hidden) {
+    const k = e.key.toLowerCase();
+    if (['arrowleft', 'arrowright', ' '].includes(k) && !['title', 'select', 'done'].includes(state)) e.preventDefault();
+    if (state === 'title' && (k === 'enter' || k === ' ')) {
       e.preventDefault();
       startBtn.click();
       return;
     }
+    if (k === 'escape' && state !== 'title' && state !== 'select') {
+      openSelect();
+      return;
+    }
+    if (k === 'r' && !['title', 'select'].includes(state)) {
+      loadStage(stageIndex);
+      return;
+    }
+    if (state === 'preview' && (k === ' ' || k === 'enter')) {
+      startAim();
+      return;
+    }
     if (state !== 'aim') return;
-    keys.add(e.key.toLowerCase());
-    const k = e.key.toLowerCase();
+    keys.add(k);
     if (k === 'a') aimAngle = clamp(aimAngle - 0.005, -MAX_ANGLE, MAX_ANGLE);
     if (k === 'd') aimAngle = clamp(aimAngle + 0.005, -MAX_ANGLE, MAX_ANGLE);
     if (k === 'q') hook = clamp(Math.round((hook - 0.25) * 4) / 4, -1, 1);
     if (k === 'e') hook = clamp(Math.round((hook + 0.25) * 4) / 4, -1, 1);
     if (['a', 'd', 'q', 'e'].includes(k)) showAimHud();
-    if (e.key === ' ' && !charging && !e.repeat) {
+    if (k === ' ' && !charging && !e.repeat) {
       initAudio();
       charging = true;
       power = 0;
@@ -1047,13 +1478,21 @@
   }
 
   startBtn.addEventListener('click', () => {
-    clearTimeout(nextTimer);
-    clearTimeout(throwTimer);
-    clearTrail(false);
-    hideCallout();
     initAudio();
     startBtn.blur();
-    startGame();
+    openSelect();
+  });
+  selectBack.addEventListener('click', () => {
+    state = 'title';
+    showScreen('title');
+  });
+  menuBtn.addEventListener('click', () => {
+    menuBtn.blur();
+    openSelect();
+  });
+  retryBtn.addEventListener('click', () => {
+    retryBtn.blur();
+    if (state !== 'title' && state !== 'select') loadStage(stageIndex);
   });
 
   // =====================================================================
@@ -1074,22 +1513,64 @@
   new ResizeObserver(() => { resize(); sizeTrail(); }).observe(wrap);
   resize();
 
-  // オイルの薄い奥のほうで、回転の向きに曲がる (力は物理の1ステップごとに消えるので毎ステップかける)
+  // 物理の1ステップごとの処理 (力は毎ステップ消えるので、カーブの力も毎回かける)
   const hookForce = new CANNON.Vec3();
   world.addEventListener('preStep', () => {
+    moverClock += STEP;
+    setMovers(true);
     const bp = ballBody.position;
-    if (!inGutter && Math.abs(bp.x) > LANE_HALF + 0.01 && bp.z > HEAD_Z) inGutter = true;
-    if (state !== 'rolling' || inGutter || bp.z > OIL_END_Z || bp.z < HEAD_Z + 0.3 || bp.y < 0) return;
-    hookForce.set(hook * HOOK_FORCE * clamp((OIL_END_Z - bp.z) / 4, 0, 1), 0, 0);
+    if (state !== 'rolling') return;
+
+    // 落とし穴: 穴の上をレーンの高さで転がったら落ちる (飛び越えれば落ちない)
+    if (!ballFell && bp.y < BALL_R + 0.02) {
+      for (const h of holes) {
+        if (inHole(h, bp.x, bp.z)) {
+          ballFell = true;
+          ballBody.collisionFilterMask = -1 & ~LANE_GROUP;
+          break;
+        }
+      }
+    }
+    if (bp.y < -0.8) {
+      // 穴の底。見えないところで止めておく
+      bp.y = -0.8;
+      ballBody.velocity.setZero();
+    }
+
+    if (treasure && !treasure.taken) {
+      const t = treasure.def;
+      if (Math.hypot(bp.x - t.x, bp.y - t.y, bp.z - t.z) < TREASURE_REACH) takeTreasure();
+    }
+
+    if (!inGutter && Math.abs(bp.x) > LANE_HALF + 0.01 && bp.y < BALL_R && bp.z > HEAD_Z) inGutter = true;
+    // オイルの薄い奥のほうで、回転の向きに曲がる。坂の上や空中では曲がらない
+    if (inGutter || ballFell || bp.z > HOOK_START_Z || bp.z < HEAD_Z + 0.3 || Math.abs(ballBody.velocity.y) > 0.3) return;
+    hookForce.set(hook * HOOK_FORCE * clamp((HOOK_START_Z - bp.z) / HOOK_RAMP, 0, 1), 0, 0);
     ballBody.applyForce(hookForce, bp);
   });
 
+  // 物理は 1/240 秒ずつ進める。描画が遅い端末では、ゲームの時間ごとゆっくり進む
+  let stepAcc = 0;
   function updatePhysics(dt) {
-    if (state === 'rolling' || state === 'result') world.step(1 / 240, dt, 10);
+    if (state !== 'rolling' && state !== 'result') {
+      stepAcc = 0;
+      moverClock += dt;
+      setMovers(false);
+      return;
+    }
+    stepAcc += dt;
+    let n = 0;
+    while (stepAcc >= STEP && n < 12) {
+      world.step(STEP);
+      stepAcc -= STEP;
+      n++;
+    }
+    if (n === 12) stepAcc = 0;
   }
 
   // 時間は物理の時計 (world.time) で測る。描画が遅い端末でも判定がずれないように
   function updateGame(dt) {
+    if (state === 'preview' && performance.now() > previewUntil) startAim();
     if (state === 'aim') {
       ballBody.position.set(ballX, BALL_R, START_Z);
       if (keys.has('arrowleft')) ballX = clamp(ballX - dt * 0.7, -BALL_X_MAX, BALL_X_MAX);
@@ -1107,7 +1588,7 @@
       const t = now - throwTime;
       const speed = ballBody.velocity.length();
       if (rumble && audio) {
-        const onLane = bp.y > 0 && bp.y < 0.2 && bp.z > DECK_END;
+        const onLane = !ballFell && bp.y > 0 && bp.y < 0.2 && bp.z > DECK_END;
         rumble.gain.setTargetAtTime(onLane ? clamp(speed / 10, 0, 1) * 0.35 : 0, audio.currentTime, 0.05);
       }
       const ballDone = bp.y < -0.15 || bp.z < DECK_END - 0.1 || (speed < 0.2 && t > 1.5);
@@ -1115,36 +1596,52 @@
       const quiet = pins.every((p) => !p.active || p.body.sleepState === CANNON.Body.SLEEPING
         || (p.body.velocity.length() < 0.06 && p.body.angularVelocity.length() < 0.4));
       const since = ballDoneAt ? now - ballDoneAt : 0;
-      if ((ballDoneAt && ((quiet && since > 0.9) || since > 4)) || t > 14) finishRoll();
+      // 落とし穴に落ちたら、ピンが止まるのを待たずに終わる
+      if ((ballDoneAt && ((quiet && since > (ballFell ? 0.4 : 0.9)) || since > 4)) || t > 14) finishRoll();
     }
   }
 
   function updateCamera(dt) {
     const bp = ballBody.position;
-    if (state === 'title' || state === 'over') {
+    const by = Math.max(bp.y - BALL_R, 0);
+    if (state === 'title' || state === 'select' || state === 'done') {
       const t = performance.now() / 1000;
       tmpV.set(Math.sin(t * 0.25) * 0.6, 1.1, HEAD_Z + 6.5);
       focus.set(0, 0.2, HEAD_Z - 0.3);
+    } else if (state === 'preview') {
+      // ピンの手前から投げる位置まで、レーンの上を引いてくる。仕掛けが順に見える
+      const p = clamp(1 - (previewUntil - performance.now()) / PREVIEW_MS, 0, 1);
+      const e = p * p * (3 - 2 * p);
+      const z = HEAD_Z + 3.4 + (START_Z + 2.4 - HEAD_Z - 3.4) * e;
+      camPos.set(ballX * 0.6 * e, 1.9 - 0.65 * e, z);
+      camLook.set(ballX * 0.25 * e, 0, Math.min(z - 8, HEAD_Z - 0.4 + (-12 - HEAD_Z + 0.4) * e));
+      tmpV.copy(camPos);
+      focus.copy(camLook);
     } else if (state === 'aim' || state === 'windup') {
       tmpV.set(ballX * 0.6, 1.25, START_Z + 2.4);
       focus.set(ballX * 0.25, 0, -12);
-    } else if (state === 'rolling' && bp.z > HEAD_Z + 5) {
+    } else if (state === 'rolling' && bp.z > HEAD_Z + 5 && !ballFell) {
       const near = clamp((-bp.z) / -HEAD_Z, 0, 1);
-      tmpV.set(bp.x * 0.5, 1.25 - near * 0.4, bp.z + 2.4);
-      focus.set(bp.x * 0.3, 0.05, Math.min(bp.z - 9, HEAD_Z));
+      tmpV.set(bp.x * 0.5, 1.25 - near * 0.4 + by * 0.6, bp.z + 2.4);
+      focus.set(bp.x * 0.3, 0.05 + by * 0.4, Math.min(bp.z - 9, HEAD_Z));
+    } else if (state === 'rolling' && ballFell) {
+      // 落ちた穴をのぞきこむ
+      tmpV.set(bp.x * 0.5, 1.4, Math.max(bp.z, HEAD_Z + 2) + 2.6);
+      focus.set(bp.x * 0.5, 0, Math.max(bp.z, HEAD_Z + 2) - 1);
     } else {
       tmpV.set(0, 1.0, HEAD_Z + 3.2);
       focus.set(0, 0.15, HEAD_Z - 0.4);
     }
-    const k = 1 - Math.exp(-dt * (state === 'rolling' ? 7 : 3));
+    const k = 1 - Math.exp(-dt * (state === 'rolling' ? 7 : state === 'preview' ? 2.2 : 3));
     camPos.lerp(tmpV, k);
     camLook.lerp(focus, k);
     camera.position.copy(camPos);
     camera.lookAt(camLook);
 
     // 影のライトは、ボールかピンのどちらか近いほうに合わせる
-    const fz = state === 'rolling' && bp.z > HEAD_Z + 1.5 ? bp.z : HEAD_Z - 0.4;
-    const fx = state === 'rolling' && bp.z > HEAD_Z + 1.5 ? bp.x : 0;
+    const followBall = state === 'rolling' && bp.z > HEAD_Z + 1.5 && !ballFell;
+    const fz = followBall ? bp.z : HEAD_Z - 0.4;
+    const fx = followBall ? bp.x : 0;
     sun.position.set(fx + 1.2, 5, fz + 2);
     sun.target.position.set(fx, 0, fz);
   }
@@ -1155,14 +1652,34 @@
     aimLine.children.forEach((d, i) => {
       const dist = 0.45 + i * 0.32;
       d.position.set(ballX + Math.sin(aimAngle) * dist, 0.003, START_Z - Math.cos(aimAngle) * dist);
-      d.material.opacity = 0.85;
       d.scale.setScalar(1 - i / 40);
     });
+  }
+
+  function updateTreasure(dt) {
+    const t = treasure;
+    if (!t) return;
+    const time = performance.now() / 1000;
+    t.mesh.rotation.y += dt * 2.2;
+    t.group.position.y = t.def.y + Math.sin(time * 2.4) * 0.015;
+    if (t.burst > 0) {
+      // 取った瞬間にふくらんで消える
+      t.burst += dt;
+      const k = clamp(t.burst / 0.45, 0, 1);
+      t.group.scale.setScalar(1 + k * 1.6);
+      t.mesh.material.opacity = (t.owned ? 0.4 : 1) * (1 - k);
+      t.halo.material.opacity = 0.9 * (1 - k);
+      if (k >= 1) {
+        t.group.visible = false;
+        t.burst = 0;
+      }
+    }
   }
 
   function sync() {
     ballMesh.position.copy(ballBody.position);
     ballMesh.quaternion.copy(ballBody.quaternion);
+    ballMesh.visible = ballBody.position.y > -0.3;
     for (const p of pins) {
       if (!p.active) continue;
       p.mesh.position.copy(p.body.position);
@@ -1173,6 +1690,7 @@
         p.body.sleep();
       }
     }
+    for (const m of movers) m.mesh.position.copy(m.body.position);
   }
 
   let last = performance.now();
@@ -1182,17 +1700,19 @@
     updateGame(dt);
     updatePhysics(dt);
     sync();
+    updateTreasure(dt);
     updateCamera(dt);
     updateAimLine();
     renderer.render(scene, camera);
     requestAnimationFrame(loop);
   }
 
-  // タイトル画面の後ろにもピンを並べておく
-  rackPins(false);
-  resetBall();
-  const best = Number(store.get('bowling-best')) || 0;
-  if (best) bestEl.textContent = `ベストスコア ${best}`;
-  renderSheet();
+  // タイトル画面の後ろには、最初のステージを並べておく
+  loadStage(0);
+  state = 'title';
+  hintEl.textContent = '';
+  retryBtn.disabled = true;
+  showScreen('title');
+  updateHud();
   requestAnimationFrame(loop);
 })();
