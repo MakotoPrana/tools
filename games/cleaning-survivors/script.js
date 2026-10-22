@@ -23,6 +23,8 @@
   const MAX_PARTICLES = 700;
   const TAU = Math.PI * 2;
   const SAVE_KEY = 'cleaning-survivors-save';
+  // テスト版は <meta name="cs-test-unlock"> で全部屋・全主人公を開放する
+  const TEST_UNLOCK = !!document.querySelector('meta[name="cs-test-unlock"]');
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const randInt = (a, b) => Math.floor(rand(a, b + 1));
@@ -85,11 +87,11 @@
   // lv: レベル2〜8で足す値と、その説明
   const WEAPONS = {
     vacuum: {
-      name: '超強力掃除機', desc: '進む方向に扇形の吸引ノズルを出し、ゴミを吸い込む', evo: 'blackhole', passive: 'battery', power: 1,
-      base: { dmg: 5, cd: 0.5, range: 85, angle: 70, pull: 45 },
+      name: '超強力掃除機', desc: '近くのゴミに扇形の吸引ノズルを向けて、まとめてダメージを与える', evo: 'blackhole', passive: 'battery', power: 1,
+      base: { dmg: 5, cd: 0.5, range: 85, angle: 70 },
       lv: [
         [{ dmg: 2 }, '攻撃力 +2'], [{ range: 15 }, '吸引距離 +15'], [{ angle: 15 }, '吸引の角度 +15°'], [{ dmg: 3 }, '攻撃力 +3'],
-        [{ cd: -0.06 }, '吸引の間隔 -0.06秒'], [{ range: 20, pull: 20 }, '吸引距離 +20・吸い寄せる力アップ'], [{ dmg: 4, angle: 15 }, '攻撃力 +4・角度 +15°'],
+        [{ cd: -0.06 }, '吸引の間隔 -0.06秒'], [{ range: 20 }, '吸引距離 +20'], [{ dmg: 4, angle: 15 }, '攻撃力 +4・角度 +15°'],
       ],
     },
     washer: {
@@ -129,7 +131,7 @@
   const MAX_WEAPON_LV = 8;
 
   const EVOS = {
-    blackhole: { name: 'ブラックホール掃除機', desc: '前方に吸引の渦を置き、周りのゴミをまとめて吸い込む' },
+    blackhole: { name: 'ブラックホール掃除機', desc: '前方に吸引の渦を置き、渦の中のゴミにまとめてダメージを与える' },
     steam: { name: '超高温スチームカノン', desc: '太く長い蒸気ビームで、通った線を一気にピカピカにする' },
     army: { name: 'お掃除ロボ軍団', desc: 'ロボが自分で汚れとゴミを探して部屋を巡回する' },
     acid: { name: '酸性雨ミスト', desc: '画面中に除菌の雨を降らせる' },
@@ -305,15 +307,23 @@
         case 'pop': tone(rand(700, 1000), rand(1300, 1700), 0.04, 'square', 0.025); break;
         case 'hit': noise(0.05, 0.08, 'bandpass', 1800, 900, 0, 2); break;
         case 'suck': noise(0.14, 0.12, 'bandpass', 2600, 500, 0, 3); tone(300, 900, 0.1, 'triangle', 0.04); break;
-        case 'gulp': // 大量に吸い込んだ (ガガガッ! シュポポン!)
-          for (let i = 0; i < 4; i++) noise(0.04, 0.12, 'bandpass', 900 + i * 300, 400, i * 0.05, 4);
-          tone(500, 1400, 0.08, 'sine', 0.08, 0.22);
-          tone(700, 1800, 0.08, 'sine', 0.08, 0.3);
-          break;
         case 'shot': noise(0.18, 0.1, 'highpass', 3000, 1500, 0, 0.7); break;
         case 'hurt': tone(220, 90, 0.18, 'sawtooth', 0.09); break;
-        case 'level': [523, 659, 784, 1047].forEach((f, i) => tone(f, 0, 0.12, 'square', 0.05, i * 0.07)); break;
+        case 'level':
+          [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0, 0.14, 'square', 0.05, i * 0.06));
+          tone(1047, 0, 0.5, 'triangle', 0.06, 0.32);
+          tone(1568, 0, 0.5, 'triangle', 0.04, 0.32);
+          break;
         case 'chest': [784, 988, 1175, 1568, 1976].forEach((f, i) => tone(f, 0, 0.18, 'triangle', 0.08, i * 0.08)); break;
+        case 'chest-open':
+        case 'chest-evo': {
+          for (let i = 0; i < 5; i++) noise(0.05, 0.14, 'bandpass', 500 + i * 60, 300, i * 0.13, 3);
+          noise(0.25, 0.2, 'highpass', 2000, 6000, 0.7, 0.7);
+          const notes = name === 'chest-evo' ? [523, 659, 784, 1047, 1319, 1568, 2093] : [784, 988, 1175, 1568, 1976];
+          notes.forEach((f, i) => tone(f, 0, 0.22, 'triangle', 0.09, 0.75 + i * 0.07));
+          if (name === 'chest-evo') [1047, 1319, 1568].forEach((f) => tone(f, 0, 0.8, 'square', 0.04, 1.3));
+          break;
+        }
         case 'compress':
           tone(140, 35, 0.6, 'sine', 0.35);
           noise(0.5, 0.25, 'lowpass', 1200, 80, 0, 1);
@@ -1365,7 +1375,6 @@
       bullets: [],
       clouds: [],
       beams: [],
-      sucks: [],
       parts: [],
       trail: [],
       dumps: [[600, 600], [1800, 600], [600, 1800], [1800, 1800]].map(([x, y]) => ({ x, y, t: 0 })),
@@ -1381,7 +1390,6 @@
       flash: 0,
       hitstop: 0,
       sparkBudget: 0,
-      suckCount: 0,
       kyuStreak: 0,
       kyuLast: -1,
       cam: { x: ROOM / 2, y: ROOM / 2 },
@@ -1775,8 +1783,6 @@
     e.dirtyT = rand(0, 0.5);
     e.robotHit = 0;
     e.rollHit = 0;
-    e.vortexHit = 0;
-    e.pulled = false;
     if (def.move === 'roll') {
       const a = Math.atan2(G.p.y - y, G.p.x - x) + rand(-0.25, 0.25);
       e.vx = Math.cos(a) * e.speed;
@@ -2080,7 +2086,7 @@
     if (i >= 0) G.bosses.splice(i, 1);
   }
 
-  function hurtEnemy(e, dmg, kx, ky, how) {
+  function hurtEnemy(e, dmg, kx, ky) {
     if (!e.alive || e.flee) return;
     e.hp -= dmg;
     e.flash = 0.09;
@@ -2090,22 +2096,17 @@
       e.ky += ky * kb;
     }
     Sound.play('hit');
-    if (e.hp <= 0) killEnemy(e, how);
+    if (e.hp <= 0) killEnemy(e);
   }
 
-  function killEnemy(e, how) {
+  function killEnemy(e) {
     e.alive = false;
     removeBoss(e);
     G.kills++;
     G.killsByType[e.type] = (G.killsByType[e.type] || 0) + 1;
     const def = e.def;
-    if (how === 'suck' && !e.boss && !e.elite) {
-      G.sucks.push({ type: e.type, x: e.x, y: e.y, r: e.r, t: 0, rot: e.rot, spin: rand(-8, 8) });
-      G.suckCount++;
-    } else {
-      puff(e.x, e.y, e.type === 'grease' ? '#c9a227' : e.type === 'spore' ? '#7bc043' : '#d8d2c6', e.boss ? 40 : 6);
-      Sound.play('pop');
-    }
+    puff(e.x, e.y, e.type === 'grease' ? '#c9a227' : e.type === 'spore' ? '#7bc043' : '#d8d2c6', e.boss ? 40 : 6);
+    Sound.play('pop');
     // ダスト
     if (e.boss) {
       for (let i = 0; i < 14; i++) dropGem(e.x + rand(-60, 60), e.y + rand(-60, 60), 2);
@@ -2172,21 +2173,7 @@
     const half = ((s.angle / 2) * Math.PI) / 180;
     const nx = p.x + Math.cos(w.ang) * 14;
     const ny = p.y + Math.sin(w.ang) * 14;
-    // 範囲の中のゴミを吸い寄せる
     const reach = s.range * 1.25;
-    const n = query(p.x, p.y, reach + 30);
-    for (let k = 0; k < n; k++) {
-      const e = qbuf[k];
-      if (e.boss) continue;
-      const dx = e.x - p.x;
-      const dy = e.y - p.y;
-      const d = Math.hypot(dx, dy);
-      if (d > reach + e.r || d < 1) continue;
-      if (Math.abs(angleDiff(Math.atan2(dy, dx), w.ang)) > half + e.r / d) continue;
-      const pull = s.pull * (e.elite ? 0.3 : 1);
-      e.x -= (dx / d) * pull * dt;
-      e.y -= (dy / d) * pull * dt;
-    }
     // ダストも吸い寄せる
     for (const g of G.gems) {
       if (g.homing) continue;
@@ -2210,7 +2197,7 @@
         const d = Math.hypot(dx, dy) || 1;
         if (d > s.range + e.r) continue;
         if (d > e.r && Math.abs(angleDiff(Math.atan2(dy, dx), w.ang)) > half + e.r / d) continue;
-        hurtEnemy(e, dmg, (-dx / d) * 40, (-dy / d) * 40, 'suck');
+        hurtEnemy(e, dmg, 0, 0);
         hits++;
       }
       cleanCone(nx, ny, w.ang, half, s.range, s.power);
@@ -2274,7 +2261,7 @@
       const px = x1 + cos * t - e.x;
       const py = y1 + sin * t - e.y;
       if (px * px + py * py > (s.width / 2 + e.r) ** 2) continue;
-      hurtEnemy(e, dmg, cos * 160, sin * 160, 'beam');
+      hurtEnemy(e, dmg, cos * 160, sin * 160);
     }
     cleanLine(x1, y1, x2, y2, s.width, s.power);
     G.beams.push({ x1, y1, x2, y2, w: s.width, life: 0.2, max: 0.2, steam });
@@ -2347,7 +2334,7 @@
         const d = Math.hypot(dx, dy) || 1;
         if (d > s.size + e.r) continue;
         e.robotHit = G.time + 0.45;
-        hurtEnemy(e, dmg, (dx / d) * 90, (dy / d) * 90, 'hit');
+        hurtEnemy(e, dmg, (dx / d) * 90, (dy / d) * 90);
       }
       if (cleanNow) cleanCircle(b.x, b.y, s.size + (w.evo ? 14 : 8), s.power);
       // ロボが通ったダストは主人公へ送られる
@@ -2398,7 +2385,7 @@
         const dy = e.y - pos.y;
         if (dx * dx + dy * dy > (hr + e.r) ** 2) continue;
         e.rollHit = G.time + 0.35;
-        hurtEnemy(e, dmg, 0, 0, 'hit');
+        hurtEnemy(e, dmg, 0, 0);
       }
       if (cleanNow) cleanCircle(pos.x, pos.y, hr, s.power);
     }
@@ -2439,20 +2426,6 @@
         G.zones.splice(i, 1);
         continue;
       }
-      if (z.kind === 'vortex') {
-        const n = query(z.x, z.y, z.r + 70);
-        for (let k = 0; k < n; k++) {
-          const e = qbuf[k];
-          if (e.boss) continue;
-          const dx = z.x - e.x;
-          const dy = z.y - e.y;
-          const d = Math.hypot(dx, dy) || 1;
-          if (d > z.r + e.r) continue;
-          const f = (e.elite ? 50 : 170) * dt;
-          e.x += (dx / d) * Math.min(f, d) - (dy / d) * f * 0.5;
-          e.y += (dy / d) * Math.min(f, d) + (dx / d) * f * 0.5;
-        }
-      }
       z.tick -= dt;
       if (z.tick > 0) continue;
       z.tick = z.kind === 'vortex' ? 0.25 : 0.4;
@@ -2464,7 +2437,7 @@
         const dy = e.y - z.y;
         if (dx * dx + dy * dy > (z.r + e.r) ** 2) continue;
         const mul = z.kind !== 'vortex' && e.def.mold ? 2 : 1;
-        hurtEnemy(e, dmg * mul, 0, 0, z.kind === 'vortex' ? 'suck' : 'hit');
+        hurtEnemy(e, dmg * mul, 0, 0);
       }
       cleanCircle(z.x, z.y, z.kind === 'vortex' ? z.r * 0.7 : z.r, z.power);
     }
@@ -2699,7 +2672,7 @@
       const dx = e.x - p.x;
       const dy = e.y - p.y;
       const d = Math.hypot(dx, dy) || 1;
-      hurtEnemy(e, dmg, (dx / d) * 300, (dy / d) * 300, 'boom');
+      hurtEnemy(e, dmg, (dx / d) * 300, (dy / d) * 300);
     }
     forTilesInBox(p.x - hw, p.y - hh, p.x + hw, p.y + hh, (i) => lowerTile(i, 1));
     G.hitstop = 0.15;
@@ -2759,20 +2732,6 @@
       G.beams[i].life -= dt;
       if (G.beams[i].life <= 0) G.beams.splice(i, 1);
     }
-    // 吸い込まれていくゴミ
-    const vac = G.weapons.find((w) => w.id === 'vacuum');
-    const na = vac ? vac.ang : G.p.face;
-    const nx = G.p.x + Math.cos(na) * 16;
-    const ny = G.p.y + Math.sin(na) * 16;
-    for (let i = G.sucks.length - 1; i >= 0; i--) {
-      const s = G.sucks[i];
-      s.t += dt;
-      const k = Math.min(1, dt * 14);
-      s.x += (nx - s.x) * k;
-      s.y += (ny - s.y) * k;
-      s.rot += s.spin * dt;
-      if (s.t > 0.25) G.sucks.splice(i, 1);
-    }
     if (G.banner) {
       G.banner.t -= dt;
       if (G.banner.t <= 0) G.banner = null;
@@ -2797,7 +2756,6 @@
     }
     G.sparkBudget = 8;
     G.kyuPending = false;
-    G.suckCount = 0;
 
     if (G.state === 'play') {
       G.time += dt;
@@ -2836,7 +2794,6 @@
       Sound.play('kyu', G.kyuStreak);
       G.kyuStreak++;
     }
-    if (G.suckCount >= 6) Sound.play('gulp');
 
     if (G.state === 'play') {
       const pct = cleanPct();
@@ -3112,17 +3069,6 @@
         ctx.fillRect(e.x - e.r, e.y - e.r * 1.3 - 6, e.r * 2 * Math.max(0, e.hp / e.maxHp), 4);
       }
     }
-    // 吸い込まれていくゴミ
-    for (const s of G.sucks) {
-      const k = 1 - s.t / 0.25;
-      ctx.save();
-      ctx.translate(s.x, s.y);
-      ctx.rotate(s.rot);
-      ctx.globalAlpha = k;
-      drawEnemyBody(ctx, s.type, s.r * Math.max(0.1, k), 0, 0, 0);
-      ctx.restore();
-    }
-
     // 掃除機の吸引範囲
     for (const w of G.weapons) {
       if (w.id !== 'vacuum' || G.state !== 'play') continue;
@@ -3443,7 +3389,7 @@
   const actions = {};
   overlay.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (!b || b.disabled) return;
+    if (!b || b.disabled || overlay.classList.contains('locked')) return;
     Sound.init();
     Sound.play('click');
     actions[b.dataset.act](b.dataset.arg);
@@ -3458,11 +3404,20 @@
     }
   });
 
-  function show(name, html, solid = true) {
+  // fx: { kind: 'level' | 'chest' | 'evo', lock: 押せるようになるまでの ms }
+  let unlockTimer = null;
+  function show(name, html, solid = true, fx = null) {
     screen = name;
-    overlay.innerHTML = html;
+    clearTimeout(unlockTimer);
+    overlay.classList.remove('celebrate', 'evo', 'locked');
+    overlay.innerHTML = fx ? celebrationHtml(fx.kind) + html : html;
     overlay.hidden = false;
     overlay.classList.toggle('solid', solid);
+    if (fx) {
+      overlay.classList.add('celebrate', 'locked');
+      if (fx.kind === 'evo') overlay.classList.add('evo');
+      unlockTimer = setTimeout(() => overlay.classList.remove('locked'), fx.lock);
+    }
     overlay.scrollTop = 0;
     const f = overlay.querySelector('[data-focus]') || overlay.querySelector('button:not(:disabled)');
     if (f) f.focus({ preventScroll: true });
@@ -3472,8 +3427,29 @@
     keys.clear();
   }
 
+  // 後ろで回る光と紙吹雪
+  function celebrationHtml(kind) {
+    const colors = kind === 'evo' ? ['#b77bff', '#ffcf4a', '#4fe0b6', '#ff8ad8', '#7fc8ff'] : ['#ffcf4a', '#4fe0b6', '#7fc8ff', '#ff8a5c', '#ffffff'];
+    const n = kind === 'level' ? 26 : 40;
+    let bits = '';
+    for (let i = 0; i < n; i++) {
+      const st = [
+        `--x:${rand(0, 100).toFixed(1)}%`,
+        `--c:${pick(colors)}`,
+        `--d:${rand(1.4, 2.6).toFixed(2)}s`,
+        `--delay:${(rand(0, 0.5) + (kind === 'level' ? 0 : 0.7)).toFixed(2)}s`,
+        `--r:${randInt(0, 360)}deg`,
+        `--s:${rand(-260, 260).toFixed(0)}px`,
+      ].join(';');
+      bits += `<i class="confetti" style="${st}"></i>`;
+    }
+    return `<div class="fx" aria-hidden="true"><div class="rays"></div>${bits}</div>`;
+  }
+
   function hide() {
     screen = 'play';
+    clearTimeout(unlockTimer);
+    overlay.classList.remove('celebrate', 'evo', 'locked');
     overlay.hidden = true;
     overlay.innerHTML = '';
     pauseBtn.style.visibility = 'visible';
@@ -3497,7 +3473,7 @@
   }
 
   function roomUnlocked(i) {
-    return i === 0 || save.cleared[i - 1];
+    return TEST_UNLOCK || i === 0 || save.cleared[i - 1];
   }
 
   function showRooms() {
@@ -3532,7 +3508,7 @@
     const r = ROOMS[briefRoom];
     const b = save.best[briefRoom];
     const chars = CHARS.map((c) => {
-      const ok = c.unlockRoom < 0 || save.cleared[c.unlockRoom];
+      const ok = TEST_UNLOCK || c.unlockRoom < 0 || save.cleared[c.unlockRoom];
       return `<button type="button" class="char${save.char === c.id ? ' on' : ''}" data-act="char" data-arg="${c.id}" ${ok ? '' : 'disabled'}>
         <img src="${charThumb(c.id)}" alt="">
         <span class="char-name">${ok ? esc(c.name) : '？？？'}</span><br>
@@ -3633,7 +3609,7 @@
   function renderLevelUp() {
     const cards = choices.map((o, i) => {
       const c = choiceInfo(o);
-      return `<button type="button" class="card" data-act="choose" data-arg="${i}" data-key="${i + 1}" ${i === 0 ? 'data-focus' : ''}>
+      return `<button type="button" class="card" style="--i:${i}" data-act="choose" data-arg="${i}" data-key="${i + 1}" ${i === 0 ? 'data-focus' : ''}>
         <img src="${iconURL(c.icon)}" alt="">
         <span class="card-body"><span class="card-name">${esc(c.name)}</span><span class="card-lv${c.isNew ? ' new' : ''}">${esc(c.lv)}</span><br>
         <span class="card-desc">${esc(c.desc)}</span>${c.hint ? `<br><span class="card-hint">${esc(c.hint)}</span>` : ''}</span>
@@ -3641,12 +3617,13 @@
       </button>`;
     }).join('');
     show('levelup', `
-      <div class="panel">
-        <h2>レベルアップ! Lv ${G.level - G.pendingLv}</h2>
+      <div class="panel reward">
+        <p class="reward-title">LEVEL UP!</p>
+        <p class="lv-badge">Lv ${G.level - G.pendingLv}</p>
         <p class="sub">清掃ギアかパッシブを1つ選ぶ</p>
         <div class="cards">${cards}</div>
         ${G.rerolls > 0 ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">選び直す (残り ${G.rerolls})</button></div>` : ''}
-      </div>`, false);
+      </div>`, false, { kind: 'level', lock: 450 });
   }
 
   function applyChoice(o) {
@@ -3677,7 +3654,7 @@
       evolvable.evo = true;
       recalcStats();
       icon = WEAPONS[evolvable.id].evo;
-      title = '進化!';
+      title = '進化!!';
       text = `${WEAPONS[evolvable.id].name}が「${EVOS[icon].name}」に進化した! ${EVOS[icon].desc}`;
     } else {
       const opts = [];
@@ -3697,14 +3674,20 @@
         text = 'コイン +30';
       }
     }
-    Sound.play('chest');
+    Sound.play(evolvable ? 'chest-evo' : 'chest-open');
     show('chest', `
-      <div class="panel">
-        <h2>${esc(title)}</h2>
-        <img class="chest-icon" src="${iconURL(icon)}" alt="">
-        <p class="sub">${esc(text)}</p>
-        <div class="actions"><button type="button" class="btn primary" data-act="chestOk" data-focus>OK</button></div>
-      </div>`, false);
+      <div class="panel reward">
+        <div class="chest-stage">
+          <span class="chest-flash"></span>
+          <img class="chest-box" src="${iconURL('chest')}" alt="">
+          <img class="chest-reward" src="${iconURL(icon)}" alt="">
+        </div>
+        <div class="chest-text">
+          <p class="reward-title">${esc(title)}</p>
+          <p class="sub">${esc(text)}</p>
+        </div>
+        <div class="actions chest-ok"><button type="button" class="btn primary" data-act="chestOk" data-focus>OK</button></div>
+      </div>`, false, { kind: evolvable ? 'evo' : 'chest', lock: 1000 });
   }
 
   // ---- 結果 ----

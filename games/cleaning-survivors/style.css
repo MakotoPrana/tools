@@ -301,10 +301,151 @@ body {
 
 @media (hover: none) { .card-key { display: none; } }
 
-/* 宝箱 */
-.chest-icon { display: block; width: 96px; height: 96px; margin: 8px auto; animation: chest-pop 0.5s ease-out; }
+/* レベルアップ・宝箱の演出 */
+.overlay.celebrate { background: radial-gradient(circle at 50% 42%, rgba(255, 207, 74, 0.3), rgba(8, 12, 18, 0.72) 62%); }
+.overlay.celebrate.evo { background: radial-gradient(circle at 50% 42%, rgba(183, 123, 255, 0.38), rgba(8, 12, 18, 0.78) 62%); }
+.overlay.locked .card, .overlay.locked .btn { cursor: default; }
 
-@keyframes chest-pop { from { transform: scale(0.3) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+
+.rays {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 180vmax;
+  height: 180vmax;
+  margin: -90vmax 0 0 -90vmax;
+  background: repeating-conic-gradient(rgba(255, 228, 140, 0.2) 0deg 7deg, transparent 7deg 20deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0, transparent 38%);
+  mask-image: radial-gradient(circle, #000 0, transparent 38%);
+  animation: rays-in 0.5s ease-out both, rays-spin 16s linear infinite;
+}
+
+.evo .rays { background: repeating-conic-gradient(rgba(200, 150, 255, 0.28) 0deg 7deg, rgba(255, 220, 120, 0.12) 7deg 10deg, transparent 10deg 20deg); }
+
+.confetti {
+  position: absolute;
+  top: -16px;
+  left: var(--x);
+  width: 8px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--c);
+  opacity: 0;
+  animation: confetti-fall var(--d) cubic-bezier(0.25, 0.6, 0.5, 1) var(--delay) forwards;
+}
+
+.confetti:nth-child(3n) { width: 10px; height: 10px; border-radius: 50%; }
+
+.panel.reward {
+  position: relative;
+  background: #141a22;
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 0 4px rgba(255, 207, 74, 0.15), 0 0 46px rgba(255, 207, 74, 0.4), 0 12px 40px rgba(0, 0, 0, 0.45);
+  animation: panel-pop 0.45s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+.evo .panel.reward { border-color: #c79bff; box-shadow: 0 0 0 4px rgba(183, 123, 255, 0.2), 0 0 60px rgba(183, 123, 255, 0.55), 0 12px 40px rgba(0, 0, 0, 0.45); }
+
+.reward-title {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(1.9rem, 8vw, 2.5rem);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  background: linear-gradient(180deg, #fffbe0 10%, #ffcf4a 55%, #f08a24 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 #7a4a10) drop-shadow(0 0 12px rgba(255, 190, 60, 0.6));
+  animation: title-bounce 0.7s 0.1s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.evo .reward-title {
+  background: linear-gradient(90deg, #ff8ad8, #ffcf4a, #4fe0b6, #7fc8ff, #b77bff, #ff8ad8);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 2px 0 #3a1a5a) drop-shadow(0 0 14px rgba(183, 123, 255, 0.8));
+  animation: title-bounce 0.7s 0.1s cubic-bezier(0.2, 1.6, 0.4, 1) both, rainbow 1.6s linear infinite;
+}
+
+.lv-badge {
+  width: fit-content;
+  margin: 4px auto 6px;
+  padding: 1px 14px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #3a2400;
+  font-weight: 900;
+  animation: title-bounce 0.6s 0.2s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.reward .card {
+  position: relative;
+  overflow: hidden;
+  animation: card-in 0.4s calc(0.15s + var(--i) * 0.08s) cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+
+.reward .card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: shine 0.8s calc(0.5s + var(--i) * 0.1s) ease-out both;
+  pointer-events: none;
+}
+
+.reward .card img { animation: icon-wiggle 0.5s calc(0.35s + var(--i) * 0.08s) both; }
+.reward .card:hover img, .reward .card:focus-visible img { transform: scale(1.12) rotate(-6deg); transition: transform 0.15s; }
+.reward .card-lv.new { padding: 0 6px; border-radius: 4px; background: rgba(79, 224, 182, 0.18); box-shadow: 0 0 10px rgba(79, 224, 182, 0.6); animation: new-glow 1s ease-in-out infinite alternate; }
+
+/* 宝箱: ガタガタ揺れて、光って、中身が飛び出す */
+.chest-stage { position: relative; width: 120px; height: 120px; margin: 4px auto 8px; }
+.chest-box, .chest-reward { position: absolute; inset: 0; width: 100%; height: 100%; }
+.chest-box { animation: chest-shake 0.7s ease-in-out both, chest-burst 0.25s 0.7s ease-in forwards; }
+.chest-reward { opacity: 0; filter: drop-shadow(0 0 14px rgba(255, 220, 120, 0.9)); animation: reward-pop 0.55s 0.75s cubic-bezier(0.2, 1.7, 0.4, 1) forwards, float 1.6s 1.4s ease-in-out infinite alternate; }
+.evo .chest-reward { filter: drop-shadow(0 0 18px rgba(200, 150, 255, 1)); }
+.chest-flash { position: absolute; inset: -60px; border-radius: 50%; background: radial-gradient(circle, #fff 0, rgba(255, 236, 160, 0.85) 25%, transparent 65%); opacity: 0; animation: flash 0.6s 0.68s ease-out; }
+.chest-text { opacity: 0; animation: fade-up 0.4s 0.9s ease-out forwards; }
+.chest-ok { opacity: 0; animation: fade-up 0.3s 1s ease-out forwards; }
+
+@keyframes rays-in { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes rays-spin { to { rotate: 360deg; } }
+@keyframes confetti-fall {
+  0% { opacity: 1; transform: translate(0, 0) rotate(var(--r)); }
+  100% { opacity: 0.9; transform: translate(var(--s), 900px) rotate(calc(var(--r) + 720deg)); }
+}
+@keyframes panel-pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes title-bounce { 0% { opacity: 0; transform: scale(2.2) rotate(-6deg); } 100% { opacity: 1; transform: none; } }
+@keyframes rainbow { to { background-position: 200% 0; } }
+@keyframes card-in { from { opacity: 0; transform: translateY(26px) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes shine { to { transform: translateX(120%); } }
+@keyframes icon-wiggle { 0% { transform: scale(0.3); } 60% { transform: scale(1.25) rotate(10deg); } 100% { transform: none; } }
+@keyframes new-glow { to { box-shadow: 0 0 2px rgba(79, 224, 182, 0.2); } }
+@keyframes chest-shake {
+  0%, 100% { transform: none; }
+  15% { transform: rotate(-9deg) scale(1.02); }
+  30% { transform: rotate(9deg) scale(1.04); }
+  45% { transform: rotate(-11deg) scale(1.06); }
+  60% { transform: rotate(11deg) scale(1.08); }
+  80% { transform: rotate(-5deg) scale(1.12); }
+}
+@keyframes chest-burst { to { opacity: 0; transform: scale(1.6); } }
+@keyframes reward-pop { 0% { opacity: 0; transform: translateY(20px) scale(0.2); } 100% { opacity: 1; transform: none; } }
+@keyframes float { to { transform: translateY(-6px); } }
+@keyframes flash { 0% { opacity: 0; transform: scale(0.3); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .rays, .confetti, .panel.reward, .reward-title, .lv-badge, .reward .card, .reward .card::after, .reward .card img,
+  .chest-box, .chest-flash, .chest-reward, .chest-text, .chest-ok, .reward .card-lv.new { animation: none !important; }
+  .confetti, .chest-box, .chest-flash, .reward .card::after { display: none; }
+  .chest-reward, .chest-text, .chest-ok { opacity: 1; }
+}
 
 /* 結果・一時停止 */
 .stat-list { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; margin: 10px auto 0; max-width: 320px; font-size: 0.95rem; }
