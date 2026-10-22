@@ -153,6 +153,38 @@
         [{ width: 8 }, '幅 +8'], [{ dmg: 4 }, '攻撃力 +4'], [{ count: 1 }, 'ローラー +1個'],
       ],
     },
+    mop: {
+      name: 'モップ', desc: '前方を大きくなぎ払い、ゴミを弾き飛ばす。通った床もしっかり磨く', evo: 'tornado', passive: 'gloves', power: 2,
+      base: { dmg: 11, cd: 1.3, range: 78, angle: 150 },
+      lv: [
+        [{ dmg: 4 }, '攻撃力 +4'], [{ range: 12 }, 'なぎ払う距離 +12'], [{ cd: -0.12 }, '間隔 -0.12秒'], [{ dmg: 5 }, '攻撃力 +5'],
+        [{ angle: 40 }, 'なぎ払う角度 +40°'], [{ range: 16 }, 'なぎ払う距離 +16'], [{ dmg: 6, cd: -0.1 }, '攻撃力 +6・間隔 -0.1秒'],
+      ],
+    },
+    duster: {
+      name: 'はたき', desc: 'ブーメランのように投げて、行きと帰りでゴミを払う。貫通する', evo: 'gale', passive: 'boots', power: 1,
+      base: { dmg: 7, cd: 1.6, len: 210, size: 14, count: 1 },
+      lv: [
+        [{ dmg: 3 }, '攻撃力 +3'], [{ count: 1 }, 'はたき +1本'], [{ len: 40 }, '飛ぶ距離 +40'], [{ size: 4, dmg: 3 }, '大きさ +4・攻撃力 +3'],
+        [{ count: 1 }, 'はたき +1本'], [{ cd: -0.25 }, '間隔 -0.25秒'], [{ dmg: 5, count: 1 }, '攻撃力 +5・はたき +1本'],
+      ],
+    },
+    bomb: {
+      name: '洗剤ボム', desc: 'ゴミの集まりに洗剤を投げこみ、はじける泡でまとめて片付ける', evo: 'foam', passive: 'dustpack', power: 3,
+      base: { dmg: 18, cd: 2.6, radius: 52, count: 1 },
+      lv: [
+        [{ dmg: 6 }, '攻撃力 +6'], [{ radius: 10 }, '爆発の大きさ +10'], [{ count: 1 }, 'ボム +1個'], [{ cd: -0.3 }, '間隔 -0.3秒'],
+        [{ dmg: 8 }, '攻撃力 +8'], [{ radius: 12 }, '爆発の大きさ +12'], [{ count: 1, dmg: 6 }, 'ボム +1個・攻撃力 +6'],
+      ],
+    },
+    sponge: {
+      name: 'メラミンスポンジ', desc: '壁で跳ね返りながら部屋を飛び回り、ゴミと汚れをこすり落とす', evo: 'meteor', passive: 'wax', power: 2,
+      base: { dmg: 6, cd: 3.2, size: 10, dur: 3, speed: 300, count: 1 },
+      lv: [
+        [{ dmg: 3 }, '攻撃力 +3'], [{ count: 1 }, 'スポンジ +1個'], [{ dur: 1 }, '飛ぶ時間 +1秒'], [{ size: 4 }, '大きさ +4'],
+        [{ dmg: 4, speed: 60 }, '攻撃力 +4・速さアップ'], [{ count: 1 }, 'スポンジ +1個'], [{ dmg: 5, dur: 1 }, '攻撃力 +5・飛ぶ時間 +1秒'],
+      ],
+    },
   };
   const WEAPON_IDS = Object.keys(WEAPONS);
   const MAX_WEAPON_LV = 8;
@@ -163,20 +195,27 @@
     army: { name: 'お掃除ロボ軍団', desc: 'ロボが自分で汚れとゴミを探して部屋を巡回する' },
     acid: { name: '酸性雨ミスト', desc: '画面中に除菌の雨を降らせる' },
     giant: { name: '巨大圧雪ローラー', desc: '太いローラーで通り道を全部ピカピカにし、ゴミを潰す' },
+    tornado: { name: '竜巻モップ', desc: 'まわり全部を高速でなぎ払い続ける' },
+    gale: { name: '風神はたき', desc: '大きなはたきが何本も飛び、通り道のダストを集めてくる' },
+    foam: { name: '泡の大爆発', desc: '大爆発のあとに泡が残り、しばらくゴミを溶かし続ける' },
+    meteor: { name: 'メラミン流星群', desc: '大きなスポンジが何個も長く跳ね回り、部屋じゅうを磨き上げる' },
   };
 
   const PASSIVES = {
     battery: { name: 'バッテリー増設', max: 5, desc: 'ギアの攻撃間隔 -8%' },
     boiler: { name: '温水ボイラー', max: 5, desc: 'ギアの攻撃力 +10%' },
-    roomba: { name: 'ルンバ増設', max: 2, desc: '水流・ロボ・ミストの数 +1' },
+    roomba: { name: 'ルンバ増設', max: 2, desc: 'ギアの数 +1 (水流・ロボ・ミスト・はたき・ボム・スポンジ)' },
     bleach: { name: '強力漂白剤', max: 5, desc: '攻撃範囲 +10%' },
     tape: { name: '超強力粘着テープ', max: 5, desc: '効果時間 +10%' },
     dustpack: { name: '大容量ダストパック', max: 5, desc: 'ダストボックスの容量 +40・回収範囲 +20%' },
     boots: { name: '防水ブーツ', max: 3, desc: '汚れた床での減速を半分にする・体力 +20' },
     gloves: { name: 'ゴム手袋', max: 3, desc: '受けるダメージ -1' },
+    wax: { name: 'フロアワックス', max: 5, desc: '移動速度 +6%・ギアの弾の速さ +10%' },
   };
   const PASSIVE_IDS = Object.keys(PASSIVES);
-  const MAX_SLOTS = 6;
+  // 1回のプレイで持てるギアとパッシブの数。全部は持てないので、どれを組み合わせるかでビルドが決まる
+  const MAX_GEARS = 4;
+  const MAX_PASSIVES = 4;
 
   // 清掃員。unlock: その番号のステージの宝物を見つけると仲間になる (-1 は最初から)
   //   mods: 個性 (scrub: 歩いて磨く範囲 / might: 攻撃力 / noDirtSlow: 汚れた床で遅くならない / magnet: 回収範囲 /
@@ -431,6 +470,14 @@
       ['Mists +1', 'Mist size +8', 'Damage +2', 'Duration +0.6s', 'Mists +1', 'Mist size +10', 'Damage +3, mists +1']],
     roller: ['Lint Roller', 'Follows behind you, rolling up trash and dirt along your path.',
       ['Damage +3', 'Width +8', 'Damage +3', 'Rollers +1', 'Width +8', 'Damage +4', 'Rollers +1']],
+    mop: ['Mop', 'Sweeps a wide arc ahead, knocking trash away and scrubbing the floor hard.',
+      ['Damage +4', 'Reach +12', 'Interval −0.12s', 'Damage +5', 'Sweep angle +40°', 'Reach +16', 'Damage +6, interval −0.1s']],
+    duster: ['Feather Duster', 'Thrown like a boomerang, it swats trash on the way out and back. Pierces.',
+      ['Damage +3', 'Dusters +1', 'Distance +40', 'Size +4, damage +3', 'Dusters +1', 'Interval −0.25s', 'Damage +5, dusters +1']],
+    bomb: ['Detergent Bomb', 'Lobs detergent into clusters of trash; the bursting foam cleans them all up.',
+      ['Damage +6', 'Blast size +10', 'Bombs +1', 'Interval −0.3s', 'Damage +8', 'Blast size +12', 'Bombs +1, damage +6']],
+    sponge: ['Magic Sponge', 'Bounces off walls as it flies around the room, scrubbing off trash and dirt.',
+      ['Damage +3', 'Sponges +1', 'Flight time +1s', 'Size +4', 'Damage +4, faster', 'Sponges +1', 'Damage +5, flight time +1s']],
   };
   const EN_EVOS = {
     blackhole: ['Black Hole Vacuum', 'Places a suction vortex ahead that damages all trash inside it.'],
@@ -438,16 +485,21 @@
     army: ['Robot Cleaning Squad', 'Robots seek out dirt and trash on their own and patrol the room.'],
     acid: ['Acid Rain Mist', 'Rains sanitizer all over the screen.'],
     giant: ['Giant Steamroller', 'A huge roller that polishes everything along your path and crushes trash.'],
+    tornado: ['Tornado Mop', 'Keeps sweeping all around you at high speed.'],
+    gale: ['Wind God Duster', 'Several big dusters fly out and bring back the dust along their path.'],
+    foam: ['Foam Explosion', 'Huge blasts leave foam behind that keeps dissolving trash for a while.'],
+    meteor: ['Sponge Meteor Shower', 'Many big sponges bounce around for a long time, polishing the whole room.'],
   };
   const EN_PASSIVES = {
     battery: ['Extra Battery', 'Gear attack interval −8%'],
     boiler: ['Hot Water Boiler', 'Gear damage +10%'],
-    roomba: ['Extra Roomba', 'Jets, robots and mists +1'],
+    roomba: ['Extra Roomba', 'Gear count +1 (jets, robots, mists, dusters, bombs, sponges)'],
     bleach: ['Strong Bleach', 'Attack area +10%'],
     tape: ['Super Sticky Tape', 'Effect duration +10%'],
     dustpack: ['Big Dust Pack', 'Dust box capacity +40, pickup range +20%'],
     boots: ['Rain Boots', 'Halves slowdown on dirty floors, HP +20'],
     gloves: ['Rubber Gloves', 'Damage taken −1'],
+    wax: ['Floor Wax', 'Move speed +6%, gear projectile speed +10%'],
   };
   // [名前, 個性, 個性の説明, 紹介]
   const EN_CHARS = {
@@ -554,6 +606,8 @@
       warn: (name) => `警報! ${name}が近づいている!`,
       rush: '大群ラッシュ!',
       tooTough: 'かたい! まわりを掃除しよう',
+      shieldDmg: (n) => `ダメージ ${n}%`,
+      shieldNone: 'バリアなし',
       bossDown: (name) => `${name}を片付けた!`,
       srcLeft: (room, n) => `発生源を潰した! (${room} 残り ${n})`,
       srcAll: (room) => `${room}の発生源を全部潰した!`,
@@ -579,6 +633,8 @@
       tagline: '押し寄せるゴミと汚れを、清掃ギアで一気に片付けろ!',
       play: 'はじめる',
       cleaners: '清掃員',
+      achievements: '実績',
+      achClears: '清掃員ごとのクリア状況',
       settings: '設定',
       stageSelect: 'ステージを選ぶ',
       recordOf: (name) => `${name} の記録`,
@@ -611,7 +667,7 @@
       pickCleaner: '出撃する清掃員',
       deploy: (mode) => `${mode}で出撃!`,
       back: '戻る',
-      charsSub: '清掃員を選ぶと、ステージごとのクリア状況が見られる',
+      charsSub: '清掃員を選ぶと、ステージ・モードごとのクリア状況が見られる',
       treasures: (a, b) => `宝物 (${a}/${b})`,
       roomsCell: (r, n) => `${r}/${n}部屋`,
       clears: (a, b) => `クリア ${a}/${b}`,
@@ -632,6 +688,8 @@
       evoNeed: (p) => `${p}があれば進化できる`,
       evoFor: (w) => `${w}の進化に必要`,
       pickOne: '清掃ギアかパッシブを1つ選ぶ',
+      slots: (g, gm, p, pm) => `ギア ${g}/${gm} ・ パッシブ ${p}/${pm}`,
+      slotNote: (g, p) => `清掃ギアは${g}つ、パッシブは${p}つまでしか持てない。どれを組み合わせるかで、戦い方が変わる。`,
       reroll: (n) => `選び直す (残り ${n})`,
       treasureNew: '宝物を見つけた!',
       owned: '（もう持っている）',
@@ -683,6 +741,8 @@
       warn: (name) => `Warning! ${name} is approaching!`,
       rush: 'Swarm rush!',
       tooTough: 'Too tough! Clean around it',
+      shieldDmg: (n) => `DMG ${n}%`,
+      shieldNone: 'No barrier',
       bossDown: (name) => `${name} cleaned up!`,
       srcLeft: (room, n) => `Source destroyed! (${room}: ${n} left)`,
       srcAll: (room) => `All sources in the ${room} destroyed!`,
@@ -707,6 +767,8 @@
       tagline: 'Wipe out waves of trash and grime with your cleaning gear!',
       play: 'Play',
       cleaners: 'Cleaners',
+      achievements: 'Achievements',
+      achClears: 'Clears by cleaner',
       settings: 'Settings',
       stageSelect: 'Select a Stage',
       recordOf: (name) => `${name}'s records`,
@@ -739,7 +801,7 @@
       pickCleaner: 'Choose your cleaner',
       deploy: (mode) => `Start (${mode})`,
       back: 'Back',
-      charsSub: 'Select a cleaner to see their clears for each stage',
+      charsSub: 'Select a cleaner to see their clears for each stage and mode',
       treasures: (a, b) => `Treasures (${a}/${b})`,
       roomsCell: (r, n) => `${r}/${n} rooms`,
       clears: (a, b) => `Clears ${a}/${b}`,
@@ -760,6 +822,8 @@
       evoNeed: (p) => `Can evolve if you have ${p}`,
       evoFor: (w) => `Needed to evolve the ${w}`,
       pickOne: 'Choose a gear or a passive',
+      slots: (g, gm, p, pm) => `Gear ${g}/${gm} · Passives ${p}/${pm}`,
+      slotNote: (g, p) => `You can carry only ${g} pieces of gear and ${p} passives, so your combination decides how you fight.`,
       reroll: (n) => `Reroll (${n} left)`,
       treasureNew: 'Treasure found!',
       owned: ' (already owned)',
@@ -910,7 +974,7 @@
     let bgmGain;
     let noiseBuf;
     const last = {};
-    const GAP = { pop: 0.035, kyu: 0.06, hit: 0.045, suck: 0.09, shot: 0.08, hurt: 0.15, dump: 0.3 };
+    const GAP = { swing: 0.12, throw: 0.12, boom: 0.08, pop: 0.035, kyu: 0.06, hit: 0.045, suck: 0.09, shot: 0.08, hurt: 0.15, dump: 0.3 };
 
     function init() {
       if (ac) {
@@ -984,6 +1048,9 @@
         case 'hit': noise(0.05, 0.08, 'bandpass', 1800, 900, 0, 2); break;
         case 'suck': noise(0.14, 0.12, 'bandpass', 2600, 500, 0, 3); tone(300, 900, 0.1, 'triangle', 0.04); break;
         case 'shot': noise(0.18, 0.1, 'highpass', 3000, 1500, 0, 0.7); break;
+        case 'swing': noise(0.16, 0.1, 'bandpass', 700, 2400, 0, 1.5); break;
+        case 'throw': noise(0.12, 0.06, 'bandpass', 1400, 3200, 0, 2); break;
+        case 'boom': tone(160, 60, 0.2, 'sine', 0.1); noise(0.22, 0.1, 'lowpass', 2600, 300, 0, 1); break;
         case 'hurt': tone(220, 90, 0.18, 'sawtooth', 0.09); break;
         case 'level':
           [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0, 0.14, 'square', 0.05, i * 0.06));
@@ -1832,6 +1899,115 @@
         }
         break;
       }
+      case 'mop':
+      case 'tornado':
+        if (id === 'tornado') {
+          glow('rgba(110,220,255,0.7)');
+          c.strokeStyle = 'rgba(200,245,255,0.9)';
+          c.lineWidth = 3;
+          for (let k = 0; k < 3; k++) {
+            c.beginPath();
+            c.ellipse(32, 44 - k * 12, 26 - k * 6, 6, 0, 0.3, TAU - 0.3);
+            c.stroke();
+          }
+        }
+        c.strokeStyle = '#8a5a2b';
+        c.lineWidth = 5;
+        c.beginPath();
+        c.moveTo(48, 6);
+        c.lineTo(30, 40);
+        c.stroke();
+        c.fillStyle = '#f2f2ee';
+        for (let k = 0; k < 7; k++) {
+          c.beginPath();
+          c.roundRect(14 + k * 4.5, 40, 5, 18 - Math.abs(k - 3) * 1.5, 2.5);
+          c.fill();
+        }
+        c.fillStyle = '#3a8dde';
+        c.fillRect(16, 37, 30, 6);
+        break;
+      case 'duster':
+      case 'gale': {
+        if (id === 'gale') glow('rgba(255,200,90,0.7)');
+        c.strokeStyle = '#8a5a2b';
+        c.lineWidth = 5;
+        c.beginPath();
+        c.moveTo(52, 56);
+        c.lineTo(32, 32);
+        c.stroke();
+        const cols = id === 'gale' ? ['#ffcf4a', '#ff8ad8', '#7fc8ff'] : ['#ff9ab0', '#ffe08a', '#a8e6ff'];
+        for (let k = 0; k < 9; k++) {
+          const a = -2.4 + (k / 8) * 2.2;
+          c.fillStyle = cols[k % 3];
+          c.beginPath();
+          c.ellipse(28 + Math.cos(a) * 12, 28 + Math.sin(a) * 12, 13, 5, a, 0, TAU);
+          c.fill();
+        }
+        break;
+      }
+      case 'bomb':
+      case 'foam':
+        if (id === 'foam') glow('rgba(255,150,220,0.7)');
+        c.strokeStyle = id === 'foam' ? '#ffd1f0' : '#bfe9ff';
+        c.lineWidth = 2;
+        [[48, 16, 7], [56, 30, 5], [42, 8, 4], [14, 14, 5]].forEach(([x, y, r]) => {
+          c.beginPath();
+          c.arc(x, y, r, 0, TAU);
+          c.stroke();
+        });
+        c.fillStyle = id === 'foam' ? '#ff8ad8' : '#4fb6ff';
+        c.beginPath();
+        c.roundRect(18, 24, 26, 34, 7);
+        c.fill();
+        c.fillStyle = '#f4f6f8';
+        c.fillRect(25, 12, 12, 13);
+        c.fillStyle = 'rgba(255,255,255,0.85)';
+        c.fillRect(22, 36, 18, 10);
+        break;
+      case 'sponge':
+      case 'meteor':
+        if (id === 'meteor') {
+          glow('rgba(255,180,80,0.7)');
+          c.strokeStyle = 'rgba(255,220,140,0.8)';
+          c.lineWidth = 4;
+          c.beginPath();
+          c.moveTo(4, 8);
+          c.lineTo(22, 22);
+          c.moveTo(4, 26);
+          c.lineTo(18, 34);
+          c.stroke();
+        }
+        c.save();
+        c.translate(36, 36);
+        c.rotate(-0.35);
+        c.fillStyle = id === 'meteor' ? '#ffcf4a' : '#f6f3ea';
+        c.beginPath();
+        c.roundRect(-20, -14, 40, 28, 5);
+        c.fill();
+        c.fillStyle = id === 'meteor' ? '#ff8a5c' : '#6fd3a8';
+        c.fillRect(-20, 3, 40, 11);
+        c.restore();
+        break;
+      case 'wax':
+        c.fillStyle = '#e8c35a';
+        c.beginPath();
+        c.roundRect(16, 16, 32, 42, 6);
+        c.fill();
+        c.fillStyle = '#9a7a2a';
+        c.fillRect(24, 6, 16, 11);
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.beginPath();
+        c.moveTo(32, 26);
+        c.lineTo(35, 34);
+        c.lineTo(43, 37);
+        c.lineTo(35, 40);
+        c.lineTo(32, 48);
+        c.lineTo(29, 40);
+        c.lineTo(21, 37);
+        c.lineTo(29, 34);
+        c.closePath();
+        c.fill();
+        break;
       case 'battery':
         c.fillStyle = '#2f3a46';
         c.beginPath();
@@ -2321,6 +2497,11 @@
       bullets: [],
       clouds: [],
       beams: [],
+      swings: [],
+      booms: [],
+      bombs: [],
+      blasts: [],
+      sponges: [],
       parts: [],
       trail: [],
       dumps: [],
@@ -2789,7 +2970,8 @@
     const bn = G.bonus; // 清掃が完了した部屋の特典
     const cm = G.ch.mods; // 清掃員の個性
     s.maxHp = G.ch.hp + sh.hp * 12 + lv('boots') * 20 + bn.hp;
-    s.speed = 118 * G.ch.speed * (1 + sh.speed * 0.04 + bn.speed);
+    s.speed = 118 * G.ch.speed * (1 + sh.speed * 0.04 + bn.speed + lv('wax') * 0.06);
+    s.projSpeed = 1 + lv('wax') * 0.1;
     s.might = 1 + sh.might * 0.08 + lv('boiler') * 0.1 + bn.might + (cm.might || 0);
     s.cd = 1 - lv('battery') * 0.08 - bn.cd;
     s.area = 1 + lv('bleach') * 0.1 + bn.area;
@@ -2869,6 +3051,50 @@
         if (w.evo) {
           s.width = 72 * st.area;
           s.dmg *= 2;
+          s.power = 3;
+        }
+        break;
+      case 'mop':
+        s.range *= st.area;
+        if (w.evo) {
+          s.angle = 360;
+          s.range += 24;
+          s.dmg *= 1.4;
+          s.cd = Math.max(0.35, s.cd * 0.55);
+          s.power = 3;
+        }
+        break;
+      case 'duster':
+        s.size *= st.area;
+        s.speed = 430 * st.projSpeed;
+        if (w.evo) {
+          s.count += 2;
+          s.size += 12;
+          s.len += 90;
+          s.dmg *= 1.5;
+          s.power = 2;
+        }
+        break;
+      case 'bomb':
+        s.radius *= st.area;
+        if (w.evo) {
+          s.radius += 24;
+          s.dmg *= 1.4;
+          s.count += 1;
+          s.foamR = s.radius * 0.85;
+          s.foamDur = 2.5 * st.dur;
+          s.foamDmg = s.dmg * 0.18;
+        }
+        break;
+      case 'sponge':
+        s.size *= Math.sqrt(st.area);
+        s.dur *= st.dur;
+        s.speed *= st.projSpeed;
+        if (w.evo) {
+          s.count += 2;
+          s.size += 8;
+          s.dur += 2;
+          s.dmg *= 1.6;
           s.power = 3;
         }
         break;
@@ -3423,6 +3649,10 @@
         case 'robot': updateRobot(w, s, dt, p); break;
         case 'spray': updateSpray(w, s, dt, p); break;
         case 'roller': updateRoller(w, s, dt, p); break;
+        case 'mop': updateMop(w, s, dt, p); break;
+        case 'duster': updateDuster(w, s, dt, p); break;
+        case 'bomb': updateBomb(w, s, dt, p); break;
+        case 'sponge': updateSponge(w, s, dt, p); break;
         default: break;
       }
     }
@@ -3672,6 +3902,224 @@
     w.rollers.length = s.count;
   }
 
+  // いちばん近いゴミの方向 (いなければ進む方向)
+  function aimNearest(p, r) {
+    let aim = p.face;
+    let best = r * r;
+    const n = query(p.x, p.y, r);
+    for (let k = 0; k < n; k++) {
+      const e = qbuf[k];
+      const d2 = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
+      if (d2 < best) {
+        best = d2;
+        aim = Math.atan2(e.y - p.y, e.x - p.x);
+      }
+    }
+    return aim;
+  }
+
+  function updateMop(w, s, dt, p) {
+    w.t -= dt;
+    if (w.t > 0) return;
+    w.t = s.cd;
+    const full = s.angle >= 360;
+    const aim = full ? w.ang + 2 : aimNearest(p, s.range * 1.8);
+    w.ang = aim;
+    const half = full ? Math.PI : ((s.angle / 2) * Math.PI) / 180;
+    const dmg = s.dmg * dmgMul();
+    const n = query(p.x, p.y, s.range + 70);
+    for (let k = 0; k < n; k++) {
+      const e = qbuf[k];
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d > s.range + e.r) continue;
+      if (!full && d > e.r && Math.abs(angleDiff(Math.atan2(dy, dx), aim)) > half + e.r / d) continue;
+      hurtEnemy(e, dmg, (dx / d) * 260, (dy / d) * 260);
+    }
+    cleanCone(p.x, p.y, aim, half, s.range, s.power);
+    // 振るたびに左右を入れ替えて、なぎ払う向きを見せる
+    w.side = -(w.side || 1);
+    G.swings.push({ x: p.x, y: p.y, a: aim, half, r: s.range, side: w.side, life: 0.22, max: 0.22, evo: w.evo });
+    Sound.play('swing');
+  }
+
+  function updateDuster(w, s, dt, p) {
+    w.t -= dt;
+    if (w.t > 0) return;
+    w.t = s.cd;
+    const base = aimNearest(p, s.len + 60);
+    for (let i = 0; i < s.count; i++) {
+      const a = base + (i - (s.count - 1) / 2) * 0.45;
+      G.booms.push({ x: p.x, y: p.y, a, d: 0, back: false, s, evo: w.evo, spin: rand(0, TAU), hits: new Set() });
+    }
+    Sound.play('throw');
+  }
+
+  function updateBomb(w, s, dt, p) {
+    w.t -= dt;
+    if (w.t > 0) return;
+    w.t = s.cd;
+    // ゴミがかたまっている所をねらう (候補をいくつか見て、まわりの数がいちばん多い所)
+    const n = query(p.x, p.y, 320);
+    for (let i = 0; i < s.count; i++) {
+      let tx = p.x + Math.cos(p.face) * 120;
+      let ty = p.y + Math.sin(p.face) * 120;
+      if (n) {
+        let best = -1;
+        for (let k = 0; k < 6; k++) {
+          const e = qbuf[(Math.random() * n) | 0];
+          let c = 0;
+          for (let j = 0; j < n; j++) if ((qbuf[j].x - e.x) ** 2 + (qbuf[j].y - e.y) ** 2 < s.radius * s.radius) c++;
+          if (c > best) {
+            best = c;
+            tx = e.x;
+            ty = e.y;
+          }
+        }
+      }
+      tx += rand(-12, 12) * i;
+      ty += rand(-12, 12) * i;
+      G.bombs.push({ x0: p.x, y0: p.y, x: p.x, y: p.y, tx: clamp(tx, 10, ROOM - 10), ty: clamp(ty, 10, ROOM - 10), t: 0, dur: 0.5 + i * 0.08, s, evo: w.evo });
+    }
+    Sound.play('throw');
+  }
+
+  function updateSponge(w, s, dt, p) {
+    w.t -= dt;
+    if (w.t > 0) return;
+    w.t = s.cd;
+    for (let i = 0; i < s.count; i++) {
+      const a = rand(0, TAU);
+      G.sponges.push({ x: p.x, y: p.y, vx: Math.cos(a) * s.speed, vy: Math.sin(a) * s.speed, life: s.dur, s, evo: w.evo, cleanT: 0, rot: 0 });
+    }
+  }
+
+  // はたき・洗剤ボム・スポンジ・モップのなぎ払い
+  function updateProjectiles(dt) {
+    const p = G.p;
+    for (let i = G.swings.length - 1; i >= 0; i--) {
+      G.swings[i].life -= dt;
+      if (G.swings[i].life <= 0) G.swings.splice(i, 1);
+    }
+    // はたき: 飛んでいって、戻ってくる
+    for (let i = G.booms.length - 1; i >= 0; i--) {
+      const b = G.booms[i];
+      const s = b.s;
+      b.spin += dt * 14;
+      if (!b.back) {
+        b.d += s.speed * dt;
+        b.x += Math.cos(b.a) * s.speed * dt;
+        b.y += Math.sin(b.a) * s.speed * dt;
+        if (b.d >= s.len || isBlocked(b.x, b.y)) {
+          b.back = true;
+          b.hits.clear(); // 帰りも当たる
+        }
+      } else {
+        const dx = p.x - b.x;
+        const dy = p.y - b.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < 16) {
+          G.booms.splice(i, 1);
+          continue;
+        }
+        const sp = s.speed * 1.15 * dt;
+        b.x += (dx / d) * Math.min(d, sp);
+        b.y += (dy / d) * Math.min(d, sp);
+      }
+      const dmg = s.dmg * dmgMul();
+      const m = query(b.x, b.y, s.size + 70);
+      for (let k = 0; k < m; k++) {
+        const e = qbuf[k];
+        if (b.hits.has(e)) continue;
+        const dx = e.x - b.x;
+        const dy = e.y - b.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d > s.size + e.r) continue;
+        b.hits.add(e);
+        hurtEnemy(e, dmg, (dx / d) * 120, (dy / d) * 120);
+      }
+      cleanCircle(b.x, b.y, s.size, s.power);
+      // 進化すると、通り道のダストを主人公へ送る
+      if (b.evo) {
+        const rr = (s.size + 20) ** 2;
+        for (const g of G.gems) if (!g.homing && (g.x - b.x) ** 2 + (g.y - b.y) ** 2 < rr) g.homing = true;
+      }
+    }
+    // 洗剤ボム: 弧を描いて飛び、着地ではじける
+    for (let i = G.bombs.length - 1; i >= 0; i--) {
+      const b = G.bombs[i];
+      b.t += dt;
+      const k = Math.min(1, b.t / b.dur);
+      b.x = b.x0 + (b.tx - b.x0) * k;
+      b.y = b.y0 + (b.ty - b.y0) * k;
+      b.h = Math.sin(k * Math.PI) * 50;
+      if (k < 1) continue;
+      G.bombs.splice(i, 1);
+      const s = b.s;
+      const dmg = s.dmg * dmgMul();
+      const m = query(b.x, b.y, s.radius + 70);
+      for (let q = 0; q < m; q++) {
+        const e = qbuf[q];
+        const dx = e.x - b.x;
+        const dy = e.y - b.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d > s.radius + e.r) continue;
+        hurtEnemy(e, dmg, (dx / d) * 200, (dy / d) * 200);
+      }
+      cleanCircle(b.x, b.y, s.radius, s.power);
+      G.blasts.push({ x: b.x, y: b.y, r: s.radius, life: 0.3, max: 0.3, evo: b.evo });
+      for (let q = 0; q < 10; q++) addPart(b.x, b.y, rand(-160, 160), rand(-160, 160), 0.5, rand(3, 6), b.evo ? '#ffd1f0' : '#d8f4ff', 'dot');
+      if (b.evo) G.zones.push({ kind: 'foam', x: b.x, y: b.y, r: s.foamR, life: s.foamDur, max: s.foamDur, tick: 0.2, dmg: s.foamDmg, power: 2 });
+      G.shake = Math.max(G.shake, 2);
+      Sound.play('boom');
+    }
+    for (let i = G.blasts.length - 1; i >= 0; i--) {
+      G.blasts[i].life -= dt;
+      if (G.blasts[i].life <= 0) G.blasts.splice(i, 1);
+    }
+    // スポンジ: 壁で跳ね返りながら飛び回る
+    for (let i = G.sponges.length - 1; i >= 0; i--) {
+      const b = G.sponges[i];
+      const s = b.s;
+      b.life -= dt;
+      if (b.life <= 0) {
+        G.sponges.splice(i, 1);
+        continue;
+      }
+      b.rot += dt * 6;
+      const nx = b.x + b.vx * dt;
+      const ny = b.y + b.vy * dt;
+      if (nx < s.size || nx > ROOM - s.size || isBlocked(nx, b.y)) b.vx = -b.vx;
+      else b.x = nx;
+      if (ny < s.size || ny > ROOM - s.size || isBlocked(b.x, ny)) b.vy = -b.vy;
+      else b.y = ny;
+      // 主人公から離れすぎたら、主人公の方へ跳ね返る
+      if (Math.hypot(b.x - p.x, b.y - p.y) > 420) {
+        const a = Math.atan2(p.y - b.y, p.x - b.x) + rand(-0.5, 0.5);
+        b.vx = Math.cos(a) * s.speed;
+        b.vy = Math.sin(a) * s.speed;
+      }
+      const dmg = s.dmg * dmgMul();
+      const m = query(b.x, b.y, s.size + 70);
+      for (let k = 0; k < m; k++) {
+        const e = qbuf[k];
+        if (e.spongeHit > G.time) continue;
+        const dx = e.x - b.x;
+        const dy = e.y - b.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d > s.size + e.r) continue;
+        e.spongeHit = G.time + 0.3;
+        hurtEnemy(e, dmg, (dx / d) * 80, (dy / d) * 80);
+      }
+      b.cleanT -= dt;
+      if (b.cleanT <= 0) {
+        b.cleanT = 0.06;
+        cleanCircle(b.x, b.y, s.size + 6, s.power);
+      }
+    }
+  }
+
   // 主人公が通った道のりで、dist だけ後ろの点
   function trailPoint(dist) {
     const tr = G.trail;
@@ -3708,7 +4156,7 @@
       }
       z.tick -= dt;
       if (z.tick > 0) continue;
-      z.tick = z.kind === 'vortex' ? 0.25 : 0.4;
+      z.tick = z.kind === 'vortex' ? 0.25 : z.kind === 'foam' ? 0.3 : 0.4;
       const dmg = z.dmg * dmgMul();
       const n = query(z.x, z.y, z.r + 70);
       for (let k = 0; k < n; k++) {
@@ -3716,7 +4164,7 @@
         const dx = e.x - z.x;
         const dy = e.y - z.y;
         if (dx * dx + dy * dy > (z.r + e.r) ** 2) continue;
-        const mul = z.kind !== 'vortex' && e.def.mold ? 2 : 1;
+        const mul = (z.kind === 'spray' || z.kind === 'acid') && e.def.mold ? 2 : 1;
         hurtEnemy(e, dmg * mul, 0, 0);
       }
       cleanCircle(z.x, z.y, z.kind === 'vortex' ? z.r * 0.7 : z.r, z.power);
@@ -4090,6 +4538,7 @@
     separate();
     if (G.state === 'play') {
       updateWeapons(dt);
+      updateProjectiles(dt);
       updateZones(dt);
       updateHazards(dt);
       playerContacts();
@@ -4366,6 +4815,22 @@
           ctx.arc(zn.x, zn.y, zn.r * (0.3 + k * 0.22), tm * 6 + k * 2, tm * 6 + k * 2 + 2.2);
           ctx.stroke();
         }
+      } else if (zn.kind === 'foam') {
+        // 泡: 白とピンクの泡がふくらんだりしぼんだりする
+        ctx.fillStyle = `rgba(255,240,250,${0.18 * a})`;
+        ctx.beginPath();
+        ctx.arc(zn.x, zn.y, zn.r, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255,200,235,${0.75 * a})`;
+        ctx.lineWidth = 1.5;
+        for (let k = 0; k < 9; k++) {
+          const ang = k * 2.4;
+          const rr = zn.r * (0.15 + ((k * 0.37) % 0.75));
+          const br = 4 + ((k * 3) % 5) + Math.sin(tm * 4 + k) * 1.5;
+          ctx.beginPath();
+          ctx.arc(zn.x + Math.cos(ang) * rr, zn.y + Math.sin(ang) * rr, br, 0, TAU);
+          ctx.stroke();
+        }
       } else {
         const acid = zn.kind === 'acid';
         ctx.fillStyle = acid ? `rgba(180,255,100,${0.25 * a})` : `rgba(110,235,205,${0.25 * a})`;
@@ -4506,6 +4971,7 @@
         ctx.fillStyle = '#ff6b6b';
         ctx.fillRect(e.x - e.r, e.y - e.r * 1.3 - 6, e.r * 2 * Math.max(0, e.hp / e.maxHp), 4);
       }
+      if (e.def.source && !e.flee) drawShieldBadge(e);
     }
     // 掃除機の吸引範囲
     for (const w of G.weapons) {
@@ -4576,6 +5042,98 @@
         ctx.fill();
         ctx.restore();
       }
+    }
+
+    // モップのなぎ払い
+    for (const sw of G.swings) {
+      const a = sw.life / sw.max;
+      const prog = 1 - a;
+      ctx.strokeStyle = sw.evo ? `rgba(120,230,255,${0.7 * a})` : `rgba(235,245,255,${0.6 * a})`;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 14;
+      ctx.beginPath();
+      if (sw.half >= Math.PI) {
+        ctx.arc(sw.x, sw.y, sw.r * 0.8, sw.a, sw.a + TAU * prog);
+      } else {
+        // 片側から反対側へ振り抜く
+        const from = sw.a - sw.half * sw.side;
+        const to = from + 2 * sw.half * sw.side * prog;
+        ctx.arc(sw.x, sw.y, sw.r * 0.8, Math.min(from, to), Math.max(from, to));
+      }
+      ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = `rgba(255,255,255,${0.8 * a})`;
+      ctx.stroke();
+    }
+
+    // はたき
+    for (const b of G.booms) {
+      if (!inView(b.x, b.y, 30)) continue;
+      const sz = b.s.size;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.spin);
+      ctx.strokeStyle = '#8a5a2b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-sz * 1.1, 0);
+      ctx.lineTo(0, 0);
+      ctx.stroke();
+      const cols = b.evo ? ['#ffcf4a', '#ff8ad8', '#7fc8ff'] : ['#ff9ab0', '#ffe08a', '#a8e6ff'];
+      for (let k = 0; k < 7; k++) {
+        const fa = (k / 7) * TAU;
+        ctx.fillStyle = cols[k % 3];
+        ctx.beginPath();
+        ctx.ellipse(Math.cos(fa) * sz * 0.45, Math.sin(fa) * sz * 0.45, sz * 0.55, sz * 0.25, fa, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 洗剤ボム (影と、弧を描くボトル)
+    for (const b of G.bombs) {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(b.x, b.y + 4, 8, 4, 0, 0, TAU);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(b.x, b.y - b.h);
+      ctx.rotate(b.t * 12);
+      ctx.fillStyle = b.evo ? '#ff8ad8' : '#4fb6ff';
+      ctx.beginPath();
+      ctx.roundRect(-6, -8, 12, 16, 3);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(-3, -12, 6, 5);
+      ctx.restore();
+    }
+    for (const bl of G.blasts) {
+      const a = bl.life / bl.max;
+      const r = bl.r * (1.1 - a * 0.4);
+      ctx.fillStyle = bl.evo ? `rgba(255,200,240,${0.45 * a})` : `rgba(200,240,255,${0.45 * a})`;
+      ctx.beginPath();
+      ctx.arc(bl.x, bl.y, r, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255,255,255,${0.9 * a})`;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // スポンジ
+    for (const b of G.sponges) {
+      if (!inView(b.x, b.y, 30)) continue;
+      const sz = b.s.size;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.globalAlpha = Math.min(1, b.life / 0.3);
+      ctx.fillStyle = b.evo ? '#ffcf4a' : '#f6f3ea';
+      ctx.beginPath();
+      ctx.roundRect(-sz, -sz * 0.7, sz * 2, sz * 1.4, 3);
+      ctx.fill();
+      ctx.fillStyle = b.evo ? '#ff8a5c' : '#6fd3a8';
+      ctx.fillRect(-sz, sz * 0.15, sz * 2, sz * 0.55);
+      ctx.restore();
     }
 
     // 水流
@@ -4677,6 +5235,48 @@
       if ((it.kind === 'chest' || it.kind === 'treasure') && !inView(it.x, it.y, 0)) offscreenArrow(it.x, it.y, '#ffcf4a');
     }
     drawHud(tm);
+  }
+
+  // 発生源の上に、汚れバリアの強さ (5段階) と、いま通るダメージの割合を出す
+  const SHIELD_COLORS = ['#4fe0b6', '#a6e05a', '#ffd84a', '#ffa23a', '#ff5a4a'];
+  const shieldLevel = (e) => Math.ceil(((1 - e.shield) / (1 - SHIELD_MIN)) * 5 - 0.05);
+  function drawShieldBadge(e) {
+    const lvl = clamp(shieldLevel(e), 0, 5);
+    const col = lvl ? SHIELD_COLORS[lvl - 1] : '#4fe0b6';
+    const label = lvl ? t('shieldDmg', Math.round(e.shield * 100)) : t('shieldNone');
+    ctx.font = '800 10px system-ui, sans-serif';
+    const tw = ctx.measureText(label).width;
+    const segW = 7;
+    const w = 18 + segW * 5 + 4 + tw + 8;
+    const h = 16;
+    const x = e.x - w / 2;
+    const y = e.y - e.r * 1.3 - 26;
+    ctx.fillStyle = 'rgba(20,16,12,0.78)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 8);
+    ctx.fill();
+    // 盾のマーク
+    const sx = x + 9;
+    const sy = y + 3;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(sx - 5, sy);
+    ctx.lineTo(sx + 5, sy);
+    ctx.lineTo(sx + 5, sy + 5);
+    ctx.quadraticCurveTo(sx + 4, sy + 9, sx, sy + 11);
+    ctx.quadraticCurveTo(sx - 4, sy + 9, sx - 5, sy + 5);
+    ctx.closePath();
+    ctx.fill();
+    // 5段階のゲージ。段階が上がるほど赤くなる
+    for (let k = 0; k < 5; k++) {
+      ctx.fillStyle = k < lvl ? SHIELD_COLORS[k] : 'rgba(255,255,255,0.18)';
+      ctx.fillRect(x + 17 + k * segW, y + 4 + (4 - k) * 1.2, segW - 2, 8 - (4 - k) * 1.2);
+    }
+    ctx.fillStyle = col;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + 18 + segW * 5 + 4, y + h / 2 + 0.5);
+    ctx.textBaseline = 'alphabetic';
   }
 
   function offscreenArrow(wx, wy, color) {
@@ -5005,11 +5605,18 @@
         ${completionHtml()}
         <div class="actions">
           <button type="button" class="btn primary" data-act="rooms" data-focus>${t('play')}</button>
-          <button type="button" class="btn" data-act="chars" data-arg="title">${t('cleaners')}</button>
+          <button type="button" class="btn trophy" data-act="chars" data-arg="title"><span aria-hidden="true">🏆</span> ${t('achievements')}</button>
           <button type="button" class="btn" data-act="settings" data-arg="title">${t('settings')}</button>
         </div>
       </div>`);
   }
+
+  // 画面の上の見出し。左に「‹ 戻る」(Esc でも戻る)、右は見出しを真ん中に置くための空き
+  const panelHead = (title, act, arg = '', focus = false) => `<div class="panel-head">
+      <button type="button" class="back-btn" data-act="${act}"${arg ? ` data-arg="${arg}"` : ''} data-back${focus ? ' data-focus' : ''}>‹ ${t('back')}</button>
+      <h2>${title}</h2>
+      <span class="back-btn ghost" aria-hidden="true">‹ ${t('back')}</span>
+    </div>`;
 
   const curChar = () => CHARS.find((c) => c.id === save.char && charUnlocked(c)) || CHARS[0];
   const modeTabs = (act) => `<div class="mode-tabs" role="tablist">${Object.keys(MODES).map((m) => `<button type="button" role="tab" class="mode-tab ${m}${save.mode === m ? ' on' : ''}" aria-selected="${save.mode === m}" data-act="${act}" data-arg="${m}">${L(MODES[m], 'name')}</button>`).join('')}</div>`;
@@ -5038,17 +5645,16 @@
     }).join('');
     show('rooms', `
       <div class="panel">
-        <h2>${t('stageSelect')}</h2>
+        ${panelHead(t('stageSelect'), 'title')}
         <p class="sub">${esc(t('recordOf', L(ch, 'name')))}${t('sep')}${t('coins')} <span class="coins">${save.coins}</span></p>
         ${modeTabs('mode')}
         ${hard ? `<p class="mode-note">${t('hardNote')}</p>` : ''}
         <div class="rooms">${rooms}</div>
         <div class="menu-row">
           <button type="button" class="btn small" data-act="shop">${t('skills')}</button>
-          <button type="button" class="btn small" data-act="chars" data-arg="rooms">${t('cleaners')}</button>
+          <button type="button" class="btn small" data-act="chars" data-arg="rooms"><span aria-hidden="true">🏆</span> ${t('achievements')}</button>
           <button type="button" class="btn small" data-act="zukan">${t('zukan')}</button>
           <button type="button" class="btn small" data-act="settings" data-arg="rooms">${t('settings')}</button>
-          <button type="button" class="btn small" data-act="title" data-back>${t('toTitle')}</button>
         </div>
       </div>`);
   }
@@ -5082,7 +5688,7 @@
     const modeName = L(MODES[save.mode], 'name');
     show('brief', `
       <div class="panel wide">
-        <h2>${esc(t('stageTitle', briefRoom + 1, L(r, 'name')))}</h2>
+        ${panelHead(esc(t('stageTitle', briefRoom + 1, L(r, 'name'))), 'rooms')}
         <p class="sub">${esc(L(r, 'desc'))}</p>
         ${hardUnlocked(briefRoom) ? modeTabs('briefMode') : ''}
         <div class="plan">
@@ -5096,13 +5702,13 @@
           <img src="${iconURL('treasure')}" alt="">
           <span>${found ? esc(t('treasureFoundLine', L(r.treasure, 'name'))) : esc(t('treasureHint', '★'.repeat(tRoom.danger), L(tRoom, 'name')))}${unlocks ? `<br><small>${found ? esc(t('joined', L(unlocks, 'name'))) : t('willJoin')}</small>` : ''}</span>
         </div>
+        <p class="brief-note">${esc(t('slotNote', MAX_GEARS, MAX_PASSIVES))}</p>
         <p class="brief-note">${esc(t('bossNote', L(ENEMIES.yokai, 'name'), L(ENEMIES[r.boss], 'name')))}</p>
         <div class="records"><span>${esc(L(ch, 'name'))}${t('sep')}${modeName}</span><span>${t('bestRooms', `<b>${rec.r}`, `${r.rooms.length}</b>`)}</span>${rec.t ? `<span>${t('bestClear', `<b>${fmtTime(rec.t)}</b>`)}</span>` : ''}${rec.c ? `<span><b>${t('cleared')}</b></span>` : ''}</div>
         <h3>${t('pickCleaner')}</h3>
         <div class="chars">${chars}</div>
         <div class="actions">
           <button type="button" class="btn primary" data-act="start" data-focus>${t('deploy', modeName)}</button>
-          <button type="button" class="btn" data-act="rooms" data-back>${t('back')}</button>
         </div>
       </div>`);
   }
@@ -5116,13 +5722,13 @@
     const tre = STAGES.map((st, i) => `<li class="${save.treasures[i] ? 'found' : ''}"><img src="${iconURL('treasure')}" alt=""><span><b>${save.treasures[i] ? esc(L(st.treasure, 'name')) : '？？？'}</b><br><small>${esc(t('stageTitle', i + 1, stageUnlocked(i) ? L(st, 'name') : '？？？'))}${save.treasures[i] ? `${t('sep')}${esc(L(st.treasure, 'desc'))}` : ''}</small></span></li>`).join('');
     show('chars', `
       <div class="panel wide">
-        <h2>${t('cleaners')}</h2>
+        ${panelHead(t('achievements'), charsBack, '', true)}
         ${completionHtml()}
-        <p class="sub">${t('charsSub')}</p>
+        <h3>${t('achClears')}</h3>
+        <p class="sub left">${t('charsSub')}</p>
         <div class="chars">${list}</div>
         <h3>${t('treasures', save.treasures.filter(Boolean).length, STAGES.length)}</h3>
         <ul class="treasure-list">${tre}</ul>
-        <div class="actions"><button type="button" class="btn" data-act="${charsBack}" data-back data-focus>${t('back')}</button></div>
       </div>`);
   }
 
@@ -5141,13 +5747,13 @@
     for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (peekRec(c.id, i, m).c) n++;
     show('charRec', `
       <div class="panel wide">
+        ${panelHead(t('achievements'), 'chars', '', true)}
         <div class="rec-head"><img src="${charThumb(c.id, !ok)}" alt=""><div><h2>${ok ? esc(L(c, 'name')) : '？？？'}</h2>
         <p class="sub">${esc(ok ? traitText(c) : unlockText(c))}</p></div></div>
         <p class="sub">${t('clears', n, STAGES.length * 2)}</p>
         <div class="rec-wrap"><table class="rec-table"><thead><tr><th>${t('stage')}</th><th>${L(MODES.normal, 'name')}</th><th>${L(MODES.hard, 'name')}</th></tr></thead><tbody>${rows}</tbody></table></div>
         <div class="actions">
           ${ok ? `<button type="button" class="btn primary" data-act="pickChar" data-arg="${c.id}">${t('useCleaner')}</button>` : ''}
-          <button type="button" class="btn" data-act="chars" data-back data-focus>${t('back')}</button>
         </div>
       </div>`);
   }
@@ -5252,8 +5858,8 @@
     const opts = [];
     for (const w of G.weapons) if (!w.evo && w.lv < MAX_WEAPON_LV) opts.push({ kind: 'w', id: w.id });
     for (const id of Object.keys(G.passives)) if (G.passives[id] < PASSIVES[id].max) opts.push({ kind: 'p', id });
-    if (G.weapons.length < MAX_SLOTS) for (const id of WEAPON_IDS) if (!G.weapons.some((w) => w.id === id)) opts.push({ kind: 'w', id, isNew: true });
-    if (Object.keys(G.passives).length < MAX_SLOTS) for (const id of PASSIVE_IDS) if (!G.passives[id]) opts.push({ kind: 'p', id, isNew: true });
+    if (G.weapons.length < MAX_GEARS) for (const id of WEAPON_IDS) if (!G.weapons.some((w) => w.id === id)) opts.push({ kind: 'w', id, isNew: true });
+    if (Object.keys(G.passives).length < MAX_PASSIVES) for (const id of PASSIVE_IDS) if (!G.passives[id]) opts.push({ kind: 'p', id, isNew: true });
     const n = 3 + save.shop.choices;
     if (!opts.length) return [{ kind: 'heal' }, { kind: 'coin' }];
     return shuffle(opts).slice(0, n);
@@ -5299,7 +5905,7 @@
       <div class="panel reward">
         <p class="reward-title">LEVEL UP!</p>
         <p class="lv-badge">Lv ${G.level - G.pendingLv}</p>
-        <p class="sub">${t('pickOne')}</p>
+        <p class="sub">${t('pickOne')}<br><span class="slots">${t('slots', G.weapons.length, MAX_GEARS, Object.keys(G.passives).length, MAX_PASSIVES)}</span></p>
         <div class="cards">${cards}</div>
         ${G.rerolls > 0 ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button></div>` : ''}
       </div>`, false, { kind: 'level', lock: 450 });
@@ -5499,10 +6105,9 @@
     }).join('');
     show('shop', `
       <div class="panel">
-        <h2>${t('skills')}</h2>
+        ${panelHead(t('skills'), 'rooms', '', true)}
         <p class="sub">${t('coins')} <span class="coins">${save.coins}</span>${t('sep')}${t('shopSub')}</p>
         <div class="shop">${items}</div>
-        <div class="actions"><button type="button" class="btn" data-act="rooms" data-back data-focus>${t('back')}</button></div>
       </div>`);
   }
 
@@ -5525,10 +6130,9 @@
     }).join('');
     show('zukan', `
       <div class="panel wide">
-        <h2>${t('zukan')}</h2>
+        ${panelHead(t('zukan'), 'rooms', '', true)}
         <p class="sub">${seen} / ${ENEMY_ORDER.length}</p>
         <div class="zukan">${list}</div>
-        <div class="actions"><button type="button" class="btn" data-act="rooms" data-back data-focus>${t('back')}</button></div>
       </div>`);
   }
 
@@ -5547,9 +6151,8 @@
     rerender = () => showSettings();
     show('settings', `
       <div class="panel">
-        <h2>${t('settings')}</h2>
+        ${panelHead(t('settings'), settingsBack, '', true)}
         ${settingsHtml()}
-        <div class="actions"><button type="button" class="btn" data-act="${settingsBack}" data-back data-focus>${t('back')}</button></div>
       </div>`);
   }
 
@@ -5645,5 +6248,15 @@
   showTitle();
 
   // テスト用 (ブラウザのコンソールから状態を見る)
-  window.__cs = { get G() { return G; }, save, step: (dt) => G && !G.paused && overlay.hidden && update(dt) };
+  window.__cs = {
+    get G() { return G; },
+    save,
+    step: (dt) => G && !G.paused && overlay.hidden && update(dt),
+    give: (id, lv = 1, evo = false) => {
+      const w = G.weapons.find((x) => x.id === id) || addWeapon(id);
+      w.lv = lv;
+      w.evo = evo;
+      recalcStats();
+    },
+  };
 })();

@@ -205,6 +205,33 @@ body {
 .panel.bare { background: transparent; border: 0; box-shadow: none; text-align: center; }
 
 .panel h2 { margin: 0 0 4px; font-size: 1.35rem; text-align: center; }
+/* 画面上の見出し: 左に「‹ 戻る」、見出しは真ん中 */
+.panel-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; margin: -6px -6px 6px; }
+.panel-head h2 { margin: 0; overflow-wrap: anywhere; }
+.back-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--panel-2);
+  color: var(--panel-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.back-btn:hover, .back-btn:focus-visible { border-color: var(--mint); outline: none; }
+.back-btn.ghost { visibility: hidden; }
+@media (max-width: 480px) {
+  /* 狭い画面では右の空きをなくして、見出しに場所をゆずる */
+  .panel-head { grid-template-columns: auto minmax(0, 1fr); }
+  .panel-head h2 { font-size: 1.15rem; text-align: left; }
+  .back-btn.ghost { display: none; }
+}
+.slots { display: inline-block; margin-top: 4px; padding: 1px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); font-size: 0.8rem; font-weight: 700; }
+.sub.left { text-align: left; margin-bottom: 8px; }
+.btn.trophy { border-color: rgba(255, 207, 74, 0.55); color: var(--gold); }
+
 .panel h3 { margin: 16px 0 8px; font-size: 0.95rem; color: var(--panel-muted); }
 .sub { margin: 0 0 14px; color: var(--panel-muted); font-size: 0.88rem; text-align: center; }
 
