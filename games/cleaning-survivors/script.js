@@ -634,7 +634,7 @@
       play: 'はじめる',
       cleaners: '清掃員',
       achievements: '実績',
-      achClears: '清掃員ごとのクリア状況',
+      achClears: '清掃員ごとのクリア状況 (おまけ)',
       settings: '設定',
       stageSelect: 'ステージを選ぶ',
       recordOf: (name) => `${name} の記録`,
@@ -667,7 +667,7 @@
       pickCleaner: '出撃する清掃員',
       deploy: (mode) => `${mode}で出撃!`,
       back: '戻る',
-      charsSub: '清掃員を選ぶと、ステージ・モードごとのクリア状況が見られる',
+      charsSub: '達成率には入らない、やりこみ用の記録。清掃員を選ぶと、ステージ・モードごとのクリア状況が見られる',
       treasures: (a, b) => `宝物 (${a}/${b})`,
       roomsCell: (r, n) => `${r}/${n}部屋`,
       clears: (a, b) => `クリア ${a}/${b}`,
@@ -768,7 +768,7 @@
       play: 'Play',
       cleaners: 'Cleaners',
       achievements: 'Achievements',
-      achClears: 'Clears by cleaner',
+      achClears: 'Clears by cleaner (bonus)',
       settings: 'Settings',
       stageSelect: 'Select a Stage',
       recordOf: (name) => `${name}'s records`,
@@ -801,7 +801,7 @@
       pickCleaner: 'Choose your cleaner',
       deploy: (mode) => `Start (${mode})`,
       back: 'Back',
-      charsSub: 'Select a cleaner to see their clears for each stage and mode',
+      charsSub: 'Extra records for completionists; they don\'t count toward completion. Select a cleaner to see their clears for each stage and mode',
       treasures: (a, b) => `Treasures (${a}/${b})`,
       roomsCell: (r, n) => `${r}/${n} rooms`,
       clears: (a, b) => `Clears ${a}/${b}`,
@@ -950,12 +950,13 @@
   const hardUnlocked = (i) => TEST_UNLOCK || stageCleared(i, 'normal');
   const charUnlocked = (c) => TEST_UNLOCK || c.unlock < 0 || save.treasures[c.unlock];
 
-  // 達成率 = (清掃員ごとの各ステージ・各モードのクリア + 宝物) ÷ その総数
+  // 達成率 = (各ステージ・各モードのクリア + 宝物) ÷ その総数。クリアはどの清掃員でもよい
+  // (清掃員ごとのクリア状況は、実績画面のおまけとして見せるだけで達成率には入れない)
   function completion() {
     let clears = 0;
-    for (const c of CHARS) for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (peekRec(c.id, i, m).c) clears++;
+    for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (stageCleared(i, m)) clears++;
     const tre = save.treasures.filter(Boolean).length;
-    const clearTotal = CHARS.length * STAGES.length * Object.keys(MODES).length;
+    const clearTotal = STAGES.length * Object.keys(MODES).length;
     return { pct: ((clears + tre) / (clearTotal + STAGES.length)) * 100, clears, clearTotal, tre, treTotal: STAGES.length };
   }
 
