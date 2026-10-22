@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>おそうじサバイバー</title>
+  <meta name="description" content="押し寄せるゴミと汚れを、清掃ギアで一気に片付けるヴァンサバ風アクション。10分間生き残るか、部屋をピカピカにしよう。" />
+  <link rel="icon" href="../../assets/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../">‹ ゲーム一覧</a>
+      <h1>おそうじサバイバー</h1>
+      <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" tabindex="-1" style="visibility: hidden">Ⅱ</button>
+    </header>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="ゲーム画面"></canvas>
+      <button type="button" id="bomb-btn" class="bomb-btn" tabindex="-1" hidden>
+        <span class="bomb-name">ゴミ圧縮</span><span class="bomb-key">Space</span>
+      </button>
+      <div class="overlay" id="overlay" hidden></div>
+    </div>
+
+    <section class="help">
+      <h2>遊び方</h2>
+      <p>ゴミ屋敷に押し寄せるゴミや汚れを、清掃ギアで片付けながら 10分間 生き残るゲームです。操作するのは移動だけで、清掃ギアは自動で動きます。片付けたゴミはダストを落とし、拾うと経験値になります。レベルアップしたら、新しい清掃ギアやパッシブを1つ選んで強くなりましょう。部屋の「清掃度」を 100% にしても勝ちです。</p>
+
+      <h3>床の汚れ</h3>
+      <p>床は汚れていて、汚れがひどいほど歩くのが遅くなります。清掃ギアが通った床はきれいになり、ピカピカになった床の上では速く歩けて、ダストを拾える範囲も広がります。汚れは少しずつ広がり、ゴミが歩いた場所も汚れます。</p>
+
+      <h3>ダストボックスとゴミ圧縮</h3>
+      <p>拾ったダストはダストボックスに溜まります。満タンになると清掃ギアの攻撃力が下がるので、部屋の4か所にあるゴミ捨て場に立って空にしましょう (コインがもらえます)。ダストボックスが半分以上溜まっていれば、「ゴミ圧縮」で中身を使って画面内のゴミにまとめて大ダメージを与えられます。</p>
+
+      <h3>進化</h3>
+      <p>清掃ギアをレベル8にして、対応するパッシブを持った状態で宝箱を開けると、清掃ギアが進化します。宝箱は金色のふちのゴミや、中ボス・ボスが落とします。</p>
+      <table>
+        <tbody>
+          <tr><th>超強力掃除機 + バッテリー増設</th><td>ブラックホール掃除機</td></tr>
+          <tr><th>高圧洗浄機 + 温水ボイラー</th><td>超高温スチームカノン</td></tr>
+          <tr><th>お掃除ロボット + ルンバ増設</th><td>お掃除ロボ軍団</td></tr>
+          <tr><th>除菌スプレー + 強力漂白剤</th><td>酸性雨ミスト</td></tr>
+          <tr><th>コロコロ + 超強力粘着テープ</th><td>巨大圧雪ローラー</td></tr>
+        </tbody>
+      </table>
+
+      <h3>スマホの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>画面に指を置いて動かす</th><td>移動 (指を置いた場所がスティックの中心になります)</td></tr>
+          <tr><th>「ゴミ圧縮」ボタン</th><td>ゴミ圧縮</td></tr>
+          <tr><th>右上の Ⅱ</th><td>一時停止</td></tr>
+        </tbody>
+      </table>
+
+      <h3>パソコンの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>WASD / 矢印キー</th><td>移動</td></tr>
+          <tr><th>スペース</th><td>ゴミ圧縮</td></tr>
+          <tr><th>P / Esc</th><td>一時停止 (メニューでは Esc で戻る)</td></tr>
+          <tr><th>1〜4</th><td>レベルアップの候補を選ぶ</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>&copy; tools.e-seventh.com</footer>
+
+  <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
+  <script src="../origami-intro.js"></script>
+  <script>OrigamiIntro.play();</script>
+  <script src="script.js?v=1"></script>
+</body>
+</html>
