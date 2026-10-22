@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>STRIKE LANE</title>
+  <meta name="description" content="スワイプで投げる3Dボウリング。ピンは物理演算で倒れます。10フレームの本格スコアでハイスコアを目指そう。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../">‹ ゲーム一覧</a>
+      <h1>STRIKE LANE</h1>
+      <button type="button" id="sound-btn" class="icon-btn" aria-label="効果音" aria-pressed="true">♪</button>
+    </header>
+
+    <div class="sheet" id="sheet" aria-label="スコアシート"></div>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="ゲーム画面"></canvas>
+
+      <div class="hud" id="hud">
+        <p class="hud-frame" id="hud-frame"></p>
+        <p class="hud-speed" id="hud-speed"></p>
+      </div>
+      <div class="power" id="power" hidden><span id="power-fill"></span></div>
+      <p class="hint" id="hint"></p>
+      <p class="callout" id="callout" aria-live="polite"></p>
+
+      <div class="overlay" id="overlay">
+        <div class="title-screen" id="title-screen">
+          <p class="game-logo"><span class="logo-strike">STRIKE</span><span class="logo-lane">LANE</span></p>
+          <p class="game-kana">ストライク・レーン</p>
+          <p class="overlay-text" id="overlay-text">上にスワイプして投げよう</p>
+        </div>
+        <div class="overlay-actions">
+          <button type="button" class="start-btn" id="start-btn">ゲームスタート</button>
+          <p class="best" id="best"></p>
+        </div>
+      </div>
+
+      <p class="load-error" id="load-error" hidden>3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。</p>
+    </div>
+
+    <section class="help">
+      <h2>遊び方</h2>
+      <p>10フレームで、できるだけ多くのピンを倒すボウリングです。1フレームに2回まで投げられ、1投目で10本すべて倒すとストライク、2投目までに倒しきるとスペアです。ピンは物理演算で動くので、当たる角度によって倒れ方が毎回変わります。</p>
+
+      <h3>スマホの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>左右になぞる</th><td>投げる位置を動かす</td></tr>
+          <tr><th>上にスワイプ</th><td>投げる。速くはじくほどボールが速くなり、斜めにはじくと斜めに転がります</td></tr>
+          <tr><th>弧を描いてスワイプ</th><td>カーブ (フック) がかかります。最後に左へ曲げると、ボールも奥で左へ曲がります</td></tr>
+        </tbody>
+      </table>
+
+      <h3>パソコンの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>マウスでドラッグ</th><td>スマホと同じ (左右で位置、上へはじいて投げる)</td></tr>
+          <tr><th>← →</th><td>投げる位置を動かす</td></tr>
+          <tr><th>A / D</th><td>投げる向きを変える</td></tr>
+          <tr><th>Q / E</th><td>カーブの向きと強さを変える</td></tr>
+          <tr><th>スペースを押して離す</th><td>押している間にパワーがたまり、離すと投げる</td></tr>
+        </tbody>
+      </table>
+
+      <h3>スコアの数え方</h3>
+      <p>ストライクのフレームは、10本に次の2投で倒した本数を足します。スペアのフレームは、10本に次の1投で倒した本数を足します。10フレーム目でストライクかスペアを取ると、3投目を投げられます。全部ストライクなら300点です。</p>
+      <table>
+        <tbody>
+          <tr><th>X</th><td>ストライク</td></tr>
+          <tr><th>/</th><td>スペア</td></tr>
+          <tr><th>-</th><td>1本も倒れなかった投球 (ミス・ガター)</td></tr>
+          <tr><th>赤い数字</th><td>スプリット (ヘッドピンが倒れて、残りのピンが離れて残った状態)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ちょっとしたコツ</h3>
+      <p>レーンの手前に並ぶ7つの三角はスパットです。まっすぐ転がすより、少し右から投げて1番ピンと3番ピンの間 (ポケット) に左カーブで入れると、ストライクが出やすくなります。</p>
+    </section>
+  </main>
+
+  <footer>&copy; tools.e-seventh.com</footer>
+
+  <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
+  <script src="../origami-intro.js"></script>
+  <script>OrigamiIntro.play();</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+  <script src="script.js?v=1"></script>
+</body>
+</html>

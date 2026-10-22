@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <!-- ゲーム一覧 (games/index.html) のタイル画像。レーンを手前から見た構図 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c0e18"/>
+      <stop offset="1" stop-color="#1b1838"/>
+    </linearGradient>
+    <linearGradient id="lane" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c99a5e"/>
+      <stop offset="1" stop-color="#e2b57a"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="0.38" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#6d8dff"/>
+      <stop offset="0.5" stop-color="#2b3f99"/>
+      <stop offset="1" stop-color="#121a45"/>
+    </radialGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#fff6d8" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#fff6d8" stop-opacity="0"/>
+    </radialGradient>
+    <symbol id="pin" viewBox="0 0 10 30">
+      <path d="M5 0c2 0 2.6 2 2.4 4-.2 1.6-1.2 2.8-1.2 4.4 0 2.6 3.6 6 3.6 11 0 4-1.4 8.2-2.2 10.6H2.4C1.6 27.6.2 23.4.2 19.4c0-5 3.6-8.4 3.6-11C3.8 6.8 2.8 5.6 2.6 4 2.4 2 3 0 5 0z" fill="#f7f5ef"/>
+      <rect x="3.3" y="8.6" width="3.4" height="0.9" fill="#c8261c"/>
+      <rect x="3.1" y="10.2" width="3.8" height="0.9" fill="#c8261c"/>
+    </symbol>
+  </defs>
+  <rect width="320" height="200" fill="url(#bg)"/>
+  <!-- マスキング -->
+  <rect x="112" y="40" width="96" height="22" rx="2" fill="#25205a" stroke="#ff5e7a" stroke-width="1.5"/>
+  <text x="160" y="56" font-family="Arial Black, sans-serif" font-size="12" font-weight="900" fill="#ffd25e" text-anchor="middle">7</text>
+  <!-- ガターとレーン -->
+  <path d="M128 78 L192 78 L300 200 L20 200 Z" fill="#2b2f3d"/>
+  <path d="M136 78 L184 78 L262 200 L58 200 Z" fill="url(#lane)"/>
+  <g stroke="#9c6b36" stroke-opacity="0.35" stroke-width="0.7">
+    <path d="M144 78 L84 200M152 78 L120 200M160 78 L160 200M168 78 L200 200M176 78 L236 200"/>
+  </g>
+  <!-- スパット -->
+  <g fill="#5a2f14">
+    <path d="M105 160 l4 -8 l4 8z"/><path d="M128 154 l4 -8 l4 8z"/><path d="M156 148 l4 -8 l4 8z"/>
+    <path d="M184 154 l4 -8 l4 8z"/><path d="M207 160 l4 -8 l4 8z"/>
+  </g>
+  <!-- ピン -->
+  <ellipse cx="160" cy="80" rx="46" ry="16" fill="url(#glow)"/>
+  <use href="#pin" x="141" y="62" width="7" height="20"/>
+  <use href="#pin" x="149" y="62" width="7" height="20"/>
+  <use href="#pin" x="164" y="62" width="7" height="20"/>
+  <use href="#pin" x="172" y="62" width="7" height="20"/>
+  <use href="#pin" x="145" y="66" width="8" height="22"/>
+  <use href="#pin" x="156" y="66" width="8" height="22"/>
+  <use href="#pin" x="167" y="66" width="8" height="22"/>
+  <use href="#pin" x="150" y="70" width="9" height="24"/>
+  <use href="#pin" x="161" y="70" width="9" height="24"/>
+  <use href="#pin" x="155" y="74" width="10" height="27"/>
+  <!-- ボール -->
+  <ellipse cx="176" cy="191" rx="26" ry="6" fill="#000" opacity="0.3"/>
+  <circle cx="176" cy="166" r="26" fill="url(#ball)"/>
+  <circle cx="168" cy="156" r="3" fill="#05060a"/><circle cx="178" cy="156" r="3" fill="#05060a"/><circle cx="173" cy="165" r="3.4" fill="#05060a"/>
+  <text x="18" y="30" font-family="Arial Black, sans-serif" font-size="20" font-weight="900" fill="#f6f1e6">STRIKE <tspan fill="#ffc24a">LANE</tspan></text>
+</svg>
