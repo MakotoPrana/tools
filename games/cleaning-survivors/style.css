@@ -280,6 +280,12 @@ body {
 .room-list b { min-width: 6em; }
 .room-list span { color: var(--panel-muted); }
 .room-list .bonus { color: var(--mint); margin-left: auto; }
+.room-list .danger { letter-spacing: 0.05em; }
+.room-list .danger.d1 { color: #9fe3c8; }
+.room-list .danger.d2 { color: #d8f08a; }
+.room-list .danger.d3 { color: #ffcf4a; }
+.room-list .danger.d4 { color: #ff9a4a; }
+.room-list .danger.d5 { color: #ff5a5a; }
 .brief-note { margin: 10px 0 6px; font-size: 0.82rem; color: var(--panel-muted); text-align: center; }
 
 /* レベルアップ */

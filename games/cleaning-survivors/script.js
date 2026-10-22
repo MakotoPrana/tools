@@ -1,6 +1,6 @@
 /*
  * おそうじサバイバー
- *   押し寄せるゴミと汚れを、自動で動く清掃ギアで片付けながら10分間生き残るヴァンサバ風アクション。
+ *   押し寄せるゴミと汚れを、自動で動く清掃ギアで片付けながら、10分以内に家じゅうの部屋をピカピカにするヴァンサバ風アクション。
  *   仕様は SPEC.md を参照。
  */
 (() => {
@@ -18,7 +18,7 @@
   const CELL = 64; // 当たり判定の空間ハッシュ
   const GN = Math.ceil(ROOM / CELL);
   const GAME_TIME = 600; // 10分
-  const ROOM_DONE = 0.95; // 部屋の清掃が完了する、きれいな床の割合
+  const ROOM_DONE = 0.9; // 部屋の清掃が完了する、きれいな床の割合
   const MAX_ENEMIES = 400;
   const MAX_GEMS = 300;
   const MAX_PARTICLES = 700;
@@ -176,12 +176,27 @@
     heal: '体力が全回復',
   };
 
-  // 発生源から湧きやすいゴミ (書いていないゴミは 0.25 倍)
+  // 部屋の汚れレベル (★1〜5)。高いほど汚れがキツく、ゴミが多くて強い
+  //   density: 湧く量 / hp・dmg・speed: ゴミの HP・接触ダメージ・速さ / src: 発生源の HP / dirt: 最初の汚れ方
+  //   upgrade: 落とすダストが一段大きくなる確率 / elite: 金色のふちのゴミになる確率 / types: 湧くゴミ
+  const DANGER = [
+    null,
+    { density: 0.6, hp: 0.8, dmg: 0.8, speed: 1, src: 0.7, dirt: -0.35, upgrade: 0, elite: 0, types: ['dust', 'hair', 'paper'] },
+    { density: 0.9, hp: 1, dmg: 1, speed: 1, src: 1, dirt: -0.15, upgrade: 0.05, elite: 0, types: ['dust', 'hair', 'paper', 'can'] },
+    { density: 1.4, hp: 1.6, dmg: 1.6, speed: 1.05, src: 1.3, dirt: 0.05, upgrade: 0.2, elite: 0, types: ['dust', 'hair', 'paper', 'can', 'grease', 'bottle', 'spore'] },
+    { density: 2.2, hp: 2.6, dmg: 2.4, speed: 1.12, src: 1.8, dirt: 0.2, upgrade: 0.4, elite: 0.01, types: ['dust', 'hair', 'paper', 'can', 'grease', 'bottle', 'spore', 'bag'] },
+    { density: 3, hp: 4, dmg: 3.2, speed: 1.2, src: 2.5, dirt: 0.3, upgrade: 0.6, elite: 0.03, types: ['dust', 'hair', 'paper', 'can', 'grease', 'bottle', 'spore', 'bag'] },
+  ];
+  const TYPE_WEIGHT = { dust: 6, hair: 2.5, paper: 3, can: 1.1, grease: 0.6, bottle: 0.8, spore: 0.7, bag: 0.45 };
+  const stars = (d) => '★'.repeat(d) + '☆'.repeat(5 - d);
+  const DANGER_COLOR = [null, '#9fe3c8', '#d8f08a', '#ffcf4a', '#ff9a4a', '#ff5a5a'];
+
+  // 発生源から湧きやすいゴミ (書いていないゴミは 0.25 倍)。main はどの汚れレベルでも湧く得意なゴミ
   const SOURCE_MIX = {
-    pile: { dust: 1.5, hair: 1, paper: 1.5, can: 1, bag: 1 },
-    drain: { grease: 4, hair: 2, dust: 0.6 },
-    nest: { spore: 4, dust: 1, hair: 0.5 },
-    boxes: { paper: 2, can: 1.5, bottle: 1.5, dust: 0.6 },
+    pile: { dust: 1.5, hair: 1, paper: 1.5, can: 1, bag: 1, main: 'paper' },
+    drain: { grease: 4, hair: 2, dust: 0.6, main: 'grease' },
+    nest: { spore: 4, dust: 1, hair: 0.5, main: 'spore' },
+    boxes: { paper: 2, can: 1.5, bottle: 1.5, dust: 0.6, main: 'can' },
   };
 
   // 間取りは 40×40 マス (1マス = BLOCK px)。rect: [x, y, 幅, 高さ]。部屋の境目は壁になり、doors の組み合わせの間にドアを開ける
@@ -189,64 +204,64 @@
     {
       name: 'ゴミ屋敷の1階', desc: 'リビングまわり。ホコリ・紙くず・空き缶が中心。', dirt: [74, 64, 52], weights: {}, spawnMul: 1, hpMul: 1, growth: 1, boss: 'kaiju',
       rooms: [
-        { id: 'genkan', name: '玄関', rect: [24, 28, 16, 12], floor: 'stone', bonus: 'speed', src: ['pile'] },
-        { id: 'rouka', name: '廊下', rect: [24, 20, 16, 8], floor: 'wood', bonus: 'magnet', src: ['pile'] },
-        { id: 'living', name: 'リビング', rect: [0, 0, 24, 24], floor: 'wood', bonus: 'hp', src: ['pile', 'pile'] },
-        { id: 'washitsu', name: '和室', rect: [24, 0, 16, 20], floor: 'tatami', bonus: 'regen', src: ['pile'] },
-        { id: 'dining', name: 'ダイニング', rect: [0, 24, 24, 16], floor: 'wood', bonus: 'might', src: ['pile', 'boxes'] },
+        { id: 'genkan', name: '玄関', rect: [24, 28, 16, 12], floor: 'stone', bonus: 'speed', danger: 1, src: ['pile'] },
+        { id: 'rouka', name: '廊下', rect: [24, 20, 16, 8], floor: 'wood', bonus: 'magnet', danger: 1, src: ['pile'] },
+        { id: 'living', name: 'リビング', rect: [0, 0, 24, 24], floor: 'wood', bonus: 'hp', danger: 4, src: ['pile', 'pile', 'boxes'] },
+        { id: 'washitsu', name: '和室', rect: [24, 0, 16, 20], floor: 'tatami', bonus: 'regen', danger: 2, src: ['pile'] },
+        { id: 'dining', name: 'ダイニング', rect: [0, 24, 24, 16], floor: 'wood', bonus: 'might', danger: 3, src: ['pile', 'boxes'] },
       ],
       doors: [['genkan', 'rouka'], ['rouka', 'washitsu'], ['rouka', 'living'], ['rouka', 'dining'], ['living', 'dining']],
       start: 'genkan',
       dumps: [['rouka', 0.5, 0.5], ['living', 0.3, 0.3]],
     },
     {
-      name: '呪われた台所', desc: '油汚れと生ゴミが多い。排水口から油汚れが湧き、床がすぐドロドロに戻る。', dirt: [112, 86, 24], weights: { grease: 3, bag: 2 }, spawnMul: 1.05, hpMul: 1.15, growth: 1.7, boss: 'kaiju',
+      name: '呪われた台所', desc: '油汚れと生ゴミが多い。排水口から油汚れが湧き、床がすぐドロドロに戻る。', dirt: [112, 86, 24], weights: { grease: 3, bag: 2 }, spawnMul: 1.15, hpMul: 1.25, growth: 1.7, boss: 'kaiju',
       rooms: [
-        { id: 'rouka', name: '廊下', rect: [0, 16, 40, 7], floor: 'wood', bonus: 'magnet', src: ['pile'] },
-        { id: 'dining', name: 'ダイニング', rect: [0, 0, 22, 16], floor: 'wood', bonus: 'might', src: ['pile', 'pile'] },
-        { id: 'kitchen', name: 'キッチン', rect: [22, 0, 18, 16], floor: 'kitchen', bonus: 'heal', src: ['drain', 'drain'] },
-        { id: 'pantry', name: 'パントリー', rect: [0, 23, 14, 17], floor: 'concrete', bonus: 'box', src: ['boxes'], boxes: 5 },
-        { id: 'laundry', name: '洗濯室', rect: [14, 23, 14, 17], floor: 'bath', bonus: 'area', src: ['drain'] },
-        { id: 'katte', name: '勝手口', rect: [28, 23, 12, 17], floor: 'stone', bonus: 'speed', src: ['pile'] },
+        { id: 'rouka', name: '廊下', rect: [0, 16, 40, 7], floor: 'wood', bonus: 'magnet', danger: 2, src: ['pile'] },
+        { id: 'dining', name: 'ダイニング', rect: [0, 0, 22, 16], floor: 'wood', bonus: 'might', danger: 3, src: ['pile', 'pile'] },
+        { id: 'kitchen', name: 'キッチン', rect: [22, 0, 18, 16], floor: 'kitchen', bonus: 'heal', danger: 5, src: ['drain', 'drain', 'pile'] },
+        { id: 'pantry', name: 'パントリー', rect: [0, 23, 14, 17], floor: 'concrete', bonus: 'box', danger: 3, src: ['boxes', 'boxes'], boxes: 5 },
+        { id: 'laundry', name: '洗濯室', rect: [14, 23, 14, 17], floor: 'bath', bonus: 'area', danger: 2, src: ['drain'] },
+        { id: 'katte', name: '勝手口', rect: [28, 23, 12, 17], floor: 'stone', bonus: 'speed', danger: 1, src: ['pile'] },
       ],
       doors: [['rouka', 'dining'], ['rouka', 'kitchen'], ['dining', 'kitchen'], ['rouka', 'pantry'], ['rouka', 'laundry'], ['rouka', 'katte']],
       start: 'katte',
       dumps: [['rouka', 0.2, 0.5], ['rouka', 0.8, 0.5]],
     },
     {
-      name: 'カビだらけの水まわり', desc: 'カビの胞子が多い。浴室の床は滑る。', dirt: [52, 78, 50], weights: { spore: 3.5 }, spawnMul: 1.1, hpMul: 1.3, growth: 1.3, boss: 'kaiju',
+      name: 'カビだらけの水まわり', desc: 'カビの胞子が多い。浴室の床は滑る。', dirt: [52, 78, 50], weights: { spore: 2.5 }, spawnMul: 1.2, hpMul: 1.35, growth: 1.3, boss: 'kaiju',
       rooms: [
-        { id: 'rouka', name: '廊下', rect: [16, 0, 8, 40], floor: 'wood', bonus: 'magnet', src: ['pile'] },
-        { id: 'bath', name: '浴室', rect: [24, 0, 16, 22], floor: 'bath', bonus: 'cd', src: ['nest', 'nest'], slippery: true },
-        { id: 'datsui', name: '脱衣所', rect: [24, 22, 16, 18], floor: 'wood', bonus: 'regen', src: ['nest'] },
-        { id: 'toilet', name: 'トイレ', rect: [0, 0, 16, 14], floor: 'bath', bonus: 'armor', src: ['drain'] },
-        { id: 'senmen', name: '洗面所', rect: [0, 14, 16, 26], floor: 'bath', bonus: 'area', src: ['nest', 'drain'] },
+        { id: 'rouka', name: '廊下', rect: [16, 0, 8, 40], floor: 'wood', bonus: 'magnet', danger: 1, src: ['pile'] },
+        { id: 'bath', name: '浴室', rect: [24, 0, 16, 22], floor: 'bath', bonus: 'cd', danger: 5, src: ['nest', 'nest', 'nest'], slippery: true },
+        { id: 'datsui', name: '脱衣所', rect: [24, 22, 16, 18], floor: 'wood', bonus: 'regen', danger: 3, src: ['nest', 'nest'] },
+        { id: 'toilet', name: 'トイレ', rect: [0, 0, 16, 14], floor: 'bath', bonus: 'armor', danger: 2, src: ['drain'] },
+        { id: 'senmen', name: '洗面所', rect: [0, 14, 16, 26], floor: 'bath', bonus: 'area', danger: 3, src: ['nest', 'drain'] },
       ],
       doors: [['rouka', 'bath'], ['rouka', 'datsui'], ['rouka', 'toilet'], ['rouka', 'senmen'], ['bath', 'datsui']],
       start: 'rouka',
       dumps: [['rouka', 0.5, 0.25], ['datsui', 0.5, 0.6]],
     },
     {
-      name: '開かずの物置と2階', desc: '物置と納戸は段ボールだらけで通路が狭い。', dirt: [70, 62, 52], weights: { paper: 1.5, bag: 1.5 }, spawnMul: 1.15, hpMul: 1.45, growth: 1.2, boss: 'kaiju',
+      name: '開かずの物置と2階', desc: '物置と納戸は段ボールだらけで通路が狭い。', dirt: [70, 62, 52], weights: { paper: 1.5, bag: 1.5 }, spawnMul: 1.3, hpMul: 1.55, growth: 1.2, boss: 'kaiju',
       rooms: [
-        { id: 'kids', name: '子ども部屋', rect: [0, 0, 24, 14], floor: 'wood', bonus: 'speed', src: ['pile', 'boxes'] },
-        { id: 'study', name: '書斎', rect: [24, 0, 16, 26], floor: 'carpet', bonus: 'might', src: ['boxes'] },
-        { id: 'hall', name: '階段ホール', rect: [0, 14, 24, 12], floor: 'wood', bonus: 'heal', src: ['pile'] },
-        { id: 'storage', name: '物置', rect: [0, 26, 22, 14], floor: 'concrete', bonus: 'box', src: ['boxes', 'boxes'], boxes: 14 },
-        { id: 'nando', name: '納戸', rect: [22, 26, 18, 14], floor: 'concrete', bonus: 'armor', src: ['boxes'], boxes: 10 },
+        { id: 'kids', name: '子ども部屋', rect: [0, 0, 24, 14], floor: 'wood', bonus: 'speed', danger: 2, src: ['pile'] },
+        { id: 'study', name: '書斎', rect: [24, 0, 16, 26], floor: 'carpet', bonus: 'might', danger: 3, src: ['boxes', 'pile'] },
+        { id: 'hall', name: '階段ホール', rect: [0, 14, 24, 12], floor: 'wood', bonus: 'heal', danger: 1, src: ['pile'] },
+        { id: 'storage', name: '物置', rect: [0, 26, 22, 14], floor: 'concrete', bonus: 'box', danger: 5, src: ['boxes', 'boxes', 'boxes'], boxes: 14 },
+        { id: 'nando', name: '納戸', rect: [22, 26, 18, 14], floor: 'concrete', bonus: 'armor', danger: 4, src: ['boxes', 'boxes'], boxes: 10 },
       ],
       doors: [['hall', 'kids'], ['hall', 'study'], ['hall', 'storage'], ['study', 'nando'], ['storage', 'nando']],
       start: 'hall',
       dumps: [['hall', 0.5, 0.5], ['study', 0.5, 0.75]],
     },
     {
-      name: '屋敷の主の間', desc: 'すべてのゴミが現れる最後のステージ。ボスは「ゴミ屋敷の主」。', dirt: [52, 40, 46], weights: { grease: 1.5, spore: 1.5, bag: 1.5 }, spawnMul: 1.25, hpMul: 1.6, growth: 1.5, boss: 'master',
+      name: '屋敷の主の間', desc: 'すべてのゴミが現れる最後のステージ。ボスは「ゴミ屋敷の主」。', dirt: [52, 40, 46], weights: { grease: 1.5, spore: 1.5, bag: 1.5 }, spawnMul: 1.4, hpMul: 1.75, growth: 1.5, boss: 'master',
       rooms: [
-        { id: 'shoko', name: '書庫', rect: [0, 0, 14, 14], floor: 'carpet', bonus: 'cd', src: ['boxes'] },
-        { id: 'bedroom', name: '寝室', rect: [14, 0, 12, 14], floor: 'carpet', bonus: 'regen', src: ['pile'] },
-        { id: 'closet', name: '衣装部屋', rect: [26, 0, 14, 14], floor: 'wood', bonus: 'area', src: ['nest'] },
-        { id: 'hall', name: '大広間', rect: [0, 14, 22, 26], floor: 'carpet', bonus: 'hp', src: ['pile', 'drain'] },
-        { id: 'master', name: '主の間', rect: [22, 14, 18, 26], floor: 'carpet', bonus: 'might', src: ['pile', 'nest', 'boxes'] },
+        { id: 'shoko', name: '書庫', rect: [0, 0, 14, 14], floor: 'carpet', bonus: 'cd', danger: 3, src: ['boxes', 'boxes'] },
+        { id: 'bedroom', name: '寝室', rect: [14, 0, 12, 14], floor: 'carpet', bonus: 'regen', danger: 3, src: ['pile', 'nest'] },
+        { id: 'closet', name: '衣装部屋', rect: [26, 0, 14, 14], floor: 'wood', bonus: 'area', danger: 4, src: ['nest', 'pile'] },
+        { id: 'hall', name: '大広間', rect: [0, 14, 22, 26], floor: 'carpet', bonus: 'hp', danger: 2, src: ['pile', 'drain'] },
+        { id: 'master', name: '主の間', rect: [22, 14, 18, 26], floor: 'carpet', bonus: 'might', danger: 5, src: ['pile', 'nest', 'boxes', 'drain'] },
       ],
       doors: [['hall', 'shoko'], ['hall', 'bedroom'], ['shoko', 'bedroom'], ['bedroom', 'closet'], ['closet', 'master'], ['hall', 'master']],
       start: 'hall',
@@ -1736,7 +1751,7 @@
         const v10 = grid[y0 * (N + 1) + x0 + 1];
         const v01 = grid[(y0 + 1) * (N + 1) + x0];
         const v11 = grid[(y0 + 1) * (N + 1) + x0 + 1];
-        const v = lerp(lerp(v00, v10, fx), lerp(v01, v11, fx), fy) + (Math.random() - 0.5) * 0.12;
+        const v = lerp(lerp(v00, v10, fx), lerp(v01, v11, fx), fy) + (Math.random() - 0.5) * 0.12 + DANGER[stage.rooms[roomGrid[b]].danger].dirt;
         G.dirt[i] = v > 0.66 ? 3 : v > 0.3 ? 2 : 1;
         G.rooms[roomGrid[b]].total++;
         total++;
@@ -1770,7 +1785,7 @@
           const [fx, fy] = SPOTS[(k + tries) % SPOTS.length];
           const [x, y] = roomPoint(r.rect, clamp(fx + rand(-0.08, 0.08), 0.15, 0.85), clamp(fy + rand(-0.08, 0.08), 0.15, 0.85));
           if (isBlocked(x, y) || Math.hypot(x - G.p.x, y - G.p.y) < 180) continue;
-          const e = spawnEnemy(kind, x, y, { force: true });
+          const e = spawnEnemy(kind, x, y, { force: true, danger: r.danger });
           e.room = r.idx;
           r.src++;
           r.src0++;
@@ -1939,11 +1954,13 @@
     });
   }
 
-  function dirtyCircle(x, y, r, add) {
+  // onlyRoom を渡すと、その部屋のマスだけ汚す (壁の向こうは汚さない)
+  function dirtyCircle(x, y, r, add, onlyRoom = -1) {
     const r2 = r * r;
     forTilesInBox(x - r, y - r, x + r, y + r, (i, cx, cy) => {
       const v = G.dirt[i];
       if (v >= 3 || v === 255) return;
+      if (onlyRoom >= 0 && G.tileRoom[i] !== onlyRoom) return;
       if ((cx - x) ** 2 + (cy - y) ** 2 <= r2) setDirt(i, Math.min(3, v + add));
     });
   }
@@ -2137,15 +2154,25 @@
     if (G.enemies.length >= MAX_ENEMIES && !opt.force) return null;
     const def = ENEMIES[type];
     const e = G.pool.pop() || {};
-    const tScale = def.boss || def.source ? 1 : 1 + G.time / 260;
+    const tScale = def.boss || def.source ? 1 : 1 + G.time / 400;
+    const dg = DANGER[opt.danger || 1];
+    const dHp = def.boss ? 1 : def.source ? dg.src : dg.hp;
     e.type = type;
     e.def = def;
     e.x = x;
     e.y = y;
     e.r = def.r * (opt.elite ? 1.6 : 1);
-    e.maxHp = e.hp = def.hp * tScale * G.stage.hpMul * (opt.elite ? 10 : 1) * (def.boss && G.stageIdx === 4 && type !== 'master' ? 1.3 : 1);
-    e.speed = def.speed * (1 + G.time / 1200) * rand(0.9, 1.1) * (opt.elite ? 0.9 : 1);
-    e.dmg = def.boss ? def.dmg : Math.round(def.dmg * (1 + G.time / 600));
+    e.maxHp = e.hp = def.hp * tScale * dHp * G.stage.hpMul * (opt.elite ? 10 : 1) * (def.boss && G.stageIdx === 4 && type !== 'master' ? 1.3 : 1);
+    e.speed = def.speed * (1 + G.time / 1200) * rand(0.9, 1.1) * (opt.elite ? 0.9 : 1) * (def.boss ? 1 : DANGER[opt.danger || 1].speed);
+    e.dmg = def.boss ? def.dmg : Math.round(def.dmg * (1 + G.time / 600) * dg.dmg);
+    e.danger = opt.danger || 1;
+    e.home = opt.home != null ? opt.home : -1;
+    e.aggro = false;
+    e.src = null;
+    e.brood = 0;
+    e.wx = -1;
+    e.wy = -1;
+    e.wanderT = 0;
     e.elite = !!opt.elite;
     e.boss = !!def.boss;
     e.alive = true;
@@ -2206,26 +2233,16 @@
     return G.flow[b] >= 0 && !G.rooms[G.roomGrid[b]].done;
   }
 
-  function spawnWeights() {
-    const t = G.time;
-    const w = { dust: 6, hair: 2.5 };
-    if (t >= 90) { w.paper = 3; w.can = 1.1; }
-    if (t >= 180) { w.grease = 0.5; w.bottle = 0.8; }
-    if (t >= 300) { w.spore = 0.7; w.bag = 0.45; }
-    if (t >= 420) { w.dust = 4; w.paper = 4; w.grease = 0.8; }
-    for (const k in G.stage.weights) if (w[k] != null) w[k] *= G.stage.weights[k];
-    // 早い時間でも部屋の特徴が少し出るように
-    if (t >= 45 && G.stage.weights.spore && w.spore == null) w.spore = 0.4;
-    if (t >= 45 && G.stage.weights.grease && w.grease == null) w.grease = 0.3;
-    return w;
-  }
-
-  function sourceWeights(base, kind) {
-    const mix = SOURCE_MIX[kind];
+  // 汚れレベル d の部屋で湧くゴミの重み (発生源の種類 kind があれば、その得意なゴミを増やす)
+  function typeWeights(d, kind) {
+    const mix = kind ? SOURCE_MIX[kind] : null;
     const w = {};
-    for (const k in base) w[k] = base[k] * (mix[k] != null ? mix[k] : 0.25);
-    // 発生源の得意なゴミは、早い時間からでも少し出る
-    for (const k in mix) if (w[k] == null && G.time >= 20) w[k] = mix[k] * 0.3;
+    for (const k of DANGER[d].types) w[k] = TYPE_WEIGHT[k];
+    if (mix && w[mix.main] == null) w[mix.main] = TYPE_WEIGHT[mix.main];
+    for (const k in w) {
+      if (G.stage.weights[k]) w[k] *= G.stage.weights[k];
+      if (mix) w[k] *= mix[k] != null ? mix[k] : 0.25;
+    }
     return w;
   }
 
@@ -2255,46 +2272,57 @@
     return 'dust';
   }
 
+  // ゴミを1つ (ホコリなら3つ) 湧かせる。home は住みかの部屋 (-1 は住みかなし = いつも追いかけてくる)
+  function spawnGroup(x, y, danger, kind, home, src) {
+    const type = pickWeighted(typeWeights(danger, kind));
+    const elite = Math.random() < DANGER[danger].elite;
+    const n = type === 'dust' && !elite ? 3 : 1;
+    for (let k = 0; k < n; k++) {
+      const e = spawnEnemy(type, x + (n > 1 ? rand(-14, 14) : 0), y + (n > 1 ? rand(-14, 14) : 0), { danger, elite, home });
+      if (!e) return;
+      if (src) {
+        e.src = src;
+        src.brood++;
+      }
+      // 主人公が遠いときに湧いた缶やボトルは、部屋の中を好きな向きに転がる
+      if (e.def.move === 'roll' && home >= 0 && Math.hypot(G.p.x - x, G.p.y - y) > 400) {
+        const a = rand(0, TAU);
+        e.vx = Math.cos(a) * e.speed;
+        e.vy = Math.sin(a) * e.speed;
+      }
+    }
+  }
+
   function updateSpawns(dt) {
     G.spawnT -= dt;
     if (G.spawnT <= 0) {
       G.spawnT = 0.2;
       const t = G.time;
-      // 発生源を潰すほど湧く量が減る (全部潰しても 35% は画面の外から湧く)
-      const srcs = G.enemies.filter((e) => e.alive && e.def.source);
-      const ratio = G.srcTotal ? srcs.length / G.srcTotal : 0;
-      let desired = (14 + t * 0.5) * G.stage.spawnMul * (0.35 + 0.65 * ratio);
-      if (t >= 480 && t < 540) desired += 60;
-      desired = Math.min(MAX_ENEMIES - 20, desired);
-      const n = Math.min(5, Math.ceil(desired - (G.enemies.length - srcs.length)));
-      if (n > 0) {
-        const base = spawnWeights();
-        for (let i = 0; i < n; i++) {
-          let pos = null;
-          let w = base;
-          if (srcs.length && Math.random() < 0.8) {
-            // 近くの発生源ほど選ばれやすい
-            const src = pickWeightedBy(srcs, (e) => 1 / (1 + Math.hypot(e.x - G.p.x, e.y - G.p.y) / 400));
-            const a = rand(0, TAU);
-            const d = src.r + rand(10, 26);
-            const x = src.x + Math.cos(a) * d;
-            const y = src.y + Math.sin(a) * d;
-            if (!isBlocked(x, y)) {
-              pos = [x, y];
-              w = sourceWeights(base, src.type);
-              src.flash = 0.06;
-            }
-          }
-          if (!pos) pos = spawnPos(40);
-          if (!pos) break;
-          const type = pickWeighted(w);
-          // ホコリはかたまりで湧く
-          if (type === 'dust') {
-            for (let k = 0; k < 3; k++) spawnEnemy('dust', pos[0] + rand(-14, 14), pos[1] + rand(-14, 14));
-          } else {
-            spawnEnemy(type, pos[0], pos[1]);
-          }
-        }
+      // 発生源: それぞれが自分の部屋に住むゴミを、汚れレベルに応じた数まで湧かせる
+      for (const src of G.enemies) {
+        if (!src.alive || !src.def.source) continue;
+        const cap = (6 + t * 0.07) * G.stage.spawnMul * DANGER[src.danger].density;
+        if (src.brood >= cap || Math.random() > 0.35) continue;
+        const a = rand(0, TAU);
+        const d = src.r + rand(10, 26);
+        const x = src.x + Math.cos(a) * d;
+        const y = src.y + Math.sin(a) * d;
+        if (isBlocked(x, y)) continue;
+        spawnGroup(x, y, src.danger, src.type, src.room, src);
+        src.flash = 0.06;
+      }
+      // 住みかのないゴミが、画面の外から少しずつ湧く (今いる部屋の汚れレベルで量が決まる)
+      const here = G.rooms[G.curRoom];
+      const hereDanger = !here || here.done ? 1 : here.danger;
+      let roaming = 0;
+      for (const e of G.enemies) if (e.alive && e.home < 0 && !e.def.source && !e.boss) roaming++;
+      const desired = Math.min(170, (10 + t * 0.3) * G.stage.spawnMul * DANGER[hereDanger].density);
+      const n = Math.min(3, Math.ceil(desired - roaming));
+      for (let i = 0; i < n && G.enemies.length < MAX_ENEMIES - 20; i++) {
+        const pos = spawnPos(40);
+        if (!pos) break;
+        const r = G.rooms[roomAt(pos[0], pos[1])];
+        spawnGroup(pos[0], pos[1], r ? r.danger : 1, null, -1, null);
       }
     }
     // 大群ラッシュ: ホコリの大波が四方から
@@ -2393,7 +2421,7 @@
         e.dirtyT -= dt;
         if (e.dirtyT <= 0 && !e.flee) {
           e.dirtyT = 1;
-          dirtyCircle(e.x, e.y, 70, 1);
+          dirtyCircle(e.x, e.y, 70, 1, e.room);
         }
         continue;
       }
@@ -2435,10 +2463,32 @@
         }
       }
       if (e.boss) bossAct(e, dt, d);
-      // 壁の向こうにいるときは、ドアを通る道のりに沿って進む
+      if (e.home >= 0 && !e.boss) {
+        if (!e.aggro) {
+          // 壁ごしには気づかない (ドアを通る道のりで 5 マス以内か、同じ部屋に入ってきたら追いかける)
+          const fd = G.flow[blockAt(e.x, e.y)];
+          if ((fd >= 0 && fd <= 5) || G.curRoom === e.home) e.aggro = true;
+        } else if (d > 750 && G.curRoom !== e.home) {
+          e.aggro = false;
+        }
+      }
       let mx = dx / d;
       let my = dy / d;
-      if (sp > 0 && steer(e)) {
+      if (e.home >= 0 && !e.aggro) {
+        // 部屋の中のどこかへゆっくり歩く
+        e.wanderT -= dt;
+        if (e.wanderT <= 0 || e.wx < 0 || Math.hypot(e.wx - e.x, e.wy - e.y) < 12) {
+          e.wanderT = rand(2, 4);
+          [e.wx, e.wy] = roomPoint(G.rooms[e.home].rect, rand(0.12, 0.88), rand(0.12, 0.88));
+        }
+        const wx = e.wx - e.x;
+        const wy = e.wy - e.y;
+        const wd = Math.hypot(wx, wy) || 1;
+        mx = wx / wd;
+        my = wy / wd;
+        sp = Math.abs(sp) * 0.35;
+      } else if (sp > 0 && steer(e)) {
+        // 壁の向こうにいるときは、ドアを通る道のりに沿って進む
         const sx = steerX - e.x;
         const sy = steerY - e.y;
         const sd = Math.hypot(sx, sy) || 1;
@@ -2472,7 +2522,7 @@
         const x = e.x + Math.cos(a) * 70;
         const y = e.y + Math.sin(a) * 70;
         if (isBlocked(x, y)) continue;
-        spawnEnemy(i === 0 ? 'bag' : pick(['paper', 'dust', 'hair']), x, y, { force: true });
+        spawnEnemy(i === 0 ? 'bag' : pick(['paper', 'dust', 'hair']), x, y, { force: true, danger: 3 });
         puff(x, y, '#8a6a44', 8);
       }
     } else {
@@ -2490,7 +2540,7 @@
           const a = rand(0, TAU);
           const x = e.x + Math.cos(a) * 90;
           const y = e.y + Math.sin(a) * 90;
-          if (!isBlocked(x, y)) spawnEnemy(master ? pick(['bag', 'grease', 'spore', 'bottle']) : 'spore', x, y, { force: true });
+          if (!isBlocked(x, y)) spawnEnemy(master ? pick(['bag', 'grease', 'spore', 'bottle']) : 'spore', x, y, { force: true, danger: 3 });
         }
       }
     }
@@ -2537,6 +2587,7 @@
     if (!e.alive || e.flee) return;
     e.hp -= dmg;
     e.flash = 0.09;
+    e.aggro = true;
     if (!e.boss && !e.def.source) {
       const kb = e.elite ? 0.25 : 1;
       e.kx += kx * kb;
@@ -2581,7 +2632,7 @@
       dropGem(e.x, e.y, 2);
       G.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 });
     } else {
-      dropGem(e.x, e.y, def.gem);
+      dropGem(e.x, e.y, Math.min(2, def.gem + (Math.random() < DANGER[e.danger].upgrade ? 1 : 0)));
       if (def.gem === 2 && Math.random() < 0.04) G.items.push({ kind: 'heal', x: e.x + 10, y: e.y, t: 0 });
     }
     if (def.burst) {
@@ -2589,8 +2640,9 @@
         const a = (i / def.burst) * TAU;
         const x = e.x + Math.cos(a) * 18;
         const y = e.y + Math.sin(a) * 18;
-        const m = spawnEnemy(pick(['dust', 'hair', 'paper']), x, y, { force: G.enemies.length < MAX_ENEMIES + 40 });
+        const m = spawnEnemy(pick(['dust', 'hair', 'paper']), x, y, { force: G.enemies.length < MAX_ENEMIES + 40, danger: e.danger, home: e.home });
         if (m) {
+          m.aggro = true;
           m.kx = Math.cos(a) * 160;
           m.ky = Math.sin(a) * 160;
         }
@@ -2946,8 +2998,8 @@
     // 歩くだけで足元の床を少し磨く
     p.scrubT = (p.scrubT || 0) - dt;
     if (p.scrubT <= 0) {
-      p.scrubT = 0.15;
-      cleanCircle(p.x, p.y, 20, 1);
+      p.scrubT = 0.12;
+      cleanCircle(p.x, p.y, 30, 1);
     }
     // 通った道を記録 (コロコロ用)
     const tr = G.trail;
@@ -3261,7 +3313,11 @@
     for (let i = 0; i < es.length; i++) {
       const e = es[i];
       if (e.alive && !(e.flee && e.life > 0 && Math.hypot(e.x - G.p.x, e.y - G.p.y) > 900)) es[j++] = e;
-      else G.pool.push(e);
+      else {
+        if (e.src) e.src.brood--;
+        e.src = null;
+        G.pool.push(e);
+      }
     }
     es.length = j;
 
@@ -3288,7 +3344,8 @@
       for (const r of G.rooms) {
         if (!r.done && r.src === 0 && r.clean >= r.total * ROOM_DONE) completeRoom(r);
       }
-      if (G.rooms.every((r) => r.done) || G.time >= GAME_TIME) winGame();
+      if (G.rooms.every((r) => r.done)) winGame();
+      else if (G.time >= GAME_TIME) timeUp();
       else if (G.pendingLv > 0 && overlay.hidden) showLevelUp();
     } else if (G.state === 'win' && G.endT > 2.6) {
       showResult(true);
@@ -3325,24 +3382,33 @@
     }
     recalcStats();
     if (r.bonus === 'heal') G.p.hp = G.stats.maxHp;
-    G.roomCoins += 30;
+    G.roomCoins += 15 * r.danger;
     G.items.push({ kind: 'chest', x: G.p.x + 26, y: G.p.y, t: 0 });
     showBanner(`${r.name} ピカピカ完了! ${ROOM_BONUS[r.bonus]}`, '#4fe0b6', 3);
     Sound.play('room-clear');
     G.shake = Math.max(G.shake, 6);
   }
 
+  function timeUp() {
+    G.state = 'dead';
+    G.timeUp = true;
+    G.endT = 0;
+    G.time = GAME_TIME;
+    showBanner('時間切れ…', '#ff6b6b', 2);
+    Sound.bgm(null);
+    Sound.play('lose');
+  }
+
   function winGame() {
     G.state = 'win';
     G.endT = 0;
-    G.time = Math.min(G.time, GAME_TIME);
     for (const e of G.enemies) {
       e.flee = true;
       e.life = 1;
     }
     G.bullets.length = 0;
     G.clouds.length = 0;
-    showBanner('清掃完了!', '#4fe0b6', 2.6);
+    showBanner('全部屋 清掃完了!', '#4fe0b6', 2.6);
     Sound.bgm(null);
     Sound.play('win');
   }
@@ -3408,6 +3474,12 @@
       if (!inView(cx, cy, 200)) continue;
       ctx.fillStyle = r.done ? 'rgba(79,224,182,0.35)' : 'rgba(0,0,0,0.16)';
       ctx.fillText(r.done ? `${r.name} ✓` : r.name, cx, cy);
+      if (!r.done) {
+        ctx.font = '900 22px system-ui, sans-serif';
+        ctx.fillStyle = r.danger >= 4 ? 'rgba(160,20,20,0.3)' : 'rgba(0,0,0,0.16)';
+        ctx.fillText(stars(r.danger), cx, cy + 34);
+        ctx.font = '900 34px system-ui, -apple-system, "Hiragino Sans", sans-serif';
+      }
     }
     ctx.textBaseline = 'alphabetic';
 
@@ -3663,7 +3735,7 @@
     }
 
     // 主人公
-    if (G.state !== 'dead' || G.endT < 0.3) {
+    if (G.state !== 'dead' || G.timeUp || G.endT < 0.3) {
       ctx.save();
       ctx.translate(p.x, p.y);
       if (p.inv > 0 && Math.floor(t * 20) % 2) ctx.globalAlpha = 0.6;
@@ -3931,13 +4003,19 @@
     ctx.fillStyle = '#4fc3ff';
     ctx.fillRect(0, 0, w * (G.xp / G.xpNext), 8);
     hudText(`Lv ${G.level}`, 10, 30, 16);
-    hudText(fmtTime(G.time), w / 2, 34, 24, 'center');
+    const left = GAME_TIME - G.time;
+    hudText(fmtTime(Math.ceil(left)), w / 2, 34, 24, 'center', left <= 60 && Math.floor(t * 2) % 2 ? '#ff6b6b' : left <= 60 ? '#ffb3b3' : '#ffffff');
     // 今いる部屋
     const here = G.rooms[G.curRoom];
     const doneN = G.rooms.filter((r) => r.done).length;
     if (here) {
       const pct = Math.min(100, (here.clean / here.total) * 100);
       hudText(here.done ? `${here.name} 完了!` : `${here.name} ${Math.floor(pct)}%`, w - 10, 28, 15, 'right', here.done ? '#4fe0b6' : '#ffffff');
+      if (!here.done) {
+        ctx.font = '800 15px system-ui, -apple-system, "Hiragino Sans", sans-serif';
+        const nameW = ctx.measureText(`${here.name} ${Math.floor(pct)}%`).width;
+        hudText('★'.repeat(here.danger), w - 16 - nameW, 28, 12, 'right', DANGER_COLOR[here.danger]);
+      }
       hudText(here.done ? `部屋 ${doneN}/${G.rooms.length} 完了` : `発生源 ${here.src} ・ 部屋 ${doneN}/${G.rooms.length} 完了`, w - 10, 46, 12, 'right', here.src > 0 ? '#ffb3b3' : '#d9e2ec');
     }
     hudText(`片付け ${G.kills}`, w - 10, 62, 11, 'right', '#c5d0dc');
@@ -3946,9 +4024,12 @@
     // ボスの体力
     const boss = G.bosses.find((e) => e.boss && e.alive);
     if (boss) {
-      const bw = Math.min(360, w - 140);
-      hudText(boss.def.name, w / 2, 54, 12, 'center', '#ffb3b3');
-      bar(w / 2 - bw / 2, 60, bw, 8, boss.hp / boss.maxHp, '#ff6b6b');
+      // ミニマップの右、右上の部屋の表示の下に出す
+      const left = 10 + clamp(Math.min(view.w, view.h) * 0.22, 84, 140) + 14;
+      const bw = Math.min(360, w - left - 12);
+      const cx = (left + w - 12) / 2;
+      hudText(boss.def.name, cx, 80, 12, 'center', '#ffb3b3');
+      bar(cx - bw / 2, 86, bw, 8, boss.hp / boss.maxHp, '#ff6b6b');
     }
 
     // 体力とダストボックス
@@ -3999,7 +4080,12 @@
       const b = G.banner;
       const a = Math.min(1, b.t / 0.3, (b.max - b.t) / 0.15);
       ctx.globalAlpha = a;
-      hudText(b.text, w / 2, h * 0.3, Math.min(30, w / 14), 'center', b.color);
+      // 画面の幅に収まる大きさで出す
+      let size = 30;
+      ctx.font = `800 ${size}px system-ui, -apple-system, "Hiragino Sans", sans-serif`;
+      const tw = ctx.measureText(b.text).width;
+      if (tw > w - 24) size = Math.max(12, Math.floor((size * (w - 24)) / tw));
+      hudText(b.text, w / 2, h * 0.3, size, 'center', b.color);
       ctx.globalAlpha = 1;
     }
 
@@ -4120,7 +4206,7 @@
     const rooms = STAGES.map((r, i) => {
       const ok = roomUnlocked(i);
       const b = save.best[i];
-      const meta = !ok ? '前のステージをクリアすると入れる' : b.time > 0 ? `清掃した部屋 最高 ${b.rooms || 0}/${r.rooms.length} ・ 最長 ${fmtTime(b.time)}` : `${r.rooms.length}部屋 ・ ${r.desc}`;
+      const meta = !ok ? '前のステージをクリアすると入れる' : b.time > 0 ? `清掃した部屋 最高 ${b.rooms || 0}/${r.rooms.length}${b.clear ? ` ・ 最速クリア ${fmtTime(b.clear)}` : ''}` : `${r.rooms.length}部屋 ・ ${r.desc}`;
       return `<button type="button" class="room${save.cleared[i] ? ' cleared' : ''}" data-act="brief" data-arg="${i}" ${ok ? '' : 'disabled'}>
         <span class="room-no">${ok ? i + 1 : '🔒'}</span>
         <span class="room-body"><span class="room-name">${ok ? esc(r.name) : '？？？'}</span><br><span class="room-meta">${esc(meta)}</span></span>
@@ -4153,7 +4239,7 @@
         <span class="char-desc">${ok ? `${esc(c.desc)} 最初のギア: ${esc(WEAPONS[c.weapon].name)}` : `ステージ${c.unlockRoom + 1}をクリアすると仲間になる`}</span>
       </button>`;
     }).join('');
-    const roomList = r.rooms.map((rm) => `<li><b>${esc(rm.name)}</b><span>発生源 ${rm.src.length}</span><span class="bonus">${esc(ROOM_BONUS[rm.bonus])}</span></li>`).join('');
+    const roomList = [...r.rooms].sort((a, c) => a.danger - c.danger).map((rm) => `<li><b>${esc(rm.name)}</b><span class="danger d${rm.danger}">${stars(rm.danger)}</span><span>発生源 ${rm.src.length}</span><span class="bonus">${esc(ROOM_BONUS[rm.bonus])}</span></li>`).join('');
     show('brief', `
       <div class="panel wide">
         <h2>ステージ${briefRoom + 1} ${esc(r.name)}</h2>
@@ -4161,12 +4247,12 @@
         <div class="plan">
           <img class="plan-img" src="${planImage(briefRoom)}" alt="間取り図">
           <div class="plan-side">
-            <p class="brief-desc">部屋の<b>発生源</b>（赤い点）を全部潰して床をピカピカにすると、その部屋の清掃が完了。宝箱と、部屋ごとの特典がもらえる。全部屋を完了するか、10分間生き残ればクリア。</p>
+            <p class="brief-desc"><b>10分以内に全部屋の清掃を完了</b>すればクリア。部屋の<b>発生源</b>（赤い点）を全部潰して床をピカピカにすると、その部屋の清掃が完了し、宝箱と特典がもらえる。<b>★が多い部屋ほど汚れがキツく</b>、ゴミが多くて強い。弱いうちに入るとすぐやられるので、★の少ない部屋から片付けよう。</p>
             <ul class="room-list">${roomList}</ul>
           </div>
         </div>
         <p class="brief-note">5分で中ボス「${ENEMIES.yokai.name}」、9分でボス「${esc(ENEMIES[r.boss].name)}」が現れる。</p>
-        <div class="records"><span>清掃した部屋 最高 <b>${b.rooms || 0}/${r.rooms.length}</b></span><span>最長 <b>${fmtTime(b.time)}</b></span>${save.cleared[briefRoom] ? '<span><b>クリア済み</b></span>' : ''}</div>
+        <div class="records"><span>清掃した部屋 最高 <b>${b.rooms || 0}/${r.rooms.length}</b></span>${b.clear ? `<span>最速クリア <b>${fmtTime(b.clear)}</b></span>` : ''}${save.cleared[briefRoom] ? '<span><b>クリア済み</b></span>' : ''}</div>
         <h3>出撃する清掃員</h3>
         <div class="chars">${chars}</div>
         <div class="actions">
@@ -4243,7 +4329,7 @@
     show('pause', `
       <div class="panel">
         <h2>一時停止</h2>
-        <p class="sub">${esc(G.stage.name)} ・ ${fmtTime(G.time)} ・ 清掃した部屋 ${G.rooms.filter((r) => r.done).length}/${G.rooms.length}</p>
+        <p class="sub">${esc(G.stage.name)} ・ 残り ${fmtTime(Math.ceil(GAME_TIME - G.time))} ・ 清掃した部屋 ${G.rooms.filter((r) => r.done).length}/${G.rooms.length}</p>
         <div class="gear-list">${gear}</div>
         <div class="actions">
           <button type="button" class="btn primary" data-act="resume" data-back data-focus>再開</button>
@@ -4399,6 +4485,7 @@
     const best = save.best[i];
     best.clean = Math.max(best.clean, pct);
     best.rooms = Math.max(best.rooms || 0, doneN);
+    if (win) best.clear = best.clear ? Math.min(best.clear, g.time) : g.time;
     best.time = Math.max(best.time, g.time);
     const firstClear = win && !save.cleared[i];
     if (win) save.cleared[i] = true;
@@ -4413,10 +4500,10 @@
     G = null;
     show('result', `
       <div class="panel">
-        <h2 class="result-title ${win ? 'win' : 'lose'}">${win ? '清掃完了!' : '力尽きた…'}</h2>
+        <h2 class="result-title ${win ? 'win' : 'lose'}">${win ? '全部屋 清掃完了!' : g.timeUp ? '時間切れ…' : '力尽きた…'}</h2>
         <p class="sub">ステージ${i + 1} ${esc(STAGES[i].name)}</p>
         <dl class="stat-list">
-          <dt>生き残った時間</dt><dd>${fmtTime(g.time)}</dd>
+          <dt>${win ? 'クリアタイム' : 'プレイした時間'}</dt><dd>${fmtTime(g.time)}</dd>
           <dt>清掃した部屋</dt><dd>${doneN}/${g.rooms.length}</dd>
           <dt>清掃度 (家全体)</dt><dd>${pct.toFixed(1)}%</dd>
           <dt>片付けたゴミ</dt><dd>${g.kills}</dd>
