@@ -17,7 +17,7 @@
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
   <main class="app">
@@ -38,12 +38,16 @@
       <button type="button" id="bomb-btn" class="bomb-btn" tabindex="-1" hidden>
         <span class="bomb-name" data-i18n="compress">ゴミ圧縮</span><span class="bomb-key">Space</span>
       </button>
+      <div class="tutor" id="tutor" role="status" aria-live="polite" hidden></div>
       <div class="overlay" id="overlay" hidden></div>
     </div>
 
     <section class="help" data-lang="ja">
       <h2>遊び方</h2>
       <p>ゴミ屋敷の部屋を、清掃ギアでゴミを片付けながら <b>10分以内に全部ピカピカにする</b>ゲームです。操作するのは移動だけで、清掃ギアは自動で動きます。片付けたゴミはダストを落とし、拾うと経験値になります。レベルアップしたら、新しい清掃ギアやパッシブを1つ選んで強くなりましょう。時間切れか、体力がなくなると失敗です。</p>
+
+      <h3>チュートリアル</h3>
+      <p>はじめての方は、タイトルの「チュートリアル」から遊んでみてください。3部屋だけの小さな家を2〜3分で片付けながら、画面の下に出るヒントと緑の矢印で、移動・レベルアップ・発生源・部屋の清掃完了・宝箱・ゴミ捨て場を順番に覚えられます。チュートリアルは達成率には入りません。</p>
 
       <h3>間取りと発生源</h3>
       <p>ステージは全部で10個。各ステージは、壁とドアで区切られた5〜7部屋の家です。部屋には赤い点線の輪がついた「発生源」(ゴミの山・排水口・カビの巣・段ボールの山) があり、ゴミのほとんどはそこから湧いてきます。発生源は潰すまで周りの床を汚し続けます。また、発生源はまわりの床が汚れているほど硬くなる「汚れバリア」 (茶色い膜) をまとっています。発生源の上には、バリアの強さ (5段階のゲージ) と、いま通るダメージの割合 (例: 「ダメージ 12%」) が出ます。ゲージが赤いほど硬く、まわりの汚れを取るほどゲージが減って攻撃が効くようになるので、まず発生源のまわりを掃除しましょう。発生源を潰すほど、湧くゴミが減ります。左上のミニマップで、部屋の汚れ具合と発生源 (赤) の場所を確かめられます。</p>
@@ -114,6 +118,9 @@
     <section class="help" data-lang="en" hidden>
       <h2>How to Play</h2>
       <p>Clear the trash out of a junk-filled house with your cleaning gear and <b>get every room sparkling clean within 10 minutes</b>. You only control movement: your cleaning gear works automatically. Cleared trash drops dust, which you pick up as experience. When you level up, choose a new piece of cleaning gear or a passive to grow stronger. You fail if time runs out or your HP hits zero.</p>
+
+      <h3>Tutorial</h3>
+      <p>New players should start with "Tutorial" on the title screen. You clean a tiny three-room house in 2–3 minutes while hints at the bottom of the screen and a green arrow walk you through moving, leveling up, sources, finishing rooms, chests and trash dumps. The tutorial doesn't count toward completion.</p>
 
       <h3>Floor Plans and Sources</h3>
       <p>There are 10 stages. Each stage is a house of 5–7 rooms divided by walls and doors. Rooms contain "sources" ringed with a red dotted circle (trash piles, drains, mold nests, cardboard heaps), and most of the trash spawns from them. Sources keep dirtying the floor around them until destroyed. Sources are also wrapped in a "grime barrier" (a brown film) that makes them tougher the dirtier the floor around them is. Above each source you'll see the barrier strength (a 5-step gauge) and how much of your damage currently gets through (e.g. "DMG 12%"). The redder the gauge, the tougher the source. Cleaning around it lowers the gauge and lets your attacks work, so scrub around it first. The more sources you destroy, the less trash spawns. The minimap in the top left shows how dirty each room is and where the sources (red) are.</p>
@@ -187,6 +194,6 @@
   <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
-  <script src="script.js?v=5"></script>
+  <script src="script.js?v=6"></script>
 </body>
 </html>
