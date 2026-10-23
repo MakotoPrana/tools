@@ -229,6 +229,7 @@
     S = window.SummitTerrain.createScene(W, scene);
     O = window.SummitObstacles.create(W, scene);
     mountainId = id;
+    MAP_E = W.footR * 1.22;
     const mr = mrec(id);
     for (const uid of mr.items) O.setTaken(uid, true);
     for (const cp of mr.cp) O.setFlag(cp, true);
@@ -630,7 +631,7 @@
     if (P.stamina <= 0) P.exhausted = true;
   }
   function regenStamina(dt, mult) {
-    const altK = lerp(1, 0.7, clamp(P.y / 1000, 0, 1));
+    const altK = lerp(1, 0.7, clamp(P.y / W.maxY, 0, 1));
     P.stamina = Math.min(maxStamina(), P.stamina + 0.32 * altK * (mult || 1) * dt);
     if (P.exhausted && P.stamina > 0.3 * maxStamina()) P.exhausted = false;
     if (P.stamina < maxStamina()) P.staminaShow = 1.2;
@@ -734,7 +735,13 @@
       return;
     }
     W.normal(nx, nz, nrm);
-    if (dy > 0.02 && nrm.y < MAX_WALK_SLOPE) { slideAlong(dx, dz, pushed); return; }
+    if (dy > 0.02 && nrm.y < MAX_WALK_SLOPE) {
+      // 急な坂のすぐ先に登れる壁があれば、そのままつかまる
+      const l = Math.hypot(dx, dz) || 1;
+      const ff = findFace(nx + dx / l * 0.7, nz + dz / l * 0.7, P.y, dx, dz);
+      if (ff && canGrip(ff.f) && P.stunT <= 0 && !P.exhausted && P.stamina > 0.05) { startClimb(ff.f, ff.u, Math.max(P.y, ff.f.y0) + 0.1); return; }
+      slideAlong(dx, dz, pushed); return;
+    }
     // 崖の縁: 歩いているときは止まる (走っている・風に押されているときは落ちる)
     const steepDown = dy < -0.6 || (dy < 0 && nrm.y < 0.66);
     // 登れる壁の上なら、向きを変えて下へつかまる
@@ -1786,7 +1793,7 @@
   // =====================================================================
   const mapCanvas = $('map-canvas');
   let mapImage = null;
-  const MAP_E = 1560;
+  let MAP_E = 1560; // 地図の端 (山を選んだときに裾の大きさから決める)
   let mapState = null;
   function buildMapImage() {
     const N = 360;
@@ -1811,9 +1818,9 @@
       const shade = 0.5 + 0.62 * lam;
       if (h < W.M.terrain.seaY + 0.3) col.setHex(0x3f7fa8);
       else if (h < 4) col.setHex(0x9dbd6a);
-      else if (h < 250) col.setHex(0x6f9a4c);
-      else if (h < 550) col.setHex(0x8fa060);
-      else if (h < 850) col.setHex(0x9c978c);
+      else if (h < W.bands[0].y1) col.setHex(0x6f9a4c);
+      else if (h < W.bands[1].y1) col.setHex(0x8fa060);
+      else if (h < W.bands[2].y1) col.setHex(0x9c978c);
       else col.setHex(0xd8dce0);
       // 等高線 (100m ごと)
       const band = Math.floor(h / 100);
@@ -2210,8 +2217,8 @@
   const skyTint = new THREE.Color();
   function atmosphere() {
     const y = camera.position.y;
-    let near = lerp(150, 1500, smooth(y / 1000));
-    let far = lerp(750, 4600, smooth(y / 1000));
+    let near = lerp(150, 1500, smooth(y / W.maxY));
+    let far = lerp(750, 4600, smooth(y / W.maxY));
     fogCol.setHex(0xcfe3f2);
     let light = 1;
     if (weather === 'cloudy') { near *= 0.8; far *= 0.8; fogCol.setHex(0xc4ccd4); light = 0.85; }
@@ -2233,10 +2240,10 @@
     skyTint.setRGB(light, light, light);
     S.skyMat.color.copy(skyTint);
     // 遠くの山並みは雲の上から見える
-    S.farMat.opacity = smooth((y - 380) / 300) * (weather === 'fog' ? 0.3 : weather === 'rain' ? 0.5 : 1);
+    S.farMat.opacity = smooth((y - W.cloudY + 0.17 * W.maxY) / (0.3 * W.maxY)) * (weather === 'fog' ? 0.3 : weather === 'rain' ? 0.5 : 1);
     S.cloud.material.opacity = weather === 'fog' ? 0.98 : 0.93;
     if (windGain && soundOn) {
-      const wv = clamp((y - 200) / 900, 0, 1) * 0.06 + (windNow ? 0.08 : 0) + (weather === 'rain' ? 0.03 : 0);
+      const wv = clamp((y - 0.2 * W.maxY) / (0.9 * W.maxY), 0, 1) * 0.06 + (windNow ? 0.08 : 0) + (weather === 'rain' ? 0.03 : 0);
       windGain.gain.value = lerp(windGain.gain.value, mode === 'play' ? wv : 0, 0.05);
       windFilter.frequency.value = 300 + (windNow ? 300 : 0);
     }
@@ -2418,7 +2425,7 @@
     balEl.classList.toggle('is-on', P.state === 'balance');
     balMark.style.left = `${50 + clamp(P.bal, -1, 1) * 48}%`;
     // 着地の予測 (麓と中腹だけ)
-    if (P.state === 'swing' && P.y < 550) {
+    if (P.state === 'swing' && P.y < W.bands[1].y1) {
       const lp = predictLanding();
       if (lp) {
         const rp = toScreen(lp.x, lp.y + 0.05, lp.z);

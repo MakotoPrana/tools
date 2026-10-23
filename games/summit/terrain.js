@@ -104,8 +104,11 @@
     function noiseAmp(r) {
       if (r > prof[0][1]) return T.plainNoise;
       const y = radialY(r);
-      return lerp(T.footNoise, T.topNoise, clamp(y / 1000, 0, 1)) * smooth(r / 60);
+      return lerp(T.footNoise, T.topNoise, clamp(y / MAXY, 0, 1)) * smooth(r / 60);
     }
+    // 山の大きさ (標高の最大と、裾の半径)。草木や色の境目はこれに合わせて伸び縮みする
+    const MAXY = prof[prof.length - 1][0];
+    const RS = prof[0][1] / 1283;
     // 向きによって裾の広がりを変え、尾根 (張り出し) をつけて円すいに見えないようにする
     const LOBES = T.lobes || [[2, 0.1, 1], [3, 0.06, 2], [5, 0.035, 0.5]];
     const SPURS = T.spurs || { k: 7, amp: 16, phase: 0.7 };
@@ -119,7 +122,7 @@
       let y = radialY(rr) + n * noiseAmp(rr);
       if (rr < prof[0][1]) {
         const sp = 1 - Math.abs(Math.sin(SPURS.k * th / 2 + SPURS.phase));
-        const env = smooth((rr - 90) / 120) * (1 - smooth((rr - 600) / 300));
+        const env = smooth((rr - 90 * RS) / (120 * RS)) * (1 - smooth((rr - 600 * RS) / (300 * RS)));
         y += (sp * sp - 0.35) * SPURS.amp * env;
       }
       return y;
@@ -303,9 +306,22 @@
             prev = p;
           }
         };
+        // もう一方の端 (難所の入口) の高さは変えずに、そこからも傾きをおさえる (段ができないように)
+        const back = (c, order, endY) => {
+          pts[order[0]].y = endY;
+          let prev = null;
+          for (const k of order) {
+            const p = pts[k];
+            if (prev && Math.hypot(p.x - c.x, p.z - c.z) >= c.R + 2.5) {
+              const ds = Math.hypot(p.x - prev.x, p.z - prev.z);
+              p.y = clamp(p.y, prev.y - G * ds, prev.y + G * ds);
+            }
+            prev = p;
+          }
+        };
         const idx = pts.map((_, k) => k);
-        if (i === 0) limit(A, idx);
-        if (i === pieces.length - 1) limit(B, idx.slice().reverse());
+        if (i === 0) { limit(A, idx); if (pieces.length > 1) back(A, idx.slice().reverse(), pc.y1); }
+        if (i === pieces.length - 1) { limit(B, idx.slice().reverse()); if (pieces.length > 1) back(B, idx, pc.y0); }
       }
 
       // 線分にして登録する
@@ -343,8 +359,8 @@
           const low = band.id === 'foot';
           const g = {
             type: o.type, cx, cz, ux, uz, nx, nz, halfL: L / 2 - 1.6, edgeW: 1.2,
-            up: o.up != null ? o.up : (low ? 150 : 14),
-            down: o.down != null ? o.down : (low ? 240 : 30),
+            up: o.up != null ? o.up : (low ? 150 * RS : 14),
+            down: o.down != null ? o.down : (low ? 240 * RS : 30),
             taper: low ? 40 : 6,
             depth: o.depth != null ? o.depth : (low ? (o.type === 'log' ? 6 : 10) : 45),
             y: pc.y0, y2: pc.y1, ridge: o.type === 'ridge' ? (o.hw || 0.7) : 0,
@@ -669,7 +685,7 @@
     return {
       M, cps, edges, segs, gorges, steps, items, views, plants,
       height, normal, base, rAt, radialY, bandAt, edgePoint, cellItems, polar,
-      worldR: RMAX, cloudY: T.cloudY, seaY: T.seaY,
+      bands, worldR: RMAX, cloudY: T.cloudY, seaY: T.seaY, maxY: MAXY, footR: prof[0][1], RS,
     };
   }
 
@@ -693,7 +709,10 @@
     const nrm = { x: 0, y: 1, z: 0 };
 
     // 地面の色
-    function colorAt(x, z, h, ny, out) {
+    // 色の境目は標高 1000m の山のつもりで書き、K で伸び縮みさせる
+    const K = W.maxY / 1000;
+    function colorAt(x, z, hh, ny, out) {
+      const h = hh / K;
       const r = Math.hypot(x, z);
       const n1 = cnoise(x / 37, z / 37);
       const n2 = cnoise(x / 9, z / 9);
@@ -705,8 +724,8 @@
       else if (s === 'ice') out.copy(PAL.ice);
       else if (s === 'gorge') out.copy(PAL.gorge);
       else if (r > M.terrain.coastR - 40) {
-        out.copy(h < M.terrain.seaY + 0.5 ? PAL.seabed : PAL.sand);
-      } else if (h < 4 && r > 1250) {
+        out.copy(hh < M.terrain.seaY + 0.5 ? PAL.seabed : PAL.sand);
+      } else if (hh < 4 && r > 1250 * W.RS) {
         out.copy(n1 > 0.15 ? PAL.field : PAL.plain);
       } else {
         // 標高と傾きで、草 → 岩 → 雪
@@ -801,7 +820,7 @@
     }
 
     // 山全体 (12.5m ごと)
-    const CORE = 1650;
+    const CORE = Math.ceil(W.footR * 1.29);
     const core = new THREE.Mesh(gridGeometry(-CORE, -CORE, CORE * 2, 264, false), coreMat);
     core.position.y = -0.35;
     scene.add(core);
@@ -912,12 +931,12 @@
       const greens = [0x3f6e34, 0x4b7d3a, 0x355f2e, 0x5a8640, 0x6d8f3e];
       for (let tries = 0; tries < 40000 && count < MAXT; tries++) {
         const a = rnd() * Math.PI * 2;
-        const r = 380 + Math.sqrt(rnd()) * 1700;
+        const r = (380 + Math.sqrt(rnd()) * 1700) * W.RS;
         const x = r * Math.cos(a), z = r * Math.sin(a);
-        const h = W.height(x, z);
-        if (h < 3 || h > 560 || r > M.terrain.coastR - 120) continue;
+        const hh = W.height(x, z), h = hh / K;
+        if (hh < 3 || h > 560 || r > M.terrain.coastR - 120) continue;
         // 平地はまばら、麓は森
-        const dens = h < 4 ? 0.06 : h < 250 ? 0.95 : 0.5 * (1 - (h - 250) / 310);
+        const dens = hh < 4 ? 0.06 : h < 250 ? 0.95 : 0.5 * (1 - (h - 250) / 310);
         if (rnd() > dens * (0.55 + 0.45 * cnoise(x / 90, z / 90))) continue;
         W.normal(x, z, nrm);
         if (nrm.y < 0.72) continue;
@@ -925,9 +944,9 @@
         const ht = (h < 250 ? 7 : 5) + rnd() * 6;
         const wd = ht * (0.28 + rnd() * 0.1);
         const trunkH = ht * 0.3;
-        ps.set(x, h - 0.2, z); q.setFromAxisAngle(up, rnd() * 6.28); sc.set(1, trunkH + 0.2, 1);
+        ps.set(x, hh - 0.2, z); q.setFromAxisAngle(up, rnd() * 6.28); sc.set(1, trunkH + 0.2, 1);
         m4.compose(ps, q, sc); trMesh.setMatrixAt(count, m4);
-        ps.set(x, h + trunkH * 0.8, z); sc.set(wd, ht - trunkH * 0.8, wd);
+        ps.set(x, hh + trunkH * 0.8, z); sc.set(wd, ht - trunkH * 0.8, wd);
         m4.compose(ps, q, sc); folMesh.setMatrixAt(count, m4);
         folMesh.setColorAt(count, tmpC.setHex(greens[Math.floor(rnd() * greens.length)]));
         trees.push([x, z, 0.35]);
@@ -945,10 +964,10 @@
       const bushMesh = new THREE.InstancedMesh(bush, new THREE.MeshLambertMaterial({ color: 0x3e5f34 }), 1400);
       let nb = 0;
       for (let tries = 0; tries < 20000 && nb < 1400; tries++) {
-        const a = rnd() * Math.PI * 2, r = 150 + rnd() * 260;
+        const a = rnd() * Math.PI * 2, r = (150 + rnd() * 260) * W.RS;
         const x = r * Math.cos(a), z = r * Math.sin(a);
         const h = W.height(x, z);
-        if (h < 540 || h > 860) continue;
+        if (h < 540 * K || h > 860 * K) continue;
         if (cnoise(x / 37, z / 37) < 0.05) continue;
         W.normal(x, z, nrm);
         if (nrm.y < 0.55 || !clearOf(x, z, 1.5)) continue;
@@ -963,10 +982,10 @@
       const rockMesh = new THREE.InstancedMesh(rock, new THREE.MeshLambertMaterial({ color: 0x8b867f }), 900);
       let nr = 0;
       for (let tries = 0; tries < 20000 && nr < 900; tries++) {
-        const a = rnd() * Math.PI * 2, r = 40 + rnd() * 900;
+        const a = rnd() * Math.PI * 2, r = (40 + rnd() * 900) * W.RS;
         const x = r * Math.cos(a), z = r * Math.sin(a);
         const h = W.height(x, z);
-        if (h < 150) continue;
+        if (h < 150 * K) continue;
         if (!clearOf(x, z, 1.2)) continue;
         ps.set(x, h, z); q.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5, 1).normalize();
         const s = 0.4 + rnd() * 1.6; sc.set(s, s * 0.7, s * 0.9);

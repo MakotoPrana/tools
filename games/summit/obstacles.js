@@ -92,7 +92,7 @@
         y0: st.y0, y1: st.y1, kind, overhang: !!def.overhang, edge: st.edge, ledges: [], thorns: [], anchor: null, ropeHung: false,
       };
       const g = new THREE.Group();
-      const texKey = kind === 'smooth' ? 'smooth' : kind === 'ice' ? 'ice' : st.y0 > 550 ? 'high' : 'rock';
+      const texKey = kind === 'smooth' ? 'smooth' : kind === 'ice' ? 'ice' : st.y0 > W.bands[1].y1 ? 'high' : 'rock';
       const tex = TEX[texKey].clone();
       tex.needsUpdate = true;
       tex.repeat.set(st.halfW * 2 / 4, (H + 2) / 4);
@@ -102,7 +102,7 @@
       box.position.set(0, (H + 3) / 2 - 3, -depth / 2);
       g.add(box);
       // 上の縁の草
-      const lip = new THREE.Mesh(new THREE.BoxGeometry(st.halfW * 2 + 0.2, 0.25, depth + 0.2), mat(st.y1 > 760 ? 0xdfe4e8 : 0x7a8a55));
+      const lip = new THREE.Mesh(new THREE.BoxGeometry(st.halfW * 2 + 0.2, 0.25, depth + 0.2), mat(st.y1 > 0.76 * W.maxY ? 0xdfe4e8 : 0x7a8a55));
       lip.position.set(0, H + 0.05, -depth / 2);
       g.add(lip);
       for (const v of def.ledges || []) {
@@ -470,7 +470,7 @@
       const w = 6, d = 4.5, h = 3;
       const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M.wall);
       body.position.y = h / 2; g.add(body);
-      const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 4.4, 2.2, 4, 1), c.y > 500 ? M.roofBlue : M.roof);
+      const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 4.4, 2.2, 4, 1), c.y > 0.5 * W.maxY ? M.roofBlue : M.roof);
       roof.position.y = h + 1.1; roof.rotation.y = Math.PI / 4; roof.scale.set(1.05, 1, 0.8); g.add(roof);
       const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2, 0.1), M.woodDark);
       door.position.set(0, 1, d / 2 + 0.03); g.add(door);
