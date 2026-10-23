@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>SUMMIT ROUTES</title>
+  <meta name="description" content="ひとつの山を好きな登山口から好きな目的地まで登る3D山登りゲーム。揺れる吊り橋、スタミナを使う岩壁、ターザンロープ。道具を見つけると新しい道が開き、高く登るほど眺めが良くなる。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../">‹ <span data-i18n="gamesList">ゲーム一覧</span></a>
+      <h1>SUMMIT ROUTES</h1>
+      <div class="top-actions">
+        <select id="lang-select" class="lang-select" data-i18n-label="language" aria-label="言語"></select>
+        <button type="button" id="sound-btn" class="icon-btn" data-i18n-label="sound" aria-label="効果音" aria-pressed="true">♪</button>
+      </div>
+    </header>
+
+    <div class="game" id="game">
+      <canvas id="view" aria-label="SUMMIT ROUTES"></canvas>
+
+      <!-- 登山中の表示 -->
+      <div class="hud" id="hud" hidden>
+        <div class="hud-left">
+          <div class="hearts" id="hearts" aria-live="off"></div>
+          <div class="status-effects" id="effects"></div>
+        </div>
+        <div class="hud-right" id="status">
+          <p class="alt" id="alt"></p>
+          <p class="compass" id="compass"></p>
+          <p class="next" id="next"></p>
+          <p class="clock" id="clock"></p>
+        </div>
+        <div class="bag" id="bag">
+          <button type="button" class="bag-btn" id="use-herb"><span class="bag-icon">🌿</span><span id="herb-count">0</span></button>
+          <button type="button" class="bag-btn" id="use-food"><span class="bag-icon">🍙</span><span id="food-count">0</span></button>
+        </div>
+        <svg class="stamina" id="stamina" viewBox="0 0 48 48" aria-hidden="true">
+          <circle class="st-bg" cx="24" cy="24" r="18"></circle>
+          <circle class="st-extra" id="st-extra" cx="24" cy="24" r="22"></circle>
+          <circle class="st-fill" id="st-fill" cx="24" cy="24" r="18"></circle>
+        </svg>
+        <div class="balance" id="balance" aria-hidden="true">
+          <div class="bal-track"><span class="bal-center"></span><span class="bal-mark" id="bal-mark"></span></div>
+        </div>
+        <div class="land-ring" id="land-ring" aria-hidden="true"></div>
+        <p class="prompt" id="prompt"></p>
+        <p class="toast" id="toast" aria-live="polite"></p>
+        <p class="banner" id="banner" aria-live="polite"></p>
+        <div class="vignette" id="vignette"></div>
+      </div>
+
+      <!-- スマホの操作 -->
+      <div class="touch" id="touch" hidden>
+        <div class="stick" id="stick"><span class="stick-knob" id="stick-knob"></span></div>
+        <button type="button" class="tbtn tbtn-jump" id="btn-jump" data-i18n="btnJump">ジャンプ</button>
+        <button type="button" class="tbtn tbtn-use" id="btn-use" data-i18n="btnUse" hidden>使う</button>
+        <button type="button" class="tbtn tbtn-release" id="btn-release" data-i18n="btnRelease" hidden>離す</button>
+        <button type="button" class="tbtn tbtn-photo" id="btn-photo" data-i18n-label="photoMode" aria-label="写真モード">📷</button>
+      </div>
+      <button type="button" class="pause-btn" id="btn-pause" data-i18n-label="pause" aria-label="一時停止" hidden>Ⅱ</button>
+
+      <div class="overlay" id="overlay">
+        <!-- タイトル -->
+        <div class="screen title-screen" id="screen-title">
+          <p class="game-logo"><span class="logo-a">SUMMIT</span><span class="logo-b">ROUTES</span></p>
+          <p class="overlay-text" data-i18n="tagline">好きな道から、山頂へ。</p>
+          <p class="title-progress" id="title-progress"></p>
+          <div class="overlay-actions">
+            <button type="button" class="start-btn" id="btn-continue" data-i18n="continue" hidden>つづきから</button>
+            <button type="button" class="start-btn" id="btn-new" data-i18n="newClimb">登山をはじめる</button>
+            <div class="sub-actions">
+              <button type="button" class="start-btn is-sub" id="btn-title-tools" data-i18n="tools">道具</button>
+              <button type="button" class="start-btn is-sub" id="btn-title-records" data-i18n="records">記録</button>
+              <button type="button" class="start-btn is-sub" id="btn-title-album" data-i18n="album">アルバム</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 山の選択 (山が2つ以上のとき) -->
+        <div class="screen list-screen" id="screen-mountains" hidden>
+          <h2 class="screen-title" data-i18n="chooseMountain">山を選ぶ</h2>
+          <div class="choice-list" id="mountain-list"></div>
+          <button type="button" class="text-btn" id="mountains-back" data-i18n="back">戻る</button>
+        </div>
+
+        <!-- 山の地図 -->
+        <div class="screen map-screen" id="screen-map" hidden>
+          <div class="map-head">
+            <h2 class="screen-title" id="map-title"></h2>
+            <p class="map-step" id="map-step"></p>
+          </div>
+          <div class="map-body">
+            <div class="map-canvas-wrap"><canvas id="map-canvas" width="720" height="720"></canvas></div>
+            <div class="map-panel" id="map-panel"></div>
+          </div>
+          <div class="map-foot" id="map-foot"></div>
+        </div>
+
+        <!-- 一時停止 -->
+        <div class="screen list-screen" id="screen-pause" hidden>
+          <h2 class="screen-title" data-i18n="paused">一時停止</h2>
+          <p class="pause-info" id="pause-info"></p>
+          <div class="choice-list">
+            <button type="button" class="start-btn" id="pause-resume" data-i18n="resume">再開</button>
+            <button type="button" class="start-btn is-sub" id="pause-tools" data-i18n="tools">道具</button>
+            <button type="button" class="start-btn is-sub" id="pause-checkpoint" data-i18n="fromCheckpoint">最後のチェックポイントから</button>
+            <button type="button" class="start-btn is-sub" id="pause-map" data-i18n="viewMap">地図を見る</button>
+            <button type="button" class="start-btn is-sub" id="pause-quit" data-i18n="quitClimb">登山をやめる</button>
+          </div>
+        </div>
+
+        <!-- 到着 -->
+        <div class="screen list-screen" id="screen-arrive" hidden>
+          <p class="arrive-title" id="arrive-title"></p>
+          <p class="arrive-name" id="arrive-name"></p>
+          <dl class="arrive-stats" id="arrive-stats"></dl>
+          <div class="choice-list">
+            <button type="button" class="start-btn" id="arrive-map" data-i18n="toMap">地図へ</button>
+            <button type="button" class="start-btn is-sub" id="arrive-again" data-i18n="sameRoute">同じ道をもう一度</button>
+          </div>
+        </div>
+
+        <!-- 道具 -->
+        <div class="screen list-screen" id="screen-tools" hidden>
+          <h2 class="screen-title" data-i18n="tools">道具</h2>
+          <div class="tool-summary" id="tool-summary"></div>
+          <div class="tool-grid" id="tool-grid"></div>
+          <button type="button" class="text-btn" id="tools-back" data-i18n="back">戻る</button>
+        </div>
+
+        <!-- 記録 -->
+        <div class="screen list-screen wide" id="screen-records" hidden>
+          <h2 class="screen-title" data-i18n="records">記録</h2>
+          <div class="records-body">
+            <div class="map-canvas-wrap small"><canvas id="rec-canvas" width="480" height="480"></canvas></div>
+            <div class="records-text" id="records-text"></div>
+          </div>
+          <button type="button" class="text-btn" id="records-back" data-i18n="back">戻る</button>
+        </div>
+
+        <!-- アルバム -->
+        <div class="screen list-screen wide" id="screen-album" hidden>
+          <h2 class="screen-title" data-i18n="album">アルバム</h2>
+          <p class="album-count" id="album-count"></p>
+          <div class="album-grid" id="album-grid"></div>
+          <button type="button" class="text-btn" id="album-back" data-i18n="back">戻る</button>
+        </div>
+
+        <!-- 力尽きた -->
+        <div class="screen dead-screen" id="screen-dead" hidden>
+          <p class="dead-text" id="dead-text"></p>
+        </div>
+
+        <!-- 読み込み中 -->
+        <div class="screen loading-screen" id="screen-loading" hidden>
+          <p class="loading-text" data-i18n="loading">山を読み込んでいます…</p>
+        </div>
+      </div>
+
+      <!-- 写真モード -->
+      <div class="photo-ui" id="photo-ui" hidden>
+        <p class="photo-hint" data-i18n="photoHint">ドラッグで向きを変える</p>
+        <button type="button" class="shutter" id="btn-shutter" data-i18n-label="takePhoto" aria-label="撮る"></button>
+        <button type="button" class="text-btn photo-close" id="btn-photo-close" data-i18n="close">とじる</button>
+      </div>
+      <div class="flash" id="flash"></div>
+
+      <p class="load-error" id="load-error" data-i18n="loadError" hidden>3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。</p>
+    </div>
+
+    <section class="help" data-lang="ja">
+      <h2>遊び方</h2>
+      <p>大きな山を、好きな登山口から好きな目的地まで登るゲームです。地図で登山口と目的地を選ぶと、道の候補 (最短・易しい・景色の良い) が出ます。道の途中には、揺れる吊り橋、スタミナを使って登る岩壁、ターザンロープなどの難所があります。高いところほど難所が多く、そのかわり遠くまで見渡せます。</p>
+      <h3>体力とスタミナ</h3>
+      <p>左上のハートが体力です。イラクサ・ウルシ・イバラなどの危険な植物に触れたり、6m 以上の高さから落ちたりすると減り、なくなると最後に通ったチェックポイントからやり直します (見つけた道具はなくなりません)。走る・壁を登る・ロープにぶら下がるとスタミナ (キャラクターの横の輪) が減ります。0 になると手が離れます。</p>
+      <h3>チェックポイントと道具</h3>
+      <p>山小屋・祠・テント場に着くと自動でセーブし、体力とスタミナが全快します。山の中で鉈・革手袋・ロープ・鉤縄・ピッケル・アイゼンを見つけると、それまで通れなかった近道が通れるようになります。祠のお守りを4つ集めるとハートが1つ増え、展望スポットを4か所見つけるとスタミナが増えます。</p>
+      <h3>パソコンの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>WASD / 矢印</th><td>移動</td></tr>
+          <tr><th>マウスでドラッグ</th><td>カメラを回す</td></tr>
+          <tr><th>スペース</th><td>ジャンプ / 壁で飛びつき / ロープから飛ぶ</td></tr>
+          <tr><th>Shift 長押し / Ctrl 長押し</th><td>走る / そっと歩く (吊り橋で揺れにくい)</td></tr>
+          <tr><th>E</th><td>使う (道具、水を飲む、山小屋で補充)</td></tr>
+          <tr><th>X</th><td>壁やロープから手を離す</td></tr>
+          <tr><th>1 / 2</th><td>薬草 / 携帯食</td></tr>
+          <tr><th>P / Esc</th><td>写真モード / 一時停止</td></tr>
+        </tbody>
+      </table>
+      <h3>スマホの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>画面の左半分をなぞる</th><td>移動。大きく倒すと走る、少しだけ倒すとそっと歩く</td></tr>
+          <tr><th>画面の右半分をなぞる</th><td>カメラを回す</td></tr>
+          <tr><th>ボタン</th><td>ジャンプ、使う、離す、写真</td></tr>
+        </tbody>
+      </table>
+      <p>吊り橋や丸太の上では、足もとのゲージが傾きを示します。傾いた方と反対に移動の操作を入れて立て直しましょう。ゲーム機のコントローラーにも対応しています。</p>
+    </section>
+
+    <section class="help" data-lang="en" hidden>
+      <h2>How to play</h2>
+      <p>Climb one big mountain from any trailhead to any destination. Pick a start and a goal on the map to get route suggestions (shortest, easiest, most scenic). Along the way you'll face swaying suspension bridges, rock walls you climb with stamina, and rope swings. The higher you go, the more obstacles there are — and the better the view.</p>
+      <h3>Hearts and stamina</h3>
+      <p>The hearts in the top left are your health. Touching nettles, poison ivy or thorns, or falling 6 m or more, costs hearts. Run out and you restart from the last checkpoint you passed (you keep every tool you found). Running, climbing and hanging on ropes use stamina (the ring beside your hiker). When it runs out, you let go.</p>
+      <h3>Checkpoints and tools</h3>
+      <p>Reaching a hut, shrine or campsite saves your game and fully restores hearts and stamina. Find the machete, leather gloves, rope, grappling hook, ice axe and crampons to open shortcuts you couldn't take before. Every 4 charms from the shrines add a heart, and every 4 viewpoints you discover add stamina.</p>
+      <h3>Keyboard and mouse</h3>
+      <table>
+        <tbody>
+          <tr><th>WASD / Arrows</th><td>Move</td></tr>
+          <tr><th>Drag the mouse</th><td>Turn the camera</td></tr>
+          <tr><th>Space</th><td>Jump / lunge up a wall / leap off a rope</td></tr>
+          <tr><th>Hold Shift / Hold Ctrl</th><td>Run / Tiptoe (less sway on bridges)</td></tr>
+          <tr><th>E</th><td>Use (tools, drink water, restock at huts)</td></tr>
+          <tr><th>X</th><td>Let go of a wall or rope</td></tr>
+          <tr><th>1 / 2</th><td>Herb / Trail food</td></tr>
+          <tr><th>P / Esc</th><td>Photo mode / Pause</td></tr>
+        </tbody>
+      </table>
+      <h3>Touch</h3>
+      <table>
+        <tbody>
+          <tr><th>Drag on the left half</th><td>Move. Push far to run, just a little to tiptoe</td></tr>
+          <tr><th>Drag on the right half</th><td>Turn the camera</td></tr>
+          <tr><th>Buttons</th><td>Jump, Use, Let go, Photo</td></tr>
+        </tbody>
+      </table>
+      <p>On bridges and logs, the gauge at your feet shows how far you're leaning. Push the other way to regain your balance. Game controllers work too.</p>
+    </section>
+
+    <section class="help" data-lang="zh" hidden>
+      <h2>玩法</h2>
+      <p>从任意登山口出发，登上一座大山的任意目的地。在地图上选择起点和终点后，会给出路线建议（最短、最轻松、风景最好）。途中有摇晃的吊桥、需要耐力攀爬的岩壁、可以荡过去的绳索等难关。越往高处难关越多，景色也越好。</p>
+      <h3>体力与耐力</h3>
+      <p>左上角的心形是体力。碰到荨麻、漆树、荆棘等危险植物，或从 6 米以上的高处落下都会减少体力，耗尽后会从最后经过的检查点重新开始（找到的道具不会丢失）。奔跑、攀爬岩壁、抓着绳索都会消耗耐力（角色旁边的圆环），耗尽后就会松手。</p>
+      <h3>检查点与道具</h3>
+      <p>到达山屋、神祠或营地时会自动存档，并完全恢复体力和耐力。在山中找到柴刀、皮手套、绳索、钩绳、冰镐、冰爪后，就能通过以前走不了的近路。每收集 4 个神祠的护身符，心形增加 1 个；每发现 4 个观景点，耐力增加。</p>
+      <h3>键盘与鼠标</h3>
+      <table>
+        <tbody>
+          <tr><th>WASD / 方向键</th><td>移动</td></tr>
+          <tr><th>拖动鼠标</th><td>转动镜头</td></tr>
+          <tr><th>空格</th><td>跳跃 / 在岩壁上猛攀 / 从绳索跃出</td></tr>
+          <tr><th>按住 Shift / 按住 Ctrl</th><td>奔跑 / 轻轻走（在吊桥上不易晃动）</td></tr>
+          <tr><th>E</th><td>使用（道具、喝水、在山屋补给）</td></tr>
+          <tr><th>X</th><td>从岩壁或绳索上松手</td></tr>
+          <tr><th>1 / 2</th><td>草药 / 干粮</td></tr>
+          <tr><th>P / Esc</th><td>拍照模式 / 暂停</td></tr>
+        </tbody>
+      </table>
+      <h3>触屏</h3>
+      <table>
+        <tbody>
+          <tr><th>在左半边拖动</th><td>移动。推得远就跑，推一点就轻轻走</td></tr>
+          <tr><th>在右半边拖动</th><td>转动镜头</td></tr>
+          <tr><th>按钮</th><td>跳跃、使用、松手、拍照</td></tr>
+        </tbody>
+      </table>
+      <p>在吊桥和圆木上，脚下的仪表显示身体的倾斜。向相反方向操作即可恢复平衡。也支持游戏手柄。</p>
+    </section>
+
+    <section class="help" data-lang="ko" hidden>
+      <h2>플레이 방법</h2>
+      <p>큰 산 하나를 원하는 등산로 입구에서 원하는 목적지까지 오르는 게임입니다. 지도에서 출발지와 목적지를 고르면 길 후보(최단, 쉬운 길, 경치 좋은 길)가 나옵니다. 길 중간에는 흔들리는 출렁다리, 스태미나를 써서 오르는 암벽, 타잔 로프 같은 난관이 있습니다. 높이 올라갈수록 난관이 많아지는 대신 멀리까지 내다보입니다.</p>
+      <h3>체력과 스태미나</h3>
+      <p>왼쪽 위의 하트가 체력입니다. 쐐기풀, 옻나무, 가시덤불 같은 위험한 식물에 닿거나 6m 이상 높이에서 떨어지면 줄어들고, 다 없어지면 마지막으로 지난 체크포인트에서 다시 시작합니다(찾은 도구는 없어지지 않습니다). 달리기, 암벽 오르기, 로프에 매달리기는 스태미나(캐릭터 옆의 고리)를 씁니다. 0이 되면 손을 놓칩니다.</p>
+      <h3>체크포인트와 도구</h3>
+      <p>산장, 사당, 야영지에 도착하면 자동으로 저장되고 체력과 스태미나가 모두 회복됩니다. 산속에서 마체테, 가죽 장갑, 로프, 갈고리, 피켈, 아이젠을 찾으면 전에는 지나갈 수 없던 지름길이 열립니다. 사당의 부적을 4개 모을 때마다 하트가 1개 늘고, 전망 명소를 4곳 찾을 때마다 스태미나가 늘어납니다.</p>
+      <h3>키보드와 마우스</h3>
+      <table>
+        <tbody>
+          <tr><th>WASD / 방향키</th><td>이동</td></tr>
+          <tr><th>마우스 드래그</th><td>카메라 돌리기</td></tr>
+          <tr><th>스페이스</th><td>점프 / 암벽에서 도약 / 로프에서 뛰어내리기</td></tr>
+          <tr><th>Shift 누르기 / Ctrl 누르기</th><td>달리기 / 살금살금 걷기(출렁다리에서 덜 흔들림)</td></tr>
+          <tr><th>E</th><td>사용(도구, 물 마시기, 산장에서 보충)</td></tr>
+          <tr><th>X</th><td>벽이나 로프에서 손 놓기</td></tr>
+          <tr><th>1 / 2</th><td>약초 / 행동식</td></tr>
+          <tr><th>P / Esc</th><td>사진 모드 / 일시 정지</td></tr>
+        </tbody>
+      </table>
+      <h3>터치</h3>
+      <table>
+        <tbody>
+          <tr><th>화면 왼쪽 절반을 드래그</th><td>이동. 크게 밀면 달리고, 조금만 밀면 살금살금 걷기</td></tr>
+          <tr><th>화면 오른쪽 절반을 드래그</th><td>카메라 돌리기</td></tr>
+          <tr><th>버튼</th><td>점프, 사용, 손 놓기, 사진</td></tr>
+        </tbody>
+      </table>
+      <p>출렁다리와 통나무 위에서는 발밑의 게이지가 기울기를 보여 줍니다. 기운 쪽의 반대로 이동 조작을 넣어 균형을 잡으세요. 게임 컨트롤러도 쓸 수 있습니다.</p>
+    </section>
+  </main>
+
+  <script src="../origami-intro.js"></script>
+  <script>OrigamiIntro.play();</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="i18n.js?v=1"></script>
+  <script src="items.js?v=1"></script>
+  <script src="hazards.js?v=1"></script>
+  <script src="terrain.js?v=1"></script>
+  <script src="obstacles.js?v=1"></script>
+  <script src="mountains/index.js?v=1"></script>
+  <script src="script.js?v=1"></script>
+</body>
+</html>

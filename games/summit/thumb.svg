@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <!-- ゲーム一覧 (games/index.html) のタイル画像。雲海から突き出た山と、尾根の吊り橋 -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d7fd6"/>
+      <stop offset="1" stop-color="#cfe3f2"/>
+    </linearGradient>
+    <linearGradient id="rock" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a39f98"/>
+      <stop offset="1" stop-color="#6f6a63"/>
+    </linearGradient>
+    <linearGradient id="cloud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e6edf3"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="200" fill="url(#sky)"/>
+  <circle cx="262" cy="42" r="16" fill="#fff6d8"/>
+  <!-- 遠くの山並み -->
+  <path d="M0 132 L40 104 L72 120 L112 92 L150 124 L0 140Z" fill="#8fa6c4"/>
+  <path d="M190 128 L236 98 L268 116 L300 96 L320 108 L320 140 L190 140Z" fill="#8fa6c4"/>
+  <!-- 山 -->
+  <path d="M60 150 L150 36 L168 30 L182 40 L270 150Z" fill="url(#rock)"/>
+  <path d="M150 36 L168 30 L182 40 L176 50 L166 44 L156 52Z" fill="#f1f4f8"/>
+  <path d="M96 120 L130 82 L148 92 L120 128Z" fill="#4c6d3c" opacity="0.7"/>
+  <!-- 道 -->
+  <path d="M112 150 C130 128 150 128 170 112 S 200 92 176 74 S 150 62 166 46" fill="none" stroke="#c9a875" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 0"/>
+  <!-- 岩壁 -->
+  <rect x="186" y="84" width="20" height="26" fill="#7d776e"/>
+  <path d="M190 88 l4 6 l-3 6 M198 92 l3 8 M194 102 l5 4" stroke="#4d4740" stroke-width="1.2" fill="none"/>
+  <!-- 吊り橋 -->
+  <path d="M118 110 Q 138 118 158 104" fill="none" stroke="#7a5432" stroke-width="3"/>
+  <path d="M118 102 Q 138 110 158 96" fill="none" stroke="#d9c08a" stroke-width="1.2"/>
+  <path d="M118 102 v8 M158 96 v8" stroke="#5e4029" stroke-width="2.5"/>
+  <!-- ハイカー -->
+  <g transform="translate(140 110)">
+    <rect x="-3" y="-11" width="6" height="7" rx="1" fill="#e0562f"/>
+    <rect x="-5" y="-11" width="3" height="6" fill="#2f6fb3"/>
+    <circle cx="0" cy="-14" r="2.3" fill="#f1c9a5"/>
+    <rect x="-3.4" y="-17" width="6.8" height="1.4" rx="0.7" fill="#e8d9b0"/>
+    <rect x="-2.6" y="-4" width="2" height="6" fill="#34465c"/>
+    <rect x="0.6" y="-4" width="2" height="6" fill="#34465c"/>
+  </g>
+  <!-- 旗 (山頂) -->
+  <path d="M168 30 v-14" stroke="#555" stroke-width="1.5"/>
+  <path d="M168 16 l12 4 l-12 4z" fill="#ff8a1f"/>
+  <!-- 雲海 -->
+  <path d="M0 140 C30 128 60 146 90 136 S 150 148 190 136 S 260 146 320 134 V200 H0Z" fill="url(#cloud)"/>
+  <path d="M0 162 C40 152 80 168 130 158 S 230 170 320 156 V200 H0Z" fill="#ffffff" opacity="0.85"/>
+</svg>
