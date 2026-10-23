@@ -548,6 +548,14 @@ body {
   .top h1 { font-size: 0.85rem; letter-spacing: 0.06em; }
   .toast { max-width: calc(100% - 140px); font-size: 0.8rem; }
 }
+@media (max-width: 440px) {
+  .top { gap: 4px; }
+  .back span { display: none; }
+  .top h1 { font-size: 0.78rem; letter-spacing: 0.02em; }
+  .top-actions { gap: 4px; }
+  .lang-select { max-width: 5.6em; padding: 0 2px; }
+  .icon-btn { width: 30px; }
+}
 @media (pointer: coarse) {
   .prompt { bottom: 120px; }
 }

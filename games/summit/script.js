@@ -187,8 +187,23 @@
   // =====================================================================
   const canvas = $('view');
   const gameEl = $('game');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  // 省電力モード: スマホでは最初からオン。30fps、解像度ひかえめ、草木を減らす
+  const ecoStored = store.get('summit-eco');
+  let eco = ecoStored ? ecoStored === 'on' : matchMedia('(pointer: coarse)').matches;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !eco, powerPreference: eco ? 'low-power' : 'high-performance' });
+  const pixelRatio = () => Math.min(window.devicePixelRatio || 1, eco ? 1.25 : 1.75);
+  renderer.setPixelRatio(pixelRatio());
+  const ecoBtn = $('eco-btn');
+  ecoBtn.setAttribute('aria-pressed', String(eco));
+  ecoBtn.addEventListener('click', () => {
+    eco = !eco;
+    ecoBtn.setAttribute('aria-pressed', String(eco));
+    store.set('summit-eco', eco ? 'on' : 'off');
+    renderer.setPixelRatio(pixelRatio());
+    resize();
+    if (S) S.setEco(eco);
+    toast(t(eco ? 'ecoOn' : 'ecoOff'), 2.5);
+  });
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, 1, 0.3, 26000);
   const hemi = new THREE.HemisphereLight(0xdcecff, 0x5d6b45, 0.75);
@@ -226,7 +241,7 @@
     while (scene.children.length) scene.remove(scene.children[0]);
     scene.add(hemi, sun, player.group, shadowBlob, guide, hookLine, rain, handCursor, candRing, reachRing);
     W = window.SummitTerrain.build(window.SUMMIT_MOUNTAINS[id]);
-    S = window.SummitTerrain.createScene(W, scene);
+    S = window.SummitTerrain.createScene(W, scene, { eco });
     O = window.SummitObstacles.create(W, scene);
     mountainId = id;
     MAP_E = W.footR * 1.22;
@@ -2771,6 +2786,9 @@
   let saveTimer = 0;
   function frame(now) {
     requestAnimationFrame(frame);
+    // 描く回数をおさえる (省電力は登山中 30fps、メニューの後ろはさらに少なく)
+    const fps = mode === 'play' || mode === 'photo' ? (eco ? 30 : 60) : (eco ? 20 : 30);
+    if (now - last < 1000 / fps - 3) return;
     let dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     perfTime += dt;

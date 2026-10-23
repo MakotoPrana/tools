@@ -7,7 +7,7 @@ window.SUMMIT_I18N = {
   ui: {
     ja: {
       climbTip: '左右の手を別々に動かして、白いホールドをつかもう (画面の左半分 = 左手、右半分 = 右手 / WASD と矢印キー)', noHoldHere: 'ここにはつかめるところがない', thornHold: 'イバラのホールドで手が離れた!', gripLost: '手が離れた!', strainFall: '無理な体勢で落ちた!', oneHand: '片手!', strained: '無理な体勢!', resting: '出っぱりで休んでいる', climbHelpTouch: '左半分 = 左手 / 右半分 = 右手', climbHelpKb: 'WASD = 左手 / 矢印 = 右手 / マウスの左右でも', mapToggle: '地図', mapClose: '地図をタップするか M キーで閉じる', balanceTip: '傾いた方と反対へ動こうとすると立て直せる',
-      gamesList: 'ゲーム一覧', language: '言語', sound: '効果音', pause: '一時停止', photoMode: '写真モード', takePhoto: '撮る',
+      gamesList: 'ゲーム一覧', language: '言語', sound: '効果音', eco: '省電力モード (スマホが熱くなるとき)', ecoOn: '省電力モード: オン (30fps・画質ひかえめ)', ecoOff: '省電力モード: オフ', pause: '一時停止', photoMode: '写真モード', takePhoto: '撮る',
       loadError: '3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。',
       loading: '山を読み込んでいます…',
       tagline: '好きな道から、山頂へ。',
@@ -61,7 +61,7 @@ window.SUMMIT_I18N = {
     },
     en: {
       climbTip: 'Move each hand on its own and grab the white holds (left half of the screen = left hand, right half = right hand / WASD and arrow keys)', noHoldHere: 'Nothing to grip here', thornHold: 'Thorny hold — you let go!', gripLost: 'You lost your grip!', strainFall: 'Too stretched — you fell!', oneHand: 'One hand!', strained: 'Overstretched!', resting: 'Resting on the ledge', climbHelpTouch: 'Left half = left hand / Right half = right hand', climbHelpKb: 'WASD = left hand / Arrows = right hand / or drag either side', mapToggle: 'Map', mapClose: 'Tap the map or press M to close', balanceTip: 'Push toward the opposite side of your lean to recover',
-      gamesList: 'Games', language: 'Language', sound: 'Sound', pause: 'Pause', photoMode: 'Photo mode', takePhoto: 'Take photo',
+      gamesList: 'Games', language: 'Language', sound: 'Sound', eco: 'Battery saver (if your phone gets hot)', ecoOn: 'Battery saver: on (30fps, lighter graphics)', ecoOff: 'Battery saver: off', pause: 'Pause', photoMode: 'Photo mode', takePhoto: 'Take photo',
       loadError: 'Could not load the 3D library. Check your connection and reload the page.',
       loading: 'Loading the mountain…',
       tagline: 'Any route you like, all the way to the top.',
@@ -115,7 +115,7 @@ window.SUMMIT_I18N = {
     },
     zh: {
       climbTip: '分别移动左右手，抓住白色的岩点（屏幕左半边 = 左手，右半边 = 右手 / WASD 和方向键）', noHoldHere: '这里没有可以抓的地方', thornHold: '荆棘岩点，手松开了!', gripLost: '手滑脱了!', strainFall: '姿势太勉强，掉下去了!', oneHand: '单手!', strained: '姿势太勉强!', resting: '在岩台上休息', climbHelpTouch: '左半边 = 左手 / 右半边 = 右手', climbHelpKb: 'WASD = 左手 / 方向键 = 右手 / 也可用鼠标拖动左右两侧', mapToggle: '地图', mapClose: '点击地图或按 M 键关闭', balanceTip: '向倾斜的反方向移动即可恢复平衡',
-      gamesList: '游戏列表', language: '语言', sound: '音效', pause: '暂停', photoMode: '拍照模式', takePhoto: '拍照',
+      gamesList: '游戏列表', language: '语言', sound: '音效', eco: '省电模式（手机发热时）', ecoOn: '省电模式：开（30fps，画质降低）', ecoOff: '省电模式：关', pause: '暂停', photoMode: '拍照模式', takePhoto: '拍照',
       loadError: '无法加载 3D 组件。请检查网络后重新加载页面。',
       loading: '正在加载山…',
       tagline: '走你喜欢的路，登上山顶。',
@@ -169,7 +169,7 @@ window.SUMMIT_I18N = {
     },
     ko: {
       climbTip: '양손을 따로 움직여 흰 홀드를 잡자 (화면 왼쪽 절반 = 왼손, 오른쪽 절반 = 오른손 / WASD와 방향키)', noHoldHere: '여기에는 잡을 곳이 없다', thornHold: '가시 홀드라 손을 놓쳤다!', gripLost: '손이 미끄러졌다!', strainFall: '무리한 자세로 떨어졌다!', oneHand: '한 손!', strained: '무리한 자세!', resting: '바위턱에서 쉬는 중', climbHelpTouch: '왼쪽 절반 = 왼손 / 오른쪽 절반 = 오른손', climbHelpKb: 'WASD = 왼손 / 방향키 = 오른손 / 마우스로 좌우를 드래그해도 된다', mapToggle: '지도', mapClose: '지도를 탭하거나 M 키로 닫기', balanceTip: '기운 쪽의 반대로 움직이려고 하면 균형을 잡을 수 있다',
-      gamesList: '게임 목록', language: '언어', sound: '효과음', pause: '일시 정지', photoMode: '사진 모드', takePhoto: '찍기',
+      gamesList: '게임 목록', language: '언어', sound: '효과음', eco: '절전 모드 (휴대폰이 뜨거워질 때)', ecoOn: '절전 모드: 켬 (30fps, 가벼운 화질)', ecoOff: '절전 모드: 끔', pause: '일시 정지', photoMode: '사진 모드', takePhoto: '찍기',
       loadError: '3D 부품을 불러오지 못했습니다. 통신 상태를 확인하고 페이지를 새로 고쳐 주세요.',
       loading: '산을 불러오는 중…',
       tagline: '원하는 길로, 정상까지.',

@@ -745,7 +745,8 @@
   // =====================================================================
   // three.js の部品 (地形・草木・空・雲海・海・遠くの山・チェックポイントの建物)
   // =====================================================================
-  function createScene(W, scene) {
+  function createScene(W, scene, opts) {
+    opts = opts || {};
     const THREE = root.THREE;
     const M = W.M;
     const rnd = mulberry32((M.terrain.seed || 1) + 5);
@@ -940,7 +941,9 @@
     scene.add(sea);
 
     // ---- 近くの細かい区画 (32m 四方、2m ごと) ----
-    const CH = 32, CN = 16, RAD = 4;
+    const CH = 32, CN = 16;
+    // 省電力のときは細かい区画を狭くする (9×9 → 7×7)
+    let RAD = opts.eco ? 3 : 4;
     const chunks = new Map();
     let curCx = null, curCz = null;
     const ckey = (i, j) => i * 10007 + j;
@@ -979,6 +982,7 @@
 
     // ---- 足もとの草 (キャラクターのまわり 70m だけ。区画を切りかえるたびに置き直す) ----
     const GRASS_N = 2400;
+    let grassCap = opts.eco ? 1000 : GRASS_N;
     let grassMesh = null;
     {
       const pos = [], col = [];
@@ -1005,7 +1009,7 @@
     function rebuildGrass(cx, cz) {
       const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
       let n = 0;
-      for (let tries = 0; tries < GRASS_N * 3 && n < GRASS_N; tries++) {
+      for (let tries = 0; tries < grassCap * 3 && n < grassCap; tries++) {
         const a = grassRnd() * Math.PI * 2, r = Math.sqrt(grassRnd()) * 75;
         const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
         const h = W.height(x, z, true, info);
@@ -1047,6 +1051,7 @@
       }
       return true;
     }
+    let treeEco = null;
     {
       // 木: 段になった針葉樹と、麓の丸い広葉樹 (幹ごと1つの形にして、色は頂点の明暗 × 木ごとの色)
       const conifer = treeGeometry(THREE, 'conifer');
@@ -1094,7 +1099,9 @@
         if (!treeGrid.has(k)) treeGrid.set(k, []);
         treeGrid.get(k).push(trees[trees.length - 1]);
       }
-      conMesh.count = nc; brMesh.count = nbr;
+      // 省電力のときは木を減らす (置いた順は場所がばらばらなので、後ろを削れば均等にまばらになる)
+      treeEco = (e) => { conMesh.count = e ? Math.floor(nc * 0.55) : nc; brMesh.count = e ? Math.floor(nbr * 0.55) : nbr; };
+      treeEco(!!opts.eco);
       if (conMesh.instanceColor) conMesh.instanceColor.needsUpdate = true;
       if (brMesh.instanceColor) brMesh.instanceColor.needsUpdate = true;
       scene.add(conMesh, brMesh);
@@ -1312,6 +1319,11 @@
     return {
       update(px, pz, budget) { updateNear(px, pz, budget == null ? 3 : budget); },
       prime(px, pz) { updateNear(px, pz, 1e9); },
+      setEco(e) {
+        RAD = e ? 3 : 4; grassCap = e ? 1000 : GRASS_N;
+        if (treeEco) treeEco(e);
+        curCx = curCz = null; // 次の update で区画と草を置き直す
+      },
       treesNear,
       sky, skyMat, farMat, cloud: W._cloud, sea,
       tick(dt) {
