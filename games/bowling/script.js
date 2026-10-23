@@ -74,6 +74,8 @@
     result: $('screen-result'),
   };
   const startBtn = $('start-btn');
+  const titleOverall = $('title-overall');
+  const selectOverall = $('select-overall');
   const titleRecordsBtn = $('title-records');
   const worldPrev = $('world-prev');
   const worldNext = $('world-next');
@@ -1721,6 +1723,11 @@
       });
     }
   } catch (e) { /* 読めなければ引きつがない */ }
+  // ストライクを取ったステージは、スペアも取ったことにする (前の版で保存した記録もそろえる)
+  for (const r of Object.values(records)) {
+    if (r && r.s) r.p = 1;
+    if (r && r.st) r.pt = 1;
+  }
   const saveRecords = () => store.set(RECORD_KEY, JSON.stringify(records));
   const rec = (w, s) => records[stageId(w, s)] || (records[stageId(w, s)] = {});
   const peek = (w, s) => records[stageId(w, s)] || {};
@@ -1731,6 +1738,38 @@
     return cleared(w - 1, WORLDS[w - 1].stages.length - 1);
   }
   const worldUnlocked = (w) => isUnlocked(w, 0);
+  // 全体の達成率: 1ステージにつき、4つの記録と宝物の5つ
+  const PER_STAGE = 5;
+  function overallProgress() {
+    const sum = tally();
+    const got = sum.s + sum.p + sum.st + sum.pt + sum.t;
+    const max = sum.total * PER_STAGE;
+    return { sum, got, max, pct: Math.floor((got / max) * 100) };
+  }
+  function renderOverall(el) {
+    const o = overallProgress();
+    el.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'overall-head';
+    const label = document.createElement('span');
+    label.textContent = t('overallTitle');
+    const pct = document.createElement('strong');
+    pct.textContent = `${o.pct}%`;
+    head.append(label, pct);
+    const bar = document.createElement('div');
+    bar.className = 'overall-bar';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', String(o.max));
+    bar.setAttribute('aria-valuenow', String(o.got));
+    bar.setAttribute('aria-label', t('overallTitle'));
+    const fill = document.createElement('span');
+    fill.style.width = `${(o.got / o.max) * 100}%`;
+    bar.append(fill);
+    const detail = document.createElement('p');
+    detail.textContent = t('overallDetail', { c: o.sum.clear, n: o.sum.total, a: o.got, m: o.max, tr: o.sum.t });
+    el.append(head, bar, detail);
+  }
   function tally(filterWorld) {
     const sum = { s: 0, p: 0, st: 0, pt: 0, t: 0, n: 0, r: 0, clear: 0, total: 0 };
     WORLDS.forEach((wd, w) => {
@@ -1844,6 +1883,7 @@
     overlay.hidden = !name;
     if (name === 'select') renderSelect();
     if (name === 'records') renderRecords();
+    if (name === 'title') renderOverall(titleOverall);
   }
 
   function useWorld(w) {
@@ -1969,13 +2009,10 @@
     if (!tr || tr.taken) return;
     tr.taken = true;
     tr.burst = 0.001;
-    const r = rec(worldIndex, stageIndex);
-    const first = !r.t;
-    r.t = 1;
-    saveRecords();
+    // 宝物は、ステージをクリアしたときに持ち帰ったことになる (ここではまだ保存しない)
     chime();
     const name = treasureName(tr.def.kind);
-    showToast(first ? t('toastNew', { name }) : t('toastAgain', { name }));
+    showToast(tr.owned ? t('toastAgain', { name }) : t('toastNew', { name }));
     updateHud();
   }
 
@@ -2014,7 +2051,9 @@
   function stageClear(kind) {
     const r = rec(worldIndex, stageIndex);
     const withTreasure = Boolean(treasure && treasure.taken);
-    const keys = kind === 'strike' ? ['s', withTreasure && 'st'] : ['p', withTreasure && 'pt'];
+    // ストライクはスペアも取ったことにする
+    const keys = kind === 'strike' ? ['s', 'p', withTreasure && 'st', withTreasure && 'pt'] : ['p', withTreasure && 'pt'];
+    if (withTreasure) keys.push('t');
     const fresh = keys.filter((k) => k && !r[k]);
     for (const k of keys) if (k) r[k] = 1;
     r.c = (r.c || 0) + 1;
@@ -2037,7 +2076,7 @@
     const tr = treasure;
     const lines = [kind ? t(kind === 'strike' ? 'resultStrike' : 'resultSpare') : t('resultFail', { n: left })];
     const name = tr ? treasureName(tr.def.kind) : '';
-    if (tr && tr.taken && !tr.owned) lines.push(t('resultTreasureNew', { name }));
+    if (tr && tr.taken && !tr.owned) lines.push(t(kind ? 'resultTreasureNew' : 'resultTreasureLost', { name }));
     else if (tr && (tr.taken || tr.owned)) lines.push(t('resultTreasureOwned', { name }));
     else lines.push(t('resultTreasureNone'));
     resultText.textContent = lines.join('\n');
@@ -2093,6 +2132,7 @@
   // ---- ステージ選択 ----
   const MARKS = [['s', 'X'], ['p', '/'], ['st', 'X◆'], ['pt', '/◆']];
   function renderSelect() {
+    renderOverall(selectOverall);
     const w = selWorld;
     const wd = WORLDS[w];
     const open = worldUnlocked(w);
@@ -2164,7 +2204,9 @@
   // ---- 成績 ----
   function renderRecords() {
     const all = tally();
+    const o = overallProgress();
     const cells = [
+      ['overallShort', `${o.pct}%`],
       ['clearAll', `${all.clear}/${all.total}`],
       ['rec_s', `${all.s}/${all.total}`],
       ['rec_p', `${all.p}/${all.total}`],
@@ -2172,7 +2214,6 @@
       ['rec_pt', `${all.pt}/${all.total}`],
       ['treasures', `${all.t}/${all.total}`],
       ['plays', String(all.n)],
-      ['throws', String(all.r)],
     ];
     recSummary.innerHTML = '';
     for (const [key, value] of cells) {
@@ -2228,6 +2269,7 @@
     for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t(el.dataset.i18nLabel));
     for (const el of document.querySelectorAll('.help[data-lang]')) el.hidden = el.dataset.lang !== lang;
     renderStageBar();
+    if (state === 'title') renderOverall(titleOverall);
     if (state === 'select') renderSelect();
     if (state === 'records') renderRecords();
     if (state === 'done') {

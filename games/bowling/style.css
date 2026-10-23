@@ -344,6 +344,14 @@ body {
 .nav-btn:focus-visible { outline: 2px solid #ffd25e; outline-offset: 2px; }
 .screen-links { display: flex; gap: 18px; }
 
+/* 全体の達成率 */
+.overall { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 4px; }
+.overall-head { display: flex; justify-content: space-between; align-items: baseline; color: #e9e4d8; font-size: 0.8rem; font-weight: 700; }
+.overall-head strong { font-family: "Bungee", "Arial Black", system-ui, sans-serif; font-weight: 400; font-size: 1.2rem; color: #ffd25e; font-variant-numeric: tabular-nums; }
+.overall-bar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.overall-bar span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #5ad1ff, #ffd25e); }
+.overall p { margin: 0; color: #d9d3c6; font-size: 0.7rem; font-variant-numeric: tabular-nums; text-align: left; }
+
 /* 成績 */
 .rec-summary {
   display: grid;
