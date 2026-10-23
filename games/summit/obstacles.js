@@ -515,6 +515,9 @@
       const reserved = [];
       for (const it of W.items) if (it.pos && Math.hypot(it.pos.x - c.x, it.pos.z - c.z) < c.R + 1) reserved.push(Math.atan2(it.pos.z - c.z, it.pos.x - c.x));
       for (const v of W.views) if (Math.hypot(v.pos.x - c.x, v.pos.z - c.z) < c.R + 1) reserved.push(Math.atan2(v.pos.z - c.z, v.pos.x - c.x));
+      // 広場のすぐ近くの岩壁や谷の入口も避ける
+      for (const st of W.steps) if (Math.hypot(st.cx - c.x, st.cz - c.z) < c.R + 16) exits.push(Math.atan2(st.cz - c.z, st.cx - c.x));
+      for (const g of W.gorges) for (const e of [g.A, g.B]) if (Math.hypot(e.x - c.x, e.z - c.z) < c.R + 16) exits.push(Math.atan2(e.z - c.z, e.x - c.x));
       const inA = c.r > 1 ? Math.atan2(-c.z, -c.x) : -Math.PI / 2;
       const taken = [];
       const choose = (minSep) => {

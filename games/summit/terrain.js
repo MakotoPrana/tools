@@ -62,6 +62,7 @@
     const T = M.terrain;
     const noise = makeNoise(T.seed || 1);
     const noise2 = makeNoise((T.seed || 1) + 7);
+    const noise3 = makeNoise((T.seed || 1) + 13);
 
     // ---- 1. 山の形: 半径 → 標高 の表 (1m ごと、なめらかにしたもの) ----
     const RMAX = T.worldR;
@@ -125,6 +126,10 @@
         const env = smooth((rr - 90 * RS) / (120 * RS)) * (1 - smooth((rr - 600 * RS) / (300 * RS)));
         y += (sp * sp - 0.35) * SPURS.amp * env;
       }
+      // 岩がちな細かい起伏 (尾根状のノイズ)。高いところほど大きい
+      const rough = lerp(T.roughFoot != null ? T.roughFoot : 0.4, T.roughTop != null ? T.roughTop : 2.4, clamp(y / MAXY, 0, 1)) * (rr < prof[0][1] ? 1 : 0.15);
+      const q1 = 1 - Math.abs(noise3(x / 23, z / 23)), q2 = 1 - Math.abs(noise3(x / 9 + 50, z / 9 + 50));
+      y += ((q1 * q1 - 0.45) + (q2 * q2 - 0.45) * 0.35) * rough;
       return y;
     }
     // 角度 a で標高 y になる半径 (山の形の上で)
@@ -383,7 +388,17 @@
           const band = bandAt(pc.y0);
           const W = o.w || (band.id === 'foot' ? 30 : 12);
           const face = polar(pc.rw, a);
+          // 手前の道の傾き (壁の前の平らな場所を、道と同じ傾きで下げて段をなくす)
+          const prevRamp = pieces[pieces.indexOf(pc) - 1];
+          let g = 0;
+          if (prevRamp && prevRamp.kind === 'ramp') {
+            const pts = prevRamp.pts, n = pts.length;
+            let L = 0, k = n - 1;
+            while (k > 0 && L < 8) { L += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z); k--; }
+            g = L > 0 ? Math.max(0, (pts[n - 1].y - pts[k].y) / L) : 0;
+          }
           const st = {
+            g,
             cx: face.x, cz: face.z, nx, nz, tx, tz, halfW: W / 2,
             front: pc.r0 - pc.rw + 2.6, back: pc.rw - (pc.r1 - 2.2),
             y0: pc.y0, y1: pc.y1, edge: E.id, wallKind: o.kind || 'rock', def: o,
@@ -544,7 +559,7 @@
           if (Math.abs(u) > it.halfW || n > it.front || n < -it.back) continue;
           // 壁の手前は下の道より高くしない、奥は上の道より低くしない
           const th = render ? -2.6 : 0;
-          if (n >= th) { h = Math.min(h, it.y0); } else { h = Math.max(h, it.y1); }
+          if (n >= th) { h = Math.min(h, it.y0 - it.g * Math.max(0, -u)); } else { h = Math.max(h, it.y1); }
           step = it;
           surf = surf || 'rock';
         }
@@ -745,15 +760,38 @@
       return out;
     }
 
-    // ---- 地形の材質: 近くの細かい区画と重なるところは描かない ----
+    // ---- 地形の材質 ----
+    // 色は頂点ごとに決め、その上に細かい模様 (草・砂利・岩肌) を世界の座標で重ねる。
+    // 急な斜面は横から見た模様と、岩の層 (横縞) にする。遠くは模様を薄くする
+    const detailTex = makeDetailTexture(THREE, (M.terrain.seed || 1) + 3);
     const nearRect = { value: new THREE.Vector4(1e9, 1e9, -1e9, -1e9) };
-    const coreMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    coreMat.onBeforeCompile = (sh) => {
-      sh.uniforms.uNear = nearRect;
-      sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-      sh.fragmentShader = 'varying vec3 vWP;\nuniform vec4 uNear;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n if (vWP.x > uNear.x && vWP.x < uNear.z && vWP.z > uNear.y && vWP.z < uNear.w) discard;');
-    };
-    const nearMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    function terrainMaterial(withHole) {
+      const m = new THREE.MeshLambertMaterial({ vertexColors: true });
+      // 穴あき (山全体) と穴なし (近くの区画) を別のシェーダーとして作らせる
+      m.customProgramCacheKey = () => (withHole ? 'summit-terrain-hole' : 'summit-terrain');
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.uNear = nearRect;
+        sh.uniforms.uDetail = { value: detailTex };
+        sh.vertexShader = 'varying vec3 vWP;\nvarying vec3 vWN;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;\n vWN = normalize(mat3(modelMatrix) * objectNormal);');
+        sh.fragmentShader = 'varying vec3 vWP;\nvarying vec3 vWN;\nuniform vec4 uNear;\nuniform sampler2D uDetail;\n' + sh.fragmentShader
+          .replace('void main() {', 'void main() {\n' + (withHole ? ' if (vWP.x > uNear.x && vWP.x < uNear.z && vWP.z > uNear.y && vWP.z < uNear.w) discard;\n' : ''))
+          .replace('#include <color_fragment>', `#include <color_fragment>
+  vec3 wn = normalize(vWN);
+  vec3 an = abs(wn); an /= (an.x + an.y + an.z);
+  float d1 = texture2D(uDetail, vWP.xz * 0.13).r * an.y + texture2D(uDetail, vWP.zy * 0.13).r * an.x + texture2D(uDetail, vWP.xy * 0.13).r * an.z;
+  float d2 = texture2D(uDetail, vWP.xz * 0.021).g;
+  float d3 = texture2D(uDetail, vWP.xz * 0.0045).b;
+  float steep = 1.0 - smoothstep(0.5, 0.82, wn.y);
+  float strata = sin(vWP.y * 1.9 + d2 * 7.0) * 0.5 + 0.5;
+  float det = mix(0.8, 1.2, d1) * mix(0.9, 1.1, d2) * mix(0.92, 1.08, d3);
+  det *= mix(1.0, mix(0.78, 1.12, strata), steep);
+  float fd = smoothstep(120.0, 700.0, length(vWP - cameraPosition));
+  diffuseColor.rgb *= mix(det, mix(0.92, 1.08, d3), fd);`);
+      };
+      return m;
+    }
+    const coreMat = terrainMaterial(true);
+    const nearMat = terrainMaterial(false);
 
     function gridGeometry(x0, z0, size, n, skirt) {
       const step = size / n;
@@ -781,6 +819,9 @@
         const ny = 1 / Math.hypot(gx, 1, gz);
         W.height(x, z, true, info);
         colorAt(x, z, hgt[j * vn + i], ny, tmpC);
+        const lap = (hl + hr + hu + hd) / 4 - hgt[j * vn + i];
+        const ao = clamp(1 - lap * (1.1 / step), 0.72, 1.1);
+        tmpC.multiplyScalar(ao);
         const k = (j * vn + i) * 3;
         col[k] = tmpC.r; col[k + 1] = tmpC.g; col[k + 2] = tmpC.b;
       }
@@ -894,7 +935,59 @@
         }
       }
       // 細かい区画の縁の少し内側まで、山全体の地形 (少し低く置いてある) も描いて、すき間を見せない
+      rebuildGrass((curCx + 0.5) * CH, (curCz + 0.5) * CH);
       nearRect.value.set((curCx - RAD) * CH + 1.5, (curCz - RAD) * CH + 1.5, (curCx + RAD + 1) * CH - 1.5, (curCz + RAD + 1) * CH - 1.5);
+    }
+
+    // ---- 足もとの草 (キャラクターのまわり 70m だけ。区画を切りかえるたびに置き直す) ----
+    const GRASS_N = 2400;
+    let grassMesh = null;
+    {
+      const pos = [], col = [];
+      for (let b = 0; b < 3; b++) {
+        const a = (b / 3) * Math.PI + 0.3;
+        const cx = Math.cos(a) * 0.09, cz = Math.sin(a) * 0.09;
+        const lean = 0.12 * (b - 1);
+        pos.push(-cx, 0, -cz, cx, 0, cz, lean, 0.55 + b * 0.08, lean * 0.5);
+        col.push(0.55, 0.62, 0.45, 0.55, 0.62, 0.45, 1.05, 1.12, 0.9);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.computeVertexNormals();
+      // 草は上向きの面として光を当てる
+      const n = g.attributes.normal;
+      for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0);
+      grassMesh = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), GRASS_N);
+      grassMesh.count = 0;
+      grassMesh.frustumCulled = false;
+      scene.add(grassMesh);
+    }
+    const grassRnd = mulberry32(777);
+    function rebuildGrass(cx, cz) {
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+      let n = 0;
+      for (let tries = 0; tries < GRASS_N * 3 && n < GRASS_N; tries++) {
+        const a = grassRnd() * Math.PI * 2, r = Math.sqrt(grassRnd()) * 75;
+        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+        const h = W.height(x, z, true, info);
+        const sf = info.surf;
+        if (sf !== 'ground' || h / K > 620 || h < 2) continue;
+        W.normal(x, z, nrm);
+        if (nrm.y < 0.74) continue;
+        // 草地ほど多く、高いところはまばら
+        if (grassRnd() > (h / K < 300 ? 0.9 : 0.45) * (0.5 + 0.5 * cnoise(x / 13, z / 13))) continue;
+        const sz = 0.7 + grassRnd() * 0.9;
+        ps.set(x, h - 0.05, z); q.setFromAxisAngle(up, grassRnd() * 6.28); sc.set(sz, sz * (0.8 + grassRnd() * 0.5), sz);
+        m4.compose(ps, q, sc);
+        grassMesh.setMatrixAt(n, m4);
+        colorAt(x, z, h, nrm.y, tmpC);
+        grassMesh.setColorAt(n, tmpC.multiplyScalar(0.95 + grassRnd() * 0.2));
+        n++;
+      }
+      grassMesh.count = n;
+      grassMesh.instanceMatrix.needsUpdate = true;
+      if (grassMesh.instanceColor) grassMesh.instanceColor.needsUpdate = true;
     }
 
     // ---- 草木と岩 ----
@@ -917,19 +1010,19 @@
       return true;
     }
     {
-      // 木: 円すいの葉と幹
-      const fol = new THREE.ConeGeometry(1, 1, 7, 1);
-      fol.translate(0, 0.5, 0);
-      const trunk = new THREE.CylinderGeometry(0.12, 0.16, 1, 5);
-      trunk.translate(0, 0.5, 0);
-      const MAXT = 4200;
-      const folMesh = new THREE.InstancedMesh(fol, new THREE.MeshLambertMaterial({ color: 0xffffff }), MAXT);
-      const trMesh = new THREE.InstancedMesh(trunk, new THREE.MeshLambertMaterial({ color: 0x6b4f35 }), MAXT);
+      // 木: 段になった針葉樹と、麓の丸い広葉樹 (幹ごと1つの形にして、色は頂点の明暗 × 木ごとの色)
+      const conifer = treeGeometry(THREE, 'conifer');
+      const broad = treeGeometry(THREE, 'broad');
+      const MAXT = 3200;
+      const treeMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      const conMesh = new THREE.InstancedMesh(conifer, treeMat, MAXT);
+      const brMesh = new THREE.InstancedMesh(broad, treeMat, MAXT);
       const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
       const up = new THREE.Vector3(0, 1, 0);
-      let count = 0;
-      const greens = [0x3f6e34, 0x4b7d3a, 0x355f2e, 0x5a8640, 0x6d8f3e];
-      for (let tries = 0; tries < 40000 && count < MAXT; tries++) {
+      let nc = 0, nbr = 0;
+      const greens = [0x3f6e34, 0x4b7d3a, 0x355f2e, 0x56803d, 0x456f37];
+      const leafs = [0x5f8f3e, 0x6f9a44, 0x7d9b3f, 0x59813a, 0x8a9a45];
+      for (let tries = 0; tries < 40000 && nc + nbr < MAXT; tries++) {
         const a = rnd() * Math.PI * 2;
         const r = (380 + Math.sqrt(rnd()) * 1700) * W.RS;
         const x = r * Math.cos(a), z = r * Math.sin(a);
@@ -941,27 +1034,36 @@
         W.normal(x, z, nrm);
         if (nrm.y < 0.72) continue;
         if (!clearOf(x, z, 3.5)) continue;
-        const ht = (h < 250 ? 7 : 5) + rnd() * 6;
-        const wd = ht * (0.28 + rnd() * 0.1);
-        const trunkH = ht * 0.3;
-        ps.set(x, hh - 0.2, z); q.setFromAxisAngle(up, rnd() * 6.28); sc.set(1, trunkH + 0.2, 1);
-        m4.compose(ps, q, sc); trMesh.setMatrixAt(count, m4);
-        ps.set(x, hh + trunkH * 0.8, z); sc.set(wd, ht - trunkH * 0.8, wd);
-        m4.compose(ps, q, sc); folMesh.setMatrixAt(count, m4);
-        folMesh.setColorAt(count, tmpC.setHex(greens[Math.floor(rnd() * greens.length)]));
+        // 低いところは広葉樹が多い
+        const isBroad = h < 260 && rnd() < 0.45 - h / 900;
+        const ht = (h < 250 ? 8 : 6) + rnd() * 6;
+        ps.set(x, hh - 0.3, z); q.setFromAxisAngle(up, rnd() * 6.28);
+        if (isBroad) {
+          const w = ht * (0.5 + rnd() * 0.2);
+          sc.set(w, ht, w * (0.85 + rnd() * 0.3));
+          m4.compose(ps, q, sc); brMesh.setMatrixAt(nbr, m4);
+          brMesh.setColorAt(nbr, tmpC.setHex(leafs[Math.floor(rnd() * leafs.length)]));
+          nbr++;
+        } else {
+          const w = ht * (0.3 + rnd() * 0.08);
+          sc.set(w, ht, w);
+          m4.compose(ps, q, sc); conMesh.setMatrixAt(nc, m4);
+          conMesh.setColorAt(nc, tmpC.setHex(greens[Math.floor(rnd() * greens.length)]));
+          nc++;
+        }
         trees.push([x, z, 0.35]);
         const k = tkey(x, z);
         if (!treeGrid.has(k)) treeGrid.set(k, []);
         treeGrid.get(k).push(trees[trees.length - 1]);
-        count++;
       }
-      folMesh.count = count; trMesh.count = count;
-      folMesh.instanceColor.needsUpdate = true;
-      scene.add(folMesh, trMesh);
+      conMesh.count = nc; brMesh.count = nbr;
+      if (conMesh.instanceColor) conMesh.instanceColor.needsUpdate = true;
+      if (brMesh.instanceColor) brMesh.instanceColor.needsUpdate = true;
+      scene.add(conMesh, brMesh);
 
       // ハイマツ (高所の低い木) と岩
       const bush = new THREE.IcosahedronGeometry(1, 0);
-      const bushMesh = new THREE.InstancedMesh(bush, new THREE.MeshLambertMaterial({ color: 0x3e5f34 }), 1400);
+      const bushMesh = new THREE.InstancedMesh(bush, new THREE.MeshLambertMaterial({ color: 0xffffff }), 1400);
       let nb = 0;
       for (let tries = 0; tries < 20000 && nb < 1400; tries++) {
         const a = rnd() * Math.PI * 2, r = (150 + rnd() * 260) * W.RS;
@@ -973,13 +1075,15 @@
         if (nrm.y < 0.55 || !clearOf(x, z, 1.5)) continue;
         ps.set(x, h - 0.2, z); q.setFromAxisAngle(up, rnd() * 6.28);
         const s = 0.7 + rnd() * 1.1; sc.set(s * 1.6, s * 0.6, s * 1.3);
-        m4.compose(ps, q, sc); bushMesh.setMatrixAt(nb++, m4);
+        m4.compose(ps, q, sc); bushMesh.setMatrixAt(nb, m4);
+        bushMesh.setColorAt(nb++, tmpC.setHex(0x3e5f34).multiplyScalar(0.8 + rnd() * 0.35));
       }
       bushMesh.count = nb;
+      if (bushMesh.instanceColor) bushMesh.instanceColor.needsUpdate = true;
       scene.add(bushMesh);
 
       const rock = new THREE.DodecahedronGeometry(1, 0);
-      const rockMesh = new THREE.InstancedMesh(rock, new THREE.MeshLambertMaterial({ color: 0x8b867f }), 900);
+      const rockMesh = new THREE.InstancedMesh(rock, new THREE.MeshLambertMaterial({ color: 0xffffff }), 900);
       let nr = 0;
       for (let tries = 0; tries < 20000 && nr < 900; tries++) {
         const a = rnd() * Math.PI * 2, r = (40 + rnd() * 900) * W.RS;
@@ -989,9 +1093,11 @@
         if (!clearOf(x, z, 1.2)) continue;
         ps.set(x, h, z); q.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5, 1).normalize();
         const s = 0.4 + rnd() * 1.6; sc.set(s, s * 0.7, s * 0.9);
-        m4.compose(ps, q, sc); rockMesh.setMatrixAt(nr++, m4);
+        m4.compose(ps, q, sc); rockMesh.setMatrixAt(nr, m4);
+        rockMesh.setColorAt(nr++, tmpC.setHex(rnd() < 0.5 ? 0x8b867f : 0x7a756d).multiplyScalar(0.85 + rnd() * 0.3));
       }
       rockMesh.count = nr;
+      if (rockMesh.instanceColor) rockMesh.instanceColor.needsUpdate = true;
       scene.add(rockMesh);
     }
     function treesNear(x, z) {
@@ -1021,25 +1127,55 @@
     sky.renderOrder = -10;
     scene.add(sky);
 
-    // ---- 遠くの山並み ----
-    const farMat = new THREE.MeshBasicMaterial({ color: 0x8fa6c4, fog: false, transparent: true, opacity: 0, depthWrite: false });
+    // ---- 遠くの山並み (かすんだ青。高い峰には雪) ----
+    const farMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, transparent: true, opacity: 0, depthWrite: false });
     {
       const geos = [];
-      for (let i = 0; i < 46; i++) {
-        const a = (i / 46) * Math.PI * 2 + rnd() * 0.1;
+      const fnz = makeNoise((M.terrain.seed || 1) + 61);
+      const haze = new THREE.Color(0x9fb4cc), dark = new THREE.Color(0x7189a6), snow = new THREE.Color(0xe9eef4);
+      for (let i = 0; i < 60; i++) {
+        const a = (i / 60) * Math.PI * 2 + rnd() * 0.08;
         // 南東は海 (山を置かない)
         const deg = (a / DEG) % 360;
         if (deg > 280 && deg < 350) continue;
-        const r = 6500 + rnd() * 2500;
-        const hgt = 500 + rnd() * 1300;
-        const g = new THREE.ConeGeometry(hgt * (1.6 + rnd()), hgt, 6, 1);
-        g.translate(r * Math.cos(a), hgt / 2 - 40, -r * Math.sin(a));
+        const r = 4200 + rnd() * 2600;
+        const hgt = 250 + rnd() * 750;
+        const g = new THREE.ConeGeometry(hgt * (1.8 + rnd() * 1.2), hgt, 14, 4);
+        const p = g.attributes.position;
+        const col = [];
+        for (let k = 0; k < p.count; k++) {
+          const yy = p.getY(k) + hgt / 2; // 0〜hgt
+          const f = yy / hgt;
+          const px = p.getX(k), pz = p.getZ(k);
+          const d = (fnz(px / 220 + i * 7, pz / 220) * 0.6 + fnz(px / 80, pz / 80 + i * 3) * 0.4) * (1 - f) * hgt * 0.35;
+          const l = Math.hypot(px, pz) || 1;
+          p.setX(k, px + px / l * d); p.setZ(k, pz + pz / l * d);
+          p.setY(k, p.getY(k) + fnz(px / 150 + i, pz / 150) * hgt * 0.12 * (1 - f) * f * 4);
+          tmpC.copy(dark).lerp(haze, 0.35 + 0.65 * (1 - f));
+          if (hgt > 650 && f > 0.72 + fnz(px / 60, pz / 60) * 0.08) tmpC.copy(snow);
+          col.push(tmpC.r, tmpC.g, tmpC.b);
+        }
+        g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+        g.translate(r * Math.cos(a), hgt / 2 - 30, -r * Math.sin(a));
         geos.push(g);
       }
       const merged = mergeGeos(THREE, geos);
       const far = new THREE.Mesh(merged, farMat);
       far.renderOrder = -5;
       scene.add(far);
+    }
+
+    // ---- 太陽 (空といっしょにカメラについてくる) ----
+    {
+      const sunDir = new THREE.Vector3(0.45, 0.8, 0.35).normalize();
+      const glow = new THREE.Mesh(new THREE.CircleGeometry(900, 32), new THREE.MeshBasicMaterial({ color: 0xfff3d6, transparent: true, opacity: 0.25, fog: false, depthWrite: false }));
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(300, 32), new THREE.MeshBasicMaterial({ color: 0xfffaf0, fog: false, depthWrite: false }));
+      for (const m of [glow, disc]) {
+        m.position.copy(sunDir).multiplyScalar(11000);
+        m.lookAt(0, 0, 0);
+        m.renderOrder = -9;
+        sky.add(m);
+      }
     }
 
     // ---- 雲海 (1枚の大きな絵。外側ほど薄い) ----
@@ -1148,16 +1284,92 @@
     };
   }
 
+  // 地形に重ねる細かい模様 (つなぎ目のない 256×256)。r: 細かい、g: 中くらい、b: 大きい
+  function makeDetailTexture(THREE, seed) {
+    const N = 256;
+    const rnd = mulberry32(seed);
+    const lattice = (P) => { const v = new Float32Array(P * P); for (let i = 0; i < v.length; i++) v[i] = rnd(); return v; };
+    const tile = (P) => {
+      const v = lattice(P);
+      return (x, y) => {
+        const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+        const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+        const g = (i, j) => v[((j % P + P) % P) * P + ((i % P + P) % P)];
+        return lerp(lerp(g(ix, iy), g(ix + 1, iy), sx), lerp(g(ix, iy + 1), g(ix + 1, iy + 1), sx), sy);
+      };
+    };
+    const oct = [tile(8), tile(16), tile(32), tile(64), tile(128)];
+    const fbm = (u, v, from) => {
+      let s = 0, a = 1, tot = 0;
+      for (let o = from; o < oct.length; o++) { const P = 8 << o; s += oct[o](u * P, v * P) * a; tot += a; a *= 0.55; }
+      return s / tot;
+    };
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = N;
+    const ctx = cv.getContext('2d');
+    const img = ctx.createImageData(N, N);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const u = i / N, v = j / N;
+      const k = (j * N + i) * 4;
+      // 細かい: 砂利や草の粒 (少し鋭く)
+      const f = fbm(u, v, 2);
+      img.data[k] = clamp((f - 0.5) * 1.8 + 0.5, 0, 1) * 255;
+      img.data[k + 1] = fbm(u, v, 0) * 255;
+      img.data[k + 2] = oct[0](u * 8, v * 8) * 255;
+      img.data[k + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  // 木の形 (高さ 1、半径 1 くらい)。色は頂点の明暗で、木ごとの色をかけて使う
+  function treeGeometry(THREE, kind) {
+    const parts = [];
+    const paint = (g, fn) => {
+      const p = g.attributes.position, col = [];
+      for (let i = 0; i < p.count; i++) { const c = fn(p.getY(i)); col.push(c[0], c[1], c[2]); }
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      return g;
+    };
+    // 幹は木ごとの緑をかけても茶色に見えるよう、赤みを強めにしておく
+    const trunk = new THREE.CylinderGeometry(0.035, 0.05, 0.4, 5);
+    trunk.translate(0, 0.2, 0);
+    parts.push(paint(trunk, () => [1.55, 0.78, 0.9]));
+    if (kind === 'conifer') {
+      [[0.18, 0.46, 1.0], [0.4, 0.4, 0.74], [0.6, 0.4, 0.48]].forEach(([y0, h, r], i) => {
+        const g = new THREE.ConeGeometry(r, h, 7, 1);
+        g.translate(0, y0 + h / 2, 0);
+        parts.push(paint(g, (y) => { const t = clamp((y - y0) / h, 0, 1); const b = 0.72 + 0.18 * i + 0.25 * t; return [b, b, b * 0.95]; }));
+      });
+    } else {
+      [[0, 0.62, 0, 0.42], [0.25, 0.55, 0.12, 0.3], [-0.22, 0.57, -0.1, 0.32], [0.05, 0.8, -0.05, 0.28]].forEach(([x, y, z, r]) => {
+        const g = new THREE.IcosahedronGeometry(r, 1);
+        g.scale(1.15, 0.9, 1.15);
+        g.translate(x, y, z);
+        parts.push(paint(g, (yy) => { const b = 0.7 + 0.45 * clamp((yy - 0.35) / 0.6, 0, 1); return [b, b, b * 0.9]; }));
+      });
+    }
+    const out = mergeGeos(THREE, parts);
+    out.computeVertexNormals();
+    return out;
+  }
+
   function mergeGeos(THREE, geos) {
     let nv = 0, ni = 0;
     const parts = geos.map((g) => { const gg = g.index ? g : g; return gg; });
     for (const g of parts) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
     const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3);
+    const hasCol = parts.every((g) => g.attributes.color);
+    const col = hasCol ? new Float32Array(nv * 3) : null;
     const idx = new Uint32Array(ni);
     let ov = 0, oi = 0;
     for (const g of parts) {
       pos.set(g.attributes.position.array, ov * 3);
       if (g.attributes.normal) nor.set(g.attributes.normal.array, ov * 3);
+      if (col) col.set(g.attributes.color.array, ov * 3);
       if (g.index) { for (let i = 0; i < g.index.count; i++) idx[oi++] = g.index.array[i] + ov; }
       else { for (let i = 0; i < g.attributes.position.count; i++) idx[oi++] = i + ov; }
       ov += g.attributes.position.count;
@@ -1165,6 +1377,7 @@
     const out = new THREE.BufferGeometry();
     out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    if (col) out.setAttribute('color', new THREE.BufferAttribute(col, 3));
     out.setIndex(new THREE.BufferAttribute(idx, 1));
     return out;
   }
