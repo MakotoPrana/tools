@@ -341,7 +341,7 @@ body {
 .tbtn-jump { right: 18px; bottom: 26px; width: 76px; height: 76px; }
 .tbtn-use { right: 104px; bottom: 30px; width: 62px; height: 62px; background: rgba(224, 112, 42, 0.6); }
 .tbtn-release { right: 30px; bottom: 112px; width: 56px; height: 56px; }
-.tbtn-photo { right: 12px; top: 150px; width: 42px; height: 42px; font-size: 1.1rem; }
+.tbtn-photo { right: 12px; top: 194px; width: 42px; height: 42px; font-size: 1.1rem; }
 
 .pause-btn {
   position: absolute;
@@ -551,3 +551,61 @@ body {
 @media (pointer: coarse) {
   .prompt { bottom: 120px; }
 }
+
+/* 壁登り: 片手・無理な体勢の残り時間 */
+.grip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.grip.is-on { opacity: 1; }
+.grip circle { fill: none; transform: rotate(-90deg); transform-origin: 24px 24px; }
+.gr-bg { stroke: rgba(0, 0, 0, 0.4); stroke-width: 7; }
+.gr-fill { stroke: #ffb02e; stroke-width: 7; }
+.grip.is-danger .gr-fill { stroke: #ff4b3a; }
+.climb-warn {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: rgba(160, 30, 20, 0.75);
+  font-weight: 800;
+  opacity: 0;
+}
+.climb-warn.is-on { opacity: 1; }
+.climb-help {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  opacity: 0;
+}
+.climb-help.is-on { opacity: 1; }
+.map-btn { top: 146px; font-size: 1.05rem; }
+.map-pop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(8, 14, 20, 0.45);
+  pointer-events: auto;
+}
+.map-pop canvas { height: calc(100% - 48px); max-height: 600px; width: auto; max-width: 92%; aspect-ratio: 1; object-fit: contain; border-radius: 12px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); }
+.map-pop-hint { margin: 0; color: #fff; font-size: 0.8rem; text-shadow: 0 1px 3px #000; }

@@ -6,6 +6,7 @@ window.SUMMIT_I18N = {
   langs: [['ja', '日本語'], ['en', 'English'], ['zh', '简体中文'], ['ko', '한국어']],
   ui: {
     ja: {
+      climbTip: '左右の手を別々に動かして、白いホールドをつかもう (画面の左半分 = 左手、右半分 = 右手 / WASD と矢印キー)', noHoldHere: 'ここにはつかめるところがない', thornHold: 'イバラのホールドで手が離れた!', gripLost: '手が離れた!', strainFall: '無理な体勢で落ちた!', oneHand: '片手!', strained: '無理な体勢!', resting: '出っぱりで休んでいる', climbHelpTouch: '左半分 = 左手 / 右半分 = 右手', climbHelpKb: 'WASD = 左手 / 矢印 = 右手 / マウスの左右でも', mapToggle: '地図', mapClose: '地図をタップするか M キーで閉じる', balanceTip: '傾いた方と反対へ動こうとすると立て直せる',
       gamesList: 'ゲーム一覧', language: '言語', sound: '効果音', pause: '一時停止', photoMode: '写真モード', takePhoto: '撮る',
       loadError: '3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。',
       loading: '山を読み込んでいます…',
@@ -29,7 +30,7 @@ window.SUMMIT_I18N = {
       customRoute: '自分で道を作る', customRouteSub: 'チェックポイントを順につないで経路を作ります', customNow: 'いま: {name}',
       needsTool: '道具が必要', minutes: '分', undo: 'ひとつ戻す', climbThis: 'この道で登る', climbToHere: '{name} まで登る',
       descendTitle: '下りの近道 (たどり着いたチェックポイントへ移動)', descendNone: 'いまより低いところに、たどり着いたチェックポイントがありません', descended: '下ってきた',
-      checkpoint: 'チェックポイント', startClimb: '登山開始', resumeClimb: '再開', respawned: '最後のチェックポイントからやり直します',
+      checkpoint: 'チェックポイント', startClimb: '登山開始', resumeClimb: '再開', respawned: '最後のチェックポイントからやり直します', unstuck: '足場までもどった',
       rerouted: '道案内を引き直しました', startUnlocked: '登山口「{name}」が選べるようになった',
       weather_sunny: '天気: 晴れ', weather_cloudy: '天気: くもり', weather_rain: '天気: 雨 (壁が滑りやすい)', weather_fog: '天気: 霧 (見通しが悪い)',
       deadHp: '力尽きた…', deadFall: '落ちてしまった…', fellM: '{m}m 落ちた!',
@@ -59,6 +60,7 @@ window.SUMMIT_I18N = {
       albumCount: '展望スポット {n} / {total}', myPhoto: '標高 {m} m',
     },
     en: {
+      climbTip: 'Move each hand on its own and grab the white holds (left half of the screen = left hand, right half = right hand / WASD and arrow keys)', noHoldHere: 'Nothing to grip here', thornHold: 'Thorny hold — you let go!', gripLost: 'You lost your grip!', strainFall: 'Too stretched — you fell!', oneHand: 'One hand!', strained: 'Overstretched!', resting: 'Resting on the ledge', climbHelpTouch: 'Left half = left hand / Right half = right hand', climbHelpKb: 'WASD = left hand / Arrows = right hand / or drag either side', mapToggle: 'Map', mapClose: 'Tap the map or press M to close', balanceTip: 'Push toward the opposite side of your lean to recover',
       gamesList: 'Games', language: 'Language', sound: 'Sound', pause: 'Pause', photoMode: 'Photo mode', takePhoto: 'Take photo',
       loadError: 'Could not load the 3D library. Check your connection and reload the page.',
       loading: 'Loading the mountain…',
@@ -82,7 +84,7 @@ window.SUMMIT_I18N = {
       customRoute: 'Make your own route', customRouteSub: 'Link checkpoints one by one', customNow: 'Now: {name}',
       needsTool: 'needs gear', minutes: 'min', undo: 'Undo', climbThis: 'Climb this route', climbToHere: 'Climb to {name}',
       descendTitle: 'Descend (jump to a checkpoint you reached)', descendNone: 'No reached checkpoint is lower than you', descended: 'Descended',
-      checkpoint: 'Checkpoint', startClimb: 'Climb start', resumeClimb: 'Resumed', respawned: 'Restarting from the last checkpoint',
+      checkpoint: 'Checkpoint', startClimb: 'Climb start', resumeClimb: 'Resumed', respawned: 'Restarting from the last checkpoint', unstuck: 'Back on solid ground',
       rerouted: 'Route guidance updated', startUnlocked: 'Trailhead "{name}" unlocked',
       weather_sunny: 'Weather: sunny', weather_cloudy: 'Weather: cloudy', weather_rain: 'Weather: rain (walls are slippery)', weather_fog: 'Weather: fog (poor visibility)',
       deadHp: 'You collapsed…', deadFall: 'You fell…', fellM: 'Fell {m} m!',
@@ -112,6 +114,7 @@ window.SUMMIT_I18N = {
       albumCount: 'Viewpoints {n} / {total}', myPhoto: 'Altitude {m} m',
     },
     zh: {
+      climbTip: '分别移动左右手，抓住白色的岩点（屏幕左半边 = 左手，右半边 = 右手 / WASD 和方向键）', noHoldHere: '这里没有可以抓的地方', thornHold: '荆棘岩点，手松开了!', gripLost: '手滑脱了!', strainFall: '姿势太勉强，掉下去了!', oneHand: '单手!', strained: '姿势太勉强!', resting: '在岩台上休息', climbHelpTouch: '左半边 = 左手 / 右半边 = 右手', climbHelpKb: 'WASD = 左手 / 方向键 = 右手 / 也可用鼠标拖动左右两侧', mapToggle: '地图', mapClose: '点击地图或按 M 键关闭', balanceTip: '向倾斜的反方向移动即可恢复平衡',
       gamesList: '游戏列表', language: '语言', sound: '音效', pause: '暂停', photoMode: '拍照模式', takePhoto: '拍照',
       loadError: '无法加载 3D 组件。请检查网络后重新加载页面。',
       loading: '正在加载山…',
@@ -135,7 +138,7 @@ window.SUMMIT_I18N = {
       customRoute: '自己规划路线', customRouteSub: '依次连接检查点来规划路线', customNow: '当前: {name}',
       needsTool: '需要道具', minutes: '分钟', undo: '撤销一步', climbThis: '走这条路', climbToHere: '登到 {name}',
       descendTitle: '下山捷径（移动到到过的检查点）', descendNone: '比现在低的地方没有到过的检查点', descended: '已下山',
-      checkpoint: '检查点', startClimb: '开始登山', resumeClimb: '继续', respawned: '从最后的检查点重新开始',
+      checkpoint: '检查点', startClimb: '开始登山', resumeClimb: '继续', respawned: '从最后的检查点重新开始', unstuck: '回到了落脚处',
       rerouted: '已重新规划路线', startUnlocked: '可以选择登山口“{name}”了',
       weather_sunny: '天气: 晴', weather_cloudy: '天气: 阴', weather_rain: '天气: 雨（岩壁湿滑）', weather_fog: '天气: 雾（视野差）',
       deadHp: '体力耗尽…', deadFall: '掉下去了…', fellM: '跌落 {m} 米!',
@@ -165,6 +168,7 @@ window.SUMMIT_I18N = {
       albumCount: '观景点 {n} / {total}', myPhoto: '海拔 {m} 米',
     },
     ko: {
+      climbTip: '양손을 따로 움직여 흰 홀드를 잡자 (화면 왼쪽 절반 = 왼손, 오른쪽 절반 = 오른손 / WASD와 방향키)', noHoldHere: '여기에는 잡을 곳이 없다', thornHold: '가시 홀드라 손을 놓쳤다!', gripLost: '손이 미끄러졌다!', strainFall: '무리한 자세로 떨어졌다!', oneHand: '한 손!', strained: '무리한 자세!', resting: '바위턱에서 쉬는 중', climbHelpTouch: '왼쪽 절반 = 왼손 / 오른쪽 절반 = 오른손', climbHelpKb: 'WASD = 왼손 / 방향키 = 오른손 / 마우스로 좌우를 드래그해도 된다', mapToggle: '지도', mapClose: '지도를 탭하거나 M 키로 닫기', balanceTip: '기운 쪽의 반대로 움직이려고 하면 균형을 잡을 수 있다',
       gamesList: '게임 목록', language: '언어', sound: '효과음', pause: '일시 정지', photoMode: '사진 모드', takePhoto: '찍기',
       loadError: '3D 부품을 불러오지 못했습니다. 통신 상태를 확인하고 페이지를 새로 고쳐 주세요.',
       loading: '산을 불러오는 중…',
@@ -188,7 +192,7 @@ window.SUMMIT_I18N = {
       customRoute: '직접 길 만들기', customRouteSub: '체크포인트를 차례로 이어 경로를 만듭니다', customNow: '현재: {name}',
       needsTool: '도구 필요', minutes: '분', undo: '하나 되돌리기', climbThis: '이 길로 오르기', climbToHere: '{name}까지 오르기',
       descendTitle: '하산 지름길 (도착한 체크포인트로 이동)', descendNone: '지금보다 낮은 곳에 도착한 체크포인트가 없습니다', descended: '내려왔다',
-      checkpoint: '체크포인트', startClimb: '등산 시작', resumeClimb: '계속', respawned: '마지막 체크포인트에서 다시 시작합니다',
+      checkpoint: '체크포인트', startClimb: '등산 시작', resumeClimb: '계속', respawned: '마지막 체크포인트에서 다시 시작합니다', unstuck: '발 디딜 곳으로 돌아왔다',
       rerouted: '길 안내를 다시 찾았습니다', startUnlocked: '등산로 입구 "{name}"을(를) 고를 수 있게 되었다',
       weather_sunny: '날씨: 맑음', weather_cloudy: '날씨: 흐림', weather_rain: '날씨: 비 (벽이 미끄러움)', weather_fog: '날씨: 안개 (시야가 나쁨)',
       deadHp: '힘이 다했다…', deadFall: '떨어지고 말았다…', fellM: '{m}m 떨어졌다!',

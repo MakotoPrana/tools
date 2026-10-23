@@ -224,7 +224,7 @@
     if (!window.SUMMIT_MOUNTAINS || !window.SUMMIT_MOUNTAINS[id]) await loadScript(entry.file + '?v=1');
     // 前の山を片付ける
     while (scene.children.length) scene.remove(scene.children[0]);
-    scene.add(hemi, sun, player.group, shadowBlob, guide, hookLine, rain);
+    scene.add(hemi, sun, player.group, shadowBlob, guide, hookLine, rain, handCursor, candRing, reachRing);
     W = window.SummitTerrain.build(window.SUMMIT_MOUNTAINS[id]);
     S = window.SummitTerrain.createScene(W, scene);
     O = window.SummitObstacles.create(W, scene);
@@ -281,6 +281,13 @@
   const guide = new THREE.Mesh(new THREE.OctahedronGeometry(1.4, 0), new THREE.MeshBasicMaterial({ color: 0xffc94a, transparent: true, opacity: 0.85, fog: false }));
   scene.add(guide);
   // 鉤縄の縄
+  // 壁登り: 運んでいる手の行き先と、つかめるホールドの目印
+  const handCursor = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffb02e, transparent: true, opacity: 0.85, depthTest: false }));
+  handCursor.renderOrder = 20;
+  const candRing = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 6, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }));
+  candRing.renderOrder = 21;
+  const reachRing = new THREE.Mesh(new THREE.RingGeometry(1.57, 1.6, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }));
+  handCursor.visible = candRing.visible = reachRing.visible = false;
   const hookLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xd8c08a }));
   hookLine.visible = false; hookLine.frustumCulled = false;
   scene.add(hookLine);
@@ -313,8 +320,10 @@
   const keys = new Set();
   const pressed = new Set(); // このフレームで押されたボタン
   let inputKind = matchMedia('(pointer: coarse)').matches ? 'touch' : 'kb';
+  // 壁登りでは WASD が左手 (lu ld ll lr)、矢印が右手 (ru rd rl rr)
   const KEYMAP = {
-    KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
+    KeyW: ['up', 'lu'], ArrowUp: ['up', 'ru'], KeyS: ['down', 'ld'], ArrowDown: ['down', 'rd'],
+    KeyA: ['left', 'll'], ArrowLeft: ['left', 'rl'], KeyD: ['right', 'lr'], ArrowRight: ['right', 'rr'], KeyM: 'map',
     Space: 'jump', ShiftLeft: 'run', ShiftRight: 'run', ControlLeft: 'sneak', ControlRight: 'sneak', KeyC: 'sneak',
     KeyE: 'use', KeyX: 'release', KeyP: 'photo', Escape: 'pause', Digit1: 'herb', Digit2: 'food', KeyQ: 'camL', KeyR: 'camR',
   };
@@ -325,10 +334,12 @@
     if (mode === 'play' || mode === 'photo') e.preventDefault();
     audio();
     inputKind = 'kb';
-    if (!keys.has(k)) pressed.add(k);
-    keys.add(k);
+    for (const kk of [].concat(k)) {
+      if (!keys.has(kk)) pressed.add(kk);
+      keys.add(kk);
+    }
   });
-  window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) keys.delete(k); });
+  window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) for (const kk of [].concat(k)) keys.delete(kk); });
   window.addEventListener('blur', () => keys.clear());
 
   // カメラの向き
@@ -337,11 +348,21 @@
   // マウス・タッチ
   const touch = { stickId: null, sx: 0, sy: 0, x: 0, y: 0, camId: null, cx: 0, cy: 0 };
   let mouseDrag = null;
+  // 壁登り中のポインタ: 画面の左半分は左手、右半分は右手
+  const handPtr = new Map(); // pointerId → { hand, x, y, lx, ly }
   canvas.addEventListener('pointerdown', (e) => {
     audio();
     if (mode !== 'play' && mode !== 'photo') return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (e.pointerType !== 'mouse') { inputKind = 'touch'; showTouch(true); }
+    if (mode === 'play' && P.state === 'climb' && !P.rappel) {
+      const hand = x < rect.width / 2 ? 'L' : 'R';
+      for (const [id, hp] of handPtr) if (hp.hand === hand) handPtr.delete(id);
+      handPtr.set(e.pointerId, { hand, x, y, lx: x, ly: y });
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
       inputKind = 'touch';
       showTouch(true);
@@ -359,6 +380,8 @@
   canvas.addEventListener('pointermove', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const hp = handPtr.get(e.pointerId);
+    if (hp) { hp.x = x; hp.y = y; return; }
     if (e.pointerId === touch.stickId) { touch.x = x; touch.y = y; }
     else if (e.pointerId === touch.camId) {
       turnCamera((x - touch.cx) * 0.008, (y - touch.cy) * 0.006);
@@ -369,6 +392,7 @@
     }
   });
   const endPointer = (e) => {
+    handPtr.delete(e.pointerId);
     if (e.pointerId === touch.stickId) touch.stickId = null;
     if (e.pointerId === touch.camId) touch.camId = null;
     if (e.pointerType === 'mouse') mouseDrag = null;
@@ -431,6 +455,36 @@
     }
     if (analog && mag > 0) { const l = Math.hypot(x, y) || 1; x /= l; y /= l; }
     return { x, y, mag, analog };
+  }
+
+  // 壁登りの手の入力 (このフレームで手をどれだけ動かすか。単位は m、壁の上で右 = +u、上 = +v)
+  function readClimbInput(pad, dt) {
+    const out = { L: { active: false, du: 0, dv: 0 }, R: { active: false, du: 0, dv: 0 } };
+    const f = P.face;
+    if (!f) return out;
+    // 画面の右が壁の +u か -u か
+    const sgn = (cam.r.x * f.tx + cam.r.z * f.tz) >= 0 ? 1 : -1;
+    const KSP = 1.5 * dt;
+    const keyHand = (X, u, d, l, r) => {
+      const ku = (keys.has(r) ? 1 : 0) - (keys.has(l) ? 1 : 0), kv = (keys.has(u) ? 1 : 0) - (keys.has(d) ? 1 : 0);
+      if (ku || kv) { out[X].active = true; out[X].du += ku * KSP * sgn; out[X].dv += kv * KSP; }
+    };
+    keyHand('L', 'lu', 'ld', 'll', 'lr');
+    keyHand('R', 'ru', 'rd', 'rl', 'rr');
+    if (pad) {
+      for (const [X, ax, ay] of [['L', pad.lx, pad.ly], ['R', pad.rx, pad.ry]]) {
+        if (ax || ay) { out[X].active = true; out[X].du += ax * 1.7 * dt * sgn; out[X].dv += -ay * 1.7 * dt; }
+      }
+    }
+    const k = 2.6 / Math.max(300, gameEl.clientHeight);
+    for (const hp of handPtr.values()) {
+      const o = out[hp.hand];
+      o.active = true;
+      o.du += (hp.x - hp.lx) * k * sgn;
+      o.dv += -(hp.y - hp.ly) * k;
+      hp.lx = hp.x; hp.ly = hp.y;
+    }
+    return out;
   }
 
   // =====================================================================
@@ -639,6 +693,7 @@
   const drainK = () => (P.foodT > 0 ? 0.5 : 1);
 
   function setState(s) {
+    if (s === 'slide' && P.state !== 'slide') P.slideAll = 0;
     P.state = s;
     if (s === 'air') { P.edgeCd = 0; }
     if (s === 'ground' || s === 'balance') P.lastRope = null;
@@ -671,6 +726,16 @@
   }
 
   function stepGround(dt) {
+    // 安全に立てていた場所をおぼえておく
+    P.safeT = (P.safeT || 0) - dt;
+    if (P.safeT <= 0) {
+      P.safeT = 0.5;
+      W.normal(P.x, P.z, nrm);
+      if (nrm.y > 0.85) P.safe = { x: P.x, z: P.z };
+    }
+    // 地面に少しめりこんでいたら (登りきった直後など) 地面の上へ出す
+    const g0 = groundAt(P.x, P.z);
+    if (g0 > P.y + 0.05 && g0 < P.y + 1.5) P.y = g0;
     if (P.stunT > 0) { P.stunT -= dt; P.vx *= 0.8; P.vz *= 0.8; }
     const wi = worldInput();
     P.mode = moveMode();
@@ -728,7 +793,7 @@
     if (dy > 0.55) {
       // 段 (壁) にぶつかった
       const ff = findFace(nx, nz, P.y, dx, dz);
-      if (ff && canGrip(ff.f) && P.stunT <= 0 && !P.exhausted && P.stamina > 0.05) { startClimb(ff.f, ff.u, P.y + 0.1); return; }
+      if (ff && canGrip(ff.f) && P.stunT <= 0 && !P.exhausted && P.stamina > 0.05 && startClimb(ff.f, ff.u, P.y + 0.1)) return;
       if (ff && canGrip(ff.f) && P.exhausted && faceHintCd <= 0) { faceHintCd = 3; toast(t('tooTired')); }
       if (ff && !canGrip(ff.f)) hintFace(ff.f);
       slideAlong(dx, dz, pushed);
@@ -739,7 +804,7 @@
       // 急な坂のすぐ先に登れる壁があれば、そのままつかまる
       const l = Math.hypot(dx, dz) || 1;
       const ff = findFace(nx + dx / l * 0.7, nz + dz / l * 0.7, P.y, dx, dz);
-      if (ff && canGrip(ff.f) && P.stunT <= 0 && !P.exhausted && P.stamina > 0.05) { startClimb(ff.f, ff.u, Math.max(P.y, ff.f.y0) + 0.1); return; }
+      if (ff && canGrip(ff.f) && P.stunT <= 0 && !P.exhausted && P.stamina > 0.05 && startClimb(ff.f, ff.u, Math.max(P.y, ff.f.y0) + 0.1)) return;
       slideAlong(dx, dz, pushed); return;
     }
     // 崖の縁: 歩いているときは止まる (走っている・風に押されているときは落ちる)
@@ -747,7 +812,7 @@
     // 登れる壁の上なら、向きを変えて下へつかまる
     if (steepDown && P.mode !== 'run' && !pushed && P.stunT <= 0) {
       const fb = faceBelow(P.x, P.z, P.y, dx, dz);
-      if (fb && canGrip(fb.f) && !P.exhausted && P.stamina > 0.05) { startClimb(fb.f, fb.u, fb.f.y1 - 1.1); P.climbLock = 0.6; climbPos(); return; }
+      if (fb && canGrip(fb.f) && !P.exhausted && P.stamina > 0.05 && startClimbFromTop(fb.f, fb.u)) { climbPos(); return; }
     }
     if (steepDown && P.mode !== 'run' && !pushed && P.edgeCd <= 0) {
       const l = Math.hypot(dx, dz) || 1;
@@ -802,6 +867,15 @@
   }
 
   function stepSlide(dt) {
+    // 岩のすき間などで滑りつづけて出られないときは、最後に立っていた場所へもどす
+    P.slideAll = (P.slideAll || 0) + dt;
+    if (P.slideAll > 5 && P.safe) {
+      P.x = P.safe.x; P.z = P.safe.z; P.y = groundAt(P.x, P.z);
+      P.vx = P.vz = 0; setState('ground');
+      hurt(2, 'fall');
+      toast(t('unstuck'));
+      return;
+    }
     W.normal(P.x, P.z, nrm);
     const g = 16;
     P.vx += nrm.x * g * dt; P.vz += nrm.z * g * dt;
@@ -864,7 +938,7 @@
     if (ny < gh && gh - P.y > 0.6 && gh > prevY + 0.4) {
       // 横から壁にぶつかった: つかめればつかまる。だめなら横には進まない
       const ff = findFace(nx, nz, P.y, P.vx, P.vz);
-      if (ff && canGrip(ff.f) && P.stamina > 0 && !P.exhausted) { startClimb(ff.f, ff.u, Math.max(P.y, ff.f.y0) + 0.1); return; }
+      if (ff && canGrip(ff.f) && P.stamina > 0 && !P.exhausted && startClimb(ff.f, ff.u, Math.max(P.y, ff.f.y0) + 0.1)) return;
       if (ff) hintFace(ff.f);
       P.vx *= -0.15; P.vz *= -0.15;
       nx = P.x; nz = P.z;
@@ -887,7 +961,7 @@
       const ff = findFace(nx, nz, ny, P.vx, P.vz);
       if (ff && canGrip(ff.f) && !P.exhausted && P.stamina > 0) {
         const rx = nx - ff.f.ox, rz = nz - ff.f.oz;
-        if (rx * ff.f.nx + rz * ff.f.nz < 0.5) { startClimb(ff.f, ff.u, ny); return; }
+        if (rx * ff.f.nx + rz * ff.f.nz < 0.5 && startClimb(ff.f, ff.u, ny)) return;
       }
     }
     P.x = nx; P.z = nz; P.y = ny;
@@ -896,16 +970,72 @@
   }
 
   // ---- 壁登り ----
+  // 両手でホールドをつかんで登る。動かしたい手を選んで (画面の左半分 = 左手、右半分 = 右手、
+  // キーボードは WASD = 左手・矢印 = 右手、ゲームパッドは左右のスティック) 次のホールドへ運び、離すとつかむ。
+  // 片手のあいだと、無理な体勢 (腕を広げすぎ・手が交差) のあいだは時間制限があり、過ぎると落ちる
+  const REACH = 1.6; // つかんでいる手から、もう一方の手が届く距離
+  const GRAB_R = 0.42; // 手を離した場所からつかめるホールドまでの距離
+  const ONE_HAND = { good: 3.2, lip: 3.2, ice: 2.6, poor: 1.8, thorn: 1.4 };
+  let climbIn = { L: { active: false, du: 0, dv: 0 }, R: { active: false, du: 0, dv: 0 } };
+  const other = (X) => (X === 'L' ? 'R' : 'L');
+  // 壁に向かって右が +u なら 1、-u なら -1
+  const rs = (f) => Math.sign(f.tx * f.nz - f.tz * f.nx) || 1;
+  function holdUsable(h) {
+    if (h.type === 'ice' && !hasTool('pickaxe')) return false;
+    return true;
+  }
+  function nearestHold(f, u, v, maxD, except) {
+    let best = null, bd = maxD;
+    for (const h of f.holds) {
+      if (h === except || !holdUsable(h)) continue;
+      const d = Math.hypot(h.u - u, h.v - v);
+      if (d < bd) { bd = d; best = h; }
+    }
+    return best;
+  }
   function startClimb(f, u, v) {
+    // 足が v のとき、手の高さ (v + 1.9) あたりのホールドを左右でつかむ
+    const ground = v;
+    const hv = Math.max(v + 1.95, f.y0 + 0.6);
+    const k = rs(f);
+    const L = nearestHold(f, u - 0.35 * k, hv, 1.0);
+    const R = nearestHold(f, u + 0.35 * k, hv, 1.0, L);
+    if (!L || !R) { hintFace(f, true); return false; }
+    const [a, b] = L.u * k <= R.u * k ? [L, R] : [R, L];
+    void ground;
+    beginClimb(f, a, b);
+    return true;
+  }
+  function startClimbFromTop(f, u) {
+    const lips = f.holds.filter((h) => h.type === 'lip');
+    const k = rs(f);
+    const L = nearestHold(f, u - 0.35 * k, f.y1 - 0.08, 1.2), R = nearestHold(f, u + 0.35 * k, f.y1 - 0.08, 1.2, L);
+    if (!L || !R || !lips.length) return false;
+    const lf = L.u * k <= R.u * k;
+    beginClimb(f, lf ? L : R, lf ? R : L);
+    P.climbLock = 0.8;
+    return true;
+  }
+  function beginClimb(f, hl, hr) {
     P.face = f;
-    P.u = clamp(u, -f.halfW + 0.4, f.halfW - 0.4);
-    P.v = clamp(v, f.y0, f.y1 - 0.2);
+    P.hands = { L: { h: hl, u: hl.u, v: hl.v }, R: { h: hr, u: hr.u, v: hr.v } };
+    P.moving = null; P.cur = null; P.oneT = null; P.strainT = null; P.descend = false;
     P.vx = P.vy = P.vz = 0;
-    P.climbStartV = P.v;
     P.rappel = false;
+    P.bodyU = (hl.u + hr.u) / 2; P.bodyV = (hl.v + hr.v) / 2 - 1.85;
+    P.u = P.bodyU; P.v = P.bodyV;
     setState('climb');
+    // 歩いていた指はそのまま左手の操作にする
+    if (touch.stickId !== null) {
+      handPtr.set(touch.stickId, { hand: 'L', x: touch.x, y: touch.y, lx: touch.x, ly: touch.y });
+      touch.stickId = null;
+    }
+    if (touch.camId !== null) {
+      handPtr.set(touch.camId, { hand: 'R', x: touch.cx, y: touch.cy, lx: touch.cx, ly: touch.cy });
+      touch.camId = null;
+    }
     SFX.grab();
-    if (f.kind === 'thorn' && !hasTool('gloves')) toast(t('thornWall'));
+    if (!save.climbTip) { save.climbTip = true; toast(t('climbTip'), 6); }
   }
   function climbPos() {
     const f = P.face;
@@ -916,90 +1046,162 @@
   }
   function onLedge() {
     const f = P.face;
-    for (const l of f.ledges) if (Math.abs(P.v - l.v) < 0.5 && P.u > l.u0 && P.u < l.u1) return true;
+    if (!f || P.rappel) return false;
+    for (const l of f.ledges) if (Math.abs(P.v - l.v) < 0.4 && P.u > l.u0 && P.u < l.u1) return true;
     return false;
   }
   function letGo(push, reason) {
     const f = P.face;
-    P.face = null;
+    P.face = null; P.hands = null; P.moving = null; P.cur = null;
     goAir(f.nx * (push || 1.5), 0, f.nz * (push || 1.5), P.y);
     P.grabCd = 0.4;
     if (reason) statObs('wall', false);
   }
+  // 手を運んでいる先 (カーソル) を、つかんでいる手から届く範囲と壁の中におさめる
+  function clampCursor(f, X) {
+    const a = P.hands[other(X)];
+    let du = P.cur.u - a.u, dv = P.cur.v - a.v;
+    const d = Math.hypot(du, dv);
+    if (d > REACH) { du *= REACH / d; dv *= REACH / d; }
+    P.cur.u = clamp(a.u + du, -f.halfW + 0.3, f.halfW - 0.3);
+    P.cur.v = clamp(a.v + dv, f.y0 + 0.3, f.y1 + 0.2);
+  }
+  // 手を放したところでホールドをつかむ
+  function grabAt(X) {
+    const f = P.face;
+    const h = nearestHold(f, P.cur.u, P.cur.v, GRAB_R, P.hands[other(X)].h);
+    const hand = P.hands[X];
+    hand.u = P.cur.u; hand.v = P.cur.v;
+    P.moving = null;
+    if (!h) { hand.h = null; return; }
+    if (h.type === 'thorn' && !hasTool('gloves')) {
+      hurt(2, 'thorn'); toast(t('thornHold'), 1.6);
+      hand.h = null; return;
+    }
+    if (weather === 'rain' && h.type === 'poor' && !hasTool('gloves') && Math.random() < 0.35) {
+      toast(t('slip'), 1.2); SFX.grab();
+      hand.h = null; return;
+    }
+    // 下のホールドへ持ちかえたら「降りている」
+    P.descend = h.v < P.grabFromV - 0.05;
+    hand.h = h; hand.u = h.u; hand.v = h.v;
+    SFX.grab();
+  }
   function stepClimb(dt) {
     const f = P.face;
-    // 入力は世界の向きで見る: 壁へ向かう = 上、壁から離れる = 下、壁に沿う = 横
-    // (カメラが壁を向いていれば「前」で登り、崖の上から外を見ていれば「前」で降りる)
-    const wi = worldInput();
-    let du = 0, dv = 0;
     P.climbLock = Math.max(0, (P.climbLock || 0) - dt);
-    if (P.jumpT > 0) {
-      P.jumpT -= dt;
-      dv = 1.6 / 0.3;
-    } else if (P.stunT <= 0) {
-      du = (wi.x * f.tx + wi.z * f.tz) * CLIMB_SPEED;
-      dv = -(wi.x * f.nx + wi.z * f.nz) * CLIMB_SPEED;
-      const l = Math.hypot(du, dv);
-      if (l > CLIMB_SPEED) { du *= CLIMB_SPEED / l; dv *= CLIMB_SPEED / l; }
-    }
-    if (P.rappel) { du = 0; dv = -(wi.x * f.nx + wi.z * f.nz) * 2.0; }
-    const moving = Math.abs(du) + Math.abs(dv) > 0.05;
-    // スタミナ
-    if (!P.rappel) {
-      let k = moving ? 0.1 : 0.022;
-      if (f.kind === 'ladder' || f.kind === 'chain') k *= 0.4;
-      if (f.overhang) k *= 1.5;
-      if (weather === 'rain') k *= 1.3;
-      k *= drainK();
-      if (onLedge() && !moving) regenStamina(dt, 0.8);
-      else useStamina(k * dt);
-    }
-    // 飛びつき
-    if (pressed.has('jump') && !P.rappel && P.jumpT <= 0) {
-      pressed.delete('jump');
-      if (P.stamina > 0.05) { useStamina(0.25); P.jumpT = 0.3; SFX.jump(); }
-    }
     if (pressed.has('release')) { pressed.delete('release'); letGo(1.5); return; }
-    if (P.stamina <= 0 && !P.rappel) { toast(t('noStamina')); letGo(1.0, true); return; }
-    // 雨で手が滑る
-    if (weather === 'rain' && !hasTool('gloves') && !P.rappel) {
-      P.slipT -= dt;
-      if (P.slipT <= 0) { P.slipT = 3 + Math.random() * 4; P.v = Math.max(f.y0, P.v - 0.6); toast(t('slip'), 1.2); SFX.grab(); }
-    }
-    P.u = clamp(P.u + du * dt, -f.halfW + 0.4, f.halfW - 0.4);
-    P.v += dv * dt;
-    // イバラ
-    if (f.thorns.length && !hasTool('gloves')) {
-      const hv = P.v + 1.5;
-      for (const th of f.thorns) {
-        if (P.u > th.u0 - 0.2 && P.u < th.u1 + 0.2 && hv > th.v0 && P.v + 0.3 < th.v1) {
-          hurt(2, 'thorn'); letGo(2, true);
-          return;
+    if (P.rappel) { stepRappel(dt); return; }
+    const H = P.hands;
+    // 手の操作
+    for (const X of ['L', 'R']) {
+      const ci = climbIn[X];
+      if (ci.active && P.stunT <= 0) {
+        if (P.moving === null && H[other(X)].h) {
+          // この手を離して運びはじめる
+          P.moving = X;
+          P.grabFromV = H[X].v;
+          P.cur = { u: H[X].u, v: H[X].v };
+          H[X].h = null;
         }
+        if (P.moving === X) {
+          P.cur.u += ci.du; P.cur.v += ci.dv;
+          clampCursor(f, X);
+          H[X].u = P.cur.u; H[X].v = P.cur.v;
+        }
+      } else if (P.moving === X) {
+        grabAt(X);
       }
+      ci.du = 0; ci.dv = 0;
     }
-    // 下: 地面に着いたら降りる
-    const footX = f.ox + f.tx * P.u + f.nx * 0.9, footZ = f.oz + f.tz * P.u + f.nz * 0.9;
-    const below = groundAt(footX, footZ);
-    if (P.v <= below + 0.02 && dv <= 0) {
-      P.v = below;
-      P.face = null;
-      P.x = footX; P.z = footZ; P.y = below;
+    const held = (H.L.h ? 1 : 0) + (H.R.h ? 1 : 0);
+    if (held === 0) { toast(t('gripLost')); letGo(0.8, true); return; }
+    // 体の位置: 両手なら真ん中の下、片手ならその手の下にぶら下がる
+    let bu, bv;
+    if (held === 2) { bu = (H.L.u + H.R.u) / 2; bv = (H.L.v + H.R.v) / 2 - 1.85; }
+    else { const a = H.L.h ? H.L : H.R; bu = a.u + (H.L.h ? 0.18 : -0.18) * rs(f); bv = a.v - 1.95; }
+    // 足もとが地面なら、地面より下には下がらない (降りるのは下へ持ちかえたときだけ)
+    const fx0 = f.ox + f.tx * bu + f.nx * 0.9, fz0 = f.oz + f.tz * bu + f.nz * 0.9;
+    const gnd = groundAt(fx0, fz0);
+    if (held === 2 && bv < gnd - 0.05 && P.descend && P.climbLock <= 0) {
+      P.face = null; P.hands = null; P.moving = null;
+      P.x = fx0; P.z = fz0; P.y = gnd;
       setState('ground');
       return;
     }
-    // 上: 縁を越える
+    bv = Math.max(bv, gnd);
+    P.bodyU = lerp(P.bodyU, bu, 1 - Math.pow(0.002, dt));
+    P.bodyV = lerp(P.bodyV, bv, 1 - Math.pow(0.002, dt));
+    P.u = P.bodyU; P.v = P.bodyV;
+    const resting = onLedge();
+    // 片手の時間と、無理な体勢の時間
+    if (held === 1 && !resting) {
+      const a = H.L.h || H.R.h;
+      if (P.oneT === null) P.oneT = P.oneMax = ONE_HAND[a.type] || 2;
+      P.oneT -= dt;
+      if (P.oneT <= 0) { toast(t('gripLost')); letGo(0.8, true); return; }
+    } else P.oneT = null;
+    let strained = false;
+    if (held === 2) {
+      const span = Math.hypot(H.R.u - H.L.u, H.R.v - H.L.v);
+      strained = span > 1.75 || (H.L.u - H.R.u) * rs(f) > 0.25 || Math.abs(H.R.v - H.L.v) > 1.45;
+    }
+    if (strained && !resting) {
+      if (P.strainT === null) P.strainT = P.strainMax = 2.6;
+      P.strainT -= dt;
+      if (P.strainT <= 0) { toast(t('strainFall')); letGo(0.8, true); return; }
+    } else P.strainT = null;
+    // スタミナ
+    if (resting) regenStamina(dt, 1.2);
+    else {
+      let k = 0.012;
+      for (const X of ['L', 'R']) if (H[X].h && H[X].h.type === 'poor') k += 0.03;
+      if (held === 1) k += 0.05;
+      if (f.kind === 'ladder' || f.kind === 'chain') k *= 0.5;
+      if (f.overhang) k *= 1.5;
+      if (weather === 'rain') k *= 1.3;
+      useStamina(k * drainK() * dt);
+      if (P.stamina <= 0) { toast(t('noStamina')); letGo(1.0, true); return; }
+    }
+    // 下: 足が地面に着いたら降りる
+    // 上: 縁をつかんだら登りきる
+    const lipL = H.L.h && H.L.h.type === 'lip', lipR = H.R.h && H.R.h.type === 'lip';
+    if ((lipL && lipR) || ((lipL || lipR) && Math.min(H.L.v, H.R.v) > f.y1 - 1.3 && held === 2)) {
+      if (P.climbLock <= 0) {
+        const tx = f.ox + f.tx * P.u - f.nx * 1.0, tz = f.oz + f.tz * P.u - f.nz * 1.0;
+        climbPos();
+        P.mantle = { x0: P.x, y0: P.y, z0: P.z, x1: tx, y1: groundAt(tx, tz), z1: tz, t: 0 };
+        statObs('wall', true);
+        P.face = null; P.hands = null; P.moving = null;
+        setState('mantle');
+        return;
+      }
+    }
+    climbPos();
+    P.speed = P.moving ? 1 : 0;
+  }
+  // ロープで登り降りする (つるつるの壁)。どちらの手の上下の操作でも動く
+  function stepRappel(dt) {
+    const f = P.face;
+    const wi = worldInput();
+    let dv = -(wi.x * f.nx + wi.z * f.nz) * 2.0 * dt;
+    dv += climbIn.L.dv + climbIn.R.dv;
+    climbIn.L.dv = climbIn.R.dv = climbIn.L.du = climbIn.R.du = 0;
+    P.v += dv;
+    const footX = f.ox + f.tx * P.u + f.nx * 0.9, footZ = f.oz + f.tz * P.u + f.nz * 0.9;
+    const below = groundAt(footX, footZ);
+    if (P.v <= below + 0.02 && dv <= 0) {
+      P.face = null; P.x = footX; P.z = footZ; P.y = below; setState('ground'); return;
+    }
     if (P.v >= f.y1 - 1.0 && dv > 0 && P.climbLock <= 0) {
       const tx = f.ox + f.tx * P.u - f.nx * 1.0, tz = f.oz + f.tz * P.u - f.nz * 1.0;
+      climbPos();
       P.mantle = { x0: P.x, y0: P.y, z0: P.z, x1: tx, y1: groundAt(tx, tz), z1: tz, t: 0 };
-      statObs('wall', true);
-      P.face = null;
-      setState('mantle');
-      return;
+      P.face = null; setState('mantle'); return;
     }
     P.v = Math.min(P.v, f.y1 - 0.95);
     climbPos();
-    P.speed = moving ? 1 : 0;
+    P.speed = Math.abs(dv) > 0 ? 1 : 0;
   }
   function stepMantle(dt) {
     const m = P.mantle;
@@ -1010,9 +1212,10 @@
     if (m.t >= 1) { addClimb(Math.max(0, m.y1 - m.y0)); P.x = m.x1; P.y = m.y1; P.z = m.z1; P.vx = P.vz = 0; setState('ground'); }
   }
   let faceHintCd = 0;
-  function hintFace(f) {
+  function hintFace(f, noHolds) {
     if (faceHintCd > 0) return;
     faceHintCd = 3;
+    if (noHolds && f.kind !== 'ice' && f.kind !== 'smooth') { toast(t('noHoldHere')); return; }
     if (f.kind === 'ice' && !hasTool('pickaxe')) toast(t('needPickaxe'));
     else if (f.kind === 'smooth') toast(hasTool('rope') ? t('useRopeHere') : t('needRope'));
   }
@@ -1551,6 +1754,7 @@
     camPitch = 0.3;
     P.state = 'ground';
     P.stamina = maxStamina(); P.exhausted = false; P.rash = 0; P.bal = 0;
+    P.safe = { x: P.x, z: P.z };
     P.deck = null; P.face = null; P.rope = null; P.hook = null;
     for (const r of O.ropes) r.held = false;
     hookLine.visible = false;
@@ -1684,6 +1888,8 @@
     mode = m;
     hud.hidden = m !== 'play';
     $('btn-pause').hidden = m !== 'play';
+    $('btn-map').hidden = m !== 'play';
+    if (m !== 'play') { mapPopOn = false; $('map-pop').hidden = true; }
     $('photo-ui').hidden = m !== 'photo';
     showTouch(inputKind === 'touch');
     if (m === 'play' || m === 'photo') hideScreens();
@@ -1744,7 +1950,17 @@
     if (!run) return;
     $('pause-info').textContent = t('pauseInfo', { goal: L(W.cps[run.goal].name), time: fmtTime(run.elapsed), cp: L(W.cps[run.lastCp].name) });
   }
-  function pauseGame() { if (mode !== 'play') return; mode = 'pause'; hud.hidden = true; $('touch').hidden = true; $('btn-pause').hidden = true; showScreen('pause'); }
+  function pauseGame() { if (mode !== 'play') return; mode = 'pause'; hud.hidden = true; $('touch').hidden = true; $('btn-pause').hidden = true; $('btn-map').hidden = true; mapPopOn = false; $('map-pop').hidden = true; showScreen('pause'); }
+  // 登山中にいつでも開ける地図 (ゲームは止まらない)
+  let mapPopOn = false, mapPopT = 0;
+  function toggleMapPop() {
+    if (mode !== 'play' || !run) return;
+    mapPopOn = !mapPopOn;
+    $('map-pop').hidden = !mapPopOn;
+    mapPopT = 0;
+  }
+  $('btn-map').addEventListener('click', () => { audio(); toggleMapPop(); });
+  $('map-pop').addEventListener('click', () => toggleMapPop());
   $('pause-resume').addEventListener('click', () => setMode('play'));
   $('pause-tools').addEventListener('click', () => { backTo = 'pause'; showScreen('tools'); });
   $('pause-checkpoint').addEventListener('click', () => { if (run) respawn(); });
@@ -2268,7 +2484,7 @@
   // =====================================================================
   const camTarget = new THREE.Vector3();
   function updateCamera(dt, pad) {
-    if (pad && (pad.rx || pad.ry)) turnCamera(pad.rx * 2.4 * dt, pad.ry * 1.6 * dt);
+    if (pad && (pad.rx || pad.ry) && P.state !== 'climb') turnCamera(pad.rx * 2.4 * dt, pad.ry * 1.6 * dt);
     if (keys.has('camL')) turnCamera(-1.8 * dt, 0);
     if (keys.has('camR')) turnCamera(1.8 * dt, 0);
     camIdle += dt;
@@ -2285,18 +2501,19 @@
       camYaw += d * (1 - Math.pow(0.25, dt));
       camPitch = lerp(camPitch, camAuto.pitch, 1 - Math.pow(0.3, dt));
       if (camAuto.t <= 0) camAuto = null;
-    } else if (P.state === 'climb' && P.face && camIdle > 0.6) {
+    } else if (P.state === 'climb' && P.face) {
+      // 壁登り中は、いつも壁の正面 (登る人の背中側) から見る
       const want2 = Math.atan2(P.face.nx, P.face.nz);
       let d = want2 - camYaw; d = Math.atan2(Math.sin(d), Math.cos(d));
-      camYaw += d * (1 - Math.pow(0.4, dt));
-      camPitch = lerp(camPitch, 0.05, 1 - Math.pow(0.5, dt));
+      camYaw += d * (1 - Math.pow(0.08, dt));
+      camPitch = lerp(camPitch, 0.12, 1 - Math.pow(0.2, dt));
     } else if ((P.state === 'ground' || P.state === 'balance') && camIdle > 2.5 && P.speed > 1 && curIn.y > 0.5) {
       // 進む向きの後ろへゆっくり回り込む
       const want2 = P.yaw + Math.PI;
       let d = want2 - camYaw; d = Math.atan2(Math.sin(d), Math.cos(d));
       camYaw += d * (1 - Math.pow(0.7, dt));
     }
-    camTarget.set(P.x, P.y + 1.5, P.z);
+    camTarget.set(P.x, P.y + (P.state === 'climb' ? 2.1 : 1.5), P.z);
     const cp = Math.cos(camPitch), sp = Math.sin(camPitch);
     let dist = camDist;
     // 地面や建物にめりこまないよう縮める
@@ -2323,9 +2540,12 @@
   function animateHiker(dt) {
     const g = player.group;
     g.position.set(P.x, P.y, P.z);
+    if (g.userData.yaw === undefined) g.userData.yaw = g.rotation.y;
+    g.rotation.set(0, g.userData.yaw, 0);
     let dy = P.yaw - g.rotation.y;
     dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     g.rotation.y += dy * Math.min(1, dt * 14);
+    g.userData.yaw = g.rotation.y;
     g.rotation.z = 0; g.rotation.x = 0;
     const H = player;
     let aL = 0, aR = 0, lL = 0, lR = 0, aLz = 0, aRz = 0;
@@ -2335,7 +2555,16 @@
       case 'ground': case 'balance': {
         const k = clamp(P.speed / 4, 0, 1.2);
         lL = s * 0.6 * k; lR = -s * 0.6 * k; aL = -s * 0.5 * k; aR = s * 0.5 * k;
-        if (P.state === 'balance') { aLz = 1.2 + P.bal * 0.5; aRz = -1.2 + P.bal * 0.5; g.rotation.z = -P.bal * 0.45; }
+        if (P.state === 'balance') {
+          aLz = 1.2; aRz = -1.2;
+          // 橋の横向き (+p) へ体を傾ける
+          const d = P.deck;
+          if (d) {
+            const axis = new THREE.Vector3(-d.pz, 0, d.px).normalize();
+            g.updateMatrix();
+            g.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(axis, -P.bal * 0.5));
+          }
+        }
         if (P.mode === 'sneak') { lL *= 0.5; lR *= 0.5; }
         if (P.stunT > 0) g.rotation.x = -0.4;
         break;
@@ -2355,6 +2584,27 @@
       default: break;
     }
     H.armL.rotation.set(aL, 0, aLz); H.armR.rotation.set(aR, 0, aRz);
+    // 壁登り: 腕をそれぞれの手の位置へ向ける
+    if (P.state === 'climb' && P.hands && P.face) {
+      g.updateMatrixWorld(true);
+      const f = P.face;
+      const r = new THREE.Vector3(f.nz, 0, -f.nx); // 壁に向かって右
+      const pL = H.armL.getWorldPosition(new THREE.Vector3()).sub(g.position);
+      const leftArm = pL.dot(r) < 0 ? H.armL : H.armR;
+      const rightArm = leftArm === H.armL ? H.armR : H.armL;
+      const inv = new THREE.Quaternion().copy(g.quaternion).invert();
+      for (const [arm, X] of [[leftArm, 'L'], [rightArm, 'R']]) {
+        const hd = P.hands[X];
+        const sh = arm.getWorldPosition(new THREE.Vector3());
+        const dir = handWorld(f, hd.u, hd.v, new THREE.Vector3()).sub(sh);
+        const len = dir.length();
+        dir.normalize().applyQuaternion(inv);
+        arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
+        arm.scale.set(1, clamp(len / 0.62, 0.7, 1.4), 1);
+      }
+      H.legL.rotation.x = -0.5 + Math.sin(P.anim * 1.5) * 0.25;
+      H.legR.rotation.x = -0.5 - Math.sin(P.anim * 1.5) * 0.25;
+    } else { H.armL.scale.set(1, 1, 1); H.armR.scale.set(1, 1, 1); }
     H.legL.rotation.x = lL; H.legR.rotation.x = lR;
     // 影
     const gy = W.height(P.x, P.z);
@@ -2369,6 +2619,55 @@
   // =====================================================================
   // 表示の更新
   // =====================================================================
+  const gripEl = $('grip'), grFill = $('gr-fill'), warnEl = $('climb-warn'), helpEl = $('climb-help');
+  const CIRC_G = 2 * Math.PI * 17;
+  const tmpV = new THREE.Vector3();
+  function handWorld(f, u, v, out) {
+    out = out || tmpV;
+    return out.set(f.ox + f.tx * u + f.nx * 0.12, v, f.oz + f.tz * u + f.nz * 0.12);
+  }
+  function updateClimbHud() {
+    const climbing = P.state === 'climb' && P.hands && !P.rappel;
+    handCursor.visible = candRing.visible = reachRing.visible = false;
+    gripEl.classList.remove('is-on');
+    warnEl.classList.remove('is-on');
+    helpEl.classList.toggle('is-on', climbing);
+    if (!climbing) return;
+    helpEl.textContent = t(inputKind === 'touch' ? 'climbHelpTouch' : 'climbHelpKb');
+    const f = P.face, H = P.hands;
+    if (P.moving) {
+      const a = H[other(P.moving)];
+      handWorld(f, P.cur.u, P.cur.v);
+      handCursor.position.copy(tmpV); handCursor.visible = true;
+      // 届く範囲 (つかんでいる手のまわり)
+      handWorld(f, a.u, a.v);
+      reachRing.position.copy(tmpV); reachRing.visible = true;
+      reachRing.lookAt(tmpV.x + f.nx, tmpV.y, tmpV.z + f.nz);
+      const h = nearestHold(f, P.cur.u, P.cur.v, GRAB_R, a.h);
+      if (h) {
+        handWorld(f, h.u, h.v);
+        candRing.position.copy(tmpV); candRing.visible = true;
+        candRing.lookAt(tmpV.x + f.nx, tmpV.y, tmpV.z + f.nz);
+        candRing.material.color.setHex(h.type === 'poor' ? 0xffb02e : h.type === 'thorn' ? 0xff4b3a : 0x9cff7a);
+      }
+    }
+    // 残り時間の輪は、つかんでいる手の位置に出す
+    let T = null, Tmax = 1;
+    if (P.oneT !== null && P.oneT !== undefined) { T = P.oneT; Tmax = P.oneMax; warnEl.textContent = t('oneHand'); }
+    if (P.strainT !== null && P.strainT !== undefined) { T = P.strainT; Tmax = P.strainMax; warnEl.textContent = t('strained'); }
+    if (onLedge()) { warnEl.textContent = t('resting'); warnEl.classList.add('is-on'); warnEl.style.background = 'rgba(30,110,60,0.75)'; }
+    if (T !== null) {
+      const a = H.L.h ? H.L : H.R;
+      const sp = toScreen(...handWorld(f, a.u, a.v).toArray());
+      gripEl.style.transform = `translate(${sp.x}px, ${sp.y}px)`;
+      gripEl.classList.add('is-on');
+      gripEl.classList.toggle('is-danger', T / Tmax < 0.4);
+      grFill.style.strokeDasharray = `${CIRC_G * clamp(T / Tmax, 0, 1)} ${CIRC_G}`;
+      warnEl.classList.add('is-on');
+      warnEl.style.background = '';
+    }
+  }
+
   const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   function updateHud(dt) {
     drawHearts();
@@ -2423,7 +2722,21 @@
     const bp = toScreen(P.x, P.y - 0.2, P.z);
     balEl.style.transform = `translate(${bp.x}px, ${bp.y + 16}px)`;
     balEl.classList.toggle('is-on', P.state === 'balance');
-    balMark.style.left = `${50 + clamp(P.bal, -1, 1) * 48}%`;
+    // 画面の右へ傾いているときは右に出す (橋の向きとカメラの向きで左右が入れかわらないように)
+    const balSide = P.deck ? ((P.deck.px * cam.r.x + P.deck.pz * cam.r.z) >= 0 ? 1 : -1) : 1;
+    balMark.style.left = `${50 + clamp(P.bal * balSide, -1, 1) * 48}%`;
+    if (P.state === 'balance' && Math.abs(P.bal) > 0.45 && !save.balTip) { save.balTip = true; toast(t('balanceTip'), 4); }
+    // 壁登り: 片手・無理な体勢の残り時間、手の行き先、つかめるホールド
+    updateClimbHud();
+    // 地図 (開いているあいだは 0.5 秒ごとに描き直す)
+    if (mapPopOn) {
+      mapPopT -= dt;
+      if (mapPopT <= 0) {
+        mapPopT = 0.5;
+        const nextId = run && run.route[run.idx + 1];
+        drawMap($('pop-canvas'), { route: run ? summarize(run.route, run.edges) : null, highlight: nextId ? [nextId, run.goal] : [], player: true });
+      }
+    }
     // 着地の予測 (麓と中腹だけ)
     if (P.state === 'swing' && P.y < W.bands[1].y1) {
       const lp = predictLanding();
@@ -2485,6 +2798,9 @@
         const k = l > R ? R / l : 1;
         $('stick-knob').style.transform = `translate(${dx * k}px, ${dy * k}px)`;
       }
+      climbIn = readClimbInput(pad, dt);
+      if (P.state !== 'climb' && handPtr.size) handPtr.clear();
+      if (pressed.has('map')) { pressed.delete('map'); toggleMapPop(); }
       acc += dt;
       let n = 0;
       while (acc >= STEP && n < 16) {
@@ -2555,6 +2871,7 @@
     curIn = { x: opt.x || 0, y: l > 0 ? (opt.y != null ? opt.y : 1) : 0, mag: l > 0 || opt.x ? (opt.mag || 1) : 0, analog: !!opt.analog };
     runHeld = !!opt.run; sneakHeld = !!opt.sneak;
     for (const k of opt.press || []) pressed.add(k);
+    climbIn = { L: { active: false, du: 0, dv: 0 }, R: { active: false, du: 0, dv: 0 } };
     for (let i = 0; i < n; i++) {
       if (pressed.has('use')) { pressed.delete('use'); const a = contextAction(); if (a && a.ok) a.run(); }
       physics(STEP);
@@ -2565,7 +2882,19 @@
     pressed.clear();
     return { x: P.x, y: P.y, z: P.z, state: P.state, hp: P.hp, st: P.stamina, bal: P.bal, s: P.s };
   }
+  // テスト用: 手 X をホールドのある (u, v) へ運んでつかむ
+  function climbTo(X, u, v) {
+    if (P.state !== 'climb' || !P.hands) return false;
+    climbIn = { L: { active: false, du: 0, dv: 0 }, R: { active: false, du: 0, dv: 0 } };
+    const h = P.hands[X];
+    climbIn[X] = { active: true, du: u - h.u, dv: v - h.v };
+    physics(STEP);
+    climbIn[X] = { active: false, du: 0, dv: 0 };
+    physics(STEP);
+    return !!(P.hands && P.hands[X].h);
+  }
   window.__summit = {
+    climbTo, hasTool,
     scene,
     simWorld, contextAction: () => { const a = contextAction(); return a && { txt: a.txt, ok: a.ok }; }, giveTool: (id) => { if (!save.tools.includes(id)) save.tools.push(id); },
     teleport: (x, z, y) => { P.x = x; P.z = z; P.y = y != null ? y : W.height(x, z); P.vx = P.vy = P.vz = 0; P.state = 'ground'; P.deck = null; P.face = null; P.rope = null; S.prime(x, z); }, P, get W() { return W; }, get O() { return O; }, get run() { return run; }, save: () => save, startRun, physics, setKeys: (k) => { keys.clear(); for (const x of k) keys.add(x); }, press: (k) => pressed.add(k), get mode() { return mode; }, camYawSet: (y) => { camYaw = y; }, reachCp, planRoute };

@@ -113,7 +113,9 @@
     // 向きによって裾の広がりを変え、尾根 (張り出し) をつけて円すいに見えないようにする
     const LOBES = T.lobes || [[2, 0.1, 1], [3, 0.06, 2], [5, 0.035, 0.5]];
     const SPURS = T.spurs || { k: 7, amp: 16, phase: 0.7 };
-    function base(x, z) {
+    const CL = T.cliffs ? Object.assign({ h: 14, tread: 0.25, w: 0.11, wobble: 6, y0: 15, y1: 470 }, T.cliffs) : null;
+    const TH0 = CL ? Math.tanh(0.5 / CL.w) : 1;
+    function base(x, z, smoothOnly) {
       const r = Math.hypot(x, z);
       const th = Math.atan2(-z, x);
       let lobe = 1;
@@ -125,6 +127,15 @@
         const sp = 1 - Math.abs(Math.sin(SPURS.k * th / 2 + SPURS.phase));
         const env = smooth((rr - 90 * RS) / (120 * RS)) * (1 - smooth((rr - 600 * RS) / (300 * RS)));
         y += (sp * sp - 0.35) * SPURS.amp * env;
+      }
+      // 断崖の帯: 標高 CL.h ごとに、なだらかな段と切り立った崖をくり返す
+      if (CL && !smoothOnly && rr < prof[0][1]) {
+        const off = noise2(x / 95 + 7, z / 95 - 3) * CL.wobble;
+        const sv = (y + off) / CL.h;
+        const fl = Math.floor(sv), fr = sv - fl;
+        const ty = (fl + CL.tread * fr + (1 - CL.tread) * (Math.tanh((fr - 0.5) / CL.w) + TH0) / (2 * TH0)) * CL.h - off;
+        const m = smooth((y - CL.y0) / 40) * (1 - smooth((y - CL.y1) / 20));
+        y = lerp(y, ty, m);
       }
       // 岩がちな細かい起伏 (尾根状のノイズ)。高いところほど大きい
       const rough = lerp(T.roughFoot != null ? T.roughFoot : 0.4, T.roughTop != null ? T.roughTop : 2.4, clamp(y / MAXY, 0, 1)) * (rr < prof[0][1] ? 1 : 0.15);
@@ -139,7 +150,7 @@
       const c = Math.cos(a * DEG), s = -Math.sin(a * DEG);
       for (let i = 0; i < 30; i++) {
         const mid = (lo + hi) / 2;
-        if (base(mid * c, mid * s) > y) lo = mid; else hi = mid;
+        if (base(mid * c, mid * s, true) > y) lo = mid; else hi = mid;
       }
       return (lo + hi) / 2;
     }
@@ -416,14 +427,18 @@
 
     // ---- 谷の長さ: ほかの道やチェックポイントにかからないところまで ----
     {
-      const near = (x, z, edgeId, pad) => {
+      const near = (x, z, edgeId, pad, g) => {
         for (const s of segs) {
-          if (s.edge === edgeId) continue;
+          if (s.edge === edgeId && (s.ridge || !g)) continue;
           const m = s.hw + 3.2 + pad;
           if (x < Math.min(s.ax, s.bx) - m || x > Math.max(s.ax, s.bx) + m || z < Math.min(s.az, s.bz) - m || z > Math.max(s.az, s.bz) + m) continue;
           const dx = s.bx - s.ax, dz = s.bz - s.az;
           const t = clamp(((x - s.ax) * dx + (z - s.az) * dz) / (dx * dx + dz * dz || 1e-6), 0, 1);
-          if (Math.hypot(x - s.ax - dx * t, z - s.az - dz * t) < m) return true;
+          const qx = s.ax + dx * t, qz = s.az + dz * t;
+          if (Math.hypot(x - qx, z - qz) >= m) continue;
+          // 同じ道: 橋のたもとにつながる部分はのぞく (曲がって谷に近づいたところだけ)
+          if (s.edge === edgeId && (Math.hypot(qx - g.A.x, qz - g.A.z) < 14 || Math.hypot(qx - g.B.x, qz - g.B.z) < 14)) continue;
+          return true;
         }
         for (const id in cps) {
           const c = cps[id];
@@ -439,7 +454,7 @@
             let hit = false;
             for (const fu of [-1, -0.5, 0, 0.5, 1]) {
               const du = fu * (g.halfL + g.edgeW);
-              if (near(g.cx + g.ux * du + g.nx * n * sgn, g.cz + g.uz * du + g.nz * n * sgn, g.edge, 3)) { hit = true; break; }
+              if (near(g.cx + g.ux * du + g.nx * n * sgn, g.cz + g.uz * du + g.nz * n * sgn, g.edge, 3, g)) { hit = true; break; }
             }
             if (hit) break;
           }
@@ -447,6 +462,23 @@
           if (sgn > 0) g.down = v; else g.up = v;
         }
         g.taper = Math.min(g.taper, Math.max(3, Math.min(g.up, g.down) * 0.5));
+      }
+    }
+
+    // ---- 岩壁の幅: 前後の高さが合わない道 (曲がってきた同じ道など) にかからないところまで ----
+    for (const st of steps) {
+      for (const sg of segs) {
+        for (let k = 0; k <= 4; k++) {
+          const f = k / 4;
+          const x = lerp(sg.ax, sg.bx, f), z = lerp(sg.az, sg.bz, f), y = lerp(sg.ay, sg.by, f);
+          const rx = x - st.cx, rz = z - st.cz;
+          const n = rx * st.nx + rz * st.nz;
+          if (n > st.front + sg.hw + 1 || n < -st.back - sg.hw - 1) continue;
+          const ok = n > 0 ? y <= st.y0 + 0.5 : y >= st.y1 - 0.5;
+          if (ok) continue;
+          const u = Math.abs(rx * st.tx + rz * st.tz);
+          if (u < st.halfW + sg.hw + 1.5) st.halfW = Math.max(4, Math.min(st.halfW, u - sg.hw - 1.5));
+        }
       }
     }
 
@@ -465,17 +497,19 @@
       }
     }
     const MARGIN = 3.2;
+    // 道と広場のまわり CF m は崖の帯を弱める (道が溝や土手にならないように)
+    const CF = CL ? 14 : 0;
     for (const s of segs) {
       s.kind = 'seg';
       s.dx = s.bx - s.ax; s.dz = s.bz - s.az; s.l2 = s.dx * s.dx + s.dz * s.dz || 1e-6;
       s.mg = s.ridge ? 0.01 : MARGIN;
-      const m = s.hw + s.mg;
+      const m = s.hw + s.mg + CF;
       addBox(s, Math.min(s.ax, s.bx) - m, Math.min(s.az, s.bz) - m, Math.max(s.ax, s.bx) + m, Math.max(s.az, s.bz) + m);
     }
     for (const id in cps) {
       const c = cps[id];
       const t = { kind: 'cp', x: c.x, z: c.z, y: c.y, R: c.R, mg: 7, cp: c };
-      addBox(t, c.x - c.R - 7, c.z - c.R - 7, c.x + c.R + 7, c.z + c.R + 7);
+      addBox(t, c.x - c.R - 7 - CF, c.z - c.R - 7 - CF, c.x + c.R + 7 + CF, c.z + c.R + 7 + CF);
     }
     for (const g of gorges) {
       g.kind = 'gorge';
@@ -500,8 +534,9 @@
     // ---- 高さ ----
     // info を渡すと、地面の種類なども書きこむ
     function height(x, z, render, info) {
-      const b = base(x, z);
+      let b = base(x, z);
       let h = b;
+      let fadeD = 1e9;
       // 道と広場: 重なるところは近いものほど強く混ぜる (段ができないように)
       let bestW = 0, bestSurf = null, bestSeg = null, bestD = 0;
       let sumY = 0, sumK = 0;
@@ -514,12 +549,14 @@
           t = clamp(t, 0, 1);
           const px = it.ax + it.dx * t, pz = it.az + it.dz * t;
           d = Math.hypot(x - px, z - pz);
+          if (d - it.hw - it.mg < fadeD) fadeD = d - it.hw - it.mg;
           if (d > it.hw + it.mg) continue;
           w = d <= it.hw ? 1 : 1 - smooth((d - it.hw) / it.mg);
           y = lerp(it.ay, it.by, t);
           if (it.ridge) { d -= 2; } // やせ尾根は優先
         } else if (it.kind === 'cp') {
           d = Math.hypot(x - it.x, z - it.z);
+          if (d - it.R - it.mg < fadeD) fadeD = d - it.R - it.mg;
           if (d > it.R + it.mg) continue;
           w = d <= it.R ? 1 : 1 - smooth((d - it.R) / it.mg);
           y = it.y;
@@ -529,6 +566,7 @@
         sumY += y * kk; sumK += kk;
         if (w > bestW || (w === bestW && d < bestD)) { bestW = w; bestSurf = it.kind === 'cp' ? 'terrace' : it.surf; bestSeg = it; bestD = d; }
       }
+      if (fadeD < CF) { b = lerp(base(x, z, true), b, smooth(Math.max(0, fadeD) / CF)); h = b; }
       if (bestW > 0) h = lerp(b, sumY / sumK, bestW);
       let surf = bestW > 0.6 ? bestSurf : null;
       let gorge = null, step = null;
@@ -542,7 +580,7 @@
           const fu = du <= it.halfL ? 1 : 1 - smooth((du - it.halfL) / it.edgeW);
           const fn = Math.min(smooth((dn + it.up) / it.taper), smooth((it.down - dn) / it.taper));
           const f = fu * fn;
-          let floor = b - it.depth * f;
+          let floor = lerp(h, b - it.depth, f); // 谷の縁では今の高さから続ける
           if (it.ridge) {
             const yr = lerp(it.y, it.y2, clamp((rx * it.ux + rz * it.uz) / (it.L) + 0.5, 0, 1));
             const rp = yr - Math.max(0, Math.abs(dn) - it.ridge) * 2.2;

@@ -73,6 +73,56 @@
       plants: [], gusts: [], items: [], springs: [], views: [], cpMarks: {}, anims: [],
     };
 
+    // ---- 壁のホールド (つかめるところ) ----
+    // good: つかみやすい (白っぽい大きな出っぱり)。片手でも長く持つ
+    // poor: つかみにくい (小さく暗い)。スタミナを多く使い、片手ではすぐ落ちる
+    // lip: 壁の上の縁。両手でつかむと登りきる
+    // thorn: イバラが絡んでいる (革手袋がないと痛くて手が離れる)
+    // 中央の幅 5m ほどに、縦 0.5m・横 0.65m ごとのます目に半分くらい置く
+    const HOLD_GOOD = { foot: 0.75, mid: 0.6, high: 0.48, top: 0.4 };
+    O.allHolds = [];
+    function makeHolds(st, f, kind, H) {
+      const holds = [];
+      const band = W.bandAt(st.y0).id;
+      let goodP = HOLD_GOOD[band] || 0.5;
+      if (f.overhang) goodP *= 0.7;
+      const add = (u, v, type) => holds.push({ u, v: st.y0 + v, type, f });
+      if (kind === 'smooth') return holds;
+      if (kind === 'ladder' || kind === 'chain') {
+        for (let v = 0.5; v < H - 0.3; v += 0.42) { add(-0.17, v, 'good'); add(0.17, v, 'good'); }
+      } else {
+        const cols = [];
+        for (let u = -2.6; u <= 2.61; u += 0.65) cols.push(u);
+        for (let v = 0.7; v < H - 0.45; v += 0.5) {
+          const row = [];
+          for (const u of cols) if (rnd() < 0.55) row.push(u);
+          while (row.length < 3) row.push(cols[Math.floor(rnd() * cols.length)]);
+          for (const u0 of row) {
+            const u = u0 + (rnd() - 0.5) * 0.3, vv = v + (rnd() - 0.5) * 0.24;
+            let type = kind === 'ice' ? 'ice' : rnd() < goodP ? 'good' : 'poor';
+            if (f.thorns.some((th) => u > th.u0 - 0.1 && u < th.u1 + 0.1 && st.y0 + vv > th.v0 && st.y0 + vv < th.v1)) type = 'thorn';
+            add(u, vv, type);
+          }
+        }
+        // 下から上まで必ず登れる筋を 2 本 (左右交互に 0.85m おき)
+        for (const c0 of [-1.3, 1.3]) {
+          let c = c0, side = 1;
+          for (let v = 1.0; v < H - 0.6; v += 0.85) {
+            c = clamp(c + (rnd() - 0.5) * 0.6, -2.2, 2.2);
+            side = -side;
+            const u = c + side * 0.4;
+            let type = kind === 'ice' ? 'ice' : rnd() < goodP + 0.15 ? 'good' : 'poor';
+            if (f.thorns.some((th) => u > th.u0 - 0.1 && u < th.u1 + 0.1 && st.y0 + v > th.v0 && st.y0 + v < th.v1)) type = 'thorn';
+            if (!holds.some((h) => Math.hypot(h.u - u, h.v - st.y0 - v) < 0.3)) add(u, v, type);
+          }
+        }
+        // 出っぱりのすぐ上には、つかみやすいホールドを並べる
+        for (const l of f.ledges) for (const u of [-1.6, -0.6, 0.4, 1.4]) add(u + rnd() * 0.3, l.v - st.y0 + 1.75, kind === 'ice' ? 'ice' : 'good');
+      }
+      for (let u = -2.7; u <= 2.71; u += 0.6) add(u, H - 0.08, 'lip');
+      return holds;
+    }
+
     const basisMatrix = (tx, tz, nx, nz) => {
       const t = new THREE.Vector3(tx, 0, tz).normalize();
       const n = new THREE.Vector3().crossVectors(t, UP);
@@ -105,12 +155,18 @@
       const lip = new THREE.Mesh(new THREE.BoxGeometry(st.halfW * 2 + 0.2, 0.25, depth + 0.2), mat(st.y1 > 0.76 * W.maxY ? 0xdfe4e8 : 0x7a8a55));
       lip.position.set(0, H + 0.05, -depth / 2);
       g.add(lip);
-      for (const v of def.ledges || []) {
-        const ledge = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.35, 0.8), mat(0x7f776c));
-        ledge.position.set(0, v - 0.2, 0.35);
-        g.add(ledge);
-        f.ledges.push({ v: st.y0 + v, u0: -1.8, u1: 1.8 });
+      // 休める出っぱり: データにあるものに加え、長い壁には 7m ごとに置く
+      const ledgeV = new Set(def.ledges || []);
+      if (kind !== 'ladder' && kind !== 'chain' && kind !== 'smooth' && H > 9) {
+        for (let v = 7; v < H - 3; v += 7) if (![...ledgeV].some((x) => Math.abs(x - v) < 3.5)) ledgeV.add(v);
       }
+      for (const v of [...ledgeV].sort((a, b) => a - b)) {
+        const ledge = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.4, 1.0), mat(0x7f776c));
+        ledge.position.set(0, v - 0.2, 0.45);
+        g.add(ledge);
+        f.ledges.push({ v: st.y0 + v, u0: -2.6, u1: 2.6 });
+      }
+
       if (kind === 'ladder') {
         for (const s of [-0.32, 0.32]) {
           const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, H + 1.2, 0.08), M.wood);
@@ -161,6 +217,8 @@
         f.anchor = { x: st.cx - st.nx * 0.7, z: st.cz - st.nz * 0.7, y: st.y1 };
         f.ropeMesh = hang;
       }
+      f.holds = makeHolds(st, f, kind, H);
+      for (const h of f.holds) O.allHolds.push(h);
       g.applyMatrix4(basisMatrix(st.tx, st.tz, st.nx, st.nz));
       // basis の z が外向きになっているか確かめ、逆なら回す
       const zAxis = new THREE.Vector3(); g.matrix.extractBasis(new THREE.Vector3(), new THREE.Vector3(), zAxis);
@@ -169,6 +227,33 @@
       scene.add(g);
       f.group = g;
       O.faces.push(f);
+    }
+
+    // ホールドの見た目 (種類ごとに1つの InstancedMesh)
+    {
+      const HOLD_LOOK = {
+        good: { geo: new THREE.DodecahedronGeometry(0.13, 0), color: 0xe9dcc0, s: [1.3, 0.8, 0.9] },
+        poor: { geo: new THREE.DodecahedronGeometry(0.08, 0), color: 0x4e4740, s: [1.4, 0.6, 0.7] },
+        thorn: { geo: new THREE.DodecahedronGeometry(0.12, 0), color: 0x8a3a32, s: [1.2, 0.9, 0.9] },
+        ice: { geo: new THREE.OctahedronGeometry(0.1, 0), color: 0x9fd8f2, s: [1, 0.7, 0.6] },
+      };
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
+      for (const type in HOLD_LOOK) {
+        const L = HOLD_LOOK[type];
+        const list = O.allHolds.filter((h) => h.type === type && h.f.kind !== 'ladder' && h.f.kind !== 'chain');
+        if (!list.length) continue;
+        const inst = new THREE.InstancedMesh(L.geo, mat(L.color), list.length);
+        list.forEach((h, i) => {
+          const f = h.f;
+          ps.set(f.ox + f.tx * h.u + f.nx * 0.05, h.v, f.oz + f.tz * h.u + f.nz * 0.05);
+          q.setFromEuler(new THREE.Euler(rnd() * 0.6, Math.atan2(f.nx, f.nz) + rnd() * 0.6, rnd() * 0.6));
+          const k = 0.85 + rnd() * 0.35;
+          sc.set(L.s[0] * k, L.s[1] * k, L.s[2] * k);
+          m4.compose(ps, q, sc);
+          inst.setMatrixAt(i, m4);
+        });
+        scene.add(inst);
+      }
     }
 
     // =================================================================
