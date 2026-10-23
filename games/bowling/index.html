@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" />
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
   <main class="app">
@@ -64,6 +64,7 @@
           <p class="game-logo"><span class="logo-strike">STRIKE</span><span class="logo-lane">LANE</span></p>
           <p class="overlay-text" data-i18n="tagline">ジャンプ台、落とし穴、ワープゲート。
 10のワールドでトリックショットを決めろ</p>
+          <div class="overall" id="title-overall"></div>
           <div class="overlay-actions">
             <button type="button" class="start-btn" id="start-btn" data-i18n="play">あそぶ</button>
             <button type="button" class="start-btn is-sub" id="title-records" data-i18n="records">成績</button>
@@ -72,6 +73,7 @@
 
         <div class="screen select-screen" id="screen-select" hidden>
           <h2 class="screen-title" data-i18n="selectTitle">ステージ選択</h2>
+          <div class="overall" id="select-overall"></div>
           <div class="world-nav">
             <button type="button" class="nav-btn" id="world-prev" data-i18n-label="prevWorld" aria-label="前のワールド">‹</button>
             <p class="world-label" id="world-label"></p>
@@ -117,8 +119,8 @@
       <p>ステージが始まると、まずレーンを奥から手前へ見せます (タップで飛ばせます)。仕掛けを確かめてから投げましょう。</p>
 
       <h3>宝物と成績</h3>
-      <p>各ステージには宝物がひとつ浮かんでいます。ボールで触れると手に入ります。宝物を取っても取らなくても、クリアの条件は変わりません。</p>
-      <p>ステージごとに「ストライク」「スペア」「宝物+ストライク (同じ挑戦の中で宝物を取ってストライク)」「宝物+スペア」の4つの記録が残ります。全部そろえるには、同じステージを何度か遊ぶ必要があります。記録は「成績」画面で、ワールドごとに見られます。</p>
+      <p>各ステージには宝物がひとつ浮かんでいます。ボールで触れたあと、そのステージをクリアすると持ち帰れます (クリアできなかったら持ち帰れません)。宝物を取っても取らなくても、クリアの条件は変わりません。</p>
+      <p>ステージごとに「ストライク」「スペア」「宝物+ストライク (同じ挑戦の中で宝物を取ってストライク)」「宝物+スペア」の4つの記録が残ります。ストライクを取ると、スペアも取ったことになります。記録は「成績」画面で、ワールドごとに見られます。全体の達成率は、1ステージにつき4つの記録と宝物の5つ、全500個のうちいくつ取ったかです。</p>
 
       <h3>スマホの操作</h3>
       <table>
@@ -162,8 +164,8 @@
       <p>Each stage opens with a fly-through from the pins back to you (tap to skip). Check the gimmicks before you bowl.</p>
 
       <h3>Treasure and records</h3>
-      <p>Every stage has one floating treasure. Touch it with the ball to collect it. It does not affect whether you clear the stage.</p>
-      <p>Each stage keeps four records: Strike, Spare, Treasure + Strike (collect the treasure and strike in the same attempt) and Treasure + Spare. Filling them all takes several visits. See them by world on the Records screen.</p>
+      <p>Every stage has one floating treasure. Touch it with the ball, then clear the stage to keep it (fail and it is lost). It does not affect whether you clear the stage.</p>
+      <p>Each stage keeps four records: Strike, Spare, Treasure + Strike (collect the treasure and strike in the same attempt) and Treasure + Spare. A strike also counts as a spare. See them by world on the Records screen. Overall progress counts the four records and the treasure for every stage: 500 in all.</p>
 
       <h3>Touch controls</h3>
       <table>
@@ -207,8 +209,8 @@
       <p>每关开始时，镜头会从球瓶处拉回到投球位置（点击可跳过）。先看清机关再投球。</p>
 
       <h3>宝物与战绩</h3>
-      <p>每关都有一个漂浮的宝物，用球碰到就能拿到。拿不拿宝物都不影响过关条件。</p>
-      <p>每关会记录四项：全中、补中、宝物+全中（同一次挑战中拿到宝物并全中）、宝物+补中。要全部集齐需要反复挑战。可以在“战绩”画面按世界查看。</p>
+      <p>每关都有一个漂浮的宝物。用球碰到后，过关才能带回（没过关就带不回）。拿不拿宝物都不影响过关条件。</p>
+      <p>每关会记录四项：全中、补中、宝物+全中（同一次挑战中拿到宝物并全中）、宝物+补中。打出全中也算作补中。可以在“战绩”画面按世界查看。总完成度按每关四项记录加宝物共 5 项、全部 500 项计算。</p>
 
       <h3>触屏操作</h3>
       <table>
@@ -252,8 +254,8 @@
       <p>스테이지가 시작되면 핀 쪽에서 투구 위치까지 카메라가 이동하며 레인을 보여 줍니다(탭하면 건너뜁니다). 장치를 확인하고 던지세요.</p>
 
       <h3>보물과 기록</h3>
-      <p>스테이지마다 보물이 하나 떠 있습니다. 공으로 닿으면 손에 넣습니다. 보물을 얻든 얻지 않든 클리어 조건은 같습니다.</p>
-      <p>스테이지마다 스트라이크, 스페어, 보물+스트라이크(같은 도전에서 보물을 얻고 스트라이크), 보물+스페어의 네 가지 기록이 남습니다. 모두 모으려면 같은 스테이지를 여러 번 도전해야 합니다. 기록 화면에서 월드별로 볼 수 있습니다.</p>
+      <p>스테이지마다 보물이 하나 떠 있습니다. 공으로 닿은 뒤 스테이지를 클리어하면 가져갈 수 있습니다(클리어하지 못하면 가져갈 수 없습니다). 보물을 얻든 얻지 않든 클리어 조건은 같습니다.</p>
+      <p>스테이지마다 스트라이크, 스페어, 보물+스트라이크(같은 도전에서 보물을 얻고 스트라이크), 보물+스페어의 네 가지 기록이 남습니다. 스트라이크를 하면 스페어도 달성한 것으로 칩니다. 기록 화면에서 월드별로 볼 수 있습니다. 전체 달성률은 스테이지마다 기록 4개와 보물을 합친 5개, 모두 500개 중 몇 개를 얻었는지입니다.</p>
 
       <h3>터치 조작</h3>
       <table>
@@ -299,8 +301,8 @@
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
-  <script src="i18n.js?v=4"></script>
-  <script src="stages.js?v=4"></script>
-  <script src="script.js?v=4"></script>
+  <script src="i18n.js?v=5"></script>
+  <script src="stages.js?v=5"></script>
+  <script src="script.js?v=5"></script>
 </body>
 </html>
