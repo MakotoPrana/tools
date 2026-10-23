@@ -590,6 +590,26 @@
     for (const r of st.rooms) r.en = { name: rooms[r.id] };
     st.treasure.en = { name: tName, desc: tDesc };
   });
+  // チュートリアル: 10 ステージとは別の、3部屋だけの小さな家 (達成率や記録には入らない)。
+  // 家のまわりは「外」(通れない、何も描かない) にして、2〜3分で回れる広さにする
+  const TUT = -1;
+  const TUTORIAL = {
+    name: 'チュートリアル', desc: '遊び方を覚える、3部屋だけの小さな家。', dirt: [74, 64, 52], weights: {}, spawnMul: 0.7, hpMul: 0.75, growth: 0.5, boss: 'kaiju',
+    rooms: [
+      { id: 'genkan', name: '玄関', rect: [9, 20, 12, 10], floor: 'stone', bonus: 'speed', danger: 1, src: ['pile'] },
+      { id: 'living', name: 'リビング', rect: [21, 20, 10, 10], floor: 'wood', bonus: 'hp', danger: 1, src: ['pile'] },
+      { id: 'washitsu', name: '和室', rect: [9, 12, 22, 8], floor: 'tatami', bonus: 'might', danger: 2, src: ['pile', 'boxes'] },
+    ],
+    doors: [['genkan', 'living'], ['genkan', 'washitsu'], ['living', 'washitsu']],
+    start: 'genkan',
+    startAt: [0.3, 0.78],
+    treasure: null,
+    dumps: [['genkan', 0.78, 0.78]],
+  };
+  TUTORIAL.en = { name: 'Tutorial', desc: 'A tiny three-room house for learning how to play.' };
+  for (const r of TUTORIAL.rooms) r.en = { name: { genkan: 'Entrance', living: 'Living Room', washitsu: 'Tatami Room' }[r.id] };
+  const stageOf = (i) => (i === TUT ? TUTORIAL : STAGES[i]);
+
   const bonusText = (key) => (lang === 'en' ? EN_BONUS[key] : ROOM_BONUS[key]);
   // ギアのレベルアップの説明 (レベル lv → lv+1)
   const lvText = (id, lv) => (lang === 'en' ? WEAPONS[id].en.lvText[lv - 1] : WEAPONS[id].lv[lv - 1][1]);
@@ -635,6 +655,26 @@
       tagline: '押し寄せるゴミと汚れを、清掃ギアで一気に片付けろ!',
       play: 'はじめる',
       cleaners: '清掃員',
+      tutorial: 'チュートリアル',
+      tutAskTitle: 'はじめての方へ',
+      tutAskText: 'まずは<b>チュートリアル</b>で遊び方を覚えませんか? 3部屋だけの小さな家を、ヒントを見ながら<b>2〜3分</b>で片付けます。',
+      tutAskPlay: 'チュートリアルを遊ぶ',
+      tutAskSkip: 'スキップ',
+      tutAskNote: 'スキップすると、この案内はもう出ません。チュートリアルはタイトルとステージ選択からいつでも遊べます。',
+      tutorialMeta: '2〜3分で遊び方を覚える、3部屋だけの小さな家',
+      recommended: 'はじめての方に',
+      toStage1: 'ステージ1へ',
+      noteTutorial: 'チュートリアル完了! 次はステージ1「ゴミ屋敷の1階」に挑戦しよう',
+      noteTutorialRetry: 'もう一度チュートリアルに挑戦してみよう',
+      tutMove: 'まずは歩いてみよう。<b>WASD・矢印キー</b> (スマホは画面を指でなぞる) で移動。清掃ギアは<b>自動で</b>動く',
+      tutKill: 'ゴミに近づこう。近くのゴミに、清掃ギアが<b>自動で</b>ダメージを与える。体力 (左下) に気をつけて',
+      tutDust: '片付けたゴミは<b>ダスト</b> (ひし形) を落とす。拾うと経験値になり、たまると<b>レベルアップ</b>',
+      tutLevelUp: (a, b) => `レベルアップ! 清掃ギアかパッシブを1つ選ぼう。ギアは${a}つ・パッシブは${b}つまでしか持てないので、組み合わせを考えよう`,
+      tutSource: '赤い点線の輪が<b>発生源</b>。ゴミはここから湧く。上のゲージは<b>汚れバリア</b>で、まわりの床を磨くほど弱くなる。まわりを磨いてから潰そう',
+      tutRoom: '部屋の<b>発生源を全部潰して</b>、床を<b>90%以上</b>磨くと清掃完了。右上の%が部屋のきれいさ',
+      tutChest: '清掃完了! <b>宝箱</b>と部屋ごとの特典がもらえる。宝箱を拾って開けよう',
+      tutDump: '拾ったダストは<b>ダストボックス</b> (右下) にたまる。満タンだと攻撃が弱まるので、<b>緑のゴミ捨て場</b>に立って空にしよう。半分以上なら<b>ゴミ圧縮</b> (Space・ボタン) で一掃もできる',
+      tutDanger: '★が多い部屋ほど汚れがキツく、ゴミも強い。<b>★の少ない部屋から</b>片付けよう。本番は<b>10分以内に全部屋</b>をピカピカにすればクリア。残りの部屋も片付けよう!',
       achievements: '実績',
       achClears: '清掃員ごとのクリア状況 (おまけ)',
       settings: '設定',
@@ -707,7 +747,7 @@
       noteAll: '屋敷じゅうをピカピカにした! おめでとう!',
       noteFirst: (c, m) => `${c}で${m}を初クリア!`,
       wornOut: '力尽きた…',
-      resultSub: (n, stage, mode, c) => `ステージ${n} ${stage} ・ ${mode} ・ ${c}`,
+      resultSub: (stage, mode, c) => `${stage} ・ ${mode} ・ ${c}`,
       clearTime: 'クリアタイム',
       playTime: 'プレイした時間',
       roomsCleaned: '清掃した部屋',
@@ -770,6 +810,26 @@
       tagline: 'Wipe out waves of trash and grime with your cleaning gear!',
       play: 'Play',
       cleaners: 'Cleaners',
+      tutorial: 'Tutorial',
+      tutAskTitle: 'New to the game?',
+      tutAskText: 'Want to learn the basics in the <b>tutorial</b> first? You\'ll clean a tiny three-room house in <b>2–3 minutes</b> with hints along the way.',
+      tutAskPlay: 'Play the tutorial',
+      tutAskSkip: 'Skip',
+      tutAskNote: 'If you skip, this message won\'t appear again. You can play the tutorial anytime from the title screen or stage select.',
+      tutorialMeta: 'A tiny three-room house to learn the basics in 2–3 minutes',
+      recommended: 'New players',
+      toStage1: 'Go to Stage 1',
+      noteTutorial: 'Tutorial complete! Next, take on Stage 1, "The Trash House: 1st Floor"',
+      noteTutorialRetry: 'Give the tutorial another try',
+      tutMove: 'First, try walking. Move with <b>WASD / arrow keys</b> (on phones, drag on the screen). Your cleaning gear works <b>automatically</b>',
+      tutKill: 'Get close to the trash. Your gear damages nearby trash <b>automatically</b>. Keep an eye on your HP (bottom left)',
+      tutDust: 'Cleared trash drops <b>dust</b> (diamonds). Pick it up for experience and <b>level up</b>',
+      tutLevelUp: (a, b) => `Level up! Pick one gear or passive. You can only carry ${a} gear and ${b} passives, so think about your combination`,
+      tutSource: 'The red dotted ring is a <b>source</b>, where trash comes from. The gauge above it is its <b>grime barrier</b>, which weakens as you polish the floor around it. Scrub around it, then destroy it',
+      tutRoom: '<b>Destroy every source</b> in a room and polish <b>90%+</b> of its floor to finish it. The % at the top right shows how clean the room is',
+      tutChest: 'Room finished! You get a <b>chest</b> and a room bonus. Grab the chest to open it',
+      tutDump: 'Dust you pick up fills your <b>dust box</b> (bottom right). When it\'s full your attacks weaken, so stand on the <b>green trash dump</b> to empty it. At half full or more you can also use <b>Compress</b> (Space / button) to wipe out trash',
+      tutDanger: 'Rooms with more ★ are filthier with tougher trash, so <b>start with fewer ★</b>. In real stages you win by cleaning <b>every room within 10 minutes</b>. Clean up the remaining rooms!',
       achievements: 'Achievements',
       achClears: 'Clears by cleaner (bonus)',
       settings: 'Settings',
@@ -842,7 +902,7 @@
       noteAll: 'The whole mansion is sparkling clean! Congratulations!',
       noteFirst: (c, m) => `First ${m} clear with ${c}!`,
       wornOut: 'Worn out…',
-      resultSub: (n, stage, mode, c) => `Stage ${n}: ${stage} · ${mode} · ${c}`,
+      resultSub: (stage, mode, c) => `${stage} · ${mode} · ${c}`,
       clearTime: 'Clear time',
       playTime: 'Play time',
       roomsCleaned: 'Rooms cleaned',
@@ -903,6 +963,8 @@
     settings: { se: 70, bgm: 50, shake: true, haze: true },
     char: 'cleaner',
     mode: 'normal',
+    tutorialDone: false,
+    tutorialSeen: false, // チュートリアルを始めたか、案内でスキップを選んだ (もう案内を出さない)
   });
 
   function loadSave() {
@@ -917,6 +979,8 @@
       Object.assign(s.settings, d.settings || {});
       if (CHARS.some((c) => c.id === d.char)) s.char = d.char;
       if (MODES[d.mode]) s.mode = d.mode;
+      s.tutorialDone = !!d.tutorialDone;
+      s.tutorialSeen = !!d.tutorialSeen || s.tutorialDone;
       if (d.v === 2) {
         if (d.rec && typeof d.rec === 'object') s.rec = d.rec;
         if (Array.isArray(d.treasures)) d.treasures.forEach((v, i) => { if (i < s.treasures.length) s.treasures[i] = !!v; });
@@ -2466,11 +2530,15 @@
   let screen = 'title';
 
   function newGame(stageIdx) {
-    const stage = STAGES[stageIdx];
+    const stage = stageOf(stageIdx);
     const ch = CHARS.find((c) => c.id === save.char && charUnlocked(c)) || CHARS[0];
-    const mode = save.mode === 'hard' && hardUnlocked(stageIdx) ? 'hard' : 'normal';
+    const mode = stageIdx !== TUT && save.mode === 'hard' && hardUnlocked(stageIdx) ? 'hard' : 'normal';
     G = {
       stageIdx,
+      tutorial: stageIdx === TUT ? { step: 0, stepT: 0, moved: 0, doneT: 0 } : null,
+      dumpCount: 0,
+      compressCount: 0,
+      chestsOpened: 0,
       stage,
       ch,
       mode,
@@ -2553,8 +2621,23 @@
     for (let y = 0; y < BN; y++) {
       for (let x = 0; x < BN; x++) {
         const c = y * BN + x;
-        if ((x < BN - 1 && roomGrid[c + 1] !== roomGrid[c]) || (y < BN - 1 && roomGrid[c + BN] !== roomGrid[c])) blocked[c] = 1;
+        if (roomGrid[c] >= 0 && ((x < BN - 1 && roomGrid[c + 1] !== roomGrid[c]) || (y < BN - 1 && roomGrid[c + BN] !== roomGrid[c]))) blocked[c] = 1;
       }
+    }
+    // 家の外 (どの部屋でもないマス): 部屋の床のとなりは壁 (1)、それ以外は通れない外 (3)
+    for (let c = 0; c < BN * BN; c++) {
+      if (roomGrid[c] >= 0) continue;
+      const x = c % BN;
+      const y = Math.floor(c / BN);
+      let near = false;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < BN && ny < BN && roomGrid[ny * BN + nx] >= 0 && !blocked[ny * BN + nx]) near = true;
+        }
+      }
+      blocked[c] = near ? 1 : 3;
     }
     // ドア: 2つの部屋の間の壁の、まん中3マスを開ける
     const idOf = (name) => stage.rooms.findIndex((r) => r.id === name);
@@ -2668,7 +2751,7 @@
 
     // 主人公は玄関 (start の部屋) のまん中から
     const start = G.rooms.find((r) => r.id === stage.start);
-    [G.p.x, G.p.y] = roomPoint(start.rect, 0.5, 0.5);
+    [G.p.x, G.p.y] = roomPoint(start.rect, ...(stage.startAt || [0.5, 0.5]));
     G.cam.x = G.p.x;
     G.cam.y = G.p.y;
     G.dumps = stage.dumps.map(([id, fx, fy]) => {
@@ -3323,6 +3406,7 @@
   }
 
   function runEvents() {
+    if (G.tutorial) return; // チュートリアルでは中ボスやボスは出ない
     while (G.eventIdx < EVENTS.length && G.time >= EVENTS[G.eventIdx].t) {
       const ev = EVENTS[G.eventIdx++];
       if (ev.kind === 'warn') {
@@ -4418,6 +4502,7 @@
       const coins = Math.floor(G.box / 4);
       G.dumpCoins += coins;
       G.box = 0;
+      G.dumpCount++;
       Sound.play('dump');
       showBanner(t('dumped', coins), '#ffcf4a', 1.6);
       puff(d.x, d.y, '#c7b48a', 14);
@@ -4427,6 +4512,7 @@
   function compress() {
     if (!G || G.state !== 'play' || G.paused || !overlay.hidden) return;
     if (G.box < G.stats.boxCap * 0.5) return;
+    G.compressCount++;
     const amount = G.box;
     G.box = 0;
     const dmg = (20 + amount * 1.2) * G.stats.might;
@@ -4512,6 +4598,99 @@
     }
   }
 
+  // ---- チュートリアルの手順 ----
+  // done: 次へ進む条件 / target: 矢印で指す場所 (なければ出さない) / max: この秒数たったら先へ進める
+  const nearestOf = (list) => {
+    let best = null;
+    let bd = Infinity;
+    for (const o of list) {
+      const d = (o.x - G.p.x) ** 2 + (o.y - G.p.y) ** 2;
+      if (d < bd) {
+        bd = d;
+        best = o;
+      }
+    }
+    return best;
+  };
+  const roomCenter = (r) => {
+    const [x, y] = roomPoint(r.rect, 0.5, 0.5);
+    return { x, y };
+  };
+  const TUT_STEPS = [
+    { key: 'tutMove', done: (g) => g.tutorial.moved > 260 },
+    { key: 'tutKill', done: (g) => g.kills >= 6 },
+    { key: 'tutDust', done: (g) => g.level >= 2 },
+    {
+      key: 'tutSource',
+      done: (g) => g.rooms.some((r) => r.src < r.src0),
+      target: (g) => nearestOf(g.enemies.filter((e) => e.alive && e.def.source && g.rooms[e.room].danger === 1)),
+    },
+    {
+      key: 'tutRoom',
+      done: (g) => g.rooms.some((r) => r.done),
+      target: (g) => {
+        const here = g.rooms[roomAt(g.p.x, g.p.y)];
+        const room = here && !here.done ? here : g.rooms.find((r) => !r.done && r.danger === 1);
+        if (!room) return null;
+        return nearestOf(g.enemies.filter((e) => e.alive && e.def.source && e.room === room.idx)) || null;
+      },
+    },
+    {
+      key: 'tutChest',
+      done: (g) => g.chestsOpened > 0 || !g.items.some((it) => it.kind === 'chest'),
+      target: (g) => nearestOf(g.items.filter((it) => it.kind === 'chest')),
+      max: 25,
+    },
+    {
+      key: 'tutDump',
+      done: (g) => g.dumpCount > 0 || g.compressCount > 0,
+      target: (g) => (g.box > 0 ? nearestOf(g.dumps) : null),
+      max: 30,
+    },
+    {
+      key: 'tutDanger',
+      done: () => false,
+      target: (g) => {
+        const r = g.rooms.filter((q) => !q.done).sort((a, b) => a.danger - b.danger)[0];
+        if (!r) return null;
+        return nearestOf(g.enemies.filter((e) => e.alive && e.def.source && e.room === r.idx)) || roomCenter(r);
+      },
+    },
+  ];
+  const tutorBox = document.getElementById('tutor');
+
+  function updateTutorial(dt) {
+    const tu = G.tutorial;
+    const p = G.p;
+    if (tu.lastX != null) tu.moved += Math.hypot(p.x - tu.lastX, p.y - tu.lastY);
+    tu.lastX = p.x;
+    tu.lastY = p.y;
+    tu.stepT += dt;
+    const step = TUT_STEPS[tu.step];
+    if (!step) return;
+    // 条件を満たしたら次の手順へ。読み終わる前に消えないように、文の長さに合わせて 4〜9 秒は出しておく
+    const minT = clamp(t(step.key).replace(/<[^>]+>/g, '').length / (lang === 'en' ? 22 : 10), 4, 9);
+    if (tu.stepT > minT && (step.done(G) || (step.max && tu.stepT > step.max))) {
+      tu.step++;
+      tu.stepT = 0;
+      Sound.play('click');
+      renderTutor();
+    }
+  }
+
+  // 画面下のヒントの欄。言語を切り替えたときもこれで描き直す
+  function renderTutor() {
+    if (!tutorBox) return;
+    const tu = G && G.tutorial;
+    const step = tu && TUT_STEPS[tu.step];
+    tutorBox.hidden = !step;
+    if (!step) return;
+    tutorBox.innerHTML = `<span class="tutor-no">${tu.step + 1}/${TUT_STEPS.length}</span><span class="tutor-text">${t(step.key)}</span>`;
+    tutorBox.classList.remove('pop');
+    void tutorBox.offsetWidth;
+    tutorBox.classList.add('pop');
+  }
+
   // 汚れの靄: いる部屋のまわりの汚れ (6割) と、家全体の汚れ (4割) で濃さが決まる。きれいにすると晴れていく
   function updateHaze(dt) {
     G.hazeT -= dt;
@@ -4547,6 +4726,7 @@
       }
       updateSpawns(dt);
       updateHaze(dt);
+      if (G.tutorial) updateTutorial(dt);
     } else {
       G.endT += dt;
     }
@@ -4630,14 +4810,15 @@
     G.roomCoins += 15 * r.danger;
     G.items.push({ kind: 'chest', x: G.p.x + 26, y: G.p.y, t: 0 });
     // 宝物の部屋なら、部屋のまん中に宝物が現れる
-    if (r.id === G.stage.treasure.room) {
+    const isTreasureRoom = !!G.stage.treasure && r.id === G.stage.treasure.room;
+    if (isTreasureRoom) {
       const [tx, ty] = roomPoint(r.rect, 0.5, 0.5);
       const spot = { x: tx, y: ty };
       pushOut(spot, 16);
       G.items.push({ kind: 'treasure', x: spot.x, y: spot.y, t: 0 });
       for (let k = 0; k < 30; k++) addPart(spot.x, spot.y, rand(-120, 120), rand(-160, -20), rand(0.6, 1.2), rand(3, 6), pick(['#ffd34a', '#fff3b0', '#ffffff']), 'twinkle');
     }
-    showBanner(r.id === G.stage.treasure.room ? t('roomTreasure', L(r, 'name')) : t('roomDone', L(r, 'name'), bonusText(r.bonus)), '#4fe0b6', 3);
+    showBanner(isTreasureRoom ? t('roomTreasure', L(r, 'name')) : t('roomDone', L(r, 'name'), bonusText(r.bonus)), '#4fe0b6', 3);
     Sound.play('room-clear');
     G.shake = Math.max(G.shake, 6);
   }
@@ -4745,7 +4926,7 @@
       for (let by = by0; by <= by1; by++) {
         for (let bx = bx0; bx <= bx1; bx++) {
           const kind = G.blocked[by * BN + bx];
-          if (!kind) continue;
+          if (!kind || kind === 3) continue;
           const x = bx * BLOCK;
           const y = by * BLOCK;
           if (kind === 1) {
@@ -5248,6 +5429,38 @@
       ctx.globalAlpha = 1;
     }
 
+    // チュートリアルの矢印 (画面の中なら上で跳ねる矢印、外なら画面の端の矢印)
+    let tutTarget = null;
+    if (G.tutorial && G.state === 'play') {
+      const step = TUT_STEPS[G.tutorial.step];
+      tutTarget = step && step.target ? step.target(G) : null;
+      if (tutTarget && inView(tutTarget.x, tutTarget.y, -30)) {
+        const bob = Math.sin(tm * 6) * 6;
+        // 発生源はバリアの表示の上に出す
+        const ty = tutTarget.y - (tutTarget.r ? tutTarget.r * 1.3 + 54 : 46) + bob;
+        ctx.fillStyle = '#4fe0b6';
+        ctx.strokeStyle = '#0d3b2e';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(tutTarget.x, ty + 22);
+        ctx.lineTo(tutTarget.x - 14, ty + 4);
+        ctx.lineTo(tutTarget.x - 6, ty + 4);
+        ctx.lineTo(tutTarget.x - 6, ty - 12);
+        ctx.lineTo(tutTarget.x + 6, ty - 12);
+        ctx.lineTo(tutTarget.x + 6, ty + 4);
+        ctx.lineTo(tutTarget.x + 14, ty + 4);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+        ctx.strokeStyle = `rgba(79,224,182,${0.5 + Math.sin(tm * 6) * 0.3})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(tutTarget.x, tutTarget.y, 40 + Math.sin(tm * 4) * 4, 0, TAU);
+        ctx.stroke();
+        tutTarget = null;
+      }
+    }
+
     // ここから画面の座標
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (save.settings.haze && G.haze > 0.02) drawHaze(tm, (p.x - cam.x) * view.zoom + view.w / 2, (p.y - cam.y) * view.zoom + view.h / 2);
@@ -5259,6 +5472,7 @@
       ctx.fillStyle = 'rgba(90,160,60,0.12)';
       ctx.fillRect(0, 0, view.w, view.h);
     }
+    if (tutTarget) offscreenArrow(tutTarget.x, tutTarget.y, '#4fe0b6');
     // 画面の外の大物を矢印で知らせる
     for (const e of G.bosses) {
       if (!e.alive || inView(e.x, e.y, 0)) continue;
@@ -5444,6 +5658,7 @@
       let col;
       if (k === 1) col = MAP_WALL;
       else if (k === 2) col = MAP_BOX;
+      else if (k === 3) col = [20, 24, 30];
       else {
         const r = G.rooms[G.roomGrid[c]];
         const f = r.done ? 1 : (r.clean / r.total) * 0.75;
@@ -5649,6 +5864,7 @@
     if (f) f.focus({ preventScroll: true });
     pauseBtn.style.visibility = 'hidden';
     bombBtn.hidden = true;
+    if (tutorBox && !(G && G.tutorial)) tutorBox.hidden = true;
     // 言語はメニューでだけ切り替えられる (プレイ中の一時停止やレベルアップでは隠す)
     if (langBtn) langBtn.hidden = !!G;
     joy.id = null;
@@ -5709,7 +5925,8 @@
         <div class="title-cast"><img src="${charThumb('cleaner')}" alt="">${['dust', 'paper', 'can', 'grease', 'spore', 'bag'].map((k) => `<img src="${enemyThumb(k)}" alt="">`).join('')}</div>
         ${completionHtml()}
         <div class="actions">
-          <button type="button" class="btn primary" data-act="rooms" data-focus>${t('play')}</button>
+          <button type="button" class="btn primary" data-act="play" data-focus>${t('play')}</button>
+          <button type="button" class="btn${save.tutorialDone ? '' : ' tut-btn'}" data-act="start" data-arg="${TUT}">${t('tutorial')}</button>
           <button type="button" class="btn trophy" data-act="chars" data-arg="title"><span aria-hidden="true">🏆</span> ${t('achievements')}</button>
           <button type="button" class="btn" data-act="settings" data-arg="title">${t('settings')}</button>
         </div>
@@ -5754,13 +5971,34 @@
         <p class="sub">${esc(t('recordOf', L(ch, 'name')))}${t('sep')}${t('coins')} <span class="coins">${save.coins}</span></p>
         ${modeTabs('mode')}
         ${hard ? `<p class="mode-note">${t('hardNote')}</p>` : ''}
-        <div class="rooms">${rooms}</div>
+        <div class="rooms">
+          <button type="button" class="room tutorial${save.tutorialDone ? ' cleared' : ''}" data-act="start" data-arg="${TUT}">
+            <span class="room-no">?</span>
+            <span class="room-body"><span class="room-name">${t('tutorial')}</span>${save.tutorialDone ? '' : `<span class="badge rec">${t('recommended')}</span>`}<br><span class="room-meta">${esc(t('tutorialMeta'))}</span></span>
+          </button>
+          ${rooms}
+        </div>
         <div class="menu-row">
           <button type="button" class="btn small" data-act="shop">${t('skills')}</button>
           <button type="button" class="btn small" data-act="chars" data-arg="rooms"><span aria-hidden="true">🏆</span> ${t('achievements')}</button>
           <button type="button" class="btn small" data-act="zukan">${t('zukan')}</button>
           <button type="button" class="btn small" data-act="settings" data-arg="rooms">${t('settings')}</button>
         </div>
+      </div>`);
+  }
+
+  // はじめて「はじめる」を押したときの、チュートリアルの案内
+  function showTutorialAsk() {
+    rerender = showTutorialAsk;
+    show('tutAsk', `
+      <div class="panel tut-ask">
+        ${panelHead(t('tutAskTitle'), 'title')}
+        <p class="tut-ask-text">${t('tutAskText')}</p>
+        <div class="actions">
+          <button type="button" class="btn primary" data-act="start" data-arg="${TUT}" data-focus>${t('tutAskPlay')}</button>
+          <button type="button" class="btn" data-act="skipTutorial">${t('tutAskSkip')}</button>
+        </div>
+        <p class="tut-ask-note">${t('tutAskNote')}</p>
       </div>`);
   }
 
@@ -5919,12 +6157,17 @@
   }
 
   function startGame(stageIdx) {
+    if (stageIdx === TUT && !save.tutorialSeen) {
+      save.tutorialSeen = true;
+      persist();
+    }
     Sound.init();
     newGame(stageIdx);
     rerender = null;
     hide();
     Sound.bgm('main');
-    showBanner(L(STAGES[stageIdx], 'name'), '#ffffff', 2);
+    showBanner(L(stageOf(stageIdx), 'name'), '#ffffff', 2);
+    renderTutor();
   }
 
   function pauseGame() {
@@ -6010,6 +6253,7 @@
       <div class="panel reward">
         <p class="reward-title">LEVEL UP!</p>
         <p class="lv-badge">Lv ${G.level - G.pendingLv}</p>
+        ${G.tutorial && G.level - G.pendingLv === 2 ? `<p class="tut-tip">${t('tutLevelUp', MAX_GEARS, MAX_PASSIVES)}</p>` : ''}
         <p class="sub">${t('pickOne')}<br><span class="slots">${t('slots', G.weapons.length, MAX_GEARS, Object.keys(G.passives).length, MAX_PASSIVES)}</span></p>
         <div class="cards">${cards}</div>
         ${G.rerolls > 0 ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button></div>` : ''}
@@ -6064,6 +6308,7 @@
 
   // ---- 宝箱 ----
   function openChest() {
+    G.chestsOpened++;
     let icon;
     let title;
     let text;
@@ -6121,6 +6366,19 @@
     const mul = g.md.coin * (1 + save.shop.coin * 0.1);
     const total = Math.round(base * mul);
     save.coins += total;
+    if (i === TUT) {
+      // チュートリアルは記録や達成率には入れず、終えたことだけ覚えておく
+      if (win) save.tutorialDone = true;
+      for (const k in g.killsByType) save.kills[k] = (save.kills[k] || 0) + g.killsByType[k];
+      persist();
+      const res = {
+        win, i, tut: true, timeUp: !!g.timeUp, mode: g.mode, ch: g.ch.id, time: g.time, doneN, rooms: g.rooms.length, pct, kills: g.kills, level: g.level,
+        killCoins, cleanCoins, dumpCoins: g.dumpCoins, roomCoins: g.roomCoins, bossCoins: g.bossCoins, mul, total, notes: [[win ? 'noteTutorial' : 'noteTutorialRetry']],
+      };
+      G = null;
+      renderResult(res);
+      return;
+    }
     // 記録 (清掃員ごと・モードごと)
     const wasStageCleared = stageCleared(i, 'normal');
     const rec = recOf(save, g.ch.id, i, g.mode);
@@ -6165,10 +6423,11 @@
   function renderResult(r) {
     rerender = () => renderResult(r);
     const next = r.win && r.i + 1 < STAGES.length;
+    const stageName = r.tut ? L(TUTORIAL, 'name') : t('stageTitle', r.i + 1, L(STAGES[r.i], 'name'));
     show('result', `
       <div class="panel">
         <h2 class="result-title ${r.win ? 'win' : 'lose'}">${r.win ? t('allClean') : r.timeUp ? t('timeUp') : t('wornOut')}</h2>
-        <p class="sub">${esc(t('resultSub', r.i + 1, L(STAGES[r.i], 'name'), L(MODES[r.mode], 'name'), L(CHARS.find((c) => c.id === r.ch), 'name')))}</p>
+        <p class="sub">${esc(t('resultSub', stageName, L(MODES[r.mode], 'name'), L(CHARS.find((c) => c.id === r.ch), 'name')))}</p>
         <dl class="stat-list">
           <dt>${r.win ? t('clearTime') : t('playTime')}</dt><dd>${fmtTime(r.time)}</dd>
           <dt>${t('roomsCleaned')}</dt><dd>${r.doneN}/${r.rooms}</dd>
@@ -6186,7 +6445,7 @@
         </dl>
         ${r.notes.map((n) => `<p class="result-note">${esc(noteText(n))}</p>`).join('')}
         <div class="actions">
-          ${next ? `<button type="button" class="btn primary" data-act="brief" data-arg="${r.i + 1}" data-focus>${t('nextStage')}</button>` : ''}
+          ${next ? `<button type="button" class="btn primary" data-act="brief" data-arg="${r.i + 1}" data-focus>${r.tut ? t('toStage1') : t('nextStage')}</button>` : ''}
           <button type="button" class="btn${next ? '' : ' primary'}" data-act="start" data-arg="${r.i}">${t('again')}</button>
           <button type="button" class="btn" data-act="rooms" data-back>${t('toStages')}</button>
           <button type="button" class="btn" data-act="shop">${t('skills')}</button>
@@ -6291,6 +6550,12 @@
 
   Object.assign(actions, {
     title: showTitle,
+    play: () => (save.tutorialSeen ? showRooms() : showTutorialAsk()),
+    skipTutorial: () => {
+      save.tutorialSeen = true;
+      persist();
+      showRooms();
+    },
     rooms: showRooms,
     brief: (i) => showBrief(i),
     char: (id) => {
