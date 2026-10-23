@@ -13,37 +13,40 @@
     gtag('config', 'G-4VLZW1VMVC');
   </script>
   <title>STRIKE LANE</title>
-  <meta name="description" content="仕掛けだらけのレーンでトリックショットを決める3Dボウリング。ジャンプ台、落とし穴、動く壁を越えて全10ステージのピンを倒し、宝物を集めよう。" />
+  <meta name="description" content="仕掛けだらけのレーンでトリックショットを決める3Dボウリング。サーキット、平均台、階段の神殿、月面など全10ワールド・100ステージ。宝物を集めて成績を埋めよう。" />
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" />
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
   <main class="app">
     <header class="top">
-      <a class="back" href="../">‹ ゲーム一覧</a>
+      <a class="back" href="../">‹ <span data-i18n="gamesList">ゲーム一覧</span></a>
       <h1>STRIKE LANE</h1>
-      <button type="button" id="sound-btn" class="icon-btn" aria-label="効果音" aria-pressed="true">♪</button>
+      <div class="top-actions">
+        <select id="lang-select" class="lang-select" data-i18n-label="language" aria-label="言語"></select>
+        <button type="button" id="sound-btn" class="icon-btn" data-i18n-label="sound" aria-label="効果音" aria-pressed="true">♪</button>
+      </div>
     </header>
 
     <div class="stagebar" id="stagebar">
       <div class="stagebar-head">
-        <span class="stage-no" id="stage-no">STAGE -</span>
-        <span class="stage-name" id="stage-name">ステージを選んでください</span>
+        <span class="stage-no" id="stage-no">1-1</span>
+        <span class="stage-name" id="stage-name"></span>
       </div>
       <p class="stage-goal" id="stage-goal"></p>
       <div class="stagebar-actions">
-        <button type="button" class="small-btn" id="retry-btn" disabled>やり直す</button>
-        <button type="button" class="small-btn" id="menu-btn">ステージ選択</button>
+        <button type="button" class="small-btn" id="retry-btn" data-i18n="retry" disabled>やり直す</button>
+        <button type="button" class="small-btn" id="menu-btn" data-i18n="menu">ステージ選択</button>
       </div>
     </div>
 
     <div class="board-wrap" id="board-wrap">
-      <canvas id="board" aria-label="ゲーム画面"></canvas>
+      <canvas id="board" aria-label="STRIKE LANE"></canvas>
       <canvas id="trail" aria-hidden="true"></canvas>
 
       <div class="hud" id="hud">
@@ -59,67 +62,231 @@
       <div class="overlay" id="overlay">
         <div class="screen title-screen" id="screen-title">
           <p class="game-logo"><span class="logo-strike">STRIKE</span><span class="logo-lane">LANE</span></p>
-          <p class="game-kana">ストライク・レーン</p>
-          <p class="overlay-text">ジャンプ台、落とし穴、動く壁。<br />仕掛けだらけのレーンでトリックショットを決めろ</p>
-          <button type="button" class="start-btn" id="start-btn">あそぶ</button>
+          <p class="overlay-text" data-i18n="tagline">ジャンプ台、落とし穴、ワープゲート。
+10のワールドでトリックショットを決めろ</p>
+          <div class="overlay-actions">
+            <button type="button" class="start-btn" id="start-btn" data-i18n="play">あそぶ</button>
+            <button type="button" class="start-btn is-sub" id="title-records" data-i18n="records">成績</button>
+          </div>
         </div>
 
         <div class="screen select-screen" id="screen-select" hidden>
-          <h2 class="screen-title">ステージ選択</h2>
+          <h2 class="screen-title" data-i18n="selectTitle">ステージ選択</h2>
+          <div class="world-nav">
+            <button type="button" class="nav-btn" id="world-prev" data-i18n-label="prevWorld" aria-label="前のワールド">‹</button>
+            <p class="world-label" id="world-label"></p>
+            <button type="button" class="nav-btn" id="world-next" data-i18n-label="nextWorldLabel" aria-label="次のワールド">›</button>
+          </div>
           <p class="progress" id="progress"></p>
           <div class="stage-grid" id="stage-grid"></div>
-          <button type="button" class="text-btn" id="select-back">タイトルへ</button>
+          <div class="screen-links">
+            <button type="button" class="text-btn" id="select-records" data-i18n="records">成績</button>
+            <button type="button" class="text-btn" id="select-back" data-i18n="backToTitle">タイトルへ</button>
+          </div>
+        </div>
+
+        <div class="screen records-screen" id="screen-records" hidden>
+          <h2 class="screen-title" data-i18n="recordsTitle">成績</h2>
+          <dl class="rec-summary" id="rec-summary"></dl>
+          <div class="world-nav">
+            <button type="button" class="nav-btn" id="rec-prev" data-i18n-label="prevWorld" aria-label="前のワールド">‹</button>
+            <p class="world-label" id="rec-world-label"></p>
+            <button type="button" class="nav-btn" id="rec-next" data-i18n-label="nextWorldLabel" aria-label="次のワールド">›</button>
+          </div>
+          <div class="rec-table-wrap">
+            <table class="rec-table" id="rec-table"></table>
+          </div>
+          <button type="button" class="text-btn" id="rec-back" data-i18n="back">戻る</button>
         </div>
 
         <div class="screen result-screen" id="screen-result" hidden>
           <p class="result-title" id="result-title"></p>
           <p class="result-stage" id="result-stage"></p>
           <p class="result-text" id="result-text"></p>
+          <div class="result-badges" id="result-badges"></div>
           <div class="overlay-actions" id="result-actions"></div>
         </div>
       </div>
 
-      <p class="load-error" id="load-error" hidden>3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。</p>
+      <p class="load-error" id="load-error" data-i18n="loadError" hidden>3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。</p>
     </div>
 
-    <section class="help">
+    <section class="help" data-lang="ja">
       <h2>遊び方</h2>
-      <p>仕掛けのあるレーンで、置かれたピンを全部倒すトリックショットのゲームです。各ステージで投げられるのは2投まで。1投目で全部倒せば<strong>ストライククリア</strong>、2投目で残りを倒しきれば<strong>スペアクリア</strong>です。2投で倒しきれなかったら、もう一度挑戦しましょう。ステージをクリアすると次のステージが遊べるようになります。</p>
-      <p>ステージが始まると、まずレーン全体を上から見せます (タップで飛ばせます)。ジャンプ台、落とし穴、動く壁などの仕掛けを確かめてから投げましょう。</p>
+      <p>仕掛けのあるレーンで、置かれたピンを全部倒すトリックショットのゲームです。各ステージで投げられるのは2投まで。1投目で全部倒せば<strong>ストライククリア</strong>、2投目で残りを倒しきれば<strong>スペアクリア</strong>です。ステージをクリアすると次のステージが、ワールドの10ステージ目をクリアすると次のワールドが遊べるようになります。</p>
+      <p>ステージが始まると、まずレーンを奥から手前へ見せます (タップで飛ばせます)。仕掛けを確かめてから投げましょう。</p>
 
-      <h3>宝物</h3>
-      <p>各ステージには宝物がひとつ浮かんでいます。ボールで触れると手に入ります。宝物を取っても取らなくても、クリアの条件は変わりません。一度手に入れた宝物は、ステージで半透明になって表示されます。集めた数はステージ選択画面で確かめられます。</p>
+      <h3>宝物と成績</h3>
+      <p>各ステージには宝物がひとつ浮かんでいます。ボールで触れると手に入ります。宝物を取っても取らなくても、クリアの条件は変わりません。</p>
+      <p>ステージごとに「ストライク」「スペア」「宝物+ストライク (同じ挑戦の中で宝物を取ってストライク)」「宝物+スペア」の4つの記録が残ります。全部そろえるには、同じステージを何度か遊ぶ必要があります。記録は「成績」画面で、ワールドごとに見られます。</p>
 
       <h3>スマホの操作</h3>
       <table>
         <tbody>
           <tr><th>左右になぞる</th><td>投げる位置を動かす</td></tr>
           <tr><th>上にスワイプ</th><td>投げる。長くなぞるほどボールが速くなり (線の色が緑→黄→赤に変わります)、出だしを斜めにすると斜めに転がります</td></tr>
-          <tr><th>途中で曲げてスワイプ</th><td>カーブがかかります。途中から左へ曲げると、ボールもレーンの中ほどから左へ曲がります。大きく曲げるほど強く曲がります</td></tr>
-          <tr><th>指を離したあと</th><td>なぞった線が少しのあいだ表示され、そのあとボールが転がります</td></tr>
+          <tr><th>途中で曲げてスワイプ</th><td>カーブがかかります。途中から左へ曲げると、ボールもレーンの中ほどから左へ曲がります</td></tr>
         </tbody>
       </table>
 
       <h3>パソコンの操作</h3>
       <table>
         <tbody>
-          <tr><th>マウスでドラッグ</th><td>スマホと同じ (左右で位置、上へなぞって投げる)</td></tr>
-          <tr><th>← →</th><td>投げる位置を動かす</td></tr>
-          <tr><th>A / D</th><td>投げる向きを変える</td></tr>
-          <tr><th>Q / E</th><td>カーブの向きと強さを変える</td></tr>
+          <tr><th>マウスでドラッグ</th><td>スマホと同じ</td></tr>
+          <tr><th>← → / A D / Q E</th><td>位置 / 向き / カーブ</td></tr>
           <tr><th>スペースを押して離す</th><td>押している間にパワーがたまり、離すと投げる</td></tr>
           <tr><th>R / Esc</th><td>やり直す / ステージ選択へ</td></tr>
         </tbody>
       </table>
 
-      <h3>仕掛け</h3>
+      <h3>ワールド</h3>
       <table>
         <tbody>
-          <tr><th>ジャンプ台・坂</th><td>速いボールほど高く遠くへ飛びます。坂の上ではカーブはかかりません</td></tr>
-          <tr><th>落とし穴・谷</th><td>ボールが落ちるとその投球は終わりです。飛び越えれば落ちません</td></tr>
-          <tr><th>壁</th><td>ボールを止めてしまいます。カーブやジャンプでよけましょう</td></tr>
-          <tr><th>動く壁</th><td>左右に動き続けています。タイミングを見て投げましょう</td></tr>
-          <tr><th>反射板・バンパー</th><td>ボールをよく跳ね返します。ピンボールのように向きを変えられます</td></tr>
+          <tr><th>1 クラシックレーン</th><td>ジャンプ台、落とし穴、動く壁、反射板</td></tr>
+          <tr><th>2 グランプリサーキット</th><td>タイヤの壁に囲まれた曲がったコース</td></tr>
+          <tr><th>3 平均台アリーナ</th><td>床がなく、細い台から落ちたらおしまい</td></tr>
+          <tr><th>4 階段の神殿</th><td>下り・上りの階段と大きな段差</td></tr>
+          <tr><th>5 アイスリンク</th><td>よく滑り、カーブが効きにくい。ピンも滑る</td></tr>
+          <tr><th>6 月面ベース</th><td>重力が6分の1。ジャンプが長く、ピンはゆっくり倒れる</td></tr>
+          <tr><th>7 ネオンピンボール</th><td>はじき返すバンパーと回るバー、反射板</td></tr>
+          <tr><th>8 ワープ研究所</th><td>青いゲートに入るとオレンジのゲートから出る</td></tr>
+          <tr><th>9 ピン工場</th><td>ボールを押すベルトコンベアとプレス機</td></tr>
+          <tr><th>10 天空の城</th><td>雲の上ですべての仕掛けを組み合わせる</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="help" data-lang="en" hidden>
+      <h2>How to play</h2>
+      <p>Knock down every pin on lanes packed with gimmicks. You get two rolls per stage. Down them all with the first roll for a <strong>Strike clear</strong>, or finish the rest with the second for a <strong>Spare clear</strong>. Clearing a stage opens the next one, and clearing a world's tenth stage opens the next world.</p>
+      <p>Each stage opens with a fly-through from the pins back to you (tap to skip). Check the gimmicks before you bowl.</p>
+
+      <h3>Treasure and records</h3>
+      <p>Every stage has one floating treasure. Touch it with the ball to collect it. It does not affect whether you clear the stage.</p>
+      <p>Each stage keeps four records: Strike, Spare, Treasure + Strike (collect the treasure and strike in the same attempt) and Treasure + Spare. Filling them all takes several visits. See them by world on the Records screen.</p>
+
+      <h3>Touch controls</h3>
+      <table>
+        <tbody>
+          <tr><th>Slide sideways</th><td>Move your starting spot</td></tr>
+          <tr><th>Swipe up</th><td>Bowl. A longer swipe means a faster ball (the line turns green → yellow → red). Start the swipe at an angle to roll at an angle</td></tr>
+          <tr><th>Bend the swipe</th><td>Adds a hook. Bend left partway and the ball curves left down the lane</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Keyboard and mouse</h3>
+      <table>
+        <tbody>
+          <tr><th>Mouse drag</th><td>Same as touch</td></tr>
+          <tr><th>← → / A D / Q E</th><td>Position / aim / hook</td></tr>
+          <tr><th>Hold and release Space</th><td>Charge power, release to bowl</td></tr>
+          <tr><th>R / Esc</th><td>Retry / stage select</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Worlds</h3>
+      <table>
+        <tbody>
+          <tr><th>1 Classic Lanes</th><td>Ramps, pitfalls, moving walls and deflectors</td></tr>
+          <tr><th>2 Grand Prix Circuit</th><td>Winding tracks lined with tire walls</td></tr>
+          <tr><th>3 Balance Beam Arena</th><td>No floor. Fall off the beam and the roll is over</td></tr>
+          <tr><th>4 Temple of Stairs</th><td>Stairs up and down, and big drops</td></tr>
+          <tr><th>5 Ice Rink</th><td>Slippery: hooks barely bite and pins slide</td></tr>
+          <tr><th>6 Moon Base</th><td>One-sixth gravity: long jumps and slow-falling pins</td></tr>
+          <tr><th>7 Neon Pinball</th><td>Kicking bumpers and spinning bars</td></tr>
+          <tr><th>8 Warp Lab</th><td>Enter a blue gate, exit from the orange one</td></tr>
+          <tr><th>9 Pin Factory</th><td>Conveyor belts that push the ball, and presses</td></tr>
+          <tr><th>10 Castle in the Sky</th><td>Every gimmick combined above the clouds</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="help" data-lang="zh" hidden>
+      <h2>玩法</h2>
+      <p>在布满机关的球道上击倒所有球瓶。每关最多投两球。第一球全部击倒为<strong>全中过关</strong>，第二球把剩下的击倒为<strong>补中过关</strong>。过关后可以玩下一关，通过一个世界的第 10 关后可以进入下一个世界。</p>
+      <p>每关开始时，镜头会从球瓶处拉回到投球位置（点击可跳过）。先看清机关再投球。</p>
+
+      <h3>宝物与战绩</h3>
+      <p>每关都有一个漂浮的宝物，用球碰到就能拿到。拿不拿宝物都不影响过关条件。</p>
+      <p>每关会记录四项：全中、补中、宝物+全中（同一次挑战中拿到宝物并全中）、宝物+补中。要全部集齐需要反复挑战。可以在“战绩”画面按世界查看。</p>
+
+      <h3>触屏操作</h3>
+      <table>
+        <tbody>
+          <tr><th>左右滑动</th><td>移动投球位置</td></tr>
+          <tr><th>向上滑动</th><td>投球。滑得越长球越快（线条颜色由绿→黄→红），起手斜着滑球就斜着滚</td></tr>
+          <tr><th>中途弯曲滑动</th><td>加上弧线。中途向左弯，球也会在球道中段向左弯</td></tr>
+        </tbody>
+      </table>
+
+      <h3>电脑操作</h3>
+      <table>
+        <tbody>
+          <tr><th>鼠标拖动</th><td>与触屏相同</td></tr>
+          <tr><th>← → / A D / Q E</th><td>位置 / 方向 / 弧线</td></tr>
+          <tr><th>按住再松开空格</th><td>按住蓄力，松开投球</td></tr>
+          <tr><th>R / Esc</th><td>重来 / 选择关卡</td></tr>
+        </tbody>
+      </table>
+
+      <h3>世界</h3>
+      <table>
+        <tbody>
+          <tr><th>1 经典球道</th><td>跳台、陷阱、移动墙、反射板</td></tr>
+          <tr><th>2 大奖赛赛道</th><td>被轮胎墙围起来的弯道</td></tr>
+          <tr><th>3 平衡木竞技场</th><td>没有地板，从窄台上掉下去就结束</td></tr>
+          <tr><th>4 阶梯神殿</th><td>上下楼梯和大落差</td></tr>
+          <tr><th>5 冰场</th><td>很滑，弧线不太灵，球瓶也会滑</td></tr>
+          <tr><th>6 月球基地</th><td>重力只有六分之一，飞得远，球瓶倒得慢</td></tr>
+          <tr><th>7 霓虹弹珠台</th><td>会弹开球的弹板和旋转杆</td></tr>
+          <tr><th>8 传送实验室</th><td>进入蓝色传送门，从橙色传送门出来</td></tr>
+          <tr><th>9 球瓶工厂</th><td>推动球的传送带和冲压机</td></tr>
+          <tr><th>10 天空之城</th><td>在云上组合所有机关</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="help" data-lang="ko" hidden>
+      <h2>플레이 방법</h2>
+      <p>장치가 가득한 레인에서 놓인 핀을 모두 쓰러뜨리는 트릭샷 게임입니다. 스테이지마다 두 번까지 던질 수 있습니다. 첫 번째 투구로 모두 쓰러뜨리면 <strong>스트라이크 클리어</strong>, 두 번째로 남은 핀을 다 쓰러뜨리면 <strong>스페어 클리어</strong>입니다. 스테이지를 클리어하면 다음 스테이지가, 월드의 10번째 스테이지를 클리어하면 다음 월드가 열립니다.</p>
+      <p>스테이지가 시작되면 핀 쪽에서 투구 위치까지 카메라가 이동하며 레인을 보여 줍니다(탭하면 건너뜁니다). 장치를 확인하고 던지세요.</p>
+
+      <h3>보물과 기록</h3>
+      <p>스테이지마다 보물이 하나 떠 있습니다. 공으로 닿으면 손에 넣습니다. 보물을 얻든 얻지 않든 클리어 조건은 같습니다.</p>
+      <p>스테이지마다 스트라이크, 스페어, 보물+스트라이크(같은 도전에서 보물을 얻고 스트라이크), 보물+스페어의 네 가지 기록이 남습니다. 모두 모으려면 같은 스테이지를 여러 번 도전해야 합니다. 기록 화면에서 월드별로 볼 수 있습니다.</p>
+
+      <h3>터치 조작</h3>
+      <table>
+        <tbody>
+          <tr><th>좌우로 밀기</th><td>던지는 위치 이동</td></tr>
+          <tr><th>위로 스와이프</th><td>투구. 길게 밀수록 공이 빨라지고(선 색이 초록→노랑→빨강), 처음을 비스듬히 밀면 비스듬히 굴러갑니다</td></tr>
+          <tr><th>중간에 꺾어서 스와이프</th><td>커브가 걸립니다. 중간에 왼쪽으로 꺾으면 공도 레인 중간부터 왼쪽으로 휩니다</td></tr>
+        </tbody>
+      </table>
+
+      <h3>키보드와 마우스</h3>
+      <table>
+        <tbody>
+          <tr><th>마우스 드래그</th><td>터치와 같음</td></tr>
+          <tr><th>← → / A D / Q E</th><td>위치 / 방향 / 커브</td></tr>
+          <tr><th>스페이스를 눌렀다 떼기</th><td>누르는 동안 힘을 모으고, 떼면 던짐</td></tr>
+          <tr><th>R / Esc</th><td>다시 하기 / 스테이지 선택</td></tr>
+        </tbody>
+      </table>
+
+      <h3>월드</h3>
+      <table>
+        <tbody>
+          <tr><th>1 클래식 레인</th><td>점프대, 함정, 움직이는 벽, 반사판</td></tr>
+          <tr><th>2 그랑프리 서킷</th><td>타이어 벽으로 둘러싸인 굽은 코스</td></tr>
+          <tr><th>3 평균대 아레나</th><td>바닥이 없어 좁은 평균대에서 떨어지면 끝</td></tr>
+          <tr><th>4 계단 신전</th><td>오르내리는 계단과 큰 낭떠러지</td></tr>
+          <tr><th>5 아이스 링크</th><td>잘 미끄러지고 커브가 잘 안 걸린다. 핀도 미끄러진다</td></tr>
+          <tr><th>6 달 기지</th><td>중력 6분의 1. 점프가 길고 핀이 천천히 쓰러진다</td></tr>
+          <tr><th>7 네온 핀볼</th><td>공을 튕겨내는 범퍼와 도는 막대</td></tr>
+          <tr><th>8 워프 연구소</th><td>파란 게이트로 들어가면 주황 게이트로 나온다</td></tr>
+          <tr><th>9 핀 공장</th><td>공을 미는 컨베이어 벨트와 프레스</td></tr>
+          <tr><th>10 천공의 성</th><td>구름 위에서 모든 장치를 조합한다</td></tr>
         </tbody>
       </table>
     </section>
@@ -132,6 +299,8 @@
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
-  <script src="script.js?v=3"></script>
+  <script src="i18n.js?v=4"></script>
+  <script src="stages.js?v=4"></script>
+  <script src="script.js?v=4"></script>
 </body>
 </html>
