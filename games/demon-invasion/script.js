@@ -117,6 +117,15 @@
       kind_main: 'メイン武器', kind_sub: '灯火の武器', kind_skill: 'スキル', kind_ult: '必殺技', kind_passive: 'パッシブ', kind_command: '指揮',
       captains: '倒した隊長', confused: '混乱', rebuilt: '再建した兵舎', temp: '仮設', kind_evo: '進化',
       nBehemoth: '破城獣が現れた！ 兵舎を守れ！',
+      lockedPrev: '前の地区を取り返すと選べる', normal: 'ノーマル', hard: 'ハード', training: '訓練所', army: '防衛隊本部',
+      heroesTitle: (n, m) => `連れていくヒーロー (${n}/${m})`, heroLocked: (n) => `ステージ ${n} をクリアすると仲間になる`,
+      loadout: '初期装備', deploy: '出撃！', next: 'つぎの段階', trainingSub: '自分を鍛える', armySub: '自軍を強くする',
+      unitTrain: '訓練', unitTrainDesc: (v) => `HP・攻撃力 +${v}%`, unitImprove: '改良',
+      heroUpDesc: (v, lv) => `HP・攻撃力 +${v}%・開始レベル +${lv}・3 段階目と 5 段階目で技が強くなる`, noHeroes: 'まだ仲間がいない',
+      tabBase: '基地', tabUnits: '兵種', tabHeroes: 'ヒーロー', meritGot: '戦功ポイント',
+      newHero: (n) => `${n}が仲間になった！`, reroll: (n) => `選び直す (あと ${n} 回)`,
+      nHeroDown: (n) => `${n}が倒れた… 45 秒後に復帰`, order: '指示',
+      order_free: '自由に戦う', order_follow: 'ついてこい', order_defend: '拠点を守れ', order_assault: '突撃',
       nRebuilt: '兵舎跡に仮設の兵舎を建てた！', nEnemyRebuilt: '悪魔が兵舎跡に巣を作った…',
       nPointTaken: (n) => `${n}を占領した！`, nPointLost: (n) => `${n}を悪魔に奪われた…`,
     },
@@ -144,6 +153,15 @@
       kind_main: 'Main weapon', kind_sub: 'Ember weapon', kind_skill: 'Skill', kind_ult: 'Ultimate', kind_passive: 'Passive', kind_command: 'Command',
       captains: 'Captains defeated', confused: 'Disarray', rebuilt: 'Barracks rebuilt', temp: 'Temp ', kind_evo: 'Evolution',
       nBehemoth: 'A Behemoth has appeared! Protect the barracks!',
+      lockedPrev: 'Retake the previous district first', normal: 'Normal', hard: 'Hard', training: 'Training Ground', army: 'Defense Force HQ',
+      heroesTitle: (n, m) => `Heroes to bring (${n}/${m})`, heroLocked: (n) => `Joins after you clear stage ${n}`,
+      loadout: 'Starting loadout', deploy: 'Deploy!', next: 'next rank', trainingSub: 'Train yourself', armySub: 'Strengthen your army',
+      unitTrain: 'Training', unitTrainDesc: (v) => `HP and attack +${v}%`, unitImprove: 'Upgrade',
+      heroUpDesc: (v, lv) => `HP and attack +${v}%, start ${lv} level(s) higher, stronger techniques at ranks 3 and 5`, noHeroes: 'No allies yet',
+      tabBase: 'Base', tabUnits: 'Units', tabHeroes: 'Heroes', meritGot: 'Merit points',
+      newHero: (n) => `${n} joined your side!`, reroll: (n) => `Reroll (${n} left)`,
+      nHeroDown: (n) => `${n} is down… back in 45s`, order: 'Orders',
+      order_free: 'Fight freely', order_follow: 'Follow me', order_defend: 'Hold the base', order_assault: 'Charge',
       nRebuilt: 'A temporary barracks now stands on the ruins!', nEnemyRebuilt: 'The demons built a nest on the ruins…',
       nPointTaken: (n) => `${n} captured!`, nPointLost: (n) => `The demons took the ${n}…`,
     },
@@ -156,12 +174,17 @@
   // ===================================================================
   // 保存
   // ===================================================================
+  // 保存の形式 (v: 2): stages[ステージ][n または h] = { clear, best, stars }、merit (戦功ポイント)、恒久成長の段階
   const loadSave = () => {
-    try {
-      const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (s && s.v === 1) return s;
-    } catch (e) { /* 壊れていたら最初から */ }
-    return { v: 1, stages: {} };
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* 壊れていたら最初から */ }
+    if (!s || (s.v !== 1 && s.v !== 2)) s = { v: 2, stages: {} };
+    if (s.v === 1) {
+      // v1 はノーマルの記録だけ ({ clear, best })
+      for (const id in s.stages) s.stages[id] = { n: { ...s.stages[id], stars: 1 } };
+      s.v = 2;
+    }
+    return { merit: 0, train: {}, army: {}, unitTr: {}, unitIm: {}, heroUp: {}, lastHeroes: ['onizuka'], lastLoadout: 'none', ...s };
   };
   const save = loadSave();
   const writeSave = () => {
@@ -299,8 +322,8 @@
     if (e.repeat && (e.code === 'Escape' || e.code === 'KeyP')) return;
     const k = e.code;
     if (screen === 'levelup') {
-      const n = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(k);
-      if (n >= 0) { e.preventDefault(); pickLevelUp(n % 3); }
+      const n = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4'].indexOf(k);
+      if (n >= 0) { e.preventDefault(); pickLevelUp(n % 4); }
       return;
     }
     if (screen === 'play' || screen === 'pause') {
@@ -323,6 +346,7 @@
     if (k === 'KeyQ') input.skill[0] = true;
     if (k === 'KeyE') input.skill[1] = true;
     if (k === 'KeyR') input.ult = true;
+    if (k === 'KeyF') cycleOrder();
     input.touchUI = false;
   });
   window.addEventListener('keyup', (e) => input.keys.delete(e.code));
@@ -343,6 +367,11 @@
   canvas.addEventListener('pointerdown', (e) => {
     Sound.resume();
     const p = canvasPos(e);
+    const hp = G && screen === 'play' && G.heroPanel;
+    if (hp && p.x >= hp.x && p.x <= hp.x + hp.w && p.y >= hp.y && p.y <= hp.y + hp.h) {
+      cycleOrder();
+      return;
+    }
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
       input.touchUI = true;
       const b = dashBtn();
@@ -424,11 +453,11 @@
       units: [], bullets: [], particles: [], orbs: [], texts: [], notes: [],
       time: 0, over: false, result: null, frontT: 0, front: [], gauge: 0.5,
       shake: 0, cam: { x: 0, y: 0 },
-      stats: { kills: 0, destroyed: 0, deaths: 0, captains: 0, rebuilt: 0, dead: [0, 0], dmg: [0, 0], shots: [0, 0], heal: 0 },
+      stats: { kills: 0, destroyed: 0, deaths: 0, captains: 0, rebuilt: 0, points: 0, dead: [0, 0], dmg: [0, 0], shots: [0, 0], heal: 0 },
       barrierDown: [false, false], overtime: false,
       mmDirty: true, mm: null, lamps: [],
       shells: [], strikes: [], mines: [], walls: [], beams: [], bolts: [], rings: [], flash: 0,
-      captains: [], confuseT: 0, points: [], decoys: [], sightT: 0, shamans: [],
+      captains: [], confuseT: 0, points: [], decoys: [], sightT: 0, shamans: [], heroes: [], guards: [], wards: [],
     };
     for (const [x, y, w, h, kind] of st.open) {
       for (let j = y; j < y + h; j++) {
@@ -738,6 +767,12 @@
     };
     G.units.push(u);
     if (home) home.count++;
+    // 防衛隊本部の「兵種の訓練」
+    const trn = team === 0 ? save.unitTr[type] || 0 : 0;
+    if (trn) {
+      u.hp = u.maxHp *= 1 + 0.05 * trn;
+      u.dmgMul *= 1 + 0.05 * trn;
+    }
     // 指揮「精鋭化」: 自軍の兵士がときどき強化版で湧く
     if (team === 0 && home && Math.random() < 0.08 * ab('elite')) makeElite(u, 1.5);
     return u;
@@ -752,7 +787,7 @@
         s.spawnT -= dt * fast;
         if (s.spawnT <= 0) {
           const weak = s.hp < s.maxHp * 0.5 ? 1.5 : 1;
-          const logi = s.team === 0 ? 1 - 0.08 * ab('logistics') : 1;
+          const logi = s.team === 0 ? (1 - 0.08 * ab('logistics')) * (1 - 0.04 * am('logi')) : 1;
           const radio = pointOwned('radio', s.team) ? 0.8 : 1;
           s.spawnT = s.def.interval * weak * logi * radio;
           s.ready++;
@@ -774,8 +809,10 @@
   function spawnFrom(s) {
     // ステージに出てこない悪魔と、兵舎ごとの数の上限 (maxPer) に達した兵種は除く
     const allow = s.team === 1 && G.st.enemyTypes;
-    let mix = MIX[s.team][s.size].filter(([k]) => (!allow || allow.includes(k)) && !(UNITS[k].maxPer && (s.types[k] || 0) >= UNITS[k].maxPer));
-    if (!mix.length) mix = [MIX[s.team][s.size][0]];
+    let base = MIX[s.team][s.size];
+    if (s.team === 0 && s.size === 'l' && save.unitIm.apc) base = base.concat([['apc', 6]]); // 装甲車の改良: 大の兵舎からも出る
+    let mix = base.filter(([k]) => (!allow || allow.includes(k)) && !(UNITS[k].maxPer && (s.types[k] || 0) >= UNITS[k].maxPer));
+    if (!mix.length) mix = [base[0]];
     const type = pickWeighted(mix);
     let lane = s.lane;
     if (lane < 0) {
@@ -808,6 +845,7 @@
       // 暗殺者: プレイヤーをねらう
       if (def.stealth && P.alive && (P.x - u.x) ** 2 + (P.y - u.y) ** 2 < def.aggro * def.aggro) u.target = P;
       if (!u.target && def.sniper) u.target = sniperTarget(u);
+      if (!u.target && def.claw) u.target = clawTarget(u);
       if (!u.target) u.target = nearestFoe(u.x, u.y, u.team, def.aggro, -1, !!def.fly);
       if (!u.target) u.tStruct = nearestFoeStruct(u.x, u.y, u.team, def.melee ? def.aggro * 0.7 : def.range);
     }
@@ -833,7 +871,8 @@
       for (let i = 0; i < cand.length; i++) {
         const a = cand[i];
         if (a.team !== u.team || !a.alive || a === u || a.downT > 0) continue;
-        if (Math.abs(a.x - u.x) > def.healRange || Math.abs(a.y - u.y) > def.healRange) continue;
+        const hr = def.healRange * (u.type === 'medic' && u.team === 0 && save.unitIm.medic ? 1.45 : 1);
+        if (Math.abs(a.x - u.x) > hr || Math.abs(a.y - u.y) > hr) continue;
         const ratio = a.hp / a.maxHp;
         if (ratio < br) { br = ratio; best = a; }
       }
@@ -872,6 +911,19 @@
       hurt(u, u.burnDps * dt, null, null, G.player);
       if (!u.alive) return;
     }
+    if (u.lifeT != null) {
+      // 時間で消えるもの (機銃タレット)
+      u.lifeT -= dt;
+      if (u.lifeT <= 0) {
+        killUnit(u, false, null);
+        return;
+      }
+    }
+    if (u.hero && updateHero(u, dt)) {
+      u.lx = u.x;
+      u.ly = u.y;
+      return;
+    }
     if (u.boss && updateBoss(u, dt)) {
       u.lx = u.x;
       u.ly = u.y;
@@ -882,6 +934,7 @@
     let cdRate = 1;
     if (u.team === 1 && G.confuseT > 0 && !u.boss) { spMul = 0.7; cdRate = 0.7; }
     if (u.team === 0 && auraOn(u)) spMul = 1 + 0.05 * ab('aura');
+    if (u.team === 1 && G.wards.length && inZone(G.wards, u)) spMul *= 0.5; // 巫女の結界
     if (u.slowT > 0) {
       // 呪術師の呪い
       u.slowT -= dt;
@@ -951,6 +1004,7 @@
         my = dy / d;
       } else {
         st.hp = Math.min(st.maxHp, st.hp + def.repair * dt);
+        st.repairT = G.time;
         if (Math.random() < dt * 6) spawnParticles(p.x, p.y, 2, '#ffe08a', 60, 0.3, 2);
       }
     } else if (u.hold) {
@@ -985,7 +1039,9 @@
       if (!h.alive || Math.hypot(h.x - u.x, h.y - u.y) > def.healRange || h.hp >= h.maxHp) {
         u.healTarget = null;
       } else {
-        h.hp = Math.min(h.maxHp, h.hp + def.heal * dt);
+        // 衛生兵の改良: プレイヤーとヒーローの回復量が 2 倍
+        const twice = u.team === 0 && u.type === 'medic' && save.unitIm.medic && (h.kind === 'player' || h.hero) ? 2 : 1;
+        h.hp = Math.min(h.maxHp, h.hp + def.heal * twice * dt);
         G.stats.heal += def.heal * dt;
         u.healT += dt;
       }
@@ -1039,6 +1095,7 @@
     const def = u.def;
     let dmg = def.dmg * u.dmgMul;
     if (u.team === 0 && auraOn(u)) dmg *= 1 + 0.1 * ab('aura');
+    if (u.team === 0 && !u.hero && G.heroes.length && nearHero(u)) dmg *= 1.1; // ヒーローの近くの兵士は攻撃力 +10%
     if (u.team === 1 && !u.boss && nearCaptain(u)) dmg *= 1.15;
     if (pointOwned('ammo', u.team)) dmg *= 1.15;
     if (u.team === 1 && nearShaman(u)) dmg *= 1.2;
@@ -1066,9 +1123,14 @@
       return;
     }
     if (def.lob) {
-      // 擲弾兵: 放り投げる
-      G.shells.push({ x0: u.x, y0: u.y, x: tx + rand(-20, 20), y: ty + rand(-20, 20), t: 0, T: 0.7, r: def.lob, dmg, team: u.team, src: u, look: 'grenade' });
+      // 擲弾兵: 放り投げる (改良すると、爆発した場所の敵を燃やす)
+      G.shells.push({ x0: u.x, y0: u.y, x: tx + rand(-20, 20), y: ty + rand(-20, 20), t: 0, T: 0.7, r: def.lob, dmg, team: u.team, src: u, look: 'grenade', burn: u.type === 'grenadier' && save.unitIm.grenadier ? 6 : 0 });
       return;
+    }
+    // 歩兵の改良: ときどき手榴弾を投げる
+    if (u.type === 'infantry' && u.team === 0 && save.unitIm.infantry && G.time > (u.grenT || 0) && Math.hypot(tx - u.x, ty - u.y) > 90) {
+      u.grenT = G.time + 8;
+      G.shells.push({ x0: u.x, y0: u.y, x: tx, y: ty, t: 0, T: 0.6, r: 50, dmg: 30 * u.dmgMul, team: 0, src: u, look: 'grenade' });
     }
     if (def.melee) {
       if (u.target) hurt(u.target, dmg, u.x, u.y, u);
@@ -1082,6 +1144,7 @@
     for (let i = 0; i < (def.pellets || 1); i++) {
       const b = fireBullet(ox, oy, a + rand(-def.spread, def.spread), def.bulletSpeed, dmg, u.team, u, def.range * 1.25, def.curse ? 'curse' : u.team === 1 ? 'magic' : def.sniper ? 'snipe' : 'tracer');
       if (b && def.curse) b.slow = def.curse;
+      if (b && def.sniper && u.team === 0 && save.unitIm.sniper) b.pierce = 1;
     }
     G.stats.shots[u.team]++;
     if (onScreen(u.x, u.y, 0)) {
@@ -1105,6 +1168,7 @@
     if (e.kind === 'player') {
       if (e.invT > 0) return;
       if (nearOwnBase(e)) amt *= GUARD;
+      if (G.guards.length && inZone(G.guards, e)) amt *= 0.7;
       amt *= e.armor * (e.unleashT > 0 ? 0.25 : 1);
       e.lastHurt = G.time;
       e.hp -= amt;
@@ -1119,11 +1183,16 @@
       return;
     }
     if (nearOwnBase(e)) amt *= GUARD;
+    if (e.team === 0 && G.guards.length && inZone(G.guards, e)) amt *= 0.7; // 鬼塚の鉄壁
+    if (e.hero) {
+      e.lastHit = G.time;
+      if (e.smokeT > 0) amt *= 0.3;
+    }
     if (e.def.stone && !e.moving) amt *= e.def.stone; // ガーゴイルは止まっていると石になる
     if (e.def.stealth) e.revealT = G.time + 2;
     if (e.def.shield && sx != null) {
       const a = Math.atan2(sy - e.y, sx - e.x);
-      if (Math.abs(angleDiff(a, e.face)) < 1.0) amt *= 1 - e.def.shield;
+      if (Math.abs(angleDiff(a, e.face)) < (e.team === 0 && save.unitIm.heavy ? 1.6 : 1.0)) amt *= 1 - e.def.shield;
     }
     e.hp -= amt;
     if (amt >= 1) e.hitT = 0.08;
@@ -1169,6 +1238,14 @@
       captainDown(u);
       return;
     }
+    if (u.hero) {
+      const h = u.hero;
+      h.u = null;
+      h.respawnT = HERO_RESPAWN;
+      note(t('nHeroDown', L(h.def, 'name')), '#ff8a7a');
+      spawnParticles(u.x, u.y, 20, '#9cc4ff', 100, 1, 3, 'glow');
+      return;
+    }
     if (u.def.bomb && !u.exploded) {
       // 撃たれた自爆デーモンは、まわりの悪魔を巻き込んで爆発する
       u.exploded = true;
@@ -1202,6 +1279,7 @@
     if (!s.alive) return;
     if (s.kind === 'hq' && hasBarracks(s.team)) amt *= BARRIER;
     if (src && src.kind === 'unit' && !src.boss) amt *= src.def.siege ?? UNIT_VS_STRUCT;
+    if (s.team === 0 && save.unitIm.engineer && G.time - (s.repairT || -9) < 0.5) amt *= 0.7; // 工兵の改良
     s.hp -= amt;
     s.hitT = G.time;
     if (src && src.kind === 'player') gainXp(amt * 0.02);
@@ -1391,7 +1469,7 @@
       if (!foe) { h.cd = 0.2; continue; }
       h.cd = HQ_ROF;
       const a = Math.atan2(foe.y - h.cy, foe.x - h.cx);
-      fireBullet(h.cx, h.cy, a, 820, HQ_DMG, h.team, h, HQ_RANGE + h.pw, h.team === 1 ? 'magic' : 'cannon');
+      fireBullet(h.cx, h.cy, a, 820, HQ_DMG * (h.team === 0 ? 1 + 0.1 * am('hq') : 1), h.team, h, HQ_RANGE + h.pw, h.team === 1 ? 'magic' : 'cannon');
       h.aim = a;
     }
   }
@@ -1399,7 +1477,8 @@
   // ===================================================================
   // プレイヤー
   // ===================================================================
-  function makePlayer() {
+  const tr = (id) => save.train[id] || 0;
+  function makePlayer(loadout) {
     const h = G.hq[0];
     const P = {
       kind: 'player', team: 0, x: h.cx + h.pw / 2 + 50, y: h.cy, r: PLAYER.r, alive: true,
@@ -1410,6 +1489,23 @@
       spin: 0, charge: 0, chargeT: 0, chargeHit: null, unleashT: 0, orbitA: 0, drones: [], subT: {},
     };
     G.player = P;
+    // 初期装備
+    const lo = PROG.LOADOUTS.find((l) => l.id === loadout);
+    if (lo && lo.ab) {
+      if (lo.kind === 'main') {
+        P.ab = { [lo.ab]: 1 };
+        P.main = lo.ab;
+      } else {
+        P.ab[lo.ab] = 1;
+        if (lo.kind === 'sub') P.subs.push(lo.ab);
+        if (lo.kind === 'skill') P.skills.push(lo.ab);
+        if (lo.kind === 'ult') P.ult = lo.ab;
+      }
+    }
+    // 先手: 上のレベルから始める (そのぶんの能力はすぐに選ぶ)
+    P.lvl += tr('head');
+    P.pending = tr('head');
+    P.rerolls = tr('reroll');
     recalc();
     P.hp = P.maxHp;
     P.mag = magMax();
@@ -1422,18 +1518,18 @@
   function recalc() {
     const P = G.player;
     const prev = P.maxHp;
-    P.maxHp = PLAYER.hp * Math.pow(1.08, P.lvl - 1) * (1 + 0.12 * ab('vital'));
+    P.maxHp = PLAYER.hp * Math.pow(1.08, P.lvl - 1) * (1 + 0.12 * ab('vital')) * (1 + 0.05 * tr('hp'));
     if (P.alive) P.hp = Math.min(P.maxHp, P.hp + Math.max(0, P.maxHp - prev));
-    P.atkMul = Math.pow(1.03, P.lvl - 1) * (1 + 0.1 * ab('power'));
-    P.speedMul = 1 + 0.06 * ab('swift');
-    P.dashCdMax = PLAYER.dashCd - 0.15 * ab('swift');
+    P.atkMul = Math.pow(1.03, P.lvl - 1) * (1 + 0.1 * ab('power')) * (1 + 0.04 * tr('atk'));
+    P.speedMul = 1 + 0.06 * ab('swift') + 0.03 * tr('move');
+    P.dashCdMax = PLAYER.dashCd - 0.15 * ab('swift') - 0.1 * tr('move');
     P.magMul = 1 + 0.15 * ab('ammo');
     P.reloadMul = 1 - 0.1 * ab('ammo');
     P.armor = 1 - 0.07 * ab('armor');
     P.cdMul = 1 - 0.08 * ab('focus');
     P.ultMul = 1 + 0.12 * ab('focus');
     P.magnet = ORB_MAGNET * (1 + 0.2 * ab('soul'));
-    P.xpMul = 1 + 0.06 * ab('soul');
+    P.xpMul = (1 + 0.06 * ab('soul') + 0.05 * tr('xp')) * (G.hard ? 0.85 : 1);
   }
 
   // メイン武器の性能 (L: 武器のレベル)
@@ -1485,7 +1581,7 @@
     const P = G.player;
     P.alive = false;
     P.hp = 0;
-    P.respawnT = Math.min(18, 5 + P.lvl * 0.5);
+    P.respawnT = Math.min(18, 5 + P.lvl * 0.5) * (1 - 0.08 * tr('res'));
     P.xp *= 0.7; // 次のレベルまでの経験値の 30% を失う
     P.unleashT = 0;
     P.chargeT = 0;
@@ -2141,6 +2237,14 @@
       s.t += dt;
       if (s.t < s.T) return true;
       blast(s.x, s.y, s.r, s.dmg, s.team, s.src, 1);
+      if (s.burn) {
+        forFoesNear(s.x, s.y, s.r, s.team, (e) => {
+          if (e.kind === 'unit') {
+            e.burnT = 2;
+            e.burnDps = s.burn;
+          }
+        });
+      }
       return false;
     });
     // 空爆
@@ -2168,13 +2272,16 @@
   }
 
   // ---- 指揮 (自軍の兵舎・兵士) ----
-  const capOf = (s) => (s.team === 0 ? Math.round(s.def.cap * (1 + 0.1 * ab('reserves'))) : s.def.cap);
+  const am = (id) => save.army[id] || 0;
+  const capOf = (s) => (s.team === 0 ? Math.round(s.def.cap * (1 + 0.1 * ab('reserves')) * (1 + 0.05 * am('cap'))) : Math.round(s.def.cap * (G.hard ? 1.3 : 1)));
+  // 建物の HP 上限の元 (防衛隊本部の強化こみ)
+  const structBase = (s) => (s.kind === 'hq' ? HQ_HP * (s.team === 0 ? 1 + 0.08 * am('hq') : 1)
+    : s.def.hp * (s.temp ? 0.7 : 1) * (s.team === 0 ? 1 + 0.06 * am('bar') : 1));
 
   function applyDefense() {
     for (const s of G.structs) {
       if (s.team !== 0 || !s.alive) continue;
-      const base = s.kind === 'hq' ? HQ_HP : s.def.hp * (s.temp ? 0.7 : 1);
-      const nm = base * (1 + 0.1 * ab('defense'));
+      const nm = structBase(s) * (1 + 0.1 * ab('defense'));
       s.hp += nm - s.maxHp;
       s.maxHp = nm;
     }
@@ -2229,7 +2336,7 @@
         continue;
       }
       r.team = builder;
-      r.prog += (dt / REBUILD) * mul;
+      r.prog += (dt / (REBUILD * (builder === 0 ? 1 - 0.1 * am('rebuild') : 1))) * mul;
       if (r.prog >= 1) rebuild(s, builder, pHere);
     }
   }
@@ -2243,7 +2350,7 @@
     s.temp = true;
     s.ruin = null;
     s.alive = true;
-    s.maxHp = def.hp * 0.7 * (team === 0 ? 1 + 0.1 * ab('defense') : 1);
+    s.maxHp = structBase(s) * (team === 0 ? 1 + 0.1 * ab('defense') : 1);
     s.hp = s.maxHp;
     s.count = 0;
     s.ready = 0;
@@ -2300,6 +2407,7 @@
       const name = L(POINTS[p.k], 'name');
       if (p.prog >= 1 && p.owner !== 0) {
         p.owner = 0;
+        G.stats.points++;
         note(t('nPointTaken', name), '#8fc0ff');
         if (pHere) gainXp(30);
       } else if (p.prog <= -1 && p.owner !== 1) {
@@ -2439,10 +2547,423 @@
   }
 
   // ===================================================================
+  // 仲間のヒーロー
+  // ===================================================================
+  const { HEROES, SKILLS: HERO_SKILLS } = window.DI_HEROES;
+  const ORDERS = ['free', 'follow', 'defend', 'assault'];
+  const HERO_RESPAWN = 45;
+  const heroUp = (id) => save.heroUp[id] || 0;
+  // 3 段階目で技 1.25 倍、5 段階目で 1.5 倍
+  const heroPower = (id) => (heroUp(id) >= 5 ? 1.5 : heroUp(id) >= 3 ? 1.25 : 1);
+
+  // 自軍が一番押されているレーン / 一番押しているレーン
+  function pushedLane(most) {
+    let best = 0;
+    for (let i = 1; i < G.front.length; i++) {
+      if (most ? G.front[i] > G.front[best] : G.front[i] < G.front[best]) best = i;
+    }
+    return best;
+  }
+
+  // ヒーローのレベル: 強化 (+3 まで) + 1 分ごとに +1 + 倒した悪魔 60 体ごとに +1
+  const heroLevel = (h) => Math.min(LEVEL_MAX, 1 + Math.min(3, heroUp(h.id)) + Math.floor(G.time / 60) + Math.floor(G.stats.dead[1] / 60));
+
+  function spawnHero(h) {
+    const d = h.def;
+    const p = respawnPoint();
+    const u = spawnUnit('infantry', 0, p.x, p.y, null, pushedLane(false));
+    if (!u) {
+      h.respawnT = 3;
+      return;
+    }
+    u.type = 'hero';
+    u.def = { ...d, xp: 0, lob: d.cannon || 0 };
+    u.r = d.r;
+    u.speed = d.speed;
+    u.hero = h;
+    u.elite = false;
+    u.sk = { a: 2, b: 4 };
+    u.lastHit = -99;
+    u.laneT = 0;
+    h.u = u;
+    h.lv = 0;
+    setHeroLevel(h, heroLevel(h));
+    u.hp = u.maxHp;
+    collideTiles(u);
+  }
+
+  function setHeroLevel(h, lv) {
+    const u = h.u;
+    const up = 1 + 0.06 * heroUp(h.id);
+    const ratio = u.maxHp > 1 ? u.hp / u.maxHp : 1;
+    h.lv = lv;
+    u.maxHp = h.def.hp * (1 + 0.06 * (lv - 1)) * up;
+    u.hp = u.maxHp * ratio;
+    u.dmgMul = (1 + 0.04 * (lv - 1)) * up;
+  }
+
+  function cycleOrder() {
+    if (!G || !G.heroes.length) return;
+    G.heroOrder = (G.heroOrder + 1) % ORDERS.length;
+    note(`${t('order')}: ${t('order_' + ORDERS[G.heroOrder])}`, '#9fc0ff');
+    Sound.play('click');
+  }
+
+  function updateHeroes(dt) {
+    for (const h of G.heroes) {
+      if (!h.u) {
+        h.respawnT -= dt;
+        if (h.respawnT <= 0) spawnHero(h);
+        continue;
+      }
+      const lv = heroLevel(h);
+      if (lv > h.lv) setHeroLevel(h, lv);
+      // 5 秒ダメージを受けていなければ、少しずつ回復する
+      const u = h.u;
+      if (G.time - u.lastHit > 5) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.01 * dt);
+    }
+    G.guards = G.guards.filter((g) => (g.life -= dt) > 0);
+    G.wards = G.wards.filter((g) => (g.life -= dt) > 0);
+  }
+
+  const inZone = (list, e) => list.some((g) => (e.x - g.x) ** 2 + (e.y - g.y) ** 2 < g.r * g.r);
+  function nearHero(u) {
+    for (const h of G.heroes) if (h.u && h.u !== u && (u.x - h.u.x) ** 2 + (u.y - h.u.y) ** 2 < 260 * 260) return true;
+    return false;
+  }
+
+  // ヒーローの直線の攻撃 (貫通弾・破魔の矢)
+  function heroBeam(u, a, dmg, color) {
+    const cx = Math.cos(a);
+    const cy = Math.sin(a);
+    let len = 700;
+    for (let s = 8; s < 700; s += 12) {
+      const k = tileAt(u.x + cx * s, u.y + cy * s);
+      if (k < 0 || (G.block[k] && !(G.structAt[k] >= 0 && G.structs[G.structAt[k]].team === 0))) { len = s; break; }
+    }
+    for (const e of G.units) {
+      if (!e.alive || e.team === 0) continue;
+      const px = e.x - u.x;
+      const py = e.y - u.y;
+      const along = px * cx + py * cy;
+      if (along > 0 && along < len && Math.abs(px * cy - py * cx) < e.r + 10) hurt(e, dmg, u.x, u.y, u);
+    }
+    G.beams.push({ x1: u.x, y1: u.y, x2: u.x + cx * len, y2: u.y + cy * len, life: 0.35, max: 0.35, color, w: 7 });
+  }
+
+  // ルシア: 後ろの悪魔 (祈祷師・呪術師・魔弾兵) を優先してねらう
+  const CLAW = { shaman: 3, witch: 3, soldier: 2 };
+  function clawTarget(u) {
+    let best = null;
+    let bs = -1e9;
+    forFoesNear(u.x, u.y, u.def.aggro, u.team, (e) => {
+      if (e.stealthOn || e.kind !== 'unit') return;
+      const sc = (CLAW[e.type] || 1) * 1000 - Math.hypot(e.x - u.x, e.y - u.y);
+      if (sc > bs) {
+        bs = sc;
+        best = e;
+      }
+    });
+    return best;
+  }
+
+  function heroSkill(u, key) {
+    const h = u.hero;
+    const id = h.def.skills[key === 'a' ? 0 : 1];
+    const pw = heroPower(h.id);
+    const dmg = u.def.dmg * (u.def.pellets || 1) * u.dmgMul * pw;
+    const tg = u.target;
+    const dist = tg ? Math.hypot(tg.x - u.x, tg.y - u.y) : 1e9;
+    let n = 0;
+    const count = (r) => {
+      n = 0;
+      forFoesNear(u.x, u.y, r, 0, () => n++);
+      return n;
+    };
+    let cd = 0;
+    if (id === 'rush' && tg && dist > 100 && dist < 300) {
+      u.dashT = 0.35;
+      u.dx = (tg.x - u.x) / dist;
+      u.dy = (tg.y - u.y) / dist;
+      u.dashHit = new Set();
+      cd = 8;
+    } else if (id === 'bulwark' && count(250) >= 3) {
+      G.guards.push({ x: u.x, y: u.y, r: 220, life: 6 * pw });
+      cd = 15;
+    } else if (id === 'pierce' && tg) {
+      heroBeam(u, Math.atan2(tg.y - u.y, tg.x - u.x), dmg * 2.5, '#9fe0ff');
+      cd = 8;
+    } else if (id === 'vanish' && u.hp < u.maxHp * 0.5) {
+      u.vanishT = 4 * pw;
+      cd = 15;
+    } else if (id === 'mend') {
+      let hurtN = 0;
+      for (const a of G.units) if (a.team === 0 && a.alive && a.hp < a.maxHp * 0.6 && (a.x - u.x) ** 2 + (a.y - u.y) ** 2 < 220 * 220) hurtN++;
+      if (hurtN >= 2) {
+        for (const a of G.units) if (a.team === 0 && a.alive && (a.x - u.x) ** 2 + (a.y - u.y) ** 2 < 220 * 220) a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.4 * pw);
+        G.rings.push({ x: u.x, y: u.y, r: 220, life: 0.6, max: 0.6, color: '#7dffa0' });
+        cd = 12;
+      }
+    } else if (id === 'rescue') {
+      const P = G.player;
+      if (P.alive && P.hp < P.maxHp * 0.4 && Math.hypot(P.x - u.x, P.y - u.y) < 400) {
+        P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.4 * pw);
+        P.invT = Math.max(P.invT, 1.5);
+        G.beams.push({ x1: u.x, y1: u.y, x2: P.x, y2: P.y, life: 0.5, max: 0.5, color: '#7dffa0', w: 5 });
+        cd = 20;
+      }
+    } else if (id === 'turret' && (tg || count(400) > 0)) {
+      const t2 = spawnUnit('infantry', 0, u.x + rand(-30, 30), u.y + rand(-30, 30), null, u.lane);
+      if (t2) {
+        t2.type = 'turret';
+        t2.def = { hp: 300, r: 12, speed: 0, range: 320, aggro: 340, dmg: 6, rof: 0.15, spread: 0.08, bulletSpeed: 850, color: '#8a8f9a', dark: '#2a2d35', vehicle: true };
+        t2.maxHp = t2.hp = 300 * pw;
+        t2.speed = 0;
+        t2.r = 12;
+        t2.lifeT = 15;
+        collideTiles(t2);
+      }
+      cd = 18;
+    } else if (id === 'overhaul') {
+      let any = false;
+      for (const s of G.structs) {
+        if (!s.alive || s.team !== 0 || s.hp > s.maxHp * 0.9) continue;
+        const p = rectPoint(s, u.x, u.y);
+        if (Math.hypot(p.x - u.x, p.y - u.y) < 400) {
+          s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.15 * pw);
+          spawnParticles(s.cx, s.cy, 12, '#9fe08f', 120, 0.6, 3, 'glow');
+          any = true;
+        }
+      }
+      if (any) cd = 20;
+    } else if (id === 'barrier' && count(250) >= 3) {
+      G.wards.push({ x: u.x, y: u.y, r: 160, life: 6 * pw });
+      cd = 14;
+    } else if (id === 'arrow' && tg) {
+      heroBeam(u, Math.atan2(tg.y - u.y, tg.x - u.x), dmg * 6, '#fff2b0');
+      cd = 8;
+    } else if (id === 'salvo' && tg) {
+      for (let i = 0; i < 3; i++) G.shells.push({ x0: u.x, y0: u.y, x: tg.x + rand(-60, 60), y: tg.y + rand(-60, 60), t: -i * 0.2, T: 0.8, r: 70, dmg: dmg * 0.8, team: 0, src: u, look: 'mortar' });
+      cd = 10;
+    } else if (id === 'smoke' && u.hp < u.maxHp * 0.5) {
+      u.smokeT = 4 * pw;
+      u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.15);
+      spawnParticles(u.x, u.y, 30, '#8a8a90', 120, 2, 12, 'smoke');
+      cd = 18;
+    } else if (id === 'blink' && tg && dist > 120 && dist < 420) {
+      const a = Math.atan2(tg.y - u.y, tg.x - u.x);
+      const nx = tg.x + Math.cos(a) * 30;
+      const ny = tg.y + Math.sin(a) * 30;
+      const k = tileAt(nx, ny);
+      if (k >= 0 && !G.solid[k]) {
+        spawnParticles(u.x, u.y, 14, '#8a3ac8', 100, 0.5, 4, 'glow');
+        u.x = nx;
+        u.y = ny;
+        spawnParticles(u.x, u.y, 14, '#8a3ac8', 100, 0.5, 4, 'glow');
+        cd = 8;
+      }
+    } else if (id === 'hellfire' && count(120) >= 3) {
+      blast(u.x, u.y, 110, dmg * 2.5, 0, u, 1);
+      cd = 10;
+    }
+    if (cd) {
+      // 技は レベル 10・15・20 で 10% ずつ早く使えるようになる
+      u.sk[key] = cd * (1 - 0.1 * Math.floor(Math.min(20, u.hero.lv) / 10) - (u.hero.lv >= 15 ? 0.1 : 0));
+      floatText(u.x, u.y - u.r - 18, L(HERO_SKILLS[id], 'name'), '#9fc0ff', 1.2);
+    }
+  }
+
+  // ヒーローだけの動き。ここで動きを決めたら true を返す (ふつうの兵士の動きはしない)
+  function updateHero(u, dt) {
+    const h = u.hero;
+    const d = u.def;
+    for (const k in u.sk) u.sk[k] -= dt;
+    u.vanishT = (u.vanishT || 0) - dt;
+    u.smokeT = (u.smokeT || 0) - dt;
+    u.stealthOn = u.vanishT > 0;
+    // 巫女: まわりの暗殺者を見破る
+    if (d.ward) forFoesNear(u.x, u.y, d.ward, 0, (e) => { if (e.def && e.def.stealth) e.revealT = G.time + 0.5; });
+    if (d.claw && !u.target && u.retT <= 0) u.target = clawTarget(u);
+    // 盾の突進
+    if (u.dashT > 0) {
+      u.dashT -= dt;
+      u.x += u.dx * 520 * dt;
+      u.y += u.dy * 520 * dt;
+      forFoesNear(u.x, u.y, u.r + 8, 0, (e) => {
+        if (u.dashHit.has(e)) return;
+        u.dashHit.add(e);
+        hurt(e, d.dmg * (d.pellets || 1) * u.dmgMul * 1.2 * heroPower(h.id), u.x, u.y, u);
+        if (!heavyBody(e)) {
+          e.x += u.dx * 50;
+          e.y += u.dy * 50;
+          collideTiles(e);
+        }
+      });
+      return true;
+    }
+    if (u.sk.a <= 0) heroSkill(u, 'a');
+    if (h.lv >= 5 && u.sk.b <= 0) heroSkill(u, 'b');
+    // 指示による動き
+    const order = ORDERS[G.heroOrder];
+    if (order === 'free' || order === 'assault') {
+      u.laneT -= dt;
+      if (u.laneT <= 0 && !u.target && !u.tStruct) {
+        u.laneT = 10;
+        const nl = pushedLane(order === 'assault');
+        if (nl !== u.lane) {
+          u.lane = nl;
+          u.wp = laneProject(G.lanes[nl], u.x, u.y).seg + 1;
+        }
+      }
+      return false;
+    }
+    let gx;
+    let gy;
+    let stop;
+    if (order === 'follow') {
+      const P = G.player;
+      if (!P.alive) return false;
+      const dp = Math.hypot(P.x - u.x, P.y - u.y);
+      if ((u.target || u.tStruct) && dp < 350) return false;
+      gx = P.x;
+      gy = P.y;
+      stop = 80;
+    } else {
+      // 拠点を守れ: 一番危ない自軍の建物 (HP の割合が一番低い兵舎、なければ本拠地) の前
+      let best = null;
+      for (const s of G.structs) {
+        if (!s.alive || s.team !== 0) continue;
+        if (!best || s.hp / s.maxHp < best.hp / best.maxHp) best = s;
+      }
+      if (!best) return false;
+      gx = best.sx ?? best.cx + best.pw / 2 + 40;
+      gy = best.sy ?? best.cy;
+      const dd = Math.hypot(gx - u.x, gy - u.y);
+      if ((u.target || u.tStruct) && dd < 300) return false;
+      stop = 40;
+    }
+    const dx = gx - u.x;
+    const dy = gy - u.y;
+    const dd = Math.hypot(dx, dy);
+    u.moving = dd > stop;
+    if (u.moving) {
+      u.x += (dx / dd) * u.speed * dt;
+      u.y += (dy / dd) * u.speed * dt;
+      u.face = Math.atan2(dy, dx);
+      u.walk += dt * u.speed * 0.08;
+    }
+    u.retT -= dt;
+    if (u.retT <= 0) retarget(u);
+    return true;
+  }
+
+  function drawHero(u) {
+    const h = u.hero;
+    const d = u.def;
+    ctx.save();
+    ctx.translate(u.x, u.y);
+    if (u.stealthOn) ctx.globalAlpha = 0.4;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha *= 0.35;
+    ctx.drawImage(glowSprite, -34, -34, 68, 68);
+    ctx.globalAlpha = u.stealthOn ? 0.4 : 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(2, 5, u.r * (d.vehicle ? 1.3 : 1), u.r * 0.7, 0, 0, TAU);
+    ctx.fill();
+    ctx.rotate(u.face);
+    if (d.vehicle) {
+      ctx.fillStyle = u.hitT > 0 ? '#fff' : d.color;
+      ctx.strokeStyle = '#ffcf4a';
+      ctx.lineWidth = 3;
+      roundRect(-u.r * 1.2, -u.r * 0.85, u.r * 2.4, u.r * 1.7, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#1a1d24';
+      ctx.fillRect(4, -3.5, u.r + 16, 7);
+      ctx.fillStyle = d.dark;
+      ctx.beginPath();
+      ctx.arc(2, 0, u.r * 0.55, 0, TAU);
+      ctx.fill();
+    } else {
+      if (!d.melee) {
+        ctx.fillStyle = '#1a1d24';
+        ctx.fillRect(u.r - 4, -2.5, u.r + (d.sniper ? 16 : 6), 5);
+      } else {
+        ctx.strokeStyle = '#c9a0ff';
+        ctx.lineWidth = 2;
+        for (const sd of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(u.r - 2, sd * 5);
+          ctx.lineTo(u.r + 10, sd * 7);
+          ctx.stroke();
+        }
+      }
+      ctx.fillStyle = u.hitT > 0 ? '#fff' : d.color;
+      ctx.strokeStyle = '#ffcf4a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, u.r, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = d.dark;
+      ctx.beginPath();
+      ctx.arc(-1, 0, u.r * 0.55, 0, TAU);
+      ctx.fill();
+      if (d.shield) {
+        ctx.strokeStyle = '#cfe0ff';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(0, 0, u.r + 5, -1, 1);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.font = '800 11px system-ui, sans-serif';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    const label = `${d.icon} ${L(d, 'name')} Lv${h.lv}`;
+    ctx.strokeText(label, u.x, u.y - u.r - 10);
+    ctx.fillStyle = '#cfe0ff';
+    ctx.fillText(label, u.x, u.y - u.r - 10);
+    const w = 40;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(u.x - w / 2, u.y - u.r - 8, w, 4);
+    ctx.fillStyle = '#7fb0ff';
+    ctx.fillRect(u.x - w / 2, u.y - u.r - 8, w * clamp(u.hp / u.maxHp, 0, 1), 4);
+  }
+
+  function drawZones() {
+    for (const g of G.guards) {
+      ctx.strokeStyle = 'rgba(160,200,255,0.5)';
+      ctx.fillStyle = 'rgba(120,170,255,0.08)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, g.r, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+    }
+    for (const g of G.wards) {
+      ctx.strokeStyle = 'rgba(255,120,140,0.6)';
+      ctx.fillStyle = 'rgba(255,240,240,0.08)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, g.r, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // ===================================================================
   // 敵の隊長 (魔将)
   // ===================================================================
   // 隊長のレベル: 時間 (1 分ごとに +1) と、倒した自軍の兵士の数 (60 人ごとに +1) で上がる
-  const captainLevel = (c) => Math.min(LEVEL_MAX, c.def.startLv + Math.floor(G.time / 60) + Math.floor(G.stats.dead[0] / 60));
+  const captainLevel = (c) => Math.min(LEVEL_MAX, c.def.startLv + Math.floor((G.time * (G.hard ? 1.5 : 1)) / 60) + Math.floor(G.stats.dead[0] / 60));
 
   // 敵が一番押しているレーン
   function pushLane() {
@@ -2649,7 +3170,7 @@
       const e = ABIL.EVOLUTIONS[id];
       if (e && !P.evo[id] && ab(id) >= ABIL.MAX_LV && ab(e.need) > 0 && picks.length < 2) picks.push({ a: e, evo: id });
     }
-    while (picks.length < 3 && pool.length) {
+    while (picks.length < 3 + tr('choice') && pool.length) {
       let sum = 0;
       for (const p of pool) sum += p.w;
       let r = Math.random() * sum;
@@ -2763,10 +3284,19 @@
         <h2 class="lvup-title">${t('levelUpTitle')}</h2>
         <p class="sub">${t('levelUpSub', P.lvl - P.pending + 1)}</p>
         <div class="cards">${cards}</div>
+        ${P.rerolls > 0 ? `<div class="actions"><button type="button" class="btn" data-act="reroll">🔄 ${t('reroll', P.rerolls)}</button></div>` : ''}
         <div class="chips">${have}</div>
       </div>`);
     overlay.classList.add('celebrate');
   }
+  function rerollLevelUp() {
+    const P = G.player;
+    if (P.rerolls <= 0 || performance.now() < lvLockUntil) return;
+    P.rerolls--;
+    lvChoices = rollChoices();
+    renderLevelUp();
+  }
+
   function pickLevelUp(i) {
     if (performance.now() < lvLockUntil || !lvChoices[i]) return;
     applyChoice(lvChoices[i]);
@@ -3011,6 +3541,7 @@
     updatePlayer(dt);
     updateBarracks(dt);
     updateCaptains(dt);
+    updateHeroes(dt);
     updateCommands(dt);
     updateRuins(dt);
     updatePoints(dt);
@@ -3093,7 +3624,8 @@
     drawStructs();
     drawDecoys();
     drawOrbs();
-    for (const u of G.units) if (!u.def.fly && onScreen(u.x, u.y, 30)) (u.boss ? drawBoss(u) : drawUnit(u));
+    drawZones();
+    for (const u of G.units) if (!u.def.fly && onScreen(u.x, u.y, 30)) (u.boss ? drawBoss(u) : u.hero ? drawHero(u) : drawUnit(u));
     drawPlayer();
     drawAbilityWorld();
     drawBullets();
@@ -4244,6 +4776,16 @@
       ctx.fill();
       ctx.stroke();
     }
+    for (const h of G.heroes) {
+      if (!h.u) continue;
+      ctx.fillStyle = '#5b8ff0';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(mx + h.u.x * sxm, my + h.u.y * sym, 3, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+    }
     if (P.alive) {
       ctx.fillStyle = '#fff';
       ctx.fillRect(mx + P.x * sxm - 2, my + P.y * sym - 2, 4, 4);
@@ -4253,6 +4795,48 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.5)';
     ctx.lineWidth = 1;
     ctx.strokeRect(mx + G.cam.x * sxm - vw / 2, my + G.cam.y * sym - vh / 2, vw, vh);
+
+    // 仲間のヒーロー (タップ / クリック / F キーで指示を切り替える)
+    G.heroPanel = null;
+    if (G.heroes.length) {
+      const hx = 10;
+      const hy = small && !inline ? 118 : 66;
+      const hw = small ? 150 : 190;
+      const hh = 20 + G.heroes.length * 20;
+      G.heroPanel = { x: hx, y: hy, w: hw, h: hh };
+      ctx.fillStyle = 'rgba(10,12,18,0.72)';
+      roundRectScreen(hx, hy, hw, hh, 8);
+      ctx.fill();
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.font = '800 10px system-ui, sans-serif';
+      ctx.fillStyle = '#9fc0ff';
+      ctx.fillText(`${t('order')}: ${t('order_' + ORDERS[G.heroOrder])}${input.touchUI ? '' : ' (F)'}`, hx + 8, hy + 11);
+      G.heroes.forEach((h, i) => {
+        const y = hy + 30 + i * 20;
+        ctx.font = '13px system-ui, sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(h.def.icon, hx + 6, y);
+        ctx.font = '700 10px system-ui, sans-serif';
+        ctx.fillStyle = '#e6ecf8';
+        ctx.fillText(`${L(h.def, 'name')}`, hx + 26, y - 4);
+        const bw2 = hw - 70;
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillRect(hx + 26, y + 3, bw2, 4);
+        if (h.u) {
+          ctx.fillStyle = '#7fb0ff';
+          ctx.fillRect(hx + 26, y + 3, bw2 * clamp(h.u.hp / h.u.maxHp, 0, 1), 4);
+          ctx.fillStyle = '#cfd6e8';
+          ctx.textAlign = 'right';
+          ctx.fillText(`Lv${h.lv}`, hx + hw - 8, y);
+        } else {
+          ctx.fillStyle = '#ff8a7a';
+          ctx.textAlign = 'right';
+          ctx.fillText(`${Math.ceil(h.respawnT)}s`, hx + hw - 8, y);
+        }
+        ctx.textAlign = 'left';
+      });
+    }
 
     // 近くにいる隊長の HP
     let ny = small && !inline ? 138 : 82;
@@ -4439,33 +5023,21 @@
       </div>`, true);
   }
 
-  function showStages() {
-    screen = 'select';
-    backAction = showTitle;
-    rerender = showStages;
-    pauseBtn.style.visibility = 'hidden';
-    const cards = STAGES.map((st, i) => {
-      const rec = save.stages[st.id];
-      const meta = st.locked ? t('locked') : rec && rec.clear ? `${t('cleared')} ・ ${t('best')} ${fmtTime(rec.best)}` : t('notCleared');
-      return `
-        <button type="button" class="stage ${rec && rec.clear ? 'cleared' : ''}" data-act="stage" data-i="${i}" ${st.locked ? 'disabled' : ''}>
-          <span class="stage-no">${st.id}</span>
-          <span class="stage-body"><span class="stage-name">${esc(L(st, 'name'))}</span><br><span class="stage-meta">${esc(meta)}</span></span>
-        </button>`;
-    }).join('');
-    showOverlay(`
-      <div class="panel wide">
-        ${panelHead(t('stageSelect'), 'title')}
-        <p class="sub">${t('stageSelectSub')}</p>
-        <div class="stages">${cards}</div>
-      </div>`, true);
-  }
-
-  function startBattle(i) {
+  // opts: { mode: 'n' / 'h', heroes: [ヒーロー], loadout: 初期装備, test: 記録しない (自動テスト) }
+  function startBattle(i, opts = {}) {
     stageIdx = i;
     const st = STAGES[i];
     G = buildStage(st);
-    G.player = makePlayer();
+    G.opts = opts;
+    G.hard = opts.mode === 'h';
+    G.test = !!opts.test;
+    G.heroes = (opts.heroes || []).map((id) => ({ id, def: HEROES[id], u: null, lv: 0, respawnT: 1 }));
+    G.heroOrder = 0;
+    G.player = makePlayer(opts.loadout);
+    for (const s of G.structs) {
+      if (s.team !== 0) continue;
+      s.maxHp = s.hp = structBase(s);
+    }
     G.cam.x = G.player.x;
     G.cam.y = G.player.y;
     clampCam();
@@ -4523,15 +5095,226 @@
     rerender = null;
   }
 
+  // ---- ステージ選択 ----
+  const PROG = window.DI_PROGRESS;
+  const rec = (id, mode = 'n') => (save.stages[id] && save.stages[id][mode]) || null;
+  const cleared = (id) => !!(rec(id) && rec(id).clear);
+  const stars = (id) => Math.max(rec(id, 'n') ? rec(id, 'n').stars || 0 : 0, rec(id, 'h') ? rec(id, 'h').stars || 0 : 0);
+  const heroUnlocked = (id) => HEROES[id].unlock === 0 || cleared(HEROES[id].unlock);
+  const loadoutUnlocked = (l) => l.id === 'none' || (cleared(l.stage) && stars(l.stage) >= l.stars);
+  const heroSlots = (st) => (st.id >= 5 ? 2 : 1) + (save.army.room || 0);
+  const starStr = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
+
+  function showStages() {
+    screen = 'select';
+    backAction = showTitle;
+    rerender = showStages;
+    pauseBtn.style.visibility = 'hidden';
+    const cards = STAGES.map((st, i) => {
+      const r = rec(st.id);
+      const open = !st.locked && (i === 0 || cleared(STAGES[i - 1].id));
+      const meta = st.locked ? t('locked') : !open ? t('lockedPrev') : r && r.clear ? `${starStr(stars(st.id))} ・ ${t('best')} ${fmtTime(r.best)}${rec(st.id, 'h') && rec(st.id, 'h').clear ? ` ・ ${t('hard')}✓` : ''}` : t('notCleared');
+      return `
+        <button type="button" class="stage ${r && r.clear ? 'cleared' : ''}" data-act="brief" data-i="${i}" ${open ? '' : 'disabled'}>
+          <span class="stage-no">${st.id}</span>
+          <span class="stage-body"><span class="stage-name">${esc(L(st, 'name'))}</span><br><span class="stage-meta">${esc(meta)}</span></span>
+        </button>`;
+    }).join('');
+    showOverlay(`
+      <div class="panel wide">
+        ${panelHead(t('stageSelect'), 'title')}
+        <p class="sub">${t('stageSelectSub')} ・ <span class="merit">🎖️ ${save.merit}</span></p>
+        <div class="stages">${cards}</div>
+        <div class="actions">
+          <button type="button" class="btn" data-act="training">⬆ ${t('training')}</button>
+          <button type="button" class="btn" data-act="army">🏢 ${t('army')}</button>
+        </div>
+      </div>`, true);
+  }
+
+  // ---- 出撃前の確認 (難易度・連れていくヒーロー・初期装備) ----
+  let brief = null;
+  function showBrief(i) {
+    const st = STAGES[i];
+    if (!brief || brief.i !== i) {
+      const slots = heroSlots(st);
+      brief = {
+        i,
+        mode: 'n',
+        heroes: (save.lastHeroes || []).filter((id) => HEROES[id] && heroUnlocked(id)).slice(0, slots),
+        loadout: PROG.LOADOUTS.find((l) => l.id === save.lastLoadout && loadoutUnlocked(l)) ? save.lastLoadout : 'none',
+      };
+      if (!brief.heroes.length) brief.heroes = ['onizuka'];
+    }
+    screen = 'brief';
+    backAction = showStages;
+    rerender = () => showBrief(i);
+    const slots = heroSlots(st);
+    const hardOk = cleared(st.id);
+    const caps = (st.captains || []).map((id) => `${L(CAPTAINS[id], 'name')} (${L(CAPTAINS[id], 'title')})`).join(' / ');
+    const heroCards = Object.entries(HEROES).map(([id, h]) => {
+      const ok = heroUnlocked(id);
+      const on = brief.heroes.includes(id);
+      return `
+        <button type="button" class="hero-card ${on ? 'on' : ''}" data-act="pickHero" data-id="${id}" ${ok ? '' : 'disabled'}>
+          <span class="hero-icon">${ok ? h.icon : '🔒'}</span>
+          <span class="hero-body"><b>${ok ? esc(L(h, 'name')) : '???'}</b>${ok ? ` <small>${esc(L(h, 'role'))}${heroUp(id) ? ` ・ ★${heroUp(id)}` : ''}</small>` : ''}
+            <span class="hero-desc">${ok ? esc(lang === 'en' ? h.descEn : h.desc) : esc(t('heroLocked', h.unlock))}</span></span>
+        </button>`;
+    }).join('');
+    const loads = PROG.LOADOUTS.filter(loadoutUnlocked).map((l) => {
+      const a = l.ab ? ABIL.BY_ID[l.ab] : null;
+      return `<button type="button" class="chip-btn ${brief.loadout === l.id ? 'on' : ''}" data-act="pickLoad" data-id="${l.id}">${a ? a.icon : l.icon} ${esc(a ? L(a, 'name') : L(l, 'name'))}</button>`;
+    }).join('');
+    showOverlay(`
+      <div class="panel wide">
+        ${panelHead(`${st.id}. ${L(st, 'name')}`, 'stages')}
+        <p class="sub">${esc(lang === 'en' ? st.descEn : st.desc)}${caps ? `<br>☠ ${esc(caps)}` : ''}</p>
+        <div class="seg">
+          <button type="button" class="seg-btn ${brief.mode === 'n' ? 'on' : ''}" data-act="mode" data-m="n">${t('normal')}</button>
+          <button type="button" class="seg-btn ${brief.mode === 'h' ? 'on' : ''}" data-act="mode" data-m="h" ${hardOk ? '' : 'disabled'}>${t('hard')}${hardOk ? '' : ' 🔒'}</button>
+        </div>
+        <h3>${t('heroesTitle', brief.heroes.length, slots)}</h3>
+        <div class="hero-grid">${heroCards}</div>
+        <h3>${t('loadout')}</h3>
+        <div class="chip-row">${loads}</div>
+        <div class="actions"><button type="button" class="btn primary" data-act="go">${t('deploy')}</button></div>
+      </div>`, true);
+  }
+
+  function pickHero(id) {
+    const slots = heroSlots(STAGES[brief.i]);
+    if (brief.heroes.includes(id)) brief.heroes = brief.heroes.filter((x) => x !== id);
+    else {
+      brief.heroes.push(id);
+      while (brief.heroes.length > slots) brief.heroes.shift();
+    }
+    showBrief(brief.i);
+  }
+
+  // ---- 訓練所と防衛隊本部 ----
+  const price = (base, lv) => base * (lv + 1);
+  function upgradeRow(key, icon, name, desc, lv, max, cost) {
+    const maxed = lv >= max;
+    return `
+      <div class="up-row">
+        <span class="up-icon">${icon}</span>
+        <span class="up-body"><b>${esc(name)}</b> <small>${lv}/${max}</small><span class="up-desc">${esc(desc)}</span></span>
+        <button type="button" class="btn small" data-act="buy" data-key="${key}" ${maxed || save.merit < cost ? 'disabled' : ''}>${maxed ? 'MAX' : `🎖️ ${cost}`}</button>
+      </div>`;
+  }
+  const fill = (s, v) => s.replace('{v}', v);
+
+  function showTraining() {
+    screen = 'training';
+    backAction = showStages;
+    rerender = showTraining;
+    const rows = PROG.TRAINING.map((it) => {
+      const lv = save.train[it.id] || 0;
+      const desc = fill(L(it, 'desc'), it.per * Math.max(1, lv)) + (lv ? '' : ` (${t('next')})`);
+      return upgradeRow(`train.${it.id}`, it.icon, L(it, 'name'), desc, lv, it.max, price(it.base, lv));
+    }).join('');
+    showOverlay(`
+      <div class="panel wide">
+        ${panelHead(t('training'), 'stages')}
+        <p class="sub">${t('trainingSub')} ・ <span class="merit">🎖️ ${save.merit}</span></p>
+        <div class="up-list">${rows}</div>
+      </div>`, true);
+  }
+
+  let armyTab = 'base';
+  const ALLY_TYPES = ['infantry', 'heavy', 'medic', 'engineer', 'sniper', 'grenadier', 'apc'];
+  function showArmy() {
+    screen = 'army';
+    backAction = showStages;
+    rerender = showArmy;
+    let rows = '';
+    if (armyTab === 'base') {
+      rows = PROG.ARMY.map((it) => {
+        const lv = save.army[it.id] || 0;
+        const desc = fill(L(it, 'desc'), it.per * Math.max(1, lv)) + (lv ? '' : ` (${t('next')})`);
+        return upgradeRow(`army.${it.id}`, it.icon, L(it, 'name'), desc, lv, it.max, price(it.base, lv));
+      }).join('');
+    } else if (armyTab === 'units') {
+      rows = ALLY_TYPES.map((k) => {
+        const d = UNITS[k];
+        const lv = save.unitTr[k] || 0;
+        const tr = upgradeRow(`unitTr.${k}`, '🎽', `${L(d, 'name')}: ${t('unitTrain')}`, t('unitTrainDesc', PROG.UNIT_TRAIN.per * Math.max(1, lv)), lv, PROG.UNIT_TRAIN.max, price(PROG.UNIT_TRAIN.base, lv));
+        const im = PROG.UNIT_IMPROVE[k];
+        const ilv = save.unitIm[k] || 0;
+        const imr = upgradeRow(`unitIm.${k}`, '🛠️', `${L(d, 'name')}: ${t('unitImprove')}`, lang === 'en' ? im.en : im.desc, ilv, 1, price(PROG.UNIT_IMPROVE.base, ilv));
+        return tr + imr;
+      }).join('');
+    } else {
+      rows = Object.entries(HEROES).filter(([id]) => heroUnlocked(id)).map(([id, h]) => {
+        const lv = heroUp(id);
+        return upgradeRow(`heroUp.${id}`, h.icon, L(h, 'name'), t('heroUpDesc', PROG.HERO_UP.per * Math.max(1, lv), Math.min(3, Math.max(1, lv))), lv, PROG.HERO_UP.max, price(PROG.HERO_UP.base, lv));
+      }).join('') || `<p class="sub">${t('noHeroes')}</p>`;
+    }
+    const tab = (k, label) => `<button type="button" class="seg-btn ${armyTab === k ? 'on' : ''}" data-act="armyTab" data-k="${k}">${label}</button>`;
+    showOverlay(`
+      <div class="panel wide">
+        ${panelHead(t('army'), 'stages')}
+        <p class="sub">${t('armySub')} ・ <span class="merit">🎖️ ${save.merit}</span></p>
+        <div class="seg">${tab('base', t('tabBase'))}${tab('units', t('tabUnits'))}${tab('heroes', t('tabHeroes'))}</div>
+        <div class="up-list">${rows}</div>
+      </div>`, true);
+  }
+
+  function buy(key) {
+    const [group, id] = key.split('.');
+    const table = save[group];
+    const lv = table[id] || 0;
+    let base;
+    let max;
+    if (group === 'train') ({ base, max } = PROG.TRAINING.find((x) => x.id === id));
+    else if (group === 'army') ({ base, max } = PROG.ARMY.find((x) => x.id === id));
+    else if (group === 'unitTr') ({ base, max } = PROG.UNIT_TRAIN);
+    else if (group === 'unitIm') { base = PROG.UNIT_IMPROVE.base; max = 1; }
+    else ({ base, max } = PROG.HERO_UP);
+    const cost = price(base, lv);
+    if (lv >= max || save.merit < cost) return;
+    save.merit -= cost;
+    table[id] = lv + 1;
+    writeSave();
+    Sound.play('level');
+    if (rerender) rerender();
+  }
+
+  // ---- 結果 (★と戦功ポイント) ----
+  function stageStarsNow() {
+    if (!G.result) return 0;
+    let n = 1;
+    if (G.time <= 12 * 60) {
+      n++;
+      // 最初からあった自軍の兵舎が半分以上残っていれば ★3
+      const orig = G.st.barracks.filter((b) => b.team === 0).length;
+      const left = G.structs.filter((s) => s.team === 0 && s.kind === 'barracks' && s.alive && !s.temp).length;
+      if (left * 2 >= orig) n++;
+    }
+    return n;
+  }
+
   function endBattle(win) {
     if (G.over) return;
     G.over = true;
     G.result = win;
-    if (win) {
-      const rec = save.stages[G.st.id] || {};
-      rec.clear = true;
-      rec.best = rec.best ? Math.min(rec.best, G.time) : G.time;
-      save.stages[G.st.id] = rec;
+    const st = stageStarsNow();
+    const S = G.stats;
+    const merit = Math.round((S.dead[1] / 10 + S.destroyed * 15 + S.rebuilt * 10 + S.points * 10 + S.captains * 25 + G.player.lvl * 3 + (win ? 80 : 0) + st * 20) * (G.hard ? 1.5 : 1));
+    G.reward = { stars: st, merit };
+    if (!G.test) {
+      save.merit += merit;
+      if (win) {
+        save.stages[G.st.id] = save.stages[G.st.id] || {};
+        const r = save.stages[G.st.id][G.hard ? 'h' : 'n'] || {};
+        const firstClear = !cleared(G.st.id);
+        r.clear = true;
+        r.best = r.best ? Math.min(r.best, G.time) : G.time;
+        r.stars = Math.max(r.stars || 0, st);
+        save.stages[G.st.id][G.hard ? 'h' : 'n'] = r;
+        if (firstClear) G.reward.newHero = Object.keys(HEROES).find((id) => HEROES[id].unlock === G.st.id);
+      }
       writeSave();
     }
     setTimeout(showResult, 1600);
@@ -4544,10 +5327,13 @@
     rerender = showResult;
     pauseBtn.style.visibility = 'hidden';
     const win = G.result;
+    const rw = G.reward;
+    const nh = rw.newHero ? HEROES[rw.newHero] : null;
     showOverlay(`
       <div class="panel">
         <h2 class="result-title ${win ? 'win' : 'lose'}">${win ? t('win') : t('lose')}</h2>
         <p class="sub">${win ? t('winSub') : t('loseSub')}</p>
+        ${win ? `<p class="result-stars">${starStr(rw.stars)}</p>` : ''}
         <ul class="stats">
           <li><span>${t('time')}</span><b>${fmtTime(G.time)}</b></li>
           <li><span>${t('kills')}</span><b>${G.stats.kills}</b></li>
@@ -4556,10 +5342,14 @@
           <li><span>${t('captains')}</span><b>${G.stats.captains}</b></li>
           <li><span>${t('rebuilt')}</span><b>${G.stats.rebuilt}</b></li>
           <li><span>${t('deaths')}</span><b>${G.stats.deaths}</b></li>
+          <li class="merit-row"><span>${t('meritGot')}</span><b>🎖️ +${rw.merit}</b></li>
         </ul>
+        ${nh ? `<p class="new-hero">${nh.icon} ${esc(t('newHero', L(nh, 'name')))}</p>` : ''}
         <div class="actions">
           <button type="button" class="btn primary" data-act="retry">${t('again')}</button>
           <button type="button" class="btn" data-act="stages">${t('toStages')}</button>
+          <button type="button" class="btn" data-act="training">⬆ ${t('training')}</button>
+          <button type="button" class="btn" data-act="army">🏢 ${t('army')}</button>
         </div>
       </div>`);
   }
@@ -4567,9 +5357,23 @@
   const actions = {
     title: showTitle,
     stages: () => { G = null; showStages(); },
-    stage: (el) => startBattle(Number(el.dataset.i)),
+    brief: (el) => showBrief(Number(el.dataset.i)),
+    pickHero: (el) => pickHero(el.dataset.id),
+    pickLoad: (el) => { brief.loadout = el.dataset.id; showBrief(brief.i); },
+    mode: (el) => { brief.mode = el.dataset.m; showBrief(brief.i); },
+    go: () => {
+      save.lastHeroes = brief.heroes.slice();
+      save.lastLoadout = brief.loadout;
+      writeSave();
+      startBattle(brief.i, { mode: brief.mode, heroes: brief.heroes.slice(), loadout: brief.loadout });
+    },
+    training: () => { G = null; showTraining(); },
+    army: () => { G = null; showArmy(); },
+    armyTab: (el) => { armyTab = el.dataset.k; showArmy(); },
+    buy: (el) => buy(el.dataset.key),
+    reroll: () => rerollLevelUp(),
     resume: resumeGame,
-    retry: () => startBattle(stageIdx),
+    retry: () => startBattle(stageIdx, G ? G.opts : {}),
     pick: (el) => pickLevelUp(Number(el.dataset.i)),
   };
   overlay.addEventListener('click', (e) => {
@@ -4625,7 +5429,7 @@
 
   // テスト用: ブラウザのコンソールや自動テストから、戦闘を早送りで動かす
   window.__DI = {
-    start: (i = 0) => startBattle(i),
+    start: (i = 0, opts = { heroes: ['onizuka'] }) => startBattle(i, { test: true, ...opts }),
     // sec 秒ぶん、描画せずに進める (プレイヤーは何もしない)
     sim: (sec, step = 1 / 30) => {
       const n = Math.round(sec / step);

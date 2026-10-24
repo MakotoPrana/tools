@@ -82,7 +82,7 @@
       enemyTypes: ['imp', 'ghoul', 'soldier', 'hound', 'bomber'], // このステージに出てくる悪魔
       captains: ['varga'], // 敵の隊長
       // 敵の兵士の強さの倍率 (HP・攻撃力)。敵優勢のバランスを決める
-      enemyMul: 0.9,
+      enemyMul: 1.0,
     },
     { id: 2, name: '住宅街', en: { name: 'Residential Area' }, locked: true },
     { id: 3, name: '駅前', en: { name: 'Station Square' }, locked: true },

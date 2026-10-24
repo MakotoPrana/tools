@@ -17,7 +17,7 @@
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
   <main class="app">
@@ -57,6 +57,9 @@
       <h3>敵の隊長</h3>
       <p>戦場には悪魔の隊長 (魔将) がいます。隊長は時間がたつほどレベルが上がり、一番押しているレーンの先頭で兵舎を壊しに来ます。倒すと大量の経験値が落ち、悪魔たちが 15 秒間混乱します (動きと攻撃が遅くなる)。隊長は 60 秒後に戻ってきます。</p>
 
+      <h3>仲間のヒーローと恒久成長</h3>
+      <p>出撃前に、一緒に戦う仲間のヒーローを選びます (ステージをクリアするたびに仲間が増えます)。ヒーローは自分で考えて戦い、時間とともにレベルが上がります。画面左上のヒーローの欄をタップ (パソコンは F キー) すると、「自由に戦う / ついてこい / 拠点を守れ / 突撃」の指示を切り替えられます。戦いが終わると、勝っても負けても「戦功ポイント」がもらえます。訓練所で自分を、防衛隊本部で兵舎・兵士・ヒーローを強くしましょう。ステージをクリアするとハードと初期装備が選べるようになります。</p>
+
       <h3>パソコンの操作</h3>
       <table>
         <tbody>
@@ -66,7 +69,8 @@
           <tr><th>Q / E</th><td>スキル</td></tr>
           <tr><th>R</th><td>必殺技 (ゲージがたまったとき)</td></tr>
           <tr><th>X</th><td>リロード (弾が切れると自動でリロードします)</td></tr>
-          <tr><th>1〜3</th><td>レベルアップの能力を選ぶ</td></tr>
+          <tr><th>F</th><td>仲間のヒーローへの指示を切り替える</td></tr>
+          <tr><th>1〜4</th><td>レベルアップの能力を選ぶ</td></tr>
           <tr><th>P / Esc</th><td>一時停止</td></tr>
         </tbody>
       </table>
@@ -101,6 +105,9 @@
       <h3>Enemy Captains</h3>
       <p>A demon captain (warlord) leads the enemy. Captains level up over time and lead the charge on whichever lane the demons are winning, smashing barracks. Defeat one to drop a pile of experience and throw the demons into disarray for 15 seconds (they move and attack slower). Captains return after 60 seconds.</p>
 
+      <h3>Allied Heroes and Permanent Growth</h3>
+      <p>Before each sortie, choose the allied heroes who fight with you (more join as you clear stages). Heroes fight on their own and level up over time. Tap the hero box at the top left (or press F on PC) to switch orders: "Fight freely / Follow me / Hold the base / Charge". Win or lose, every battle earns merit points: spend them at the Training Ground to improve yourself, and at the Defense Force HQ to upgrade barracks, soldiers and heroes. Clearing a stage unlocks Hard mode and new starting loadouts.</p>
+
       <h3>PC Controls</h3>
       <table>
         <tbody>
@@ -110,7 +117,8 @@
           <tr><th>Q / E</th><td>Skills</td></tr>
           <tr><th>R</th><td>Ultimate (when the gauge is full)</td></tr>
           <tr><th>X</th><td>Reload (you also reload automatically when empty)</td></tr>
-          <tr><th>1–3</th><td>Pick a level-up ability</td></tr>
+          <tr><th>F</th><td>Change orders for your heroes</td></tr>
+          <tr><th>1–4</th><td>Pick a level-up ability</td></tr>
           <tr><th>P / Esc</th><td>Pause</td></tr>
         </tbody>
       </table>
@@ -134,7 +142,9 @@
   <script>OrigamiIntro.play();</script>
   <script src="units.js?v=3"></script>
   <script src="abilities.js?v=2"></script>
-  <script src="stages.js?v=4"></script>
-  <script src="script.js?v=4"></script>
+  <script src="heroes.js?v=1"></script>
+  <script src="progress.js?v=1"></script>
+  <script src="stages.js?v=5"></script>
+  <script src="script.js?v=5"></script>
 </body>
 </html>
