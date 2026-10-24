@@ -1,7 +1,7 @@
 /*
  * デモン・インベージョン: レベルアップで選ぶ能力のデータ (名前・説明・アイコン)
  *   動きは script.js の「能力」の章にある。各能力は最大レベル 5。
- *   kind: main (メイン武器・プレイヤーが撃つ) / sub (灯火の武器・自動で撃つ) / skill (Q・E) / ult (必殺技・R) / passive / command (指揮)
+ *   kind: main (メイン武器・操作する武将が撃つ。hero は武将の固有の武器) / sub (灯火の武器・自動で撃つ) / skill (Q・E) / ult (必殺技・R) / passive / command (指揮)
  *   EVOLUTIONS は武器の進化 (武器のレベル 5 + 対応する能力)
  *   desc は「レベル 1 で何ができるか」、up は「レベルを上げると何が強くなるか」
  */
@@ -22,6 +22,20 @@
       { name: 'Ember Railgun', desc: 'Hold to charge, release to pierce everything in a line.', up: 'A stronger charged shot' }),
     A('flame', 'main', '🔥', '火炎放射器', '前方を焼き払う。燃えた敵は少しずつダメージを受ける。', '炎の威力と届く距離が上がる',
       { name: 'Flamethrower', desc: 'Burns everything in front of you. Burning foes keep taking damage.', up: 'Hotter flames that reach farther' }),
+
+    // ---------------- 武将の固有のメイン武器 (hero: true。持ち替えの選択肢には出ない) ----------------
+    A('sniper', 'main', '🎯', '霧島の狙撃銃', '遠くまで届く一撃。弾が敵を 1 体貫く。', '威力が上がり、撃つ間隔が短くなる',
+      { name: "Kirishima's Rifle", desc: 'A long-range shot that pierces one foe.', up: 'More damage and a shorter interval' }),
+    A('smg', 'main', '💉', '衛生兵の短機関銃', '近〜中距離を素早く連射する。', '威力と回復の力が上がる',
+      { name: "Medic's SMG", desc: 'Rapid fire at short to mid range.', up: 'More damage and stronger healing' }),
+    A('mg', 'main', '🔧', '工兵の機関銃', '弾の多い機関銃で、撃ちながら動ける。', '威力と修理の速さが上がる',
+      { name: "Engineer's MG", desc: 'A high-capacity machine gun you can fire on the move.', up: 'More damage and faster repairs' }),
+    A('talisman', 'main', '📜', '破魔のお札', '悪魔を貫いて足を鈍らせるお札を投げる。', '威力が上がり、貫く数が増える',
+      { name: 'Demonbane Talismans', desc: 'Throws talismans that pierce demons and slow them.', up: 'More damage and more foes pierced' }),
+    A('cannon', 'main', '💣', '戦車の主砲', 'ねらった場所で爆発する砲弾。建物に 2 倍のダメージ。', '爆発が強く、大きくなる',
+      { name: 'Tank Cannon', desc: 'Shells that explode where you aim. Double damage to buildings.', up: 'Bigger, stronger explosions' }),
+    A('claw', 'main', '🦇', '魔爪', '前の敵をまとめて切り裂く。弾切れがない。', '威力と届く範囲が上がる',
+      { name: 'Demon Claws', desc: 'Rends every foe in front of you. Never runs out.', up: 'More damage and a wider reach' }),
 
     // ---------------- 灯火の武器 (サブ。2 つまで。自動で撃つ) ----------------
     A('missile', 'sub', '🚀', '追尾ミサイル', '数秒ごとに、近くの敵を追いかけるミサイルを撃つ。', 'ミサイルの数と威力が上がる',
@@ -128,6 +142,7 @@
 
   const BY_ID = {};
   for (const a of ABILITIES) BY_ID[a.id] = a;
+  for (const id of ['sniper', 'smg', 'mg', 'talisman', 'cannon', 'claw']) BY_ID[id].hero = true;
 
   window.DI_ABILITIES = { ABILITIES, BY_ID, EVOLUTIONS, FALLBACK, MAX_LV: 5 };
 })();

@@ -31,6 +31,16 @@
   const OVERTIME_MUL = 0.6;
   const SQUAD = 4; // 兵舎から一度に出てくる兵士の数
   const LEVEL_MAX = 30;
+  // 操作していない武将 (控え) は、操作している武将ほどは強くない: 与えるダメージと受けるダメージの倍率
+  const RESERVE_ATK = 0.5;
+  const RESERVE_DEF = 1.2;
+  // 武将全体の攻撃力 (2〜3 人で戦うぶん、1 人あたりは控えめにする)
+  const HERO_ATK = 0.5;
+  const HERO_HP = 0.75; // 武将全体の HP の倍率
+  const HERO_VS_STRUCT = 0.5; // 武将の攻撃が建物に与えるダメージの割合
+  // 悪魔の強さ: ステージの倍率に、出撃した武将の数のぶんを掛ける (武将 1 人増えるごとに +PARTY_MUL)
+  const PARTY_MUL = 0.1;
+  const enemyMul = () => (G.st.enemyMul || 1) * (1 + PARTY_MUL * (G.party.length - 1));
   const ORB_LIFE = 14; // 魂の灯が消えるまでの秒数
   const ORB_MAGNET = 110; // 魂の灯が吸い寄せられる距離
   const ALLY_KILL_SHARE = 0.3; // 味方の兵士が倒した悪魔の経験値は 30% ぶん
@@ -97,16 +107,16 @@
   const TEXT = {
     ja: {
       pageTitle: 'デモン・インベージョン',
-      pageDesc: '悪魔に侵略された街を取り返す、見下ろし型の 2D 戦争シューティング。兵舎から湧く兵士たちと一緒に戦い、ステージの中でレベルアップして戦局を変えるヒーローになろう。',
+      pageDesc: '悪魔に侵略された街を取り返す、見下ろし型の 2D 戦争シューティング。2〜3 人の武将を出撃させ、操作する武将を切り替えながら、兵舎から湧く兵士たちと一緒に戦局を変えよう。',
       backToGames: '‹ ゲーム一覧', gameTitle: 'デモン・インベージョン', pause: '一時停止', board: 'ゲーム画面',
       titleSub: 'DEMON INVASION', titleTag: '悪魔に奪われた街を、取り返せ。',
       start: '出撃する', back: '‹ 戻る', stageSelect: 'ステージ選択', stageSelectSub: '取り返す地区を選ぶ',
       locked: '開発中', cleared: '奪還済み', best: '最速', notCleared: '未奪還',
       paused: '一時停止', resume: '再開', retry: 'やり直す', toStages: 'ステージ選択へ',
       win: '勝利', lose: '敗北', winSub: '地区を取り返した！', loseSub: '防衛司令部が落とされた…',
-      again: 'もう一度', time: '戦闘時間', kills: '倒した悪魔', destroyed: '壊した敵の兵舎', level: '最終レベル', deaths: '倒された回数',
+      again: 'もう一度', time: '戦闘時間', kills: '倒した悪魔', destroyed: '壊した敵の兵舎', level: '武将のレベル', deaths: '倒された回数',
       ally: '自軍', enemy: '敵軍', front: '戦況',
-      lv: 'Lv', reload: 'リロード中', respawnIn: (s) => `倒された… ${s} 秒後に復帰`,
+      lv: 'Lv', reload: 'リロード中', respawnIn: (n, s) => `${n}が倒された… ${s} 秒後に復帰`,
       levelUp: 'LEVEL UP', barrier: '障壁',
       nAllyBarracksHit: '自軍の兵舎が攻撃されている！', nAllyBarracksLost: '自軍の兵舎が破壊された…',
       nEnemyBarracksLost: '敵の兵舎を破壊した！', nHqHit: '防衛司令部が攻撃されている！',
@@ -121,34 +131,36 @@
       nBehemoth: '破城獣が現れた！ 兵舎を守れ！',
       settings: '設定', set_sfx: '効果音', set_bgm: 'BGM', set_autoAim: 'オートエイム', set_autoFire: 'オート射撃', set_lite: '軽量モード',
       setd_autoAim: 'スマホ: 倒した方向の近くの敵にねらいを合わせる', setd_autoFire: 'パソコン: ねらった方向に敵がいれば自動で撃つ', setd_lite: 'エフェクトと街灯を減らして軽くする',
-      codex: '図鑑', codex_allies: '自軍', codex_demons: '悪魔', codex_captains: '隊長', codex_heroes: 'ヒーロー',
+      codex: '図鑑', codex_allies: '自軍', codex_demons: '悪魔', codex_captains: '隊長', codex_heroes: '武将',
       codexSub: (a, b) => `見つけた数 ${a} / ${b}`, codexUnknown: 'まだ出会っていない',
       stampWin: '勝利！', stampLose: '敗北…', testOnly: 'テスト用',
       nGuardian: (n) => `${n}が魔界門から現れた！`, nPhase: (n, p) => `${n}の力が増した… (第 ${p} 段階)`, nRevive: (n) => `${n}が倒れた悪魔をよみがえらせた！`,
       lockedPrev: '前の地区を取り返すと選べる', normal: 'ノーマル', hard: 'ハード', training: '訓練所', army: '防衛隊本部',
-      heroesTitle: (n, m) => `連れていくヒーロー (${n}/${m})`, heroLocked: (n) => `ステージ ${n} をクリアすると仲間になる`,
-      loadout: '初期装備', deploy: '出撃！', next: 'つぎの段階', trainingSub: '自分を鍛える', armySub: '自軍を強くする',
+      heroesTitle: (n, m) => `出撃する武将 (${n}/${m}) ― 1 人目から操作する`, heroLocked: (n) => `ステージ ${n} をクリアすると仲間になる`,
+      loadout: '灯火の新兵の初期装備', deploy: '出撃！', next: 'つぎの段階', trainingSub: '武将たちを鍛える (出撃する武将全員にかかる)', armySub: '自軍を強くする',
       unitTrain: '訓練', unitTrainDesc: (v) => `HP・攻撃力 +${v}%`, unitImprove: '改良',
-      heroUpDesc: (v, lv) => `HP・攻撃力 +${v}%・開始レベル +${lv}・3 段階目と 5 段階目で技が強くなる`, noHeroes: 'まだ仲間がいない',
-      tabBase: '基地', tabUnits: '兵種', tabHeroes: 'ヒーロー', meritGot: '戦功ポイント',
+      heroUpDesc: (v, lv) => `HP・攻撃力 +${v}%・開始レベル +${lv}・3 段階目と 5 段階目で技が強くなる`, noHeroes: 'まだ武将がいない',
+      tabBase: '基地', tabUnits: '兵種', tabHeroes: '武将', meritGot: '戦功ポイント',
       newHero: (n) => `${n}が仲間になった！`, reroll: (n) => `選び直す (あと ${n} 回)`,
-      nHeroDown: (n) => `${n}が倒れた… 45 秒後に復帰`, order: '指示',
+      nHeroDown: (n, s) => `${n}が倒れた… ${s} 秒後に復帰`, nHeroBack: (n) => `${n}が戦線に戻った`, order: '指示',
+      nSwitch: (n) => `操作: ${n}`, switchHint: 'Tab・1〜4 キーでほかの武将に切り替えられる', switchHintTouch: '左上の武将をタップすると切り替えられる',
+      lvLeft: (n) => `あと ${n} 回`, autoLv: 'おまかせで選ぶ', set_autoPickAi: '控えの武将はおまかせ', setd_autoPickAi: '操作していない武将のレベルアップを自動で選ぶ (切り替えたときに選ばなくてよい)',
       order_free: '自由に戦う', order_follow: 'ついてこい', order_defend: '拠点を守れ', order_assault: '突撃',
       nRebuilt: '兵舎跡に仮設の兵舎を建てた！', nEnemyRebuilt: '悪魔が兵舎跡に巣を作った…',
       nPointTaken: (n) => `${n}を占領した！`, nPointLost: (n) => `${n}を悪魔に奪われた…`,
     },
     en: {
       pageTitle: 'Demon Invasion',
-      pageDesc: 'A top-down 2D war shooter: take back a city invaded by demons. Fight alongside soldiers pouring out of the barracks, level up during the battle, and become the hero who turns the tide.',
+      pageDesc: 'A top-down 2D war shooter: take back a city invaded by demons. Deploy two or three heroes, switch between them in real time, and turn the tide alongside the soldiers pouring out of the barracks.',
       backToGames: '‹ Games', gameTitle: 'Demon Invasion', pause: 'Pause', board: 'Game screen',
       titleSub: 'CITY DEFENSE WAR', titleTag: 'Take back the city the demons stole.',
       start: 'Deploy', back: '‹ Back', stageSelect: 'Select Stage', stageSelectSub: 'Choose a district to retake',
       locked: 'In development', cleared: 'Retaken', best: 'Best', notCleared: 'Not retaken',
       paused: 'Paused', resume: 'Resume', retry: 'Restart', toStages: 'Stage Select',
       win: 'Victory', lose: 'Defeat', winSub: 'The district is ours again!', loseSub: 'The Defense HQ has fallen…',
-      again: 'Play Again', time: 'Battle time', kills: 'Demons defeated', destroyed: 'Enemy barracks destroyed', level: 'Final level', deaths: 'Times defeated',
+      again: 'Play Again', time: 'Battle time', kills: 'Demons defeated', destroyed: 'Enemy barracks destroyed', level: 'Hero levels', deaths: 'Times defeated',
       ally: 'Allies', enemy: 'Demons', front: 'Front',
-      lv: 'Lv', reload: 'Reloading', respawnIn: (s) => `Defeated… back in ${s}s`,
+      lv: 'Lv', reload: 'Reloading', respawnIn: (n, s) => `${n} is down… back in ${s}s`,
       levelUp: 'LEVEL UP', barrier: 'Barrier',
       nAllyBarracksHit: 'Our barracks is under attack!', nAllyBarracksLost: 'We lost a barracks…',
       nEnemyBarracksLost: 'Enemy barracks destroyed!', nHqHit: 'The Defense HQ is under attack!',
@@ -168,13 +180,15 @@
       stampWin: 'VICTORY!', stampLose: 'DEFEAT…', testOnly: 'test only',
       nGuardian: (n) => `${n} emerges from the Demon Gate!`, nPhase: (n, p) => `${n} grows stronger… (phase ${p})`, nRevive: (n) => `${n} raised the fallen demons!`,
       lockedPrev: 'Retake the previous district first', normal: 'Normal', hard: 'Hard', training: 'Training Ground', army: 'Defense Force HQ',
-      heroesTitle: (n, m) => `Heroes to bring (${n}/${m})`, heroLocked: (n) => `Joins after you clear stage ${n}`,
-      loadout: 'Starting loadout', deploy: 'Deploy!', next: 'next rank', trainingSub: 'Train yourself', armySub: 'Strengthen your army',
+      heroesTitle: (n, m) => `Heroes to deploy (${n}/${m}) - you start with the first`, heroLocked: (n) => `Joins after you clear stage ${n}`,
+      loadout: 'Ember Recruit loadout', deploy: 'Deploy!', next: 'next rank', trainingSub: 'Train your heroes (applies to every deployed hero)', armySub: 'Strengthen your army',
       unitTrain: 'Training', unitTrainDesc: (v) => `HP and attack +${v}%`, unitImprove: 'Upgrade',
       heroUpDesc: (v, lv) => `HP and attack +${v}%, start ${lv} level(s) higher, stronger techniques at ranks 3 and 5`, noHeroes: 'No allies yet',
       tabBase: 'Base', tabUnits: 'Units', tabHeroes: 'Heroes', meritGot: 'Merit points',
       newHero: (n) => `${n} joined your side!`, reroll: (n) => `Reroll (${n} left)`,
-      nHeroDown: (n) => `${n} is down… back in 45s`, order: 'Orders',
+      nHeroDown: (n, s) => `${n} is down… back in ${s}s`, nHeroBack: (n) => `${n} is back in the fight`, order: 'Orders',
+      nSwitch: (n) => `Now controlling ${n}`, switchHint: 'Press Tab or 1–4 to switch to another hero', switchHintTouch: 'Tap a hero at the top left to switch',
+      lvLeft: (n) => `${n} left`, autoLv: 'Pick for me', set_autoPickAi: 'Auto level-ups for reserves', setd_autoPickAi: 'Heroes you are not controlling pick their own level-ups',
       order_free: 'Fight freely', order_follow: 'Follow me', order_defend: 'Hold the base', order_assault: 'Charge',
       nRebuilt: 'A temporary barracks now stands on the ruins!', nEnemyRebuilt: 'The demons built a nest on the ruins…',
       nPointTaken: (n) => `${n} captured!`, nPointLost: (n) => `The demons took the ${n}…`,
@@ -198,9 +212,9 @@
       for (const id in s.stages) s.stages[id] = { n: { ...s.stages[id], stars: 1 } };
       s.v = 2;
     }
-    const out = { merit: 0, train: {}, army: {}, unitTr: {}, unitIm: {}, heroUp: {}, lastHeroes: ['onizuka'], lastLoadout: 'none', seen: {}, ...s };
+    const out = { merit: 0, train: {}, army: {}, unitTr: {}, unitIm: {}, heroUp: {}, lastHeroes: ['recruit', 'onizuka'], lastLoadout: 'none', seen: {}, ...s };
     // 設定 (音量は 0〜100)
-    out.settings = { sfx: 70, bgm: 50, autoAim: true, autoFire: false, lite: false, ...(s.settings || {}) };
+    out.settings = { sfx: 70, bgm: 50, autoAim: true, autoFire: false, autoPickAi: false, lite: false, ...(s.settings || {}) };
     return out;
   };
   const save = loadSave();
@@ -467,6 +481,9 @@
     if (k === 'KeyE') input.skill[1] = true;
     if (k === 'KeyR') input.ult = true;
     if (k === 'KeyF') cycleOrder();
+    if (k === 'Tab') switchNext();
+    const n = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(k);
+    if (n >= 0 && G) switchTo(n);
     input.touchUI = false;
   });
   window.addEventListener('keyup', (e) => input.keys.delete(e.code));
@@ -489,7 +506,10 @@
     const p = canvasPos(e);
     const hp = G && screen === 'play' && G.heroPanel;
     if (hp && p.x >= hp.x && p.x <= hp.x + hp.w && p.y >= hp.y && p.y <= hp.y + hp.h) {
-      cycleOrder();
+      // 見出しは指示の切り替え、武将の行は操作する武将の切り替え
+      if (p.y < hp.y + hp.head) cycleOrder();
+      else switchTo(Math.floor((p.y - hp.y - hp.head) / 24));
+      if (e.pointerType === 'touch' || e.pointerType === 'pen') input.touchUI = true;
       return;
     }
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
@@ -582,7 +602,7 @@
       barrierDown: [false, false], overtime: false,
       mmDirty: true, mm: null, lamps: [],
       shells: [], strikes: [], mines: [], walls: [], beams: [], bolts: [], rings: [], flash: 0,
-      captains: [], confuseT: 0, points: [], decoys: [], sightT: 0, shamans: [], heroes: [], guards: [], wards: [], fallen: [],
+      captains: [], confuseT: 0, points: [], decoys: [], sightT: 0, shamans: [], party: [], guards: [], wards: [], slashes: [], fallen: [],
     };
     for (const [x, y, w, h, kind] of st.open) {
       for (let j = y; j < y + h; j++) {
@@ -802,7 +822,7 @@
       grid[gj * G.GC + gi].push(e);
     };
     for (const u of G.units) if (u.alive) put(u);
-    if (G.player.alive) put(G.player);
+    for (const P of G.party) if (P.alive) put(P);
     for (const d of G.decoys) put(d);
   }
 
@@ -887,7 +907,7 @@
     if (G.units.length >= MAX_UNITS) return null;
     const def = UNITS[type];
     save.seen[type] = 1; // 図鑑
-    const mul = team === 1 ? G.st.enemyMul || 1 : 1;
+    const mul = team === 1 ? enemyMul() : 1;
     const lane = G.lanes[laneIdx];
     const pr = laneProject(lane, x, y);
     // 敵はレーンを逆にたどるので、区間の番号も逆にする
@@ -911,7 +931,7 @@
       u.dmgMul *= 1 + 0.05 * trn;
     }
     // 指揮「精鋭化」: 自軍の兵士がときどき強化版で湧く
-    if (team === 0 && home && Math.random() < 0.08 * ab('elite')) makeElite(u, 1.5);
+    if (team === 0 && home && Math.random() < 0.08 * cmd('elite')) makeElite(u, 1.5);
     return u;
   }
 
@@ -924,7 +944,7 @@
         s.spawnT -= dt * fast;
         if (s.spawnT <= 0) {
           const weak = s.hp < s.maxHp * 0.5 ? 1.5 : 1;
-          const logi = s.team === 0 ? (1 - 0.08 * ab('logistics')) * (1 - 0.04 * am('logi')) : 1;
+          const logi = s.team === 0 ? (1 - 0.08 * Math.min(6, cmd('logistics'))) * (1 - 0.04 * am('logi')) : 1;
           const radio = pointOwned('radio', s.team) ? 0.8 : 1;
           s.spawnT = s.def.interval * weak * logi * radio;
           s.ready++;
@@ -978,9 +998,14 @@
     // 破城獣: 建物を先にねらう
     if (!u.target && def.wrecker) u.tStruct = nearestFoeStruct(u.x, u.y, u.team, def.aggro);
     if (!u.target && !u.tStruct && !def.support) {
-      const P = G.player;
-      // 暗殺者: プレイヤーをねらう
-      if (def.stealth && P.alive && (P.x - u.x) ** 2 + (P.y - u.y) ** 2 < def.aggro * def.aggro) u.target = P;
+      // 暗殺者: 近くの武将をねらう
+      if (def.stealth) {
+        let bd = def.aggro * def.aggro;
+        for (const P of G.party) {
+          const d2 = (P.x - u.x) ** 2 + (P.y - u.y) ** 2;
+          if (P.alive && !P.stealthOn && d2 < bd) { bd = d2; u.target = P; }
+        }
+      }
       if (!u.target && def.sniper) u.target = sniperTarget(u);
       if (!u.target && def.claw) u.target = clawTarget(u);
       if (!u.target) u.target = nearestFoe(u.x, u.y, u.team, def.aggro, -1, !!def.fly);
@@ -1013,8 +1038,11 @@
         const ratio = a.hp / a.maxHp;
         if (ratio < br) { br = ratio; best = a; }
       }
-      const P = G.player;
-      if (u.team === 0 && P.alive && Math.hypot(P.x - u.x, P.y - u.y) < def.healRange && P.hp / P.maxHp < br) best = P;
+      if (u.team === 0) {
+        for (const P of G.party) {
+          if (P.alive && Math.hypot(P.x - u.x, P.y - u.y) < def.healRange && P.hp / P.maxHp < br) { br = P.hp / P.maxHp; best = P; }
+        }
+      }
       u.healTarget = best;
     }
   }
@@ -1045,7 +1073,7 @@
     if (u.burnT > 0) {
       // 火炎放射器で燃えている
       u.burnT -= dt;
-      hurt(u, u.burnDps * dt, null, null, G.player);
+      hurt(u, u.burnDps * dt, null, null, u.burnSrc);
       if (!u.alive) return;
     }
     if (u.lifeT != null) {
@@ -1056,11 +1084,6 @@
         return;
       }
     }
-    if (u.hero && updateHero(u, dt)) {
-      u.lx = u.x;
-      u.ly = u.y;
-      return;
-    }
     if (u.boss && updateBoss(u, dt)) {
       u.lx = u.x;
       u.ly = u.y;
@@ -1070,7 +1093,8 @@
     let spMul = 1;
     let cdRate = 1;
     if (u.team === 1 && G.confuseT > 0 && !u.boss) { spMul = 0.7; cdRate = 0.7; }
-    if (u.team === 0 && auraOn(u)) spMul = 1 + 0.05 * ab('aura');
+    const aura = u.team === 0 ? auraLv(u) : 0;
+    if (aura) spMul = 1 + 0.05 * aura;
     if (u.team === 1 && G.wards.length && inZone(G.wards, u)) spMul *= 0.5; // 巫女の結界
     if (u.slowT > 0) {
       // 呪術師の呪い
@@ -1088,7 +1112,7 @@
     }
     u.retT -= dt;
     u.cd -= dt * cdRate;
-    if (u.target && (!u.target.alive || (u.target.kind === 'player' && G.player.respawnT > 0))) u.target = null;
+    if (u.target && !u.target.alive) u.target = null;
     if (u.tStruct && !u.tStruct.alive) u.tStruct = null;
     if (u.retT <= 0) retarget(u);
 
@@ -1177,7 +1201,7 @@
         u.healTarget = null;
       } else {
         // 衛生兵の改良: プレイヤーとヒーローの回復量が 2 倍
-        const twice = u.team === 0 && u.type === 'medic' && save.unitIm.medic && (h.kind === 'player' || h.hero) ? 2 : 1;
+        const twice = u.team === 0 && u.type === 'medic' && save.unitIm.medic && h.kind === 'player' ? 2 : 1;
         h.hp = Math.min(h.maxHp, h.hp + def.heal * twice * dt);
         G.stats.heal += def.heal * dt;
         u.healT += dt;
@@ -1208,10 +1232,15 @@
   }
 
   // 指揮官の威光の中にいるか
+  // 指揮官の威光のレベル (まわりにいる武将のうち一番高いもの)
   const auroraR2 = 250 * 250;
-  function auraOn(u) {
-    const P = G.player;
-    return ab('aura') > 0 && P.alive && (u.x - P.x) ** 2 + (u.y - P.y) ** 2 < auroraR2;
+  function auraLv(u) {
+    let n = 0;
+    for (const P of G.party) {
+      const l = P.ab.aura || 0;
+      if (l > n && P.alive && (u.x - P.x) ** 2 + (u.y - P.y) ** 2 < auroraR2) n = l;
+    }
+    return n;
   }
   // 隊長の近くの悪魔は攻撃力が上がる
   // 隊長の近くの悪魔の攻撃力の倍率 (ふだん 1.15、雄叫びの間は 1.4)
@@ -1232,8 +1261,11 @@
   function attack(u, tx, ty) {
     const def = u.def;
     let dmg = def.dmg * u.dmgMul * (u.extraMul || 1);
-    if (u.team === 0 && auraOn(u)) dmg *= 1 + 0.1 * ab('aura');
-    if (u.team === 0 && !u.hero && G.heroes.length && nearHero(u)) dmg *= 1.1; // ヒーローの近くの兵士は攻撃力 +10%
+    if (u.team === 0) {
+      const aura = auraLv(u);
+      if (aura) dmg *= 1 + 0.1 * aura;
+      if (nearParty(u)) dmg *= 1.1; // 武将の近くの兵士は攻撃力 +10%
+    }
     if (u.team === 1 && !u.boss) dmg *= captainBuff(u);
     if (pointOwned('ammo', u.team)) dmg *= 1.15;
     if (u.team === 1 && nearShaman(u)) dmg *= 1.2;
@@ -1294,10 +1326,11 @@
   // ===================================================================
   // ダメージ
   // ===================================================================
-  // src: 攻撃したもの (兵士・プレイヤー・本拠地)。プレイヤーなら経験値が入る
+  // src: 攻撃したもの (兵士・武将・本拠地)。武将なら、その武将に経験値が入る
   function hurt(e, amt, sx, sy, src) {
     if (!e.alive) return;
     const byPlayer = src && src.kind === 'player';
+    if (byPlayer && src !== G.player) amt *= RESERVE_ATK;
     if (e.kind === 'decoy') {
       e.hp -= amt;
       e.hitT = 0.08;
@@ -1307,12 +1340,16 @@
       if (e.invT > 0) return;
       if (nearOwnBase(e)) amt *= GUARD;
       if (G.guards.length && inZone(G.guards, e)) amt *= 0.7;
+      // 鬼塚の大盾: 前からの攻撃を減らす
+      if (e.hero.shield && sx != null && Math.abs(angleDiff(Math.atan2(sy - e.y, sx - e.x), e.face)) < 1) amt *= 1 - e.hero.shield;
+      if (e.smokeT > 0) amt *= 0.3;
+      if (e !== G.player) amt *= RESERVE_DEF;
       amt *= e.armor * (e.unleashT > 0 ? 0.25 : 1);
       e.lastHurt = G.time;
       e.hp -= amt;
       e.hurtT = 0.25;
-      Sound.play('hit');
-      if (e.hp <= 0) playerDie();
+      if (e === G.player) Sound.play('hit');
+      if (e.hp <= 0) playerDie(e);
       return;
     }
     if (e.downT > 0) {
@@ -1322,10 +1359,7 @@
     }
     if (nearOwnBase(e)) amt *= GUARD;
     if (e.team === 0 && G.guards.length && inZone(G.guards, e)) amt *= 0.7; // 鬼塚の鉄壁
-    if (e.hero) {
-      e.lastHit = G.time;
-      if (e.smokeT > 0) amt *= 0.3;
-    }
+    if (e.team === 1 && G.wards.length && inZone(G.wards, e)) amt *= 1.25; // シズクの結界
     if (e.def.stone && !e.moving) amt *= e.def.stone; // ガーゴイルは止まっていると石になる
     if (e.def.stealth) e.revealT = G.time + 2;
     if (e.def.shield && sx != null) {
@@ -1337,9 +1371,9 @@
     G.stats.dmg[1 - e.team] += amt;
     if (byPlayer) {
       e.playerHitT = G.time;
-      gainXp(amt * 0.03);
-      const P = G.player;
-      if (P.ult) P.ultG = Math.min(100, P.ultG + amt * 0.012 * P.ultMul);
+      e.lastP = src;
+      gainXp(src, amt * 0.03);
+      if (src.ult) src.ultG = Math.min(100, src.ultG + amt * 0.012 * src.ultMul);
     }
     if (e.hp <= 0) {
       if (e.def.revive && !e.revived) {
@@ -1376,26 +1410,19 @@
       captainDown(u);
       return;
     }
-    if (u.hero) {
-      const h = u.hero;
-      h.u = null;
-      h.respawnT = HERO_RESPAWN;
-      note(t('nHeroDown', L(h.def, 'name')), '#ff8a7a');
-      spawnParticles(u.x, u.y, 20, '#9cc4ff', 100, 1, 3, 'glow');
-      return;
-    }
+    // 倒した武将 (武将が最後に当てた悪魔も、その武将の手柄)
+    const P = src && src.kind === 'player' ? src : byPlayer ? u.lastP : null;
     if (u.def.bomb && !u.exploded) {
       // 撃たれた自爆デーモンは、まわりの悪魔を巻き込んで爆発する
       u.exploded = true;
-      blast(u.x, u.y, u.def.bomb, u.def.dmg * u.dmgMul * 0.8, 0, byPlayer ? G.player : null, 0);
+      blast(u.x, u.y, u.def.bomb, u.def.dmg * u.dmgMul * 0.8, 0, P, 0);
     }
     // 隊長は自軍の兵士を倒すと体力が少し回復する
     if (u.team === 0 && src && src.boss) src.hp = Math.min(src.maxHp, src.hp + src.maxHp * 0.04);
-    if (u.team === 1 && byPlayer) {
-      const P = G.player;
+    if (u.team === 1 && P) {
       if (P.ult) P.ultG = Math.min(100, P.ultG + 3 * P.ultMul);
       // 指揮「鼓舞」: まわりの味方が回復する
-      const L2 = ab('inspire');
+      const L2 = lv(P, 'inspire');
       if (L2) {
         for (const a of G.units) if (a.team === 0 && a.alive && (a.x - P.x) ** 2 + (a.y - P.y) ** 2 < 200 * 200) a.hp = Math.min(a.maxHp, a.hp + 4 * L2);
         if (P.alive) P.hp = Math.min(P.maxHp, P.hp + 2 * L2);
@@ -1422,11 +1449,12 @@
     if (s.kind === 'hq' && hasBarracks(s.team)) amt *= BARRIER;
     if (s.kind === 'hq' && s.team === 1 && G.captains.some((c) => c.u && c.def.guardian)) amt *= 0.5; // 魔王と一体化した門
     if (src && src.kind === 'unit' && !src.boss) amt *= src.def.siege ?? UNIT_VS_STRUCT;
+    if (src && src.kind === 'player') amt *= HERO_VS_STRUCT * (src !== G.player ? RESERVE_ATK : 1);
     if (src && src.boss && src.boss.def.siege) amt *= src.boss.def.siege;
     if (s.team === 0 && save.unitIm.engineer && G.time - (s.repairT || -9) < 0.5) amt *= 0.7; // 工兵の改良
     s.hp -= amt;
     s.hitT = G.time;
-    if (src && src.kind === 'player') gainXp(amt * 0.02);
+    if (src && src.kind === 'player') gainXp(src, amt * 0.02);
     if (s.team === 0 && G.time - s.warnT > 15) {
       s.warnT = G.time;
       note(s.kind === 'hq' ? t('nHqHit') : t('nAllyBarracksHit'), '#ff8a7a');
@@ -1462,7 +1490,7 @@
     if (s.team === 1) {
       G.stats.destroyed++;
       note(t('nEnemyBarracksLost'), '#8fc0ff');
-      if (G.player.alive && Math.hypot(G.player.x - s.cx, G.player.y - s.cy) < 600) gainXp(40);
+      for (const P of G.party) if (P.alive && Math.hypot(P.x - s.cx, P.y - s.cy) < 600) gainXp(P, 40);
     } else {
       note(t('nAllyBarracksLost'), '#ff8a7a');
     }
@@ -1583,6 +1611,7 @@
           if (b.burn && hit.kind === 'unit') {
             hit.burnT = 2;
             hit.burnDps = b.burn;
+            hit.burnSrc = b.src && b.src.kind === 'player' ? b.src : null;
           }
           spark(b.x, b.y, b.look);
           if (b.pierce > 0) {
@@ -1629,22 +1658,41 @@
   }
 
   // ===================================================================
-  // プレイヤー
+  // 武将 (操作するヒーロー)
   // ===================================================================
+  // 出撃した武将は G.party に並ぶ。G.player は今操作している武将。操作していない武将は AI で戦う
+  //   武将はどれも同じ作り (kind: 'player') で、レベル・能力・武器を武将ごとに持つ
   const tr = (id) => save.train[id] || 0;
-  function makePlayer(loadout) {
-    const h = G.hq[0];
+  const { HEROES, SKILLS: HERO_SKILLS } = window.DI_HEROES;
+  const heroUp = (id) => save.heroUp[id] || 0;
+  // 防衛隊本部の強化: 3 段階目で技 1.25 倍、5 段階目で 1.5 倍
+  const heroPower = (id) => (heroUp(id) >= 5 ? 1.5 : heroUp(id) >= 3 ? 1.25 : 1);
+  // 武将 P の能力 id のレベル
+  const lv = (P, id) => P.ab[id] || 0;
+  // 指揮 (自軍全体にかかる能力) は、武将たちのレベルの合計
+  const cmd = (id) => {
+    let n = 0;
+    for (const P of G.party) n += P.ab[id] || 0;
+    return n;
+  };
+  // Q・E の技: 灯火の新兵はレベルアップで覚えたスキル、ほかの武将は固有の技
+  const qe = (P) => (P.hero.free ? P.skills : P.hero.skills);
+
+  function makeHero(id, i, loadout) {
+    const d = HEROES[id];
+    const h = homePoint();
     const P = {
-      kind: 'player', team: 0, x: homePoint().x, y: homePoint().y, r: PLAYER.r, alive: true,
-      hp: PLAYER.hp, maxHp: PLAYER.hp, atkMul: 1, lvl: 1, xp: 0, pending: 0, face: 0, fireCd: 0, mag: 0, reloadT: 0,
+      kind: 'player', id, hero: d, idx: i, team: 0, x: h.x + rand(-30, 30), y: h.y + rand(-30, 30), r: d.r, alive: true,
+      hp: d.hp, maxHp: d.hp, atkMul: 1, lvl: 1, xp: 0, pending: 0, face: 0, fireCd: 0, mag: 0, reloadT: 0,
       dashT: 0, dashCd: 0, dx: 0, dy: 0, invT: 0, hurtT: 0, lastHurt: -99, respawnT: 0, lvlFx: 0, walk: 0,
-      // 能力: ab[id] = レベル。main はメイン武器、subs は灯火の武器、skills は Q・E、ult は必殺技
-      ab: { rifle: 1 }, main: 'rifle', subs: [], skills: [], ult: null, cds: {}, ultG: 0, evo: {}, leapT: 0,
+      // 能力: ab[id] = レベル。main はメイン武器、subs は灯火の武器、skills は Q・E (灯火の新兵だけ)、ult は必殺技
+      ab: { [d.weapon]: 1 }, main: d.weapon, subs: [], skills: [], ult: null, cds: {}, ultG: 0, evo: {}, leapT: 0,
       spin: 0, charge: 0, chargeT: 0, chargeHit: null, unleashT: 0, orbitA: 0, drones: [], subT: {},
+      vanishT: 0, smokeT: 0, stealthOn: false, aimD: 240, healT: 0, healTarget: null, ai: {}, trail: [], trailT: 0,
     };
-    G.player = P;
-    // 初期装備
-    const lo = PROG.LOADOUTS.find((l) => l.id === loadout);
+    collideTiles(P);
+    // 初期装備 (灯火の新兵だけ)
+    const lo = d.free && PROG.LOADOUTS.find((l) => l.id === loadout);
     if (lo && lo.ab) {
       if (lo.kind === 'main') {
         P.ab = { [lo.ab]: 1 };
@@ -1656,34 +1704,34 @@
         if (lo.kind === 'ult') P.ult = lo.ab;
       }
     }
-    // 先手: 上のレベルから始める (そのぶんの能力はすぐに選ぶ)
-    P.lvl += tr('head');
-    P.pending = tr('head');
+    // 先手 (訓練所) と武将の強化 (防衛隊本部): 上のレベルから始める (そのぶんの能力は、その武将を操作したときに選ぶ)
+    const head = tr('head') + Math.min(3, heroUp(id));
+    P.lvl += head;
+    P.pending = head;
     P.rerolls = tr('reroll');
-    recalc();
+    recalc(P);
     P.hp = P.maxHp;
-    P.mag = magMax();
+    P.mag = magMax(P);
     return P;
   }
 
-  const ab = (id) => G.player.ab[id] || 0;
-
-  // レベルとパッシブから、プレイヤーの強さを計算し直す
-  function recalc() {
-    const P = G.player;
+  // レベルとパッシブから、武将の強さを計算し直す
+  function recalc(P) {
+    const d = P.hero;
     const prev = P.maxHp;
-    P.maxHp = PLAYER.hp * Math.pow(1.08, P.lvl - 1) * (1 + 0.12 * ab('vital')) * (1 + 0.05 * tr('hp'));
+    const up = 1 + 0.06 * heroUp(P.id);
+    P.maxHp = HERO_HP * d.hp * Math.pow(1.08, P.lvl - 1) * (1 + 0.12 * lv(P, 'vital')) * (1 + 0.05 * tr('hp')) * up;
     if (P.alive) P.hp = Math.min(P.maxHp, P.hp + Math.max(0, P.maxHp - prev));
-    P.atkMul = Math.pow(1.03, P.lvl - 1) * (1 + 0.1 * ab('power')) * (1 + 0.04 * tr('atk'));
-    P.speedMul = 1 + 0.06 * ab('swift') + 0.03 * tr('move');
-    P.dashCdMax = PLAYER.dashCd - 0.15 * ab('swift') - 0.1 * tr('move');
-    P.magMul = 1 + 0.15 * ab('ammo');
-    P.reloadMul = 1 - 0.1 * ab('ammo');
-    P.armor = 1 - 0.07 * ab('armor');
-    P.cdMul = 1 - 0.08 * ab('focus');
-    P.ultMul = 1 + 0.12 * ab('focus');
-    P.magnet = ORB_MAGNET * (1 + 0.2 * ab('soul'));
-    P.xpMul = (1 + 0.06 * ab('soul') + 0.05 * tr('xp')) * (G.hard ? 0.85 : 1);
+    P.atkMul = HERO_ATK * Math.pow(1.03, P.lvl - 1) * (1 + 0.1 * lv(P, 'power')) * (1 + 0.04 * tr('atk')) * up;
+    P.speedMul = d.speed * (1 + 0.06 * lv(P, 'swift') + 0.03 * tr('move'));
+    P.dashCdMax = PLAYER.dashCd - 0.15 * lv(P, 'swift') - 0.1 * tr('move');
+    P.magMul = 1 + 0.15 * lv(P, 'ammo');
+    P.reloadMul = 1 - 0.1 * lv(P, 'ammo');
+    P.armor = 1 - 0.07 * lv(P, 'armor');
+    P.cdMul = 1 - 0.08 * lv(P, 'focus');
+    P.ultMul = 1 + 0.12 * lv(P, 'focus');
+    P.magnet = ORB_MAGNET * (1 + 0.2 * lv(P, 'soul'));
+    P.xpMul = (1 + 0.06 * lv(P, 'soul') + 0.05 * tr('xp')) * (G.hard ? 0.85 : 1);
   }
 
   // メイン武器の性能 (L: 武器のレベル)
@@ -1693,6 +1741,13 @@
     gatling: (L) => ({ dmg: 6 * (1 + 0.12 * (L - 1)), rof: 0.22, rofMin: 0.065 - 0.004 * (L - 1), mag: 150, reload: 2.4, spread: 0.08, speed: 950, range: 460, pellets: 1, spin: true }),
     railgun: (L) => ({ dmg: 45 * (1 + 0.2 * (L - 1)), dmgMax: 140 * (1 + 0.2 * (L - 1)), charge: 1, mag: 6, reload: 1.6, range: 720, rail: true }),
     flame: (L) => ({ dmg: 5 * (1 + 0.15 * (L - 1)), tick: 0.1, range: 170 + 15 * (L - 1), arc: 0.38, mag: 80, reload: 1.6, flame: true, burn: 4 * (1 + 0.15 * (L - 1)) }),
+    // 武将の固有の武器
+    sniper: (L) => ({ dmg: 46 * (1 + 0.18 * (L - 1)), rof: 1 - 0.06 * (L - 1), mag: 5, reload: 1.8, spread: 0.006, speed: 1700, range: 680, pellets: 1, pierce: 1, look: 'snipe' }),
+    smg: (L) => ({ dmg: 4.5 * (1 + 0.15 * (L - 1)), rof: 0.1, mag: 40, reload: 1.4, spread: 0.09, speed: 850, range: 340, pellets: 1 }),
+    mg: (L) => ({ dmg: 6 * (1 + 0.14 * (L - 1)), rof: 0.12 * (1 - 0.04 * (L - 1)), mag: 70, reload: 2.2, spread: 0.07, speed: 880, range: 420, pellets: 1 }),
+    talisman: (L) => ({ dmg: 15 * (1 + 0.15 * (L - 1)), rof: 0.42, mag: 12, reload: 1.5, spread: 0.03, speed: 620, range: 430, pellets: 1, pierce: 1 + Math.floor(L / 3), slow: 1.2, look: 'ofuda' }),
+    cannon: (L) => ({ dmg: 42 * (1 + 0.2 * (L - 1)), rof: 1.3, mag: 6, reload: 2.4, range: 480, lob: 70 + 5 * (L - 1), structMul: 2 }),
+    claw: (L) => ({ dmg: 17 * (1 + 0.15 * (L - 1)), rof: 0.3, range: 62 + 4 * (L - 1), arc: 1, mag: 1, claw: true }),
   };
   // 進化したメイン武器
   const EVO_MAIN = {
@@ -1702,16 +1757,14 @@
     railgun: (w) => { w.charge = 0.5; w.wide = 10; w.boom = true; },
     flame: (w) => { w.range += 60; w.arc += 0.1; w.burn *= 2; w.heal = true; },
   };
-  const weapon = () => {
-    const P = G.player;
-    const w = MAIN[P.main](ab(P.main));
+  const weapon = (P) => {
+    const w = MAIN[P.main](lv(P, P.main));
     if (P.evo[P.main]) EVO_MAIN[P.main](w);
     return w;
   };
-  const magMax = () => Math.round(weapon().mag * G.player.magMul);
+  const magMax = (P) => Math.round(weapon(P).mag * P.magMul);
 
-  function gainXp(v) {
-    const P = G.player;
+  function gainXp(P, v) {
     if (P.lvl >= LEVEL_MAX) return;
     P.xp += v * P.xpMul;
     while (P.lvl < LEVEL_MAX && P.xp >= xpNeed(P.lvl)) {
@@ -1719,28 +1772,32 @@
       P.lvl++;
       P.pending++;
       // レベルが上がるごとに HP 上限 +8%、攻撃力 +3%。HP 上限の 25% ぶん回復する
-      recalc();
+      recalc(P);
       if (P.alive) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.25);
       P.lvlFx = 1;
       if (P.alive) {
         floatText(P.x, P.y - 24, t('levelUp'), '#ffcf4a', 1.4);
         spawnParticles(P.x, P.y, 24, '#ffab3d', 160, 0.8, 2.5, 'glow');
       }
-      Sound.play('level');
+      if (P === G.player || onScreen(P.x, P.y, 0)) Sound.play('level');
     }
     if (P.lvl >= LEVEL_MAX) P.xp = 0;
   }
 
-  function playerDie() {
-    const P = G.player;
+  function playerDie(P) {
     P.alive = false;
     P.hp = 0;
-    P.respawnT = Math.min(18, 5 + P.lvl * 0.5) * (1 - 0.08 * tr('res'));
+    P.respawnT = Math.min(20, 6 + P.lvl * 0.6) * (1 - 0.08 * tr('res'));
     P.xp *= 0.7; // 次のレベルまでの経験値の 30% を失う
     P.unleashT = 0;
     P.chargeT = 0;
+    P.leapT = 0;
+    P.leapH = 0;
     G.stats.deaths++;
     spawnParticles(P.x, P.y, 18, '#ffab3d', 120, 0.9, 2.5, 'glow');
+    note(t('nHeroDown', L(P.hero, 'name'), Math.ceil(P.respawnT)), '#ff8a7a');
+    // 操作している武将が倒れたら、少しあとで生きている武将に切り替える
+    if (P === G.player) G.switchT = 1.2;
   }
 
   // 復帰する場所: 前線に一番近い自軍の兵舎、なければ本拠地
@@ -1754,57 +1811,167 @@
       if (p > bp) { bp = p; best = s; }
     }
     if (best) return { x: best.sx, y: best.sy };
-    const h = G.hq[0];
     return homePoint();
   }
   // 自軍の本拠地の前 (最初のレーンの始まり)
   const homePoint = () => ({ x: G.lanes[0].pts[0][0].x, y: G.lanes[0].pts[0][0].y });
 
-  function updatePlayer(dt) {
-    const P = G.player;
+  // ---- 操作する武将の切り替え ----
+  function switchTo(i) {
+    const P = G.party[i];
+    if (!P || P === G.player) return;
+    G.player = P;
+    G.switchT = null;
+    input.dash = false;
+    input.reload = false;
+    input.skill = [false, false];
+    input.ult = false;
+    P.charge = 0;
+    note(t('nSwitch', `${P.hero.icon} ${L(P.hero, 'name')}`), '#ffcf4a');
+    Sound.play('click');
+  }
+  // 次の武将 (倒れている武将はとばす)
+  function switchNext() {
+    if (!G || G.party.length < 2) return;
+    for (let k = 1; k < G.party.length; k++) {
+      const P = G.party[(G.player.idx + k) % G.party.length];
+      if (P.alive) { switchTo(P.idx); return; }
+    }
+  }
+
+  function updateParty(dt) {
+    for (const P of G.party) updatePlayer(P, dt);
+    // 操作していた武将が倒れたら、生きている武将へ
+    if (G.switchT != null) {
+      G.switchT -= dt;
+      if (G.switchT <= 0) {
+        G.switchT = null;
+        if (!G.player.alive) switchNext();
+      }
+    }
+    // 操作している武将の通った道 (ついてこい の目印)
+    const C = G.player;
+    C.trailT -= dt;
+    if (C.alive && C.trailT <= 0) {
+      C.trailT = 0.25;
+      C.trail.push({ x: C.x, y: C.y });
+      if (C.trail.length > 30) C.trail.shift();
+    }
+    input.dash = false;
+    input.reload = false;
+    input.skill = [false, false];
+    input.ult = false;
+    G.guards = G.guards.filter((g) => (g.life -= dt) > 0);
+    G.wards = G.wards.filter((g) => (g.life -= dt) > 0);
+  }
+
+  // 操作している武将は入力で、ほかの武将は AI で動かす
+  function updatePlayer(P, dt) {
+    const human = P === G.player && !bot;
     P.invT -= dt;
     P.hurtT -= dt;
+    P.vanishT -= dt;
+    P.smokeT -= dt;
+    P.stealthOn = P.vanishT > 0;
     P.lvlFx = Math.max(0, P.lvlFx - dt);
     for (const id in P.cds) P.cds[id] -= dt;
     if (!P.alive) {
       P.respawnT -= dt;
       if (P.respawnT <= 0) {
         const p = respawnPoint();
-        P.x = p.x;
-        P.y = p.y;
+        P.x = p.x + rand(-20, 20);
+        P.y = p.y + rand(-20, 20);
+        collideTiles(P);
         P.alive = true;
         P.hp = P.maxHp;
         P.invT = 2;
-        P.mag = magMax();
+        P.mag = magMax(P);
         P.reloadT = 0;
+        P.ai = {};
+        note(t('nHeroBack', L(P.hero, 'name')), '#8fc0ff');
       }
-      input.dash = false;
-      input.reload = false;
-      input.skill = [false, false];
-      input.ult = false;
       return;
     }
     P.unleashT -= dt;
     const unleashed = P.unleashT > 0;
     // 再生・灯火解放の回復
-    if (ab('regen') && G.time - P.lastHurt > 3) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.012 * ab('regen') * dt);
+    if (lv(P, 'regen') && G.time - P.lastHurt > 3) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.012 * lv(P, 'regen') * dt);
     if (unleashed) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.04 * dt);
+    // 自軍の兵舎・本拠地の近くで 2 秒ダメージを受けなければ、体力が早く回復する (下がって立て直せる)
+    if (G.time - P.lastHurt > 2 && nearOwnBase(P)) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.06 * dt);
+    // 武将の持ち味 (回復・修理・見破り)
+    heroTraits(P, dt);
 
-    // 移動
+    const w = weapon(P);
     let mx = 0;
     let my = 0;
-    const k = input.keys;
-    if (k.has('KeyW') || k.has('ArrowUp')) my -= 1;
-    if (k.has('KeyS') || k.has('ArrowDown')) my += 1;
-    if (k.has('KeyA') || k.has('ArrowLeft')) mx -= 1;
-    if (k.has('KeyD') || k.has('ArrowRight')) mx += 1;
-    const ms = stickVec(input.move);
-    if (ms && ms.m > 0) { mx = ms.x; my = ms.y; }
-    if (bot) [mx, my] = botMove(P);
+    let firing = false;
+    let dash = false;
+    let skill = [false, false];
+    let ult = false;
+    let reload = false;
+    if (human) {
+      // 移動
+      const k = input.keys;
+      if (k.has('KeyW') || k.has('ArrowUp')) my -= 1;
+      if (k.has('KeyS') || k.has('ArrowDown')) my += 1;
+      if (k.has('KeyA') || k.has('ArrowLeft')) mx -= 1;
+      if (k.has('KeyD') || k.has('ArrowRight')) mx += 1;
+      const ms = stickVec(input.move);
+      if (ms && ms.m > 0) { mx = ms.x; my = ms.y; }
+      dash = input.dash;
+      skill = input.skill;
+      ult = input.ult;
+      reload = input.reload;
+      // ねらい
+      const as = stickVec(input.aim);
+      if (input.touchUI) {
+        if (as && as.m > 0.25) {
+          firing = true;
+          // オートエイム: 倒した方向 ±30° にいる一番近い敵
+          let best = null;
+          let bd = 1e9;
+          const range = Math.max(300, w.range);
+          for (const u of G.units) {
+            if (!u.alive || u.team === 0 || u.stealthOn) continue;
+            const dx = u.x - P.x;
+            const dy = u.y - P.y;
+            const d = Math.hypot(dx, dy);
+            if (d > range || d > bd) continue;
+            if (!save.settings.autoAim || Math.abs(angleDiff(Math.atan2(dy, dx), as.a)) > 0.52) continue;
+            if (!los(P.x, P.y, u.x, u.y)) continue;
+            bd = d;
+            best = u;
+          }
+          P.face = best ? Math.atan2(best.y - P.y, best.x - P.x) : as.a;
+          P.aimD = best ? bd : 240;
+        } else if (mx || my) {
+          P.face = Math.atan2(my, mx);
+          P.aimD = 240;
+        }
+      } else {
+        const wx = G.cam.x + (input.mx - cw / 2) / zoom;
+        const wy = G.cam.y + (input.my - ch / 2) / zoom;
+        P.face = Math.atan2(wy - P.y, wx - P.x);
+        P.aimD = Math.hypot(wx - P.x, wy - P.y);
+        firing = input.mouseFire;
+        // オート射撃: ねらっている方向 (±20°) の射程の中に敵がいれば撃つ
+        if (!firing && save.settings.autoFire) {
+          const foe = nearestFoe(P.x, P.y, 0, Math.max(200, w.range) * 0.95);
+          if (foe && Math.abs(angleDiff(Math.atan2(foe.y - P.y, foe.x - P.x), P.face)) < 0.35) firing = true;
+        }
+      }
+    } else {
+      const a = aiThink(P, w, dt);
+      ({ mx, my, firing, dash } = a);
+      skill = a.skill;
+      ult = a.ult;
+    }
     const ml = Math.hypot(mx, my);
     if (ml > 1) { mx /= ml; my /= ml; }
+
     P.dashCd -= dt;
-    if (input.dash && P.dashCd <= 0 && P.chargeT <= 0) {
+    if (dash && P.dashCd <= 0 && P.chargeT <= 0) {
       let dx = mx;
       let dy = my;
       if (!dx && !dy) { dx = Math.cos(P.face); dy = Math.sin(P.face); }
@@ -1814,10 +1981,8 @@
       P.dashT = PLAYER.dashTime;
       P.dashCd = P.dashCdMax;
       P.invT = Math.max(P.invT, PLAYER.dashInv);
-      Sound.play('dash');
+      if (human) Sound.play('dash');
     }
-    input.dash = false;
-    const w = weapon();
     let speed = PLAYER.speed * P.speedMul * (unleashed ? 1.35 : 1);
     if (w.spin && !w.noSlow && P.spin > 0.05) speed *= 0.6; // ガトリングを撃っている間は遅い
     if (P.slowT > 0) {
@@ -1847,61 +2012,29 @@
       P.x += mx * speed * dt;
       P.y += my * speed * dt;
     }
-    if (mx || my) P.walk += dt * 12;
+    P.moving = !!(mx || my);
+    if (mx || my) {
+      P.walk += dt * 12;
+      P.walkA = Math.atan2(my, mx);
+    }
     if (P.leapT <= 0) collideTiles(P);
 
-    // ねらい
-    let firing = false;
-    const as = stickVec(input.aim);
-    if (bot) {
-      firing = botAim(P);
-    } else if (input.touchUI) {
-      if (as && as.m > 0.25) {
-        firing = true;
-        // オートエイム: 倒した方向 ±30° にいる一番近い敵
-        let best = null;
-        let bd = 1e9;
-        const range = Math.max(300, w.range);
-        for (const u of G.units) {
-          if (!u.alive || u.team === 0 || u.stealthOn) continue;
-          const dx = u.x - P.x;
-          const dy = u.y - P.y;
-          const d = Math.hypot(dx, dy);
-          if (d > range || d > bd) continue;
-          if (!save.settings.autoAim || Math.abs(angleDiff(Math.atan2(dy, dx), as.a)) > 0.52) continue;
-          if (!los(P.x, P.y, u.x, u.y)) continue;
-          bd = d;
-          best = u;
-        }
-        P.face = best ? Math.atan2(best.y - P.y, best.x - P.x) : as.a;
-      } else if (mx || my) {
-        P.face = Math.atan2(my, mx);
-      }
-    } else {
-      const wx = G.cam.x + (input.mx - cw / 2) / zoom;
-      const wy = G.cam.y + (input.my - ch / 2) / zoom;
-      P.face = Math.atan2(wy - P.y, wx - P.x);
-      firing = input.mouseFire;
-      // オート射撃: ねらっている方向 (±20°) の射程の中に敵がいれば撃つ
-      if (!firing && save.settings.autoFire) {
-        const foe = nearestFoe(P.x, P.y, 0, Math.max(200, w.range) * 0.95);
-        if (foe && Math.abs(angleDiff(Math.atan2(foe.y - P.y, foe.x - P.x), P.face)) < 0.35) firing = true;
-      }
-    }
-    if (bot && w.rail && P.charge >= w.charge) firing = false;
-    fireMain(P, w, firing, dt);
+    if (!human && w.rail && P.charge >= w.charge) firing = false; // AI は溜めきったら撃つ
+    fireMain(P, w, firing, dt, reload);
 
-    // スキルと必殺技
+    // 技と必殺技
+    const ids = qe(P);
     for (let i = 0; i < 2; i++) {
-      if (input.skill[i] && P.skills[i]) useSkill(P, P.skills[i]);
-      input.skill[i] = false;
+      if (!skill[i] || !ids[i]) continue;
+      if (P.hero.free) useSkill(P, ids[i]);
+      else heroSkill(P, ids[i]);
     }
-    if (input.ult && P.ult && P.ultG >= 100) useUlt(P);
-    input.ult = false;
+    if (ult && P.ult && P.ultG >= 100) useUlt(P);
     updateSubs(P, dt);
 
-    // 魂の灯を拾う
+    // 魂の灯を拾う (拾った武将は全部、ほかの武将も 25% ぶんもらえる)
     for (const o of G.orbs) {
+      if (o.life <= 0) continue;
       const dx = P.x - o.x;
       const dy = P.y - o.y;
       const d = Math.hypot(dx, dy);
@@ -1911,29 +2044,79 @@
         o.y += (dy / (d || 1)) * sp * dt;
         if (d < P.r + 6) {
           o.life = 0;
-          gainXp(o.v);
-          Sound.play('pick');
+          gainXp(P, o.v);
+          for (const Q of G.party) if (Q !== P) gainXp(Q, o.v * 0.25);
+          if (P === G.player) Sound.play('pick');
         }
       }
     }
   }
 
+  // 武将の持ち味: ミナトの回復、ゲンの修理、シズクの見破り
+  function heroTraits(P, dt) {
+    const d = P.hero;
+    if (d.heal) {
+      P.healT -= dt;
+      if (P.healT <= 0) {
+        // まわりで一番弱っている味方 (兵士・武将)
+        P.healT = 0.25;
+        let best = null;
+        let br = 0.97;
+        const R2 = d.healRange * d.healRange;
+        const look = (a) => {
+          if (a === P || !a.alive || a.team !== 0 || a.downT > 0 || a.lifeT != null) return;
+          if ((a.x - P.x) ** 2 + (a.y - P.y) ** 2 > R2) return;
+          const ratio = a.hp / a.maxHp;
+          if (ratio < br) { br = ratio; best = a; }
+        };
+        for (const u of G.units) look(u);
+        for (const Q of G.party) look(Q);
+        P.healTarget = best;
+      }
+      const h = P.healTarget;
+      if (h && h.alive && h.hp < h.maxHp) {
+        const amt = d.heal * (1 + 0.12 * (lv(P, P.main) - 1)) * (1 + 0.04 * (P.lvl - 1)) * heroPower(P.id) * dt * (h.kind === 'player' ? 1.5 : 1);
+        h.hp = Math.min(h.maxHp, h.hp + amt);
+        G.stats.heal += amt;
+      } else {
+        P.healTarget = null;
+      }
+      // 自分も少しずつ治る
+      if (G.time - P.lastHurt > 3) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.01 * dt);
+    }
+    if (d.repair) {
+      const rate = d.repair * (1 + 0.12 * (lv(P, P.main) - 1)) * heroPower(P.id);
+      for (const s of G.structs) {
+        if (!s.alive || s.team !== 0 || s.hp >= s.maxHp) continue;
+        const p = rectPoint(s, P.x, P.y);
+        if ((p.x - P.x) ** 2 + (p.y - P.y) ** 2 > 130 * 130) continue;
+        s.hp = Math.min(s.maxHp, s.hp + rate * dt);
+        s.repairT = G.time;
+        if (Math.random() < dt * 6) spawnParticles(p.x, p.y, 2, '#ffe08a', 60, 0.3, 2);
+      }
+    }
+    if (d.ward) forFoesNear(P.x, P.y, d.ward, 0, (e) => { if (e.def && e.def.stealth) e.revealT = G.time + 0.5; });
+  }
+
   // ---- メイン武器 ----
-  function fireMain(P, w, firing, dt) {
-    const max = magMax();
+  function fireMain(P, w, firing, dt, reload) {
+    const max = magMax(P);
     P.fireCd -= dt;
-    if (P.reloadT > 0) {
+    if (w.claw) {
+      // 魔爪: 弾切れがない
+      P.mag = max;
+    } else if (P.reloadT > 0) {
       P.reloadT -= dt;
       if (P.reloadT <= 0) P.mag = max;
-    } else if ((input.reload && P.mag < max) || P.mag <= 0) {
+    } else if ((reload && P.mag < max) || P.mag <= 0) {
       P.reloadT = w.reload * P.reloadMul;
       P.charge = 0;
     }
-    input.reload = false;
     const ready = P.reloadT <= 0 && P.mag > 0 && P.dashT <= 0 && P.chargeT <= 0;
-    const atk = P.atkMul * (P.unleashT > 0 ? 1.6 + 0.1 * (ab('unleash') - 1) : 1) * (pointOwned('ammo', 0) ? 1.15 : 1);
+    const atk = P.atkMul * (P.unleashT > 0 ? 1.6 + 0.1 * (lv(P, 'unleash') - 1) : 1) * (pointOwned('ammo', 0) ? 1.15 : 1);
     const ox = P.x + Math.cos(P.face) * 16;
     const oy = P.y + Math.sin(P.face) * 16;
+    const loud = P === G.player || onScreen(P.x, P.y, 0);
     if (w.rail) {
       // 押しっぱなしで溜め、離したら撃つ
       if (firing && ready) {
@@ -1957,21 +2140,65 @@
       }
       return;
     }
+    if (w.claw) {
+      if (firing && ready && P.fireCd <= 0) {
+        P.fireCd = w.rof;
+        clawSwipe(P, w, atk);
+      }
+      return;
+    }
+    if (w.lob) {
+      // 戦車の主砲: ねらった場所 (射程まで) で爆発する砲弾
+      if (firing && ready && P.fireCd <= 0) {
+        P.fireCd = w.rof;
+        P.mag--;
+        const d = clamp(P.aimD, 80, w.range);
+        G.shells.push({ x0: ox, y0: oy, x: P.x + Math.cos(P.face) * d, y: P.y + Math.sin(P.face) * d, t: 0, T: 0.35 + d / 1400, r: w.lob, dmg: w.dmg * atk, team: 0, src: P, look: 'mortar', structMul: w.structMul });
+        muzzle(ox, oy, P.face, true);
+        G.shake = Math.min(8, G.shake + (P === G.player ? 1.5 : 0));
+        if (loud) Sound.play('boom');
+      }
+      return;
+    }
     if (w.spin) P.spin = firing && ready ? Math.min(1, P.spin + (dt / 1.5) * (w.spinUp || 1)) : Math.max(0, P.spin - dt * 2);
     if (firing && ready && P.fireCd <= 0) {
       P.fireCd = w.spin ? lerp(w.rof, w.rofMin, P.spin) : w.rof;
       P.mag--;
       for (let i = 0; i < w.pellets; i++) {
         const a = P.face + rand(-w.spread, w.spread);
-        const b = fireBullet(ox, oy, a, w.speed * rand(0.92, 1.05), w.dmg * atk, 0, P, w.range * (w.pellets > 1 ? rand(0.8, 1) : 1), 'player');
+        const b = fireBullet(ox, oy, a, w.speed * rand(0.92, 1.05), w.dmg * atk, 0, P, w.range * (w.pellets > 1 ? rand(0.8, 1) : 1), w.look || 'player');
         if (b) {
           b.pierce = w.pierce || 0;
           b.burn = w.burn ? w.burn * atk : 0;
+          if (w.slow) b.slow = w.slow;
         }
       }
       muzzle(ox, oy, P.face, true);
-      Sound.play('shot');
+      if (loud) Sound.play(w.look === 'snipe' ? 'rail' : 'shot');
     }
+  }
+
+  // 魔爪: 前の扇形の中の敵をまとめて切る
+  function clawSwipe(P, w, atk) {
+    const r = w.range;
+    let hit = false;
+    forFoesNear(P.x, P.y, r + 20, 0, (u) => {
+      const dx = u.x - P.x;
+      const dy = u.y - P.y;
+      if (Math.hypot(dx, dy) > r + u.r || Math.abs(angleDiff(Math.atan2(dy, dx), P.face)) > w.arc) return;
+      hurt(u, w.dmg * atk, P.x, P.y, P);
+      hit = true;
+    });
+    for (const s of G.structs) {
+      if (!s.alive || s.team === 0) continue;
+      const p = rectPoint(s, P.x, P.y);
+      if (Math.hypot(p.x - P.x, p.y - P.y) < r && Math.abs(angleDiff(Math.atan2(p.y - P.y, p.x - P.x), P.face)) < w.arc) {
+        hurtStruct(s, w.dmg * atk, P);
+        hit = true;
+      }
+    }
+    G.slashes.push({ x: P.x, y: P.y, a: P.face, r, arc: w.arc, life: 0.16, max: 0.16 });
+    if (hit && (P === G.player || onScreen(P.x, P.y, 0))) Sound.play('hit');
   }
 
   // レールガン: 壁に当たるまでの直線上の敵をすべて貫く
@@ -2018,6 +2245,7 @@
       hurt(u, w.dmg * atk, P.x, P.y, P);
       u.burnT = 2;
       u.burnDps = w.burn * atk;
+      u.burnSrc = P;
     });
     for (const s of G.structs) {
       if (!s.alive || s.team === 0) continue;
@@ -2086,7 +2314,7 @@
     const atk = P.atkMul * (P.unleashT > 0 ? 1.6 : 1);
     P.orbitA += dt;
     for (const id of P.subs) {
-      const L = ab(id);
+      const L = lv(P, id);
       P.subT[id] = (P.subT[id] ?? 1) - dt;
       if (id === 'drone') {
         const n = 1 + Math.floor((L - 1) / 2) + (P.evo.drone ? 2 : 0);
@@ -2222,22 +2450,17 @@
     leap: (L) => 12 - 1 * (L - 1),
     engineer: (L) => 12 - 0.5 * (L - 1),
   };
-  const skillCd = (id) => SKILL_CD[id](ab(id)) * G.player.cdMul;
+  const skillCd = (P, id) => SKILL_CD[id](lv(P, id)) * P.cdMul;
 
   function useSkill(P, id) {
     if ((P.cds[id] || 0) > 0) return;
-    const L = ab(id);
+    const L = lv(P, id);
     const atk = P.atkMul;
-    P.cds[id] = skillCd(id);
+    P.cds[id] = skillCd(P, id);
     const cx = Math.cos(P.face);
     const cy = Math.sin(P.face);
     if (id === 'grenade') {
-      let d = 240;
-      if (!input.touchUI && !bot) {
-        const wx = G.cam.x + (input.mx - cw / 2) / zoom;
-        const wy = G.cam.y + (input.my - ch / 2) / zoom;
-        d = clamp(Math.hypot(wx - P.x, wy - P.y), 60, 300);
-      }
+      const d = clamp(P.aimD, 60, 300);
       G.shells.push({ x0: P.x, y0: P.y, x: P.x + cx * d, y: P.y + cy * d, t: 0, T: 0.6, r: 90 + 6 * (L - 1), dmg: 60 * (1 + 0.25 * (L - 1)) * atk, team: 0, src: P, look: 'grenade' });
     } else if (id === 'wall') {
       const half = 70 + 12 * (L - 1);
@@ -2250,6 +2473,7 @@
       P.dx = cx;
       P.dy = cy;
       P.chargeHit = new Set();
+      P.chargeDmg = 40 * (1 + 0.25 * (L - 1)) * atk;
       P.invT = Math.max(P.invT, 0.4);
       Sound.play('dash');
     } else if (id === 'heal') {
@@ -2298,7 +2522,7 @@
       G.rings.push({ x: P.x, y: P.y, r: 260, life: 0.6, max: 0.6, color: '#9fe08f' });
       Sound.play('heal');
     } else if (id === 'mine') {
-      G.mines.push({ x: P.x, y: P.y, arm: 0.5, r: 85 + 5 * (L - 1), dmg: 70 * (1 + 0.25 * (L - 1)) * atk });
+      G.mines.push({ src: P, x: P.x, y: P.y, arm: 0.5, r: 85 + 5 * (L - 1), dmg: 70 * (1 + 0.25 * (L - 1)) * atk });
       if (G.mines.length > 5) G.mines.shift();
       Sound.play('click');
     }
@@ -2310,11 +2534,10 @@
     const sp = 820;
     P.x += P.dx * sp * dt;
     P.y += P.dy * sp * dt;
-    const L = ab('charge');
     forFoesNear(P.x, P.y, P.r + 10, 0, (u) => {
       if (P.chargeHit.has(u)) return;
       P.chargeHit.add(u);
-      hurt(u, 40 * (1 + 0.25 * (L - 1)) * P.atkMul, P.x, P.y, P);
+      hurt(u, P.chargeDmg, P.x, P.y, P);
       if (!heavyBody(u)) {
         u.x += P.dx * 50;
         u.y += P.dy * 50;
@@ -2327,7 +2550,7 @@
   // ---- 必殺技 (R) ----
   function useUlt(P) {
     const id = P.ult;
-    const L = ab(id);
+    const L = lv(P, id);
     const atk = P.atkMul;
     P.ultG = 0;
     note(`${abName(id)}!`, '#ffcf4a');
@@ -2335,7 +2558,7 @@
       const cx = Math.cos(P.face);
       const cy = Math.sin(P.face);
       for (let i = 0; i < 10; i++) {
-        G.strikes.push({ x: P.x + cx * (90 + i * 70), y: P.y + cy * (90 + i * 70), t: 0.5 + i * 0.08, dmg: 90 * (1 + 0.25 * (L - 1)) * atk });
+        G.strikes.push({ src: P, x: P.x + cx * (90 + i * 70), y: P.y + cy * (90 + i * 70), t: 0.5 + i * 0.08, dmg: 90 * (1 + 0.25 * (L - 1)) * atk });
       }
       Sound.play('plane');
     } else if (id === 'unleash') {
@@ -2397,12 +2620,13 @@
     G.shells = G.shells.filter((s) => {
       s.t += dt;
       if (s.t < s.T) return true;
-      blast(s.x, s.y, s.r, s.dmg, s.team, s.src, 1);
+      blast(s.x, s.y, s.r, s.dmg, s.team, s.src, s.structMul ?? 1);
       if (s.burn) {
         forFoesNear(s.x, s.y, s.r, s.team, (e) => {
           if (e.kind === 'unit') {
             e.burnT = 2;
             e.burnDps = s.burn;
+            e.burnSrc = s.src && s.src.kind === 'player' ? s.src : null;
           }
         });
       }
@@ -2412,7 +2636,7 @@
     G.strikes = G.strikes.filter((s) => {
       s.t -= dt;
       if (s.t > 0) return true;
-      if (tileAt(s.x, s.y) >= 0) blast(s.x, s.y, 75, s.dmg, 0, G.player, 1.5);
+      if (tileAt(s.x, s.y) >= 0) blast(s.x, s.y, 75, s.dmg, 0, s.src, 1.5);
       return false;
     });
     // 地雷
@@ -2422,19 +2646,20 @@
       let hit = false;
       forFoesNear(m.x, m.y, 30, 0, (u) => { if (u.kind === 'unit') hit = true; });
       if (!hit) return true;
-      blast(m.x, m.y, m.r, m.dmg, 0, G.player, 1);
+      blast(m.x, m.y, m.r, m.dmg, 0, m.src, 1);
       return false;
     });
     G.walls = G.walls.filter((w) => (w.life -= dt) > 0);
     G.beams = G.beams.filter((b) => (b.life -= dt) > 0);
     G.bolts = G.bolts.filter((b) => (b.life -= dt) > 0);
     G.rings = G.rings.filter((r) => (r.life -= dt) > 0);
+    G.slashes = G.slashes.filter((r) => (r.life -= dt) > 0);
     G.flash = Math.max(0, (G.flash || 0) - dt);
   }
 
   // ---- 指揮 (自軍の兵舎・兵士) ----
   const am = (id) => save.army[id] || 0;
-  const capOf = (s) => (s.team === 0 ? Math.round(s.def.cap * (1 + 0.1 * ab('reserves')) * (1 + 0.05 * am('cap'))) : Math.round(s.def.cap * (G.hard ? 1.3 : 1)));
+  const capOf = (s) => (s.team === 0 ? Math.round(s.def.cap * (1 + 0.1 * cmd('reserves')) * (1 + 0.05 * am('cap'))) : Math.round(s.def.cap * (G.hard ? 1.3 : 1)));
   // 建物の HP 上限の元 (防衛隊本部の強化こみ)
   const structBase = (s) => (s.kind === 'hq' ? HQ_HP * (s.team === 0 ? 1 + 0.08 * am('hq') : 1)
     : s.def.hp * (s.temp ? 0.7 : 1) * (s.team === 0 ? 1 + 0.06 * am('bar') : 1));
@@ -2442,14 +2667,14 @@
   function applyDefense() {
     for (const s of G.structs) {
       if (s.team !== 0 || !s.alive) continue;
-      const nm = structBase(s) * (1 + 0.1 * ab('defense'));
+      const nm = structBase(s) * (1 + 0.1 * cmd('defense'));
       s.hp += nm - s.maxHp;
       s.maxHp = nm;
     }
   }
 
   function updateCommands(dt) {
-    const L = ab('defense');
+    const L = cmd('defense');
     if (!L) return;
     for (const s of G.structs) {
       if (s.team === 0 && s.alive) s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.004 * L * dt);
@@ -2464,7 +2689,6 @@
   const REBUILD = 10;
 
   function updateRuins(dt) {
-    const P = G.player;
     for (const s of G.structs) {
       const r = s.ruin;
       if (!r) continue;
@@ -2481,7 +2705,9 @@
           if (u.def.repair) eng = true;
         }
       }
-      const pHere = P.alive && near(P);
+      // 近くにいる武将 (1 人でも 2 倍。工兵の心得とゲンでさらに速い)
+      const here = G.party.filter((P) => P.alive && near(P));
+      const pHere = here.length > 0;
       if (pHere) n[0]++;
       r.pHere = pHere;
       const builder = n[0] && !n[1] ? 0 : n[1] && !n[0] ? 1 : -1;
@@ -2491,20 +2717,20 @@
       }
       // プレイヤーがいると 2 倍、工兵の心得でさらに速い
       // 悪魔は巣を作るのに 2 倍の時間がかかる
-      let mul = builder === 0 && pHere ? 2 * (1 + 0.25 * ab('engineer')) : builder === 1 ? 0.5 : 1;
-      if (builder === 0 && eng) mul *= 1.5; // 工兵がいると 1.5 倍
+      let mul = builder === 0 && pHere ? 2 * (1 + 0.25 * Math.max(...here.map((P) => lv(P, 'engineer')))) : builder === 1 ? 0.5 : 1;
+      if (builder === 0 && (eng || here.some((P) => P.hero.repair))) mul *= 1.5; // 工兵 (ゲン) がいると 1.5 倍
       if (r.team !== builder && r.prog > 0) {
         r.prog = Math.max(0, r.prog - (dt / REBUILD) * mul);
         continue;
       }
       r.team = builder;
       r.prog += (dt / (REBUILD * (builder === 0 ? 1 - 0.1 * am('rebuild') : 1))) * mul;
-      if (r.prog >= 1) rebuild(s, builder, pHere);
+      if (r.prog >= 1) rebuild(s, builder, here);
     }
   }
 
-  // 兵舎跡に、仮設の兵舎 (小・HP 70%) を建てる
-  function rebuild(s, team, byPlayer) {
+  // 兵舎跡に、仮設の兵舎 (小・HP 70%) を建てる。here: 建てた武将たち
+  function rebuild(s, team, here) {
     const def = BARRACKS.s;
     s.team = team;
     s.def = def;
@@ -2512,7 +2738,7 @@
     s.temp = true;
     s.ruin = null;
     s.alive = true;
-    s.maxHp = structBase(s) * (team === 0 ? 1 + 0.1 * ab('defense') : 1);
+    s.maxHp = structBase(s) * (team === 0 ? 1 + 0.1 * cmd('defense') : 1);
     s.hp = s.maxHp;
     s.count = 0;
     s.ready = 0;
@@ -2529,7 +2755,7 @@
     }
     // 建った場所にいた兵士は外へ押し出す
     for (const u of G.units) if (u.alive) collideTiles(u);
-    if (G.player.alive) collideTiles(G.player);
+    for (const P of G.party) if (P.alive) collideTiles(P);
     G.barrierDown[team] = false;
     G.mmDirty = true;
     spawnParticles(s.cx, s.cy, 30, team === 0 ? '#9cc4ff' : '#ff6a5a', 160, 0.8, 3, 'glow');
@@ -2537,7 +2763,7 @@
     if (team === 0) {
       G.stats.rebuilt++;
       note(t('nRebuilt'), '#8fc0ff');
-      if (byPlayer) gainXp(30);
+      for (const P of here) gainXp(P, 30);
     } else {
       note(t('nEnemyRebuilt'), '#ff8a7a');
     }
@@ -2556,34 +2782,35 @@
   const pointOwned = (k, team) => G.points.some((p) => p.k === k && p.owner === team);
 
   function updatePoints(dt) {
-    const P = G.player;
     for (const p of G.points) {
-      // 円の中の兵士の数の差 (プレイヤーは 3 人ぶん) で、ゲージが傾く
+      // 円の中の兵士の数の差 (武将は 1 人で 3 人ぶん) で、ゲージが傾く
       let n = 0;
       for (const u of G.units) {
         if (u.alive && (u.x - p.x) ** 2 + (u.y - p.y) ** 2 < POINT_R * POINT_R) n += u.team === 0 ? 1 : -1;
       }
-      const pHere = P.alive && (P.x - p.x) ** 2 + (P.y - p.y) ** 2 < POINT_R * POINT_R;
-      if (pHere) n += 3;
+      const here = G.party.filter((P) => P.alive && (P.x - p.x) ** 2 + (P.y - p.y) ** 2 < POINT_R * POINT_R);
+      n += 3 * here.length;
       p.prog = clamp(p.prog + clamp(n, -6, 6) * dt * 0.04, -1, 1);
       const name = L(POINTS[p.k], 'name');
       if (p.prog >= 1 && p.owner !== 0) {
         p.owner = 0;
         G.stats.points++;
         note(t('nPointTaken', name), '#8fc0ff');
-        if (pHere) gainXp(30);
+        for (const P of here) gainXp(P, 30);
       } else if (p.prog <= -1 && p.owner !== 1) {
         p.owner = 1;
         note(t('nPointLost', name), '#ff8a7a');
       } else if ((p.owner === 0 && p.prog < 0) || (p.owner === 1 && p.prog > 0)) {
         p.owner = -1;
       }
-      // 給水塔: 持っている陣営の兵士とプレイヤーは、近くで体力が回復する
+      // 給水塔: 持っている陣営の兵士と武将は、近くで体力が回復する
       if (p.k === 'water' && p.owner >= 0) {
         for (const u of G.units) {
           if (u.alive && u.team === p.owner && (u.x - p.x) ** 2 + (u.y - p.y) ** 2 < 300 * 300) u.hp = Math.min(u.maxHp, u.hp + 2 * dt);
         }
-        if (p.owner === 0 && P.alive && (P.x - p.x) ** 2 + (P.y - p.y) ** 2 < 300 * 300) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.02 * dt);
+        if (p.owner === 0) {
+          for (const P of G.party) if (P.alive && (P.x - p.x) ** 2 + (P.y - p.y) ** 2 < 300 * 300) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.02 * dt);
+        }
       }
     }
   }
@@ -2607,7 +2834,7 @@
     };
     for (const u of G.units) if (u.alive && u.team === 0) mark(u.x, u.y);
     for (const s of G.structs) if (s.alive && s.team === 0) mark(s.cx, s.cy);
-    if (G.player.alive) mark(G.player.x, G.player.y);
+    for (const P of G.party) if (P.alive) mark(P.x, P.y);
   }
   const seen = (x, y) => pointOwned('tower', 0) || G.sight[clamp(Math.floor(y / CELL), 0, G.GR - 1) * G.GC + clamp(Math.floor(x / CELL), 0, G.GC - 1)] === 1;
 
@@ -2709,14 +2936,9 @@
   }
 
   // ===================================================================
-  // 仲間のヒーロー
+  // 武将の技と、操作していない武将の AI
   // ===================================================================
-  const { HEROES, SKILLS: HERO_SKILLS } = window.DI_HEROES;
   const ORDERS = ['free', 'follow', 'defend', 'assault'];
-  const HERO_RESPAWN = 45;
-  const heroUp = (id) => save.heroUp[id] || 0;
-  // 3 段階目で技 1.25 倍、5 段階目で 1.5 倍
-  const heroPower = (id) => (heroUp(id) >= 5 ? 1.5 : heroUp(id) >= 3 ? 1.25 : 1);
 
   // 自軍が一番押されているレーン / 一番押しているレーン
   function pushedLane(most) {
@@ -2727,79 +2949,26 @@
     return best;
   }
 
-  // ヒーローのレベル: 強化 (+3 まで) + 1 分ごとに +1 + 倒した悪魔 60 体ごとに +1
-  const heroLevel = (h) => Math.min(LEVEL_MAX, 1 + Math.min(3, heroUp(h.id)) + Math.floor(G.time / 60) + Math.floor(G.stats.dead[1] / 60));
-
-  function spawnHero(h) {
-    const d = h.def;
-    const p = respawnPoint();
-    const u = spawnUnit('infantry', 0, p.x, p.y, null, pushedLane(false));
-    if (!u) {
-      h.respawnT = 3;
-      return;
-    }
-    u.type = 'hero';
-    u.def = { ...d, xp: 0, lob: d.cannon || 0 };
-    u.r = d.r;
-    u.speed = d.speed;
-    u.hero = h;
-    u.elite = false;
-    u.sk = { a: 2, b: 4 };
-    u.lastHit = -99;
-    u.laneT = 0;
-    h.u = u;
-    h.lv = 0;
-    setHeroLevel(h, heroLevel(h));
-    u.hp = u.maxHp;
-    collideTiles(u);
-  }
-
-  function setHeroLevel(h, lv) {
-    const u = h.u;
-    const up = 1 + 0.06 * heroUp(h.id);
-    const ratio = u.maxHp > 1 ? u.hp / u.maxHp : 1;
-    h.lv = lv;
-    u.maxHp = h.def.hp * (1 + 0.06 * (lv - 1)) * up;
-    u.hp = u.maxHp * ratio;
-    u.dmgMul = (1 + 0.04 * (lv - 1)) * up;
-  }
-
   function cycleOrder() {
-    if (!G || !G.heroes.length) return;
+    if (!G || G.party.length < 2) return;
     G.heroOrder = (G.heroOrder + 1) % ORDERS.length;
     note(`${t('order')}: ${t('order_' + ORDERS[G.heroOrder])}`, '#9fc0ff');
     Sound.play('click');
   }
 
-  function updateHeroes(dt) {
-    for (const h of G.heroes) {
-      if (!h.u) {
-        h.respawnT -= dt;
-        if (h.respawnT <= 0) spawnHero(h);
-        continue;
-      }
-      const lv = heroLevel(h);
-      if (lv > h.lv) setHeroLevel(h, lv);
-      // 5 秒ダメージを受けていなければ、少しずつ回復する
-      const u = h.u;
-      if (G.time - u.lastHit > 5) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.01 * dt);
-    }
-    G.guards = G.guards.filter((g) => (g.life -= dt) > 0);
-    G.wards = G.wards.filter((g) => (g.life -= dt) > 0);
-  }
-
   const inZone = (list, e) => list.some((g) => (e.x - g.x) ** 2 + (e.y - g.y) ** 2 < g.r * g.r);
-  function nearHero(u) {
-    for (const h of G.heroes) if (h.u && h.u !== u && (u.x - h.u.x) ** 2 + (u.y - h.u.y) ** 2 < 260 * 260) return true;
+  // 武将の近くの兵士は攻撃力 +10%
+  function nearParty(u) {
+    for (const P of G.party) if (P.alive && (u.x - P.x) ** 2 + (u.y - P.y) ** 2 < 260 * 260) return true;
     return false;
   }
 
-  // ヒーローの直線の攻撃 (貫通弾・破魔の矢)
+  // 武将の直線の攻撃 (貫通弾・破魔の矢)
   function heroBeam(u, a, dmg, color) {
     const cx = Math.cos(a);
     const cy = Math.sin(a);
-    let len = 700;
-    for (let s = 8; s < 700; s += 12) {
+    let len = 720;
+    for (let s = 8; s < 720; s += 12) {
       const k = tileAt(u.x + cx * s, u.y + cy * s);
       if (k < 0 || (G.block[k] && !(G.structAt[k] >= 0 && G.structs[G.structAt[k]].team === 0))) { len = s; break; }
     }
@@ -2808,20 +2977,141 @@
       const px = e.x - u.x;
       const py = e.y - u.y;
       const along = px * cx + py * cy;
-      if (along > 0 && along < len && Math.abs(px * cy - py * cx) < e.r + 10) hurt(e, dmg, u.x, u.y, u);
+      if (along > 0 && along < len && Math.abs(px * cy - py * cx) < e.r + 10) {
+        hurt(e, dmg, u.x, u.y, u);
+        e.revealT = G.time + 3;
+      }
     }
     G.beams.push({ x1: u.x, y1: u.y, x2: u.x + cx * len, y2: u.y + cy * len, life: 0.35, max: 0.35, color, w: 7 });
+    G.shake = Math.min(10, G.shake + (u === G.player ? 3 : 0));
+    Sound.play('rail');
   }
 
-  // ルシア: 後ろの悪魔 (祈祷師・呪術師・魔弾兵) を優先してねらう
+  // 技のクールダウン: レベル 8・15 で短くなる
+  const heroCd = (P, id) => HERO_SKILLS[id].cd * P.cdMul * (P.lvl >= 15 ? 0.82 : P.lvl >= 8 ? 0.9 : 1);
+  // Q・E のクールダウンの長さ (ボタンの表示用)
+  const qeCd = (P, id) => (P.hero.free ? skillCd(P, id) : heroCd(P, id));
+
+  // 武将の技 (操作しているときは向いている方向・ねらった場所に使う)
+  function heroSkill(P, id) {
+    if ((P.cds[id] || 0) > 0) return;
+    const pw = heroPower(P.id);
+    const atk = P.atkMul * pw;
+    const cx = Math.cos(P.face);
+    const cy = Math.sin(P.face);
+    P.cds[id] = heroCd(P, id);
+    if (id === 'rush') {
+      P.chargeT = 0.34;
+      P.dx = cx;
+      P.dy = cy;
+      P.chargeHit = new Set();
+      P.chargeDmg = 45 * atk;
+      P.invT = Math.max(P.invT, 0.4);
+      Sound.play('dash');
+    } else if (id === 'bulwark') {
+      G.guards.push({ x: P.x, y: P.y, r: 220, life: 6 * pw });
+      Sound.play('wall');
+    } else if (id === 'pierce') {
+      heroBeam(P, P.face, 110 * atk, '#9fe0ff');
+    } else if (id === 'vanish') {
+      P.vanishT = 4 * pw;
+      P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.15);
+      spawnParticles(P.x, P.y, 16, '#9fd8c8', 90, 0.6, 4, 'smoke');
+    } else if (id === 'mend') {
+      const R2 = 240 * 240;
+      for (const u of G.units) if (u.team === 0 && u.alive && u.lifeT == null && (u.x - P.x) ** 2 + (u.y - P.y) ** 2 < R2) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.4 * pw);
+      for (const Q of G.party) if (Q.alive && (Q.x - P.x) ** 2 + (Q.y - P.y) ** 2 < R2) Q.hp = Math.min(Q.maxHp, Q.hp + Q.maxHp * 0.35 * pw);
+      G.rings.push({ x: P.x, y: P.y, r: 240, life: 0.6, max: 0.6, color: '#7dffa0' });
+      spawnParticles(P.x, P.y, 26, '#7dffa0', 200, 0.8, 3, 'glow');
+      Sound.play('heal');
+    } else if (id === 'rescue') {
+      // どこにいても、一番弱っている武将 (自分も)
+      let best = null;
+      for (const Q of G.party) if (Q.alive && (!best || Q.hp / Q.maxHp < best.hp / best.maxHp)) best = Q;
+      if (best) {
+        best.hp = Math.min(best.maxHp, best.hp + best.maxHp * 0.5 * pw);
+        best.invT = Math.max(best.invT, 2);
+        G.beams.push({ x1: P.x, y1: P.y, x2: best.x, y2: best.y, life: 0.5, max: 0.5, color: '#7dffa0', w: 5 });
+        spawnParticles(best.x, best.y, 20, '#7dffa0', 140, 0.7, 3, 'glow');
+        if (best !== P) floatText(best.x, best.y - 30, L(HERO_SKILLS.rescue, 'name'), '#7dffa0', 1.2);
+      }
+      Sound.play('heal');
+    } else if (id === 'turret') {
+      const t2 = spawnUnit('infantry', 0, P.x + cx * 36, P.y + cy * 36, null, nearestLane(P.x, P.y));
+      if (t2) {
+        t2.type = 'turret';
+        t2.def = { hp: 300, r: 12, speed: 0, range: 320, aggro: 340, dmg: 6 * (1 + 0.03 * (P.lvl - 1)), rof: 0.15, spread: 0.08, bulletSpeed: 850, color: '#8a8f9a', dark: '#2a2d35', vehicle: true, xp: 0 };
+        t2.maxHp = t2.hp = 300 * pw * (1 + 0.05 * (P.lvl - 1));
+        t2.speed = 0;
+        t2.r = 12;
+        t2.lifeT = 15;
+        collideTiles(t2);
+      }
+      Sound.play('wall');
+    } else if (id === 'overhaul') {
+      for (const s of G.structs) {
+        if (!s.alive || s.team !== 0) continue;
+        const p = rectPoint(s, P.x, P.y);
+        if (Math.hypot(p.x - P.x, p.y - P.y) < 400) {
+          s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.15 * pw);
+          spawnParticles(s.cx, s.cy, 12, '#9fe08f', 120, 0.6, 3, 'glow');
+        }
+      }
+      G.rings.push({ x: P.x, y: P.y, r: 400, life: 0.6, max: 0.6, color: '#9fe08f' });
+      Sound.play('heal');
+    } else if (id === 'barrier') {
+      G.wards.push({ x: P.x + cx * 70, y: P.y + cy * 70, r: 170, life: 6 * pw });
+      Sound.play('wall');
+    } else if (id === 'arrow') {
+      heroBeam(P, P.face, 240 * atk, '#fff2b0');
+    } else if (id === 'salvo') {
+      const d = clamp(P.aimD, 120, 480);
+      const tx = P.x + cx * d;
+      const ty = P.y + cy * d;
+      for (let i = 0; i < 3; i++) G.shells.push({ x0: P.x, y0: P.y, x: tx + rand(-60, 60), y: ty + rand(-60, 60), t: -i * 0.2, T: 0.8, r: 75, dmg: 55 * atk, team: 0, src: P, look: 'mortar', structMul: 2 });
+      Sound.play('boom');
+    } else if (id === 'smoke') {
+      P.smokeT = 4 * pw;
+      P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.15);
+      spawnParticles(P.x, P.y, 30, '#8a8a90', 120, 2, 12, 'smoke');
+    } else if (id === 'blink') {
+      // 着ける場所を、遠いほうから探す
+      for (let d = 280; d > 40; d -= 10) {
+        const x = P.x + cx * d;
+        const y = P.y + cy * d;
+        const k = tileAt(x, y);
+        if (k < 0 || G.solid[k] || isSolid(Math.floor((x + 12) / TILE), Math.floor(y / TILE)) || isSolid(Math.floor((x - 12) / TILE), Math.floor(y / TILE))) continue;
+        spawnParticles(P.x, P.y, 14, '#8a3ac8', 100, 0.5, 4, 'glow');
+        P.x = x;
+        P.y = y;
+        break;
+      }
+      collideTiles(P);
+      P.invT = Math.max(P.invT, 0.3);
+      blast(P.x, P.y, 80, 50 * atk, 0, P, 0.5, 'holy');
+      spawnParticles(P.x, P.y, 14, '#8a3ac8', 100, 0.5, 4, 'glow');
+    } else if (id === 'hellfire') {
+      blast(P.x, P.y, 125, 100 * atk, 0, P, 1);
+      spawnParticles(P.x, P.y, 26, '#c860ff', 220, 0.7, 4, 'glow');
+    }
+    floatText(P.x, P.y - P.r - 22, L(HERO_SKILLS[id], 'name'), '#9fc0ff', 1.2);
+  }
+
+  // ---- 操作していない武将の AI ----
+  // 敵が射程にいれば撃ち、いなければ指示 (自由に戦う・ついてこい・拠点を守れ・突撃) に合わせて進む
   const CLAW = { shaman: 3, witch: 3, soldier: 2 };
-  function clawTarget(u) {
+  const SNIPE_P = { behemoth: 4, ogre: 3, shaman: 2, witch: 2 };
+  function aiTarget(P, range) {
+    const d = P.hero;
+    if (!d.sniper && !d.claw) return nearestFoe(P.x, P.y, 0, range);
+    // 狙撃手は大物、ルシアは後ろの悪魔を優先する
+    const tbl = d.sniper ? SNIPE_P : CLAW;
     let best = null;
     let bs = -1e9;
-    forFoesNear(u.x, u.y, u.def.aggro, u.team, (e) => {
+    forFoesNear(P.x, P.y, range, 0, (e) => {
       if (e.stealthOn || e.kind !== 'unit') return;
-      const sc = (CLAW[e.type] || 1) * 1000 - Math.hypot(e.x - u.x, e.y - u.y);
-      if (sc > bs) {
+      const sc = (e.boss ? (d.sniper ? 5 : 1) : tbl[e.type] || 1) * 1000 - Math.hypot(e.x - P.x, e.y - P.y);
+      if (sc > bs && los(P.x, P.y, e.x, e.y)) {
         bs = sc;
         best = e;
       }
@@ -2829,292 +3119,245 @@
     return best;
   }
 
-  function heroSkill(u, key) {
-    const h = u.hero;
-    const id = h.def.skills[key === 'a' ? 0 : 1];
-    const pw = heroPower(h.id);
-    const dmg = u.def.dmg * (u.def.pellets || 1) * u.dmgMul * pw;
-    const tg = u.target;
-    const dist = tg ? Math.hypot(tg.x - u.x, tg.y - u.y) : 1e9;
-    let n = 0;
-    const count = (r) => {
-      n = 0;
-      forFoesNear(u.x, u.y, r, 0, () => n++);
-      return n;
-    };
-    let cd = 0;
-    if (id === 'rush' && tg && dist > 100 && dist < 300) {
-      u.dashT = 0.35;
-      u.dx = (tg.x - u.x) / dist;
-      u.dy = (tg.y - u.y) / dist;
-      u.dashHit = new Set();
-      cd = 8;
-    } else if (id === 'bulwark' && count(250) >= 3) {
-      G.guards.push({ x: u.x, y: u.y, r: 220, life: 6 * pw });
-      cd = 15;
-    } else if (id === 'pierce' && tg) {
-      heroBeam(u, Math.atan2(tg.y - u.y, tg.x - u.x), dmg * 2.5, '#9fe0ff');
-      cd = 8;
-    } else if (id === 'vanish' && u.hp < u.maxHp * 0.5) {
-      u.vanishT = 4 * pw;
-      cd = 15;
-    } else if (id === 'mend') {
-      let hurtN = 0;
-      for (const a of G.units) if (a.team === 0 && a.alive && a.hp < a.maxHp * 0.6 && (a.x - u.x) ** 2 + (a.y - u.y) ** 2 < 220 * 220) hurtN++;
-      if (hurtN >= 2) {
-        for (const a of G.units) if (a.team === 0 && a.alive && (a.x - u.x) ** 2 + (a.y - u.y) ** 2 < 220 * 220) a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.4 * pw);
-        G.rings.push({ x: u.x, y: u.y, r: 220, life: 0.6, max: 0.6, color: '#7dffa0' });
-        cd = 12;
-      }
-    } else if (id === 'rescue') {
-      const P = G.player;
-      if (P.alive && P.hp < P.maxHp * 0.4 && Math.hypot(P.x - u.x, P.y - u.y) < 400) {
-        P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.4 * pw);
-        P.invT = Math.max(P.invT, 1.5);
-        G.beams.push({ x1: u.x, y1: u.y, x2: P.x, y2: P.y, life: 0.5, max: 0.5, color: '#7dffa0', w: 5 });
-        cd = 20;
-      }
-    } else if (id === 'turret' && (tg || count(400) > 0)) {
-      const t2 = spawnUnit('infantry', 0, u.x + rand(-30, 30), u.y + rand(-30, 30), null, u.lane);
-      if (t2) {
-        t2.type = 'turret';
-        t2.def = { hp: 300, r: 12, speed: 0, range: 320, aggro: 340, dmg: 6, rof: 0.15, spread: 0.08, bulletSpeed: 850, color: '#8a8f9a', dark: '#2a2d35', vehicle: true };
-        t2.maxHp = t2.hp = 300 * pw;
-        t2.speed = 0;
-        t2.r = 12;
-        t2.lifeT = 15;
-        collideTiles(t2);
-      }
-      cd = 18;
-    } else if (id === 'overhaul') {
-      let any = false;
-      for (const s of G.structs) {
-        if (!s.alive || s.team !== 0 || s.hp > s.maxHp * 0.9) continue;
-        const p = rectPoint(s, u.x, u.y);
-        if (Math.hypot(p.x - u.x, p.y - u.y) < 400) {
-          s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.15 * pw);
-          spawnParticles(s.cx, s.cy, 12, '#9fe08f', 120, 0.6, 3, 'glow');
-          any = true;
-        }
-      }
-      if (any) cd = 20;
-    } else if (id === 'barrier' && count(250) >= 3) {
-      G.wards.push({ x: u.x, y: u.y, r: 160, life: 6 * pw });
-      cd = 14;
-    } else if (id === 'arrow' && tg) {
-      heroBeam(u, Math.atan2(tg.y - u.y, tg.x - u.x), dmg * 6, '#fff2b0');
-      cd = 8;
-    } else if (id === 'salvo' && tg) {
-      for (let i = 0; i < 3; i++) G.shells.push({ x0: u.x, y0: u.y, x: tg.x + rand(-60, 60), y: tg.y + rand(-60, 60), t: -i * 0.2, T: 0.8, r: 70, dmg: dmg * 0.8, team: 0, src: u, look: 'mortar' });
-      cd = 10;
-    } else if (id === 'smoke' && u.hp < u.maxHp * 0.5) {
-      u.smokeT = 4 * pw;
-      u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.15);
-      spawnParticles(u.x, u.y, 30, '#8a8a90', 120, 2, 12, 'smoke');
-      cd = 18;
-    } else if (id === 'blink' && tg && dist > 120 && dist < 420) {
-      const a = Math.atan2(tg.y - u.y, tg.x - u.x);
-      const nx = tg.x + Math.cos(a) * 30;
-      const ny = tg.y + Math.sin(a) * 30;
-      const k = tileAt(nx, ny);
-      if (k >= 0 && !G.solid[k]) {
-        spawnParticles(u.x, u.y, 14, '#8a3ac8', 100, 0.5, 4, 'glow');
-        u.x = nx;
-        u.y = ny;
-        spawnParticles(u.x, u.y, 14, '#8a3ac8', 100, 0.5, 4, 'glow');
-        cd = 8;
-      }
-    } else if (id === 'hellfire' && count(120) >= 3) {
-      blast(u.x, u.y, 110, dmg * 2.5, 0, u, 1);
-      cd = 10;
+  function aiThink(P, w, dt) {
+    const A = P.ai;
+    const out = { mx: 0, my: 0, firing: false, dash: false, skill: [false, false], ult: false };
+    A.t = (A.t || 0) - dt;
+    // 見つける距離は射程より広め (見つけたら近づいて撃つ)
+    const range = Math.max(420, w.range * 0.95);
+    if (A.t <= 0) {
+      A.t = 0.25;
+      A.foe = aiTarget(P, range);
+      A.struct = A.foe ? null : nearestFoeStruct(P.x, P.y, 0, w.claw ? 220 : w.range * 0.9);
+      A.near = 0;
+      forFoesNear(P.x, P.y, 260, 0, (e) => { if (e.kind === 'unit') A.near++; });
     }
-    if (cd) {
-      // 技は レベル 10・15・20 で 10% ずつ早く使えるようになる
-      u.sk[key] = cd * (1 - 0.1 * Math.floor(Math.min(20, u.hero.lv) / 10) - (u.hero.lv >= 15 ? 0.1 : 0));
-      floatText(u.x, u.y - u.r - 18, L(HERO_SKILLS[id], 'name'), '#9fc0ff', 1.2);
+    if (A.foe && (!A.foe.alive || A.foe.downT > 0)) A.foe = null;
+    if (A.struct && !A.struct.alive) A.struct = null;
+    const foe = A.foe;
+    // 体力が少なくなったら下がる (7 割まで戻ったらまた前へ)
+    if (P.hp < P.maxHp * 0.3 && !A.retreat) {
+      A.retreat = true;
+      A.retreatAt = G.time;
+    } else if (P.hp > P.maxHp * 0.7 || G.time - A.retreatAt > 25) A.retreat = false;
+
+    let tx = null;
+    let ty = null;
+    if (foe) {
+      tx = foe.x;
+      ty = foe.y;
+    } else if (A.struct) {
+      const p = rectPoint(A.struct, P.x, P.y);
+      tx = p.x;
+      ty = p.y;
     }
+    let dist = 1e9;
+    if (tx != null) {
+      dist = Math.hypot(tx - P.x, ty - P.y);
+      P.face = Math.atan2(ty - P.y, tx - P.x);
+      P.aimD = dist;
+      out.firing = w.claw ? dist < w.range + (foe ? foe.r : 4) + 4 : dist < w.range * 0.98;
+    }
+    // 移動
+    let mv = null;
+    if (A.retreat) {
+      mv = laneNav(P, nearestLane(P.x, P.y), 0);
+      if (foe && dist < 140) out.dash = true;
+    } else if (tx != null) {
+      // 間合い: ルシアは近づき、鬼塚は近め、ほかは射程の 6 割
+      const pref = w.claw ? 0 : P.main === 'shotgun' ? 150 : w.lob ? w.range * 0.7 : w.range * 0.6;
+      const dx = tx - P.x;
+      const dy = ty - P.y;
+      const d = dist || 1;
+      if (w.claw) mv = d > w.range * 0.6 ? [dx / d, dy / d] : [-dy / d * 0.3, dx / d * 0.3];
+      else if (d > pref + 70) mv = [dx / d, dy / d];
+      else if (d < pref - 70 && foe) mv = [-dx / d, -dy / d];
+      else {
+        // 横に動いて的を絞らせない
+        A.strafe = A.strafe || (Math.random() < 0.5 ? 1 : -1);
+        if (Math.random() < dt * 0.4) A.strafe = -A.strafe;
+        mv = [(-dy / d) * 0.5 * A.strafe, (dx / d) * 0.5 * A.strafe];
+      }
+      if (foe && foe.def && foe.def.melee && dist < 90 && !w.claw && P.main !== 'shotgun' && P.hp < P.maxHp * 0.6) out.dash = true;
+    } else {
+      mv = aiGoal(P, dt);
+    }
+    // 進めなくなったら、横にずれてみる
+    if (mv && (mv[0] || mv[1])) {
+      const moved = Math.hypot(P.x - (A.lx ?? P.x), P.y - (A.ly ?? P.y));
+      if (moved < PLAYER.speed * P.speedMul * dt * 0.25) A.stuck = (A.stuck || 0) + dt;
+      else A.stuck = Math.max(0, (A.stuck || 0) - dt);
+      if (A.stuck > 0.7) {
+        A.stuck = 0;
+        A.sideT = 0.6;
+        A.side = Math.random() < 0.5 ? 1 : -1;
+      }
+      if (A.sideT > 0) {
+        A.sideT -= dt;
+        mv = [mv[0] * 0.3 - mv[1] * A.side, mv[1] * 0.3 + mv[0] * A.side];
+      }
+      if (tx == null) P.face = Math.atan2(mv[1], mv[0]);
+    }
+    A.lx = P.x;
+    A.ly = P.y;
+    if (mv) [out.mx, out.my] = mv;
+    aiSkills(P, out, foe, dist);
+    return out;
   }
 
-  // ヒーローだけの動き。ここで動きを決めたら true を返す (ふつうの兵士の動きはしない)
-  function updateHero(u, dt) {
-    const h = u.hero;
-    const d = u.def;
-    for (const k in u.sk) u.sk[k] -= dt;
-    u.vanishT = (u.vanishT || 0) - dt;
-    u.smokeT = (u.smokeT || 0) - dt;
-    u.stealthOn = u.vanishT > 0;
-    // 巫女: まわりの暗殺者を見破る
-    if (d.ward) forFoesNear(u.x, u.y, d.ward, 0, (e) => { if (e.def && e.def.stealth) e.revealT = G.time + 0.5; });
-    if (d.claw && !u.target && u.retT <= 0) u.target = clawTarget(u);
-    // 盾の突進
-    if (u.dashT > 0) {
-      u.dashT -= dt;
-      u.x += u.dx * 520 * dt;
-      u.y += u.dy * 520 * dt;
-      forFoesNear(u.x, u.y, u.r + 8, 0, (e) => {
-        if (u.dashHit.has(e)) return;
-        u.dashHit.add(e);
-        hurt(e, d.dmg * (d.pellets || 1) * u.dmgMul * 1.2 * heroPower(h.id), u.x, u.y, u);
-        if (!heavyBody(e)) {
-          e.x += u.dx * 50;
-          e.y += u.dy * 50;
-          collideTiles(e);
-        }
-      });
-      return true;
-    }
-    if (u.sk.a <= 0) heroSkill(u, 'a');
-    if (h.lv >= 5 && u.sk.b <= 0) heroSkill(u, 'b');
-    // 指示による動き
+  // 指示に合わせた行き先
+  function aiGoal(P, dt) {
+    const A = P.ai;
     const order = ORDERS[G.heroOrder];
-    if (order === 'free' || order === 'assault') {
-      u.laneT -= dt;
-      if (u.laneT <= 0 && !u.target && !u.tStruct) {
-        u.laneT = 10;
-        const nl = pushedLane(order === 'assault');
-        if (nl !== u.lane) {
-          u.lane = nl;
-          u.wp = laneProject(G.lanes[nl], u.x, u.y).seg + 1;
+    const C = G.player;
+    if (order === 'follow' && C.alive && C !== P) {
+      const d = Math.hypot(C.x - P.x, C.y - P.y);
+      if (d < 110) return [0, 0];
+      // 見えていれば直接、見えなければ通った道をたどる
+      let gx = C.x;
+      let gy = C.y;
+      if (!los(P.x, P.y, C.x, C.y)) {
+        for (let i = C.trail.length - 1; i >= 0; i--) {
+          const p = C.trail[i];
+          if (los(P.x, P.y, p.x, p.y)) { gx = p.x; gy = p.y; break; }
         }
       }
-      return false;
+      const dx = gx - P.x;
+      const dy = gy - P.y;
+      const dd = Math.hypot(dx, dy) || 1;
+      return [dx / dd, dy / dd];
     }
-    let gx;
-    let gy;
-    let stop;
-    if (order === 'follow') {
-      const P = G.player;
-      if (!P.alive) return false;
-      const dp = Math.hypot(P.x - u.x, P.y - u.y);
-      if ((u.target || u.tStruct) && dp < 350) return false;
-      gx = P.x;
-      gy = P.y;
-      stop = 80;
-    } else {
-      // 拠点を守れ: 一番危ない自軍の建物 (HP の割合が一番低い兵舎、なければ本拠地) の前
+    if (order === 'defend') {
+      // 一番危ない自軍の建物 (HP の割合が一番低い兵舎、なければ本拠地) の前
       let best = null;
       for (const s of G.structs) {
         if (!s.alive || s.team !== 0) continue;
         if (!best || s.hp / s.maxHp < best.hp / best.maxHp) best = s;
       }
-      if (!best) return false;
-      gx = best.kind === 'hq' ? homePoint().x : best.sx;
-      gy = best.kind === 'hq' ? homePoint().y : best.sy;
-      const dd = Math.hypot(gx - u.x, gy - u.y);
-      if ((u.target || u.tStruct) && dd < 300) return false;
-      stop = 40;
+      if (best) {
+        const gx = best.kind === 'hq' ? homePoint().x : best.sx;
+        const gy = best.kind === 'hq' ? homePoint().y : best.sy;
+        const li = nearestLane(gx, gy);
+        const lane = G.lanes[li];
+        return laneNav(P, li, laneProject(lane, gx, gy).s / lane.len + 0.03);
+      }
     }
-    const dx = gx - u.x;
-    const dy = gy - u.y;
-    const dd = Math.hypot(dx, dy);
-    u.moving = dd > stop;
-    if (u.moving) {
-      u.x += (dx / dd) * u.speed * dt;
-      u.y += (dy / dd) * u.speed * dt;
-      u.face = Math.atan2(dy, dx);
-      u.walk += dt * u.speed * 0.08;
+    // 自由に戦う: 一番押されているレーンの前線 / 突撃: 一番押しているレーンの少し先
+    A.laneT = (A.laneT || 0) - dt;
+    if (A.lane == null || A.laneT <= 0) {
+      A.laneT = 12;
+      // 押されている順 (突撃は押している順) にレーンを並べ、武将を 1 人ずつ割り当てる (同じレーンに固まらない)
+      const order2 = G.lanes.map((_, i) => i).sort((a, b) => (order === 'assault' ? G.front[b] - G.front[a] : G.front[a] - G.front[b]));
+      const k = G.party.filter((Q) => Q.alive && Q !== C && Q.idx < P.idx).length;
+      A.lane = order === 'assault' ? order2[0] : order2[k % order2.length];
     }
-    u.retT -= dt;
-    if (u.retT <= 0) retarget(u);
-    return true;
+    const f = G.front[A.lane];
+    return laneNav(P, A.lane, order === 'assault' ? Math.min(1, f + 0.06) : Math.max(0, f - 0.03));
   }
 
-  function drawHero(u) {
-    const h = u.hero;
-    const d = u.def;
-    if (!d.vehicle && SPR.DEFS[h.id]) {
-      // ヒーローは金色の輪の上に立つ
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.3;
-      ctx.drawImage(glowSprite, u.x - 30, u.y - 34, 60, 60);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = u.stealthOn ? 0.4 : 1;
-      const top = drawSprite(u, h.id, 1.25 * VIS, { ring: '#ffcf4a', tint: u.hitT > 0 ? 'flash' : null });
-      ctx.globalAlpha = 1;
-      heroLabel(u, top);
-      return;
+  // レーンの上で (x, y) に一番近い点
+  function lanePoint(lane, x, y) {
+    const pr = laneProject(lane, x, y);
+    const p = lane.pts[0];
+    const a = p[pr.seg];
+    const b = p[pr.seg + 1];
+    const tt = clamp((pr.s - lane.cum[pr.seg]) / (lane.cum[pr.seg + 1] - lane.cum[pr.seg]), 0, 1);
+    return { x: lerp(a.x, b.x, tt), y: lerp(a.y, b.y, tt) };
+  }
+
+  // レーン li の道のり goal (0〜1) へ向かう。別のレーンから行くときは、レーンが近づくまで本拠地のほうへ戻る
+  function laneNav(P, li, goal) {
+    const A = P.ai;
+    if (A.cur == null || G.time > A.navAt) {
+      A.navAt = G.time + 0.5;
+      A.cur = nearestLane(P.x, P.y);
+      // 行きたいレーンの一番近い点が見えていれば、そのまま向かう
+      const q = lanePoint(G.lanes[li], P.x, P.y);
+      A.far = Math.hypot(q.x - P.x, q.y - P.y) > 150 && !los(P.x, P.y, q.x, q.y);
     }
-    ctx.save();
-    ctx.translate(u.x, u.y);
-    if (u.stealthOn) ctx.globalAlpha = 0.4;
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha *= 0.35;
-    ctx.drawImage(glowSprite, -34, -34, 68, 68);
-    ctx.globalAlpha = u.stealthOn ? 0.4 : 1;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(2, 5, u.r * (d.vehicle ? 1.3 : 1), u.r * 0.7, 0, 0, TAU);
-    ctx.fill();
-    ctx.rotate(u.face);
-    if (d.vehicle) {
-      ctx.fillStyle = u.hitT > 0 ? '#fff' : d.color;
-      ctx.strokeStyle = '#ffcf4a';
-      ctx.lineWidth = 3;
-      roundRect(-u.r * 1.2, -u.r * 0.85, u.r * 2.4, u.r * 1.7, 6);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = '#1a1d24';
-      ctx.fillRect(4, -3.5, u.r + 16, 7);
-      ctx.fillStyle = d.dark;
-      ctx.beginPath();
-      ctx.arc(2, 0, u.r * 0.55, 0, TAU);
-      ctx.fill();
+    if (A.cur !== li && A.far) {
+      const back = laneFollow(P, A.cur, 0);
+      if (back[0] || back[1]) return back;
+    }
+    return laneFollow(P, li, goal);
+  }
+
+  function laneFollow(P, li, goal) {
+    const lane = G.lanes[li];
+    const p = lane.pts[0];
+    const pr = laneProject(lane, P.x, P.y);
+    const cur = pr.s;
+    // レーンから離れているときは、まずレーンの一番近い点へ
+    {
+      const q = lanePoint(lane, P.x, P.y);
+      const nx = q.x - P.x;
+      const ny = q.y - P.y;
+      const nd = Math.hypot(nx, ny);
+      if (nd > 90) return [nx / nd, ny / nd];
+    }
+    const want = clamp(goal, 0, 1) * lane.len;
+    // 目標の道のりの点へ、レーンの曲がり角をたどって進む
+    let i = 1;
+    const fwd = want > cur;
+    let tx;
+    let ty;
+    if (fwd) {
+      // 曲がり角のすぐ近く (40px) まで来たら、次の曲がり角をめざす
+      while (i < p.length - 1 && lane.cum[i] <= cur + 40) i++;
     } else {
-      if (!d.melee) {
-        ctx.fillStyle = '#1a1d24';
-        ctx.fillRect(u.r - 4, -2.5, u.r + (d.sniper ? 16 : 6), 5);
-      } else {
-        ctx.strokeStyle = '#c9a0ff';
-        ctx.lineWidth = 2;
-        for (const sd of [-1, 1]) {
-          ctx.beginPath();
-          ctx.moveTo(u.r - 2, sd * 5);
-          ctx.lineTo(u.r + 10, sd * 7);
-          ctx.stroke();
-        }
-      }
-      ctx.fillStyle = u.hitT > 0 ? '#fff' : d.color;
-      ctx.strokeStyle = '#ffcf4a';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, u.r, 0, TAU);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = d.dark;
-      ctx.beginPath();
-      ctx.arc(-1, 0, u.r * 0.55, 0, TAU);
-      ctx.fill();
-      if (d.shield) {
-        ctx.strokeStyle = '#cfe0ff';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.arc(0, 0, u.r + 5, -1, 1);
-        ctx.stroke();
-      }
+      i = p.length - 2;
+      while (i > 0 && lane.cum[i] >= cur - 40) i--;
     }
-    ctx.restore();
-    heroLabel(u, u.y - u.r - 4);
+    const segEnd = lane.cum[i];
+    if ((fwd && want < segEnd) || (!fwd && want > segEnd)) {
+      const j = clamp(i - (fwd ? 1 : 0), 0, p.length - 2);
+      const f = clamp((want - lane.cum[j]) / (lane.cum[j + 1] - lane.cum[j]), 0, 1);
+      tx = lerp(p[j].x, p[j + 1].x, f);
+      ty = lerp(p[j].y, p[j + 1].y, f);
+    } else {
+      tx = p[i].x;
+      ty = p[i].y;
+    }
+    const dx = tx - P.x;
+    const dy = ty - P.y;
+    const d = Math.hypot(dx, dy);
+    return d < 24 || Math.abs(want - cur) < 24 ? [0, 0] : [dx / d, dy / d];
   }
 
-  // ヒーローの名前・レベル・体力 (top: 頭の上の y)
-  function heroLabel(u, top) {
-    const h = u.hero;
-    const d = u.def;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.font = '800 11px system-ui, sans-serif';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-    const label = `${d.icon} ${L(d, 'name')} Lv${h.lv}`;
-    ctx.strokeText(label, u.x, top - 8);
-    ctx.fillStyle = '#cfe0ff';
-    ctx.fillText(label, u.x, top - 8);
-    const w = 40;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(u.x - w / 2, top - 6, w, 4);
-    ctx.fillStyle = '#7fb0ff';
-    ctx.fillRect(u.x - w / 2, top - 6, w * clamp(u.hp / u.maxHp, 0, 1), 4);
+  // AI の技の使いどき
+  function aiSkills(P, out, foe, dist) {
+    const A = P.ai;
+    const ids = qe(P);
+    const wounded = (r, ratio) => {
+      let n = 0;
+      for (const u of G.units) if (u.team === 0 && u.alive && u.hp < u.maxHp * ratio && (u.x - P.x) ** 2 + (u.y - P.y) ** 2 < r * r) n++;
+      return n;
+    };
+    ids.forEach((id, i) => {
+      if (!id || (P.cds[id] || 0) > 0) return;
+      let go = false;
+      switch (id) {
+        case 'rush': case 'blink': go = foe && dist > 110 && dist < 280 && !A.retreat; break;
+        case 'charge': go = foe && dist < 260 && !A.retreat; break;
+        case 'bulwark': case 'barrier': case 'wall': go = A.near >= 3; break;
+        case 'pierce': case 'arrow': go = !!foe; break;
+        case 'vanish': case 'smoke': go = P.hp < P.maxHp * 0.5 && A.near > 0; break;
+        case 'heal': go = P.hp < P.maxHp * 0.55; break;
+        case 'mend': go = wounded(240, 0.6) >= 2 || P.hp < P.maxHp * 0.5 || G.party.some((Q) => Q !== P && Q.alive && Q.hp < Q.maxHp * 0.6 && Math.hypot(Q.x - P.x, Q.y - P.y) < 240); break;
+        case 'rescue': go = G.party.some((Q) => Q.alive && Q.hp < Q.maxHp * 0.4); break;
+        case 'turret': case 'mine': case 'decoy': go = A.near >= 2; break;
+        case 'overhaul': case 'engineer': go = G.structs.some((s) => s.alive && s.team === 0 && s.hp < s.maxHp * 0.85 && Math.hypot(rectPoint(s, P.x, P.y).x - P.x, rectPoint(s, P.x, P.y).y - P.y) < 260); break;
+        case 'salvo': case 'grenade': go = (foe && dist > 100) || !!A.struct; break;
+        case 'hellfire': go = A.near >= 3 && foe && dist < 140; break;
+        case 'leap': go = foe && dist < 230 && !A.retreat; break;
+        default: go = !!foe;
+      }
+      if (go) out.skill[i] = true;
+    });
+    if (P.ult && P.ultG >= 100) {
+      const big = foe && (foe.boss || (foe.def && foe.def.hp >= 400));
+      if (A.near >= 4 || big || (P.ult === 'airstrike' && A.struct)) out.ult = true;
+    }
   }
 
   function drawZones() {
@@ -3184,7 +3427,7 @@
   function setCaptainLevel(c, lv) {
     const d = c.def;
     const u = c.u;
-    const mul = G.st.enemyMul || 1;
+    const mul = enemyMul();
     const ratio = u.maxHp > 1 ? u.hp / u.maxHp : 1;
     c.lv = lv;
     u.maxHp = d.hp * (1 + d.hpUp * (lv - 1)) * mul;
@@ -3198,10 +3441,9 @@
         c.respawnT -= dt;
         if (c.respawnT > 0 || !G.hq[1].alive) continue;
         if (c.def.guardian) {
-          // 魔王: 門が傷つくか、プレイヤーが門に近づくと現れる
+          // 魔王: 門が傷つくか、武将が門に近づくと現れる
           const h = G.hq[1];
-          const P = G.player;
-          const near = P.alive && Math.hypot(P.x - h.cx, P.y - h.cy) < 700;
+          const near = G.party.some((P) => P.alive && Math.hypot(P.x - h.cx, P.y - h.cy) < 700);
           if (h.hp >= h.maxHp * 0.97 && !near) continue;
         }
         spawnCaptain(c);
@@ -3451,18 +3693,18 @@
   const ABIL = window.DI_ABILITIES;
   const abName = (id) => L(ABIL.BY_ID[id], 'name');
   const SLOTS = { sub: 2, skill: 2, ult: 1, passive: 6, command: 3 };
-  const owned = (kind) => ABIL.ABILITIES.filter((a) => a.kind === kind && ab(a.id) > 0).length;
-
-  function rollChoices() {
-    const P = G.player;
+  function rollChoices(P) {
+    const free = P.hero.free;
+    const owned = (kind) => ABIL.ABILITIES.filter((a) => a.kind === kind && lv(P, a.id) > 0).length;
     const pool = [];
-    // メイン武器の持ち替えは、1 回に 1 つまで
-    const swaps = ABIL.ABILITIES.filter((a) => a.kind === 'main' && !ab(a.id));
+    // メイン武器の持ち替えは灯火の新兵だけ、1 回に 1 つまで。ほかの武将は固有の武器を強くしていく
+    const swaps = free ? ABIL.ABILITIES.filter((a) => a.kind === 'main' && !a.hero && !lv(P, a.id)) : [];
     const swap = swaps[Math.floor(Math.random() * swaps.length)];
     for (const a of ABIL.ABILITIES) {
-      const lv = ab(a.id);
-      if (lv >= ABIL.MAX_LV) continue;
-      if (lv > 0) pool.push({ a, w: 3 });
+      const l = lv(P, a.id);
+      if (l >= ABIL.MAX_LV) continue;
+      if (a.kind === 'skill' && !free) continue; // 固有の技を持つ武将は、スキルを覚えない
+      if (l > 0) pool.push({ a, w: 3 });
       else if (a === swap) pool.push({ a, w: 1, swap: true });
       else if (a.kind !== 'main' && owned(a.kind) < SLOTS[a.kind]) pool.push({ a, w: a.kind === 'passive' ? 1 : 1.3 });
     }
@@ -3470,7 +3712,7 @@
     // 進化できる武器があれば、必ず選択肢に出す
     for (const id of [P.main, ...P.subs]) {
       const e = ABIL.EVOLUTIONS[id];
-      if (e && !P.evo[id] && ab(id) >= ABIL.MAX_LV && ab(e.need) > 0 && picks.length < 2) picks.push({ a: e, evo: id });
+      if (e && !P.evo[id] && lv(P, id) >= ABIL.MAX_LV && lv(P, e.need) > 0 && picks.length < 2) picks.push({ a: e, evo: id });
     }
     while (picks.length < 3 + tr('choice') && pool.length) {
       let sum = 0;
@@ -3493,8 +3735,7 @@
     return picks;
   }
 
-  function applyChoice(c) {
-    const P = G.player;
+  function applyChoice(P, c) {
     const a = c.a;
     P.pending = Math.max(0, P.pending - 1);
     if (a.kind === 'fallback') {
@@ -3503,47 +3744,46 @@
     }
     if (c.evo) {
       P.evo[c.evo] = true;
-      P.mag = Math.min(P.mag, magMax());
+      P.mag = Math.min(P.mag, magMax(P));
       note(`${L(a, 'name')}!`, '#ffcf4a');
       return;
     }
     if (c.swap) {
       // メイン武器の持ち替え (レベルは引き継ぐ)
-      const lv = ab(P.main);
+      const l = lv(P, P.main);
       delete P.ab[P.main];
-      P.ab[a.id] = lv;
+      P.ab[a.id] = l;
       P.main = a.id;
-      P.mag = magMax();
+      P.mag = magMax(P);
       P.reloadT = 0;
       P.charge = 0;
       P.spin = 0;
       return;
     }
-    const isNew = !ab(a.id);
-    P.ab[a.id] = ab(a.id) + 1;
+    const isNew = !lv(P, a.id);
+    P.ab[a.id] = lv(P, a.id) + 1;
     if (isNew) {
       if (a.kind === 'sub') P.subs.push(a.id);
       if (a.kind === 'skill') P.skills.push(a.id);
       if (a.kind === 'ult') P.ult = a.id;
     }
-    recalc();
+    recalc(P);
     if (a.id === 'defense') applyDefense();
-    if (a.id === 'ammo' || a.kind === 'main') P.mag = Math.min(P.mag, magMax());
+    if (a.id === 'ammo' || a.kind === 'main') P.mag = Math.min(P.mag, magMax(P));
   }
 
-  // テストや自動プレイでは、選択肢から自動で選ぶ
+  // おまかせ・自動テストでは、選択肢から自動で選ぶ (武器と持っている能力の強化を優先する。持ち替えはしない)
   const BOT_PREF = { main: 3, sub: 3, ult: 2.5, skill: 2, passive: 1.5, command: 1.2, fallback: 0, evo: 99 };
-  function autoPick() {
-    while (G.player.pending > 0) {
-      const ch = rollChoices();
-      // 自動プレイは、武器と持っている能力の強化を優先する (持ち替えはしない)
+  function autoPick(P) {
+    while (P.pending > 0) {
+      const ch = rollChoices(P);
       let best = ch[0];
       let bs = -1e9;
       for (const c of ch) {
-        const sc = c.evo ? 99 : (c.swap ? -5 : BOT_PREF[c.a.kind]) + (ab(c.a.id) ? 1 : 0) + Math.random();
+        const sc = c.evo ? 99 : (c.swap ? -5 : BOT_PREF[c.a.kind]) + (lv(P, c.a.id) ? 1 : 0) + Math.random();
         if (sc > bs) { bs = sc; best = c; }
       }
-      applyChoice(best);
+      applyChoice(P, best);
     }
   }
 
@@ -3556,7 +3796,7 @@
     input.mouseFire = false;
     input.move = null;
     input.aim = null;
-    lvChoices = rollChoices();
+    lvChoices = rollChoices(G.player);
     lvLockUntil = performance.now() + 450;
     renderLevelUp();
   }
@@ -3564,11 +3804,11 @@
     const P = G.player;
     const cards = lvChoices.map((c, i) => {
       const a = c.a;
-      const lv = c.evo ? 0 : ab(a.id);
+      const l = c.evo ? 0 : lv(P, a.id);
       const tag = a.kind === 'fallback' ? '' : c.evo ? `<span class="card-lv evo">${a.icon} ${esc(abName(c.evo))} + ${esc(abName(a.need))}</span>`
         : c.swap ? `<span class="card-lv swap">${t('swap')}</span>`
-          : lv ? `<span class="card-lv">Lv${lv} → ${lv + 1}</span>` : `<span class="card-lv new">${t('newTag')}</span>`;
-      const desc = lv && !c.swap ? L(a, 'up') : L(a, 'desc');
+          : l ? `<span class="card-lv">Lv${l} → ${l + 1}</span>` : `<span class="card-lv new">${t('newTag')}</span>`;
+      const desc = l && !c.swap ? L(a, 'up') : L(a, 'desc');
       return `
         <button type="button" class="card k-${a.kind}" data-act="pick" data-i="${i}">
           <span class="card-icon">${a.icon}</span>
@@ -3580,13 +3820,16 @@
           <span class="card-key">${i + 1}</span>
         </button>`;
     }).join('');
-    const have = ABIL.ABILITIES.filter((a) => ab(a.id) > 0).map((a) => `<span class="chip k-${a.kind}" title="${esc(L(a, 'name'))}">${P.evo[a.id] ? ABIL.EVOLUTIONS[a.id].icon : a.icon}<small>${ab(a.id)}</small></span>`).join('');
+    const have = ABIL.ABILITIES.filter((a) => lv(P, a.id) > 0).map((a) => `<span class="chip k-${a.kind}" title="${esc(L(a, 'name'))}">${P.evo[a.id] ? ABIL.EVOLUTIONS[a.id].icon : a.icon}<small>${lv(P, a.id)}</small></span>`).join('');
     showOverlay(`
       <div class="panel">
         <h2 class="lvup-title">${t('levelUpTitle')}</h2>
-        <p class="sub">${t('levelUpSub', P.lvl - P.pending + 1)}</p>
+        <p class="sub">${P.hero.icon} ${esc(L(P.hero, 'name'))} ・ ${t('levelUpSub', P.lvl - P.pending + 1)}${P.pending > 1 ? ` (${t('lvLeft', P.pending)})` : ''}</p>
         <div class="cards">${cards}</div>
-        ${P.rerolls > 0 ? `<div class="actions"><button type="button" class="btn" data-act="reroll">🔄 ${t('reroll', P.rerolls)}</button></div>` : ''}
+        <div class="actions">
+          ${P.rerolls > 0 ? `<button type="button" class="btn" data-act="reroll">🔄 ${t('reroll', P.rerolls)}</button>` : ''}
+          <button type="button" class="btn" data-act="autoLv">🎲 ${t('autoLv')}</button>
+        </div>
         <div class="chips">${have}</div>
       </div>`);
     overlay.classList.add('celebrate');
@@ -3595,89 +3838,34 @@
     const P = G.player;
     if (P.rerolls <= 0 || performance.now() < lvLockUntil) return;
     P.rerolls--;
-    lvChoices = rollChoices();
+    lvChoices = rollChoices(P);
     renderLevelUp();
   }
-
-  function pickLevelUp(i) {
-    if (performance.now() < lvLockUntil || !lvChoices[i]) return;
-    applyChoice(lvChoices[i]);
-    Sound.play('click');
-    if (G.player.pending > 0) {
-      showLevelUp();
-      return;
-    }
+  function closeLevelUp() {
     overlay.classList.remove('celebrate');
     hideOverlay();
     screen = 'play';
     rerender = null;
   }
+  function pickLevelUp(i) {
+    if (performance.now() < lvLockUntil || !lvChoices[i]) return;
+    applyChoice(G.player, lvChoices[i]);
+    Sound.play('click');
+    if (G.player.pending > 0) {
+      showLevelUp();
+      return;
+    }
+    closeLevelUp();
+  }
+  // おまかせ: 残りのレベルアップをまとめて自動で選ぶ
+  function autoLevelUp() {
+    if (performance.now() < lvLockUntil) return;
+    autoPick(G.player);
+    closeLevelUp();
+  }
 
-  // ---- テスト用の自動プレイ (バランス調整で「プレイヤーが戦うと戦局が変わるか」を確かめる) ----
+  // テスト用の自動プレイ: 操作している武将も AI で動かし、レベルアップも自動で選ぶ
   let bot = false;
-  function botAim(P) {
-    const foe = nearestFoe(P.x, P.y, 0, PLAYER.range * 0.9);
-    P.botFoe = foe;
-    if (!foe) return false;
-    P.face = Math.atan2(foe.y - P.y, foe.x - P.x);
-    return true;
-  }
-  function botMove(P) {
-    const foe = P.botFoe;
-    if (foe && Math.hypot(foe.x - P.x, foe.y - P.y) < 260) {
-      input.skill[0] = true;
-      input.skill[1] = true;
-      input.ult = true;
-    }
-    if (P.hp < P.maxHp * 0.35 || (foe && foe.def && foe.def.melee && Math.hypot(foe.x - P.x, foe.y - P.y) < 120)) {
-      // 下がる: 自軍の本拠地のほうへ
-      P.botLane = P.botLane ?? 0;
-      return botFollow(P, 0);
-    }
-    if (foe) {
-      const dx = foe.x - P.x;
-      const dy = foe.y - P.y;
-      const d = Math.hypot(dx, dy) || 1;
-      const rg = weapon().range;
-      if (d < Math.min(220, rg * 0.55)) return [-dx / d, -dy / d];
-      if (d > Math.min(360, rg * 0.85)) return [dx / d, dy / d];
-      return [-dy / d * 0.5, dx / d * 0.5];
-    }
-    // 押されているレーンの前線へ向かう
-    if (P.botLane == null || Math.random() < 0.002) P.botLane = G.front[0] < G.front[1] ? 0 : 1;
-    return botFollow(P, Math.max(0, G.front[P.botLane] - 0.05));
-  }
-  function botFollow(P, goal) {
-    const lane = G.lanes[P.botLane];
-    const p = lane.pts[0];
-    const cur = laneProject(lane, P.x, P.y).s / lane.len;
-    const want = goal * lane.len;
-    // 目標の道のりの点へ、レーンの曲がり角をたどって進む
-    let i = 1;
-    const fwd = want > cur * lane.len;
-    let tx;
-    let ty;
-    if (fwd) {
-      while (i < p.length - 1 && lane.cum[i] <= cur * lane.len + 1) i++;
-    } else {
-      i = p.length - 2;
-      while (i > 0 && lane.cum[i] >= cur * lane.len - 1) i--;
-    }
-    const segEnd = lane.cum[i];
-    if ((fwd && want < segEnd) || (!fwd && want > segEnd)) {
-      const j = clamp(i - (fwd ? 1 : 0), 0, p.length - 2);
-      const f = clamp((want - lane.cum[j]) / (lane.cum[j + 1] - lane.cum[j]), 0, 1);
-      tx = lerp(p[j].x, p[j + 1].x, f);
-      ty = lerp(p[j].y, p[j + 1].y, f);
-    } else {
-      tx = p[i].x;
-      ty = p[i].y;
-    }
-    const dx = tx - P.x;
-    const dy = ty - P.y;
-    const d = Math.hypot(dx, dy);
-    return d < 20 ? [0, 0] : [dx / d, dy / d];
-  }
 
   // ===================================================================
   // 兵士どうしの押し合い
@@ -3841,10 +4029,9 @@
     G.confuseT -= dt;
     G.shamans = G.units.filter((u) => u.alive && u.def.buff);
     buildGrid();
-    updatePlayer(dt);
+    updateParty(dt);
     updateBarracks(dt);
     updateCaptains(dt);
-    updateHeroes(dt);
     updateCommands(dt);
     updateRuins(dt);
     updatePoints(dt);
@@ -3857,7 +4044,7 @@
     buildGrid();
     separate();
     for (const u of G.units) if (u.alive && !u.def.fly) collideTiles(u);
-    if (G.player.alive && G.player.leapT <= 0) collideTiles(G.player);
+    for (const P of G.party) if (P.alive && P.leapT <= 0) collideTiles(P);
     updateHQ(dt);
     updateBullets(dt);
     updateAbilityObjects(dt);
@@ -3931,12 +4118,11 @@
     // 手前 (y が大きい) ほどあとに描く
     const list = [];
     for (const u of G.units) if (!u.def.fly && onScreen(u.x, u.y, 60)) list.push(u);
-    if (G.player.alive) list.push(G.player);
+    for (const P of G.party) if (P.alive && onScreen(P.x, P.y, 60)) list.push(P);
     list.sort((a, b) => a.y - b.y);
     for (const u of list) {
-      if (u.kind === 'player') drawPlayer();
+      if (u.kind === 'player') drawPlayer(u);
       else if (u.boss || u.clone) drawBoss(u);
-      else if (u.hero) drawHero(u);
       else drawUnit(u);
     }
     drawAbilityWorld();
@@ -3944,7 +4130,7 @@
     drawParticles();
     drawRoofs(i0, i1, j0, j1);
     for (const u of G.units) if (u.def.fly && onScreen(u.x, u.y, 30)) (u.boss ? drawBoss(u) : drawUnit(u));
-    drawPlayer(true);
+    for (const P of G.party) drawPlayer(P, true);
     drawLights();
     drawStructBars();
     drawTexts();
@@ -4713,25 +4899,61 @@
     }
   }
 
-  // top: 跳躍中は建物の屋根より上に描く
-  function drawPlayer(top = false) {
-    const P = G.player;
+  // 武将を描く。top: 跳躍中は建物の屋根より上に描く
+  function drawPlayer(P, top = false) {
     if (!P.alive || (P.leapT > 0) !== top) return;
-    // レベルが上がるほど、灯火のオーラが強くなる
+    const d = P.hero;
+    const ctl = P === G.player;
+    // レベルが上がるほど、灯火のオーラが強くなる (操作している武将は明るく)
     const aura = Math.min(1, (P.lvl - 1) / 20);
-    const size = 1.15 * VIS;
+    const size = 1.15 * Math.sqrt(P.r / 11) * VIS;
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.25 + aura * 0.5 + P.lvlFx * 0.5;
+    ctx.globalAlpha = (ctl ? 0.25 : 0.12) + aura * 0.4 + P.lvlFx * 0.5;
     const ar = 32 + aura * 20;
     ctx.drawImage(glowSprite, P.x - ar, P.y - 6 - ar - (P.leapH || 0), ar * 2, ar * 2);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    if (P.invT > 0 && Math.floor(P.invT * 20) % 2 === 0) ctx.globalAlpha = 0.5;
-    // 歩くたびに足を動かす (止まっているときは立ちポーズ)
-    const view = { x: P.x, y: P.y, face: P.face, walk: P.walk / 2.2, moving: P.walk !== P.lastWalk };
-    P.lastWalk = P.walk;
-    drawSprite(view, 'player', size, { lift: P.leapH || 0, ring: '#ffab3d', tint: P.hurtT > 0 ? 'flash' : null, weapon: PLAYER_GUN[P.main] });
+    // ミナトの回復の線
+    if (P.healTarget && P.healTarget.alive) {
+      ctx.strokeStyle = 'rgba(120,255,160,0.55)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(P.x, P.y);
+      ctx.lineTo(P.healTarget.x, P.healTarget.y);
+      ctx.stroke();
+    }
+    const fade = P.stealthOn ? 0.4 : 1;
+    ctx.globalAlpha = fade * (P.invT > 0 && Math.floor(P.invT * 20) % 2 === 0 ? 0.5 : 1);
+    let top2;
+    if (d.vehicle) {
+      top2 = drawTank(P, ctl);
+    } else {
+      // 歩くたびに足を動かす (止まっているときは立ちポーズ)
+      const key = d.sprite || P.id;
+      const view = { x: P.x, y: P.y, face: P.face, walk: P.walk / 2.2, moving: P.moving };
+      top2 = drawSprite(view, key, size, { lift: P.leapH || 0, ring: ctl ? '#ffab3d' : '#ffcf4a', tint: P.hurtT > 0 ? 'flash' : null, weapon: d.free ? PLAYER_GUN[P.main] : null });
+    }
     ctx.globalAlpha = 1;
+    // 頭の上: 番号 (切り替えのキー)・アイコン・レベル。操作している武将には印
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.font = '800 11px system-ui, sans-serif';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    const label = `${P.idx + 1} ${d.icon} Lv${P.lvl}${P.pending > 0 && !ctl ? ' ▲' : ''}`;
+    ctx.strokeText(label, P.x, top2 - 4);
+    ctx.fillStyle = ctl ? '#ffd27a' : '#cfe0ff';
+    ctx.fillText(label, P.x, top2 - 4);
+    if (ctl) {
+      const by = top2 - 20 + Math.sin(G.time * 5) * 2;
+      ctx.fillStyle = '#ffab3d';
+      ctx.beginPath();
+      ctx.moveTo(P.x - 6, by - 7);
+      ctx.lineTo(P.x + 6, by - 7);
+      ctx.lineTo(P.x, by);
+      ctx.closePath();
+      ctx.fill();
+    }
     // 足もとの体力
     const w = 30;
     const ratio = clamp(P.hp / P.maxHp, 0, 1);
@@ -4740,6 +4962,38 @@
     ctx.fillRect(P.x - w / 2 - 1, fy, w + 2, 5);
     ctx.fillStyle = ratio > 0.6 ? '#5ee07a' : ratio > 0.3 ? '#ffd24a' : '#ff5a4a';
     ctx.fillRect(P.x - w / 2, fy + 1, w * ratio, 3);
+  }
+
+  // レンの戦車 (車体はレーンの向き、砲塔はねらっている向き)。上の端の y を返す
+  function drawTank(P, ctl) {
+    const d = P.hero;
+    const r = P.r;
+    if (P.moving) P.hull = Math.atan2(Math.sin(P.walkA ?? P.face), Math.cos(P.walkA ?? P.face));
+    ctx.save();
+    ctx.translate(P.x, P.y);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(2, 6, r * 1.35, r * 0.8, 0, 0, TAU);
+    ctx.fill();
+    ctx.rotate(P.hull ?? 0);
+    ctx.fillStyle = '#2a2d26';
+    ctx.fillRect(-r * 1.25, -r * 0.95, r * 2.5, r * 0.4);
+    ctx.fillRect(-r * 1.25, r * 0.55, r * 2.5, r * 0.4);
+    ctx.fillStyle = P.hurtT > 0 ? '#fff' : d.color;
+    ctx.strokeStyle = ctl ? '#ffab3d' : '#ffcf4a';
+    ctx.lineWidth = 2.5;
+    roundRect(-r * 1.1, -r * 0.7, r * 2.2, r * 1.4, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.rotate(P.face - (P.hull ?? 0));
+    ctx.fillStyle = '#1a1d24';
+    ctx.fillRect(2, -3.5, r + 16, 7);
+    ctx.fillStyle = d.dark;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.55, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+    return P.y - r - 4;
   }
 
   function drawBullets() {
@@ -4783,6 +5037,16 @@
         ctx.lineTo(-6, 3);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
+      } else if (b.look === 'ofuda') {
+        // シズクのお札
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.a);
+        ctx.fillStyle = '#fbf6e8';
+        ctx.fillRect(-6, -3.5, 12, 7);
+        ctx.fillStyle = '#c02838';
+        ctx.fillRect(-2, -2, 4, 4);
         ctx.restore();
       } else if (b.look === 'curse') {
         ctx.fillStyle = 'rgba(160,60,255,0.4)';
@@ -4876,7 +5140,6 @@
 
   // ---- 能力の描画 (地雷・壁・砲弾・レールガン・雷・ドローン・刃) ----
   function drawAbilityWorld() {
-    const P = G.player;
     for (const m of G.mines) {
       ctx.fillStyle = '#3a3a3a';
       ctx.beginPath();
@@ -4973,10 +5236,24 @@
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
+    // 魔爪の切り跡
+    for (const sl of G.slashes) {
+      ctx.strokeStyle = `rgba(220,170,255,${(sl.life / sl.max) * 0.8})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(sl.x, sl.y, sl.r * 0.85, sl.a - sl.arc, sl.a + sl.arc);
+      ctx.stroke();
+    }
+    for (const P of G.party) drawHeroFx(P);
+  }
+
+  // 武将ごとの能力の描画 (レールガンの溜め・刃・灯火解放・ドローン)
+  function drawHeroFx(P) {
+    ctx.globalCompositeOperation = 'lighter';
     if (P.alive) {
       // レールガンの溜め
       if (P.charge > 0) {
-        const f = P.charge / weapon().charge;
+        const f = P.charge / weapon(P).charge;
         ctx.strokeStyle = `rgba(255,210,120,${0.3 + f * 0.5})`;
         ctx.lineWidth = 1 + f * 2;
         ctx.setLineDash([8, 8]);
@@ -4990,7 +5267,7 @@
         ctx.arc(P.x + Math.cos(P.face) * 18, P.y + Math.sin(P.face) * 18, 2 + f * 6, 0, TAU);
         ctx.fill();
       }
-      if (ab('blades')) {
+      if (lv(P, 'blades')) {
         const n = P.bladeN || 2;
         const rr = P.bladeR || 72;
         for (let i = 0; i < n; i++) {
@@ -5018,7 +5295,7 @@
       }
     }
     ctx.globalCompositeOperation = 'source-over';
-    if (P.alive && ab('drone')) {
+    if (P.alive && lv(P, 'drone')) {
       for (const d of P.drones) {
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
@@ -5207,9 +5484,11 @@
     const slots = touch
       ? [{ x: b.x - 76, y: b.y + 18, r: 26 }, { x: b.x - 6, y: b.y - 74, r: 26 }, { x: b.x - 70, y: b.y - 58, r: 28 }]
       : [{ x: cw / 2 - 50, y: ch - 34, r: 24 }, { x: cw / 2, y: ch - 34, r: 24 }, { x: cw / 2 + 56, y: ch - 34, r: 26 }];
-    P.skills.forEach((id, i) => {
+    qe(P).forEach((id, i) => {
+      if (!id) return;
       const cd = Math.max(0, P.cds[id] || 0);
-      out.push({ ...slots[i], act: 'skill', i, icon: ABIL.BY_ID[id].icon, ratio: 1 - cd / skillCd(id), ready: cd <= 0, label: touch ? '' : 'QE'[i] });
+      const icon = P.hero.free ? ABIL.BY_ID[id].icon : HERO_SKILLS[id].icon;
+      out.push({ ...slots[i], act: 'skill', i, icon, ratio: 1 - cd / qeCd(P, id), ready: cd <= 0, label: touch ? '' : 'QE'[i] });
     });
     if (P.ult) out.push({ ...slots[2], act: 'ult', icon: ABIL.BY_ID[P.ult].icon, ratio: P.ultG / 100, ready: P.ultG >= 100, label: touch ? '' : 'R' });
     return out;
@@ -5272,7 +5551,7 @@
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'left';
     ctx.font = '700 10px system-ui, sans-serif';
-    ctx.fillText(`${Math.ceil(P.hp)}/${Math.round(P.maxHp)}`, bx + 4, y0 + 15.5);
+    ctx.fillText(`${Math.min(Math.ceil(P.hp), Math.round(P.maxHp))}/${Math.round(P.maxHp)}`, bx + 4, y0 + 15.5);
     // 経験値
     ctx.fillStyle = 'rgba(255,255,255,0.12)';
     ctx.fillRect(bx, y0 + 25, bw, 5);
@@ -5281,7 +5560,8 @@
     // 弾
     ctx.font = '700 11px system-ui, sans-serif';
     ctx.fillStyle = P.reloadT > 0 ? '#ffd24a' : '#cfd6e8';
-    ctx.fillText(P.reloadT > 0 ? t('reload') : `${ABIL.BY_ID[P.main].icon} ${P.mag}/${magMax()}`, bx, y0 + 40);
+    const ammo = weapon(P).claw ? '∞' : `${P.mag}/${magMax(P)}`;
+    ctx.fillText(`${P.hero.icon}${small ? '' : ` ${L(P.hero, 'name')}`}  ${P.reloadT > 0 ? t('reload') : `${ABIL.BY_ID[P.main].icon} ${ammo}`}`, bx, y0 + 40);
 
     // 上の真ん中: 戦況ゲージ
     // 狭い画面では、ゲージを左上の表示の下に横いっぱいに出す
@@ -5360,13 +5640,13 @@
       ctx.fill();
       ctx.stroke();
     }
-    for (const h of G.heroes) {
-      if (!h.u) continue;
+    for (const Q of G.party) {
+      if (!Q.alive || Q === P) continue;
       ctx.fillStyle = '#5b8ff0';
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(mx + h.u.x * sxm, my + h.u.y * sym, 3, 0, TAU);
+      ctx.arc(mx + Q.x * sxm, my + Q.y * sym, 3, 0, TAU);
       ctx.fill();
       ctx.stroke();
     }
@@ -5380,43 +5660,68 @@
     ctx.lineWidth = 1;
     ctx.strokeRect(mx + G.cam.x * sxm - vw / 2, my + G.cam.y * sym - vh / 2, vw, vh);
 
-    // 仲間のヒーロー (タップ / クリック / F キーで指示を切り替える)
+    // 出撃している武将 (タップ / クリック / 1〜4 キーで操作する武将を切り替える。見出しで指示を切り替える)
     G.heroPanel = null;
-    if (G.heroes.length) {
+    {
       const hx = 10;
       const hy = small && !inline ? 118 : 66;
-      const hw = small ? 150 : 190;
-      const hh = 20 + G.heroes.length * 20;
-      G.heroPanel = { x: hx, y: hy, w: hw, h: hh };
+      const hw = small ? 156 : 200;
+      const many = G.party.length > 1;
+      const head = many ? 20 : 4;
+      const rowH = 24;
+      const hh = head + G.party.length * rowH + 4;
+      G.heroPanel = { x: hx, y: hy, w: hw, h: hh, head };
       ctx.fillStyle = 'rgba(10,12,18,0.72)';
       roundRectScreen(hx, hy, hw, hh, 8);
       ctx.fill();
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = '800 10px system-ui, sans-serif';
-      ctx.fillStyle = '#9fc0ff';
-      ctx.fillText(`${t('order')}: ${t('order_' + ORDERS[G.heroOrder])}${input.touchUI ? '' : ' (F)'}`, hx + 8, hy + 11);
-      G.heroes.forEach((h, i) => {
-        const y = hy + 30 + i * 20;
+      if (many) {
+        ctx.font = '800 10px system-ui, sans-serif';
+        ctx.fillStyle = '#9fc0ff';
+        ctx.fillText(`${t('order')}: ${t('order_' + ORDERS[G.heroOrder])}${input.touchUI ? ' ⟳' : ' (F)'}`, hx + 8, hy + 11);
+      }
+      G.party.forEach((Q, i) => {
+        const ry = hy + head + i * rowH;
+        const y = ry + rowH / 2;
+        if (Q === P) {
+          ctx.fillStyle = 'rgba(255,171,61,0.22)';
+          roundRectScreen(hx + 3, ry + 1, hw - 6, rowH - 2, 6);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,171,61,0.8)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        ctx.textAlign = 'left';
+        ctx.font = '800 9px system-ui, sans-serif';
+        ctx.fillStyle = '#9aa3b8';
+        if (!input.touchUI) ctx.fillText(String(i + 1), hx + 7, y);
         ctx.font = '13px system-ui, sans-serif';
         ctx.fillStyle = '#fff';
-        ctx.fillText(h.def.icon, hx + 6, y);
+        ctx.fillText(Q.hero.icon, hx + (input.touchUI ? 7 : 15), y);
+        const nx = hx + (input.touchUI ? 27 : 35);
         ctx.font = '700 10px system-ui, sans-serif';
-        ctx.fillStyle = '#e6ecf8';
-        ctx.fillText(`${L(h.def, 'name')}`, hx + 26, y - 4);
-        const bw2 = hw - 70;
+        ctx.fillStyle = Q === P ? '#ffd27a' : '#e6ecf8';
+        ctx.fillText(L(Q.hero, 'name'), nx, y - 5);
+        const bw2 = hw - (nx - hx) - 48;
         ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.fillRect(hx + 26, y + 3, bw2, 4);
-        if (h.u) {
-          ctx.fillStyle = '#7fb0ff';
-          ctx.fillRect(hx + 26, y + 3, bw2 * clamp(h.u.hp / h.u.maxHp, 0, 1), 4);
+        ctx.fillRect(nx, y + 3, bw2, 4);
+        ctx.textAlign = 'right';
+        if (Q.alive) {
+          const r = clamp(Q.hp / Q.maxHp, 0, 1);
+          ctx.fillStyle = r > 0.6 ? '#5ee07a' : r > 0.3 ? '#ffd24a' : '#ff5a4a';
+          ctx.fillRect(nx, y + 3, bw2 * r, 4);
           ctx.fillStyle = '#cfd6e8';
-          ctx.textAlign = 'right';
-          ctx.fillText(`Lv${h.lv}`, hx + hw - 8, y);
+          ctx.fillText(`Lv${Q.lvl}`, hx + hw - 8, y - 4);
         } else {
           ctx.fillStyle = '#ff8a7a';
-          ctx.textAlign = 'right';
-          ctx.fillText(`${Math.ceil(h.respawnT)}s`, hx + hw - 8, y);
+          ctx.fillText(`${Math.ceil(Q.respawnT)}s`, hx + hw - 8, y - 4);
+        }
+        // まだ選んでいないレベルアップ
+        if (Q.pending > 0 && Q !== P) {
+          ctx.fillStyle = '#ffcf4a';
+          ctx.font = '800 9px system-ui, sans-serif';
+          ctx.fillText(`▲${Q.pending}`, hx + hw - 8, y + 6);
         }
         ctx.textAlign = 'left';
       });
@@ -5454,7 +5759,7 @@
 
     // 左下: 持っている能力
     {
-      const list = ABIL.ABILITIES.filter((a) => ab(a.id) > 0);
+      const list = ABIL.ABILITIES.filter((a) => lv(P, a.id) > 0);
       const sz = small ? 22 : 26;
       const perRow = Math.max(4, Math.floor((input.touchUI ? cw - 230 : cw / 2 - 100) / (sz + 4)));
       list.forEach((a, i) => {
@@ -5467,10 +5772,10 @@
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#fff'; // 絵文字も fillStyle の透明度で薄くなるので、不透明な色にしておく
-        ctx.fillText(G.player.evo[a.id] ? ABIL.EVOLUTIONS[a.id].icon : a.icon, x + sz / 2, y + sz / 2 + 1);
+        ctx.fillText(P.evo[a.id] ? ABIL.EVOLUTIONS[a.id].icon : a.icon, x + sz / 2, y + sz / 2 + 1);
         ctx.font = '800 9px system-ui, sans-serif';
         ctx.fillStyle = '#fff';
-        ctx.fillText(String(ab(a.id)), x + sz - 4, y + sz - 4);
+        ctx.fillText(String(lv(P, a.id)), x + sz - 4, y + sz - 4);
       });
     }
     // スキル・必殺技のボタン
@@ -5519,14 +5824,18 @@
     }
     drawCutin();
     drawStamp();
-    // 倒されているとき
+    // 操作している武将が倒されているとき (ほかの武将が生きていれば、すぐに切り替わる)
     if (!P.alive && !G.over) {
       ctx.fillStyle = 'rgba(40,0,0,0.35)';
       ctx.fillRect(0, 0, cw, ch);
       ctx.font = '900 22px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = '#fff';
-      ctx.fillText(t('respawnIn', Math.ceil(P.respawnT)), cw / 2, ch / 2);
+      ctx.fillText(t('respawnIn', L(P.hero, 'name'), Math.ceil(P.respawnT)), cw / 2, ch / 2);
+      if (G.party.some((Q) => Q.alive) && G.switchT == null) {
+        ctx.font = '700 13px system-ui, sans-serif';
+        ctx.fillText(t(input.touchUI ? 'switchHintTouch' : 'switchHint'), cw / 2, ch / 2 + 28);
+      }
     }
 
     // タッチ操作のスティックと回避ボタン
@@ -5677,9 +5986,12 @@
     G.opts = opts;
     G.hard = opts.mode === 'h';
     G.test = !!opts.test;
-    G.heroes = (opts.heroes || []).map((id) => ({ id, def: HEROES[id], u: null, lv: 0, respawnT: 1 }));
+    const ids = (opts.heroes || []).filter((id) => HEROES[id]);
+    if (!ids.length) ids.push('recruit');
     G.heroOrder = 0;
-    G.player = makePlayer(opts.loadout);
+    G.switchT = null;
+    G.party = ids.map((id, k) => makeHero(id, k, opts.loadout));
+    G.player = G.party[0];
     for (const s of G.structs) {
       if (s.team !== 0) continue;
       s.maxHp = s.hp = structBase(s);
@@ -5750,7 +6062,7 @@
   const stars = (id) => Math.max(rec(id, 'n') ? rec(id, 'n').stars || 0 : 0, rec(id, 'h') ? rec(id, 'h').stars || 0 : 0);
   const heroUnlocked = (id) => TEST_UNLOCK || HEROES[id].unlock === 0 || cleared(HEROES[id].unlock);
   const loadoutUnlocked = (l) => TEST_UNLOCK || l.id === 'none' || (cleared(l.stage) && stars(l.stage) >= l.stars);
-  const heroSlots = (st) => (st.id >= 5 ? 2 : 1) + (save.army.room || 0);
+  const heroSlots = (st) => (st.id >= 4 ? 3 : 2) + (save.army.room || 0); // 配備できる武将の数
   const starStr = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
 
   function showStages() {
@@ -5795,7 +6107,11 @@
         heroes: (save.lastHeroes || []).filter((id) => HEROES[id] && heroUnlocked(id)).slice(0, slots),
         loadout: PROG.LOADOUTS.find((l) => l.id === save.lastLoadout && loadoutUnlocked(l)) ? save.lastLoadout : 'none',
       };
-      if (!brief.heroes.length) brief.heroes = ['onizuka'];
+      // 空いている枠は、仲間になっている武将で埋める
+      for (const id of Object.keys(HEROES)) {
+        if (brief.heroes.length >= slots) break;
+        if (heroUnlocked(id) && !brief.heroes.includes(id)) brief.heroes.push(id);
+      }
     }
     screen = 'brief';
     backAction = showStages;
@@ -5811,8 +6127,8 @@
       return `
         <button type="button" class="hero-card ${on ? 'on' : ''}" data-act="pickHero" data-id="${id}" ${ok ? '' : 'disabled'}>
           <span class="hero-icon">${ok ? h.icon : '🔒'}</span>
-          <span class="hero-body"><b>${ok ? esc(L(h, 'name')) : '???'}</b>${ok ? ` <small>${esc(L(h, 'role'))}${heroUp(id) ? ` ・ ★${heroUp(id)}` : ''}</small>` : ''}
-            <span class="hero-desc">${ok ? esc(lang === 'en' ? h.descEn : h.desc) : esc(t('heroLocked', h.unlock))}</span></span>
+          <span class="hero-body"><b>${on ? `${brief.heroes.indexOf(id) + 1}. ` : ''}${esc(L(h, 'name'))}</b> <small>${esc(L(h, 'role'))} ・ ${ABIL.BY_ID[h.weapon].icon} ${esc(abName(h.weapon))}${heroUp(id) ? ` ・ ★${heroUp(id)}` : ''}</small>
+            <span class="hero-desc">${esc(lang === 'en' ? h.descEn : h.desc)}${h.skills.length ? `<br>${h.skills.map((k) => `${HERO_SKILLS[k].icon} ${esc(L(HERO_SKILLS[k], 'name'))}`).join(' ・ ')}` : ''}</span></span>
         </button>`;
     }).join('');
     const loads = PROG.LOADOUTS.filter(loadoutUnlocked).map((l) => {
@@ -5829,9 +6145,9 @@
         </div>
         <h3>${t('heroesTitle', brief.heroes.length, slots)}</h3>
         <div class="hero-grid">${heroCards}</div>
-        <h3>${t('loadout')}</h3>
-        <div class="chip-row">${loads}</div>
-        <div class="actions sticky"><button type="button" class="btn primary" data-act="go">${t('deploy')}</button></div>
+        ${brief.heroes.includes('recruit') ? `<h3>${t('loadout')}</h3>
+        <div class="chip-row">${loads}</div>` : ''}
+        <div class="actions sticky"><button type="button" class="btn primary" data-act="go" ${brief.heroes.length ? '' : 'disabled'}>${t('deploy')}</button></div>
       </div>`, true);
   }
 
@@ -5954,7 +6270,7 @@
     G.result = win;
     const st = stageStarsNow();
     const S = G.stats;
-    const merit = Math.round((S.dead[1] / 10 + S.destroyed * 15 + S.rebuilt * 10 + S.points * 10 + S.captains * 25 + G.player.lvl * 3 + (win ? 80 : 0) + st * 20) * (G.hard ? 1.5 : 1));
+    const merit = Math.round((S.dead[1] / 10 + S.destroyed * 15 + S.rebuilt * 10 + S.points * 10 + S.captains * 25 + Math.round(G.party.reduce((n, P) => n + P.lvl, 0) * 1.5) + (win ? 80 : 0) + st * 20) * (G.hard ? 1.5 : 1));
     G.reward = { stars: st, merit };
     if (!G.test) {
       save.merit += merit;
@@ -5993,7 +6309,7 @@
           <li><span>${t('time')}</span><b>${fmtTime(G.time)}</b></li>
           <li><span>${t('kills')}</span><b>${G.stats.kills}</b></li>
           <li><span>${t('destroyed')}</span><b>${G.stats.destroyed}</b></li>
-          <li><span>${t('level')}</span><b>${G.player.lvl}</b></li>
+          <li><span>${t('level')}</span><b>${G.party.map((P) => `${P.hero.icon}${P.lvl}`).join(' ')}</b></li>
           <li><span>${t('captains')}</span><b>${G.stats.captains}</b></li>
           <li><span>${t('rebuilt')}</span><b>${G.stats.rebuilt}</b></li>
           <li><span>${t('deaths')}</span><b>${G.stats.deaths}</b></li>
@@ -6031,7 +6347,7 @@
           <h2>${t('settings')}</h2>
           <button type="button" class="back-btn ghost" tabindex="-1" aria-hidden="true">${t('back')}</button>
         </div>
-        <div class="set-list">${slider('sfx')}${slider('bgm')}${toggle('autoAim')}${toggle('autoFire')}${toggle('lite')}</div>
+        <div class="set-list">${slider('sfx')}${slider('bgm')}${toggle('autoAim')}${toggle('autoFire')}${toggle('autoPickAi')}${toggle('lite')}</div>
       </div>`, !fromPause);
   }
   function closeSettings() {
@@ -6082,7 +6398,7 @@
     } else if (codexTab === 'captains') {
       list = Object.entries(CAPTAINS).map(([id, d]) => card(save.seen[id], d.color, '☠', L(d, 'name'), L(d, 'title'), L(d, 'desc'), id)).join('');
     } else {
-      list = Object.entries(HEROES).map(([id, h]) => card(heroUnlocked(id), h.color, h.icon, L(h, 'name'), `${L(h, 'title')} ・ ${L(h, 'role')}`, lang === 'en' ? h.descEn : h.desc, id)).join('');
+      list = Object.entries(HEROES).map(([id, h]) => card(heroUnlocked(id), h.color, h.icon, L(h, 'name'), `${L(h, 'title')} ・ ${L(h, 'role')}`, (lang === 'en' ? h.descEn : h.desc) + (h.skills.length ? ` [${h.skills.map((k) => L(HERO_SKILLS[k], 'name')).join(' / ')}]` : ''), h.sprite || id)).join('');
     }
     const all = [...ALLY_LIST, ...DEMON_LIST, ...Object.keys(CAPTAINS)];
     const got = all.filter((k) => save.seen[k]).length + Object.keys(HEROES).filter(heroUnlocked).length;
@@ -6132,6 +6448,7 @@
     resume: resumeGame,
     retry: () => startBattle(stageIdx, G ? G.opts : {}),
     pick: (el) => pickLevelUp(Number(el.dataset.i)),
+    autoLv: () => autoLevelUp(),
   };
   overlay.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');
@@ -6184,9 +6501,13 @@
     lastT = now;
     if (G && (screen === 'play' || (G.over && screen !== 'select'))) update(dt);
     Sound.music.set(musicMood());
-    if (G && screen === 'play' && !G.over && G.player.pending > 0) {
-      if (bot) autoPick();
-      else showLevelUp();
+    if (G && screen === 'play' && !G.over) {
+      // 操作していない武将のレベルアップは、切り替えたときに選ぶ (設定で「おまかせ」にもできる)
+      if (bot || save.settings.autoPickAi) for (const P of G.party) if (P !== G.player && P.pending > 0) autoPick(P);
+      if (G.player.pending > 0) {
+        if (bot) autoPick(G.player);
+        else showLevelUp();
+      }
     }
     render();
     requestAnimationFrame(frame);
@@ -6194,13 +6515,13 @@
 
   // テスト用: ブラウザのコンソールや自動テストから、戦闘を早送りで動かす
   window.__DI = {
-    start: (i = 0, opts = { heroes: ['onizuka'] }) => startBattle(i, { test: true, ...opts }),
+    start: (i = 0, opts = { heroes: ['recruit', 'onizuka'] }) => startBattle(i, { test: true, ...opts }),
     // sec 秒ぶん、描画せずに進める (プレイヤーは何もしない)
     sim: (sec, step = 1 / 30) => {
       const n = Math.round(sec / step);
       for (let i = 0; i < n && G && !G.over; i++) {
         update(step);
-        if (G.player.pending > 0) autoPick();
+        for (const P of G.party) if (P.pending > 0) autoPick(P);
       }
       return window.__DI.info();
     },
@@ -6209,10 +6530,11 @@
       front: G.front.map((f) => +f.toFixed(2)),
       units: [G.units.filter((u) => u.team === 0).length, G.units.filter((u) => u.team === 1).length],
       structs: G.structs.map((s) => `${s.team}${s.kind === 'hq' ? 'H' : s.size}:${Math.round(s.hp)}`).join(' '),
-      lvl: G.player.lvl, cap: G.captains.map((c) => (c.u ? `Lv${c.lv}` : 'down')).join(','), abil: Object.entries(G.player.ab).map(([k, v]) => k + v).join(' '), dead: G.stats.dead.join('/'), dmg: G.stats.dmg.map(Math.round).join('/'), shots: G.stats.shots.join('/'), heal: Math.round(G.stats.heal),
+      lvl: G.party.map((P) => `${P.id}${P.lvl}${P.alive ? '' : 'x'}`).join(' '), cap: G.captains.map((c) => (c.u ? `Lv${c.lv}` : 'down')).join(','), abil: G.party.map((P) => Object.entries(P.ab).map(([k, v]) => k + v).join(' ')).join(' | '), deaths: G.stats.deaths, dead: G.stats.dead.join('/'), dmg: G.stats.dmg.map(Math.round).join('/'), shots: G.stats.shots.join('/'), heal: Math.round(G.stats.heal),
       types: Object.entries(G.units.reduce((m, u) => ((m[u.type] = (m[u.type] || 0) + 1), m), {})).map(([k, v]) => k + v).join(','),
     },
     get G() { return G; },
+    ai: (i) => { const P = G.party[i]; return aiThink(P, weapon(P), 1 / 30); },
     set bot(v) { bot = !!v; },
     spawn: (type, team, x, y, lane = 0) => spawnUnit(type, team, x, y, null, lane),
   };

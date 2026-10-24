@@ -6,7 +6,7 @@
 (() => {
   'use strict';
 
-  // 訓練所 (プレイヤー自身の強化)
+  // 訓練所 (出撃する武将全員の強化)
   const TRAINING = [
     { id: 'hp', icon: '❤️', max: 10, base: 40, per: 5, name: '体力', desc: 'HP 上限 +{v}%', en: { name: 'Stamina', desc: 'Max HP +{v}%' } },
     { id: 'atk', icon: '🎯', max: 10, base: 50, per: 4, name: '射撃訓練', desc: '攻撃力 +{v}%', en: { name: 'Marksmanship', desc: 'Attack +{v}%' } },
@@ -25,7 +25,7 @@
     { id: 'hq', icon: '🏢', max: 5, base: 60, per: 8, name: '本拠地の強化', desc: '本拠地の HP +{v}%・砲台の攻撃力も上がる', en: { name: 'Fortified HQ', desc: 'HQ HP +{v}%, stronger turret' } },
     { id: 'bar', icon: '🧱', max: 5, base: 50, per: 6, name: '兵舎の補強', desc: '兵舎の HP +{v}%', en: { name: 'Reinforced Barracks', desc: 'Barracks HP +{v}%' } },
     { id: 'rebuild', icon: '🚧', max: 3, base: 60, per: 10, name: '再建の手順', desc: '兵舎跡の再建にかかる時間 -{v}%', en: { name: 'Rebuild Drills', desc: 'Ruin rebuild time -{v}%' } },
-    { id: 'room', icon: '🗺️', max: 1, base: 500, per: 1, name: '作戦司令室', desc: '連れていけるヒーロー +{v} 人', en: { name: 'War Room', desc: '+{v} hero slot' } },
+    { id: 'room', icon: '🗺️', max: 1, base: 500, per: 1, name: '作戦司令室', desc: '出撃できる武将 +{v} 人', en: { name: 'War Room', desc: '+{v} hero slot' } },
   ];
 
   // 兵種の訓練 (各 5 段階・HP と攻撃力 +5%) と改良 (各 1 段階・特徴が 1 つ増える)
@@ -34,7 +34,7 @@
     base: 200,
     infantry: { desc: '手榴弾を投げるようになる', en: 'Throws grenades' },
     heavy: { desc: '盾が広くなり、後ろの味方も守れる', en: 'A wider shield that covers allies behind' },
-    medic: { desc: '回復の範囲が広がり、プレイヤーとヒーローの回復量が 2 倍', en: 'Wider healing, double healing for you and heroes' },
+    medic: { desc: '回復の範囲が広がり、武将の回復量が 2 倍', en: 'Wider healing, double healing for heroes' },
     sniper: { desc: '弾が 1 体だけ貫通する', en: 'Bullets pierce one foe' },
     grenadier: { desc: '爆発した場所の敵を燃やす', en: 'Explosions set foes on fire' },
     engineer: { desc: '修理中の建物の被ダメージ -30%', en: 'Buildings under repair take 30% less damage' },
