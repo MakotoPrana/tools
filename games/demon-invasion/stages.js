@@ -8,6 +8,7 @@
  *     lanes: 自軍の本拠地 → 敵の本拠地へ向かう道筋 (マスの座標。小数は使ってよい)。敵はこれを逆にたどる
  *     points: 占領ポイント { k: 種類, x, y (中心のマス) }  種類: water (給水塔) / radio (電波塔) / ammo (弾薬庫) / tower (見張り塔)
  *     ruins: 最初から兵舎跡になっている場所 (兵舎と同じ書き方。team は元の持ち主)
+ *     enemyTypes: このステージに出てくる悪魔 (兵舎の割合からこれ以外を除く。書いていなければ全部)
  *     captains: 敵の隊長 (units.js の CAPTAINS)
  *   locked: true のステージはまだ遊べない (開発中)
  */
@@ -78,6 +79,7 @@
         { k: 'water', x: 34, y: 38 }, // 南の通りの給水塔
       ],
       ruins: [],
+      enemyTypes: ['imp', 'ghoul', 'soldier', 'hound', 'bomber'], // このステージに出てくる悪魔
       captains: ['varga'], // 敵の隊長
       // 敵の兵士の強さの倍率 (HP・攻撃力)。敵優勢のバランスを決める
       enemyMul: 0.9,

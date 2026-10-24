@@ -116,6 +116,7 @@
       levelUpTitle: 'レベルアップ！', levelUpSub: (lv) => `Lv ${lv} ― 能力を 1 つ選ぶ`, newTag: 'NEW', swap: '持ち替え',
       kind_main: 'メイン武器', kind_sub: '灯火の武器', kind_skill: 'スキル', kind_ult: '必殺技', kind_passive: 'パッシブ', kind_command: '指揮',
       captains: '倒した隊長', confused: '混乱', rebuilt: '再建した兵舎', temp: '仮設', kind_evo: '進化',
+      nBehemoth: '破城獣が現れた！ 兵舎を守れ！',
       nRebuilt: '兵舎跡に仮設の兵舎を建てた！', nEnemyRebuilt: '悪魔が兵舎跡に巣を作った…',
       nPointTaken: (n) => `${n}を占領した！`, nPointLost: (n) => `${n}を悪魔に奪われた…`,
     },
@@ -142,6 +143,7 @@
       levelUpTitle: 'Level Up!', levelUpSub: (lv) => `Lv ${lv} - choose one ability`, newTag: 'NEW', swap: 'Swap',
       kind_main: 'Main weapon', kind_sub: 'Ember weapon', kind_skill: 'Skill', kind_ult: 'Ultimate', kind_passive: 'Passive', kind_command: 'Command',
       captains: 'Captains defeated', confused: 'Disarray', rebuilt: 'Barracks rebuilt', temp: 'Temp ', kind_evo: 'Evolution',
+      nBehemoth: 'A Behemoth has appeared! Protect the barracks!',
       nRebuilt: 'A temporary barracks now stands on the ruins!', nEnemyRebuilt: 'The demons built a nest on the ruins…',
       nPointTaken: (n) => `${n} captured!`, nPointLost: (n) => `The demons took the ${n}…`,
     },
@@ -426,7 +428,7 @@
       barrierDown: [false, false], overtime: false,
       mmDirty: true, mm: null, lamps: [],
       shells: [], strikes: [], mines: [], walls: [], beams: [], bolts: [], rings: [], flash: 0,
-      captains: [], confuseT: 0, points: [], decoys: [], sightT: 0,
+      captains: [], confuseT: 0, points: [], decoys: [], sightT: 0, shamans: [],
     };
     for (const [x, y, w, h, kind] of st.open) {
       for (let j = y; j < y + h; j++) {
@@ -484,7 +486,7 @@
       const th = b.face === 'e' || b.face === 'w' ? def.w : def.h;
       const s = addStruct({
         kind: 'barracks', team: b.team, size: b.size, def, tx: b.x, ty: b.y, tw, th, hp: def.hp, maxHp: def.hp,
-        face: b.face, lane: b.lane, nextLane: 0, count: 0, ready: 0, spawnT: rand(0.5, 1.5),
+        face: b.face, lane: b.lane, nextLane: 0, count: 0, ready: 0, spawnT: rand(0.5, 1.5), types: {},
       });
       const off = TILE * 0.7;
       s.sx = b.face === 'e' ? s.px + s.pw + off : b.face === 'w' ? s.px - off : s.cx;
@@ -640,7 +642,8 @@
   }
 
   // 一番近い相手 (兵士・プレイヤー)。見通しがあるものだけ
-  function nearestFoe(x, y, team, range, ign = -1) {
+  // noLos: 見通しを調べない (空を飛ぶ悪魔)。姿を消している暗殺者は、すぐ近く (60px) でないと見つけられない
+  function nearestFoe(x, y, team, range, ign = -1, noLos = false) {
     const gi0 = clamp(Math.floor((x - range) / CELL), 0, G.GC - 1);
     const gi1 = clamp(Math.floor((x + range) / CELL), 0, G.GC - 1);
     const gj0 = clamp(Math.floor((y - range) / CELL), 0, G.GR - 1);
@@ -658,8 +661,11 @@
           const dy = e.y - y;
           const d2 = dx * dx + dy * dy;
           if (d2 >= bd) continue;
-          if (tries++ > 12) continue; // 見通しの計算は多くても 12 回まで
-          if (!los(x, y, e.x, e.y, ign)) continue;
+          if (e.stealthOn && d2 > 3600) continue;
+          if (!noLos) {
+            if (tries++ > 12) continue; // 見通しの計算は多くても 12 回まで
+            if (!los(x, y, e.x, e.y, ign)) continue;
+          }
           bd = d2;
           best = e;
         }
@@ -728,6 +734,7 @@
       lane: laneIdx, wp, off: rand(-70, 70), face: team === 0 ? 0 : Math.PI,
       home, alive: true, hitT: 0, downT: 0, revived: false, playerHitT: -99, prog: pr.s / lane.len,
       healT: 0, healTarget: null, stuckT: 0, lx: x, ly: y, walk: Math.random() * 10,
+      revealT: -99, stealthOn: !!def.stealth, slowT: 0, moving: true,
     };
     G.units.push(u);
     if (home) home.count++;
@@ -765,13 +772,22 @@
   }
 
   function spawnFrom(s) {
-    const type = pickWeighted(MIX[s.team][s.size]);
+    // ステージに出てこない悪魔と、兵舎ごとの数の上限 (maxPer) に達した兵種は除く
+    const allow = s.team === 1 && G.st.enemyTypes;
+    let mix = MIX[s.team][s.size].filter(([k]) => (!allow || allow.includes(k)) && !(UNITS[k].maxPer && (s.types[k] || 0) >= UNITS[k].maxPer));
+    if (!mix.length) mix = [MIX[s.team][s.size][0]];
+    const type = pickWeighted(mix);
     let lane = s.lane;
     if (lane < 0) {
       lane = s.nextLane % G.lanes.length;
       s.nextLane++;
     }
-    return spawnUnit(type, s.team, s.sx, s.sy, s, lane);
+    const u = spawnUnit(type, s.team, s.sx, s.sy, s, lane);
+    if (u) {
+      s.types[type] = (s.types[type] || 0) + 1;
+      if (type === 'behemoth') note(t('nBehemoth'), '#ff8a7a');
+    }
+    return u;
   }
 
   function retarget(u) {
@@ -784,8 +800,30 @@
         if ((d.x - u.x) ** 2 + (d.y - u.y) ** 2 < 300 * 300 && los(u.x, u.y, d.x, d.y)) { u.target = d; break; }
       }
     }
-    if (!u.target) u.target = nearestFoe(u.x, u.y, u.team, def.aggro);
-    u.tStruct = u.target ? null : nearestFoeStruct(u.x, u.y, u.team, def.melee ? def.aggro * 0.7 : def.range);
+    u.tStruct = null;
+    // 破城獣: 建物を先にねらう
+    if (!u.target && def.wrecker) u.tStruct = nearestFoeStruct(u.x, u.y, u.team, def.aggro);
+    if (!u.target && !u.tStruct && !def.support) {
+      const P = G.player;
+      // 暗殺者: プレイヤーをねらう
+      if (def.stealth && P.alive && (P.x - u.x) ** 2 + (P.y - u.y) ** 2 < def.aggro * def.aggro) u.target = P;
+      if (!u.target && def.sniper) u.target = sniperTarget(u);
+      if (!u.target) u.target = nearestFoe(u.x, u.y, u.team, def.aggro, -1, !!def.fly);
+      if (!u.target) u.tStruct = nearestFoeStruct(u.x, u.y, u.team, def.melee ? def.aggro * 0.7 : def.range);
+    }
+    // 祈祷師: 相手が近いときは前に出ない
+    if (def.support) u.hold = !!nearestFoe(u.x, u.y, u.team, 260);
+    // 工兵: 近くの傷ついた自軍の建物を修理しに行く
+    if (def.repair) {
+      u.repairS = null;
+      if (!u.target) {
+        for (const st of G.structs) {
+          if (!st.alive || st.team !== u.team || st.hp > st.maxHp * 0.95) continue;
+          const p = rectPoint(st, u.x, u.y);
+          if (Math.hypot(p.x - u.x, p.y - u.y) < 300) { u.repairS = st; break; }
+        }
+      }
+    }
     u.prog = laneProject(G.lanes[u.lane], u.x, u.y).s / G.lanes[u.lane].len;
     if (def.heal) {
       // 衛生兵: 近くで一番弱っている味方
@@ -800,14 +838,34 @@
         if (ratio < br) { br = ratio; best = a; }
       }
       const P = G.player;
-      if (P.alive && Math.hypot(P.x - u.x, P.y - u.y) < def.healRange && P.hp / P.maxHp < br) best = P;
+      if (u.team === 0 && P.alive && Math.hypot(P.x - u.x, P.y - u.y) < def.healRange && P.hp / P.maxHp < br) best = P;
       u.healTarget = best;
     }
   }
 
+  // 狙撃兵: 大きな悪魔・隊長・祈祷師・呪術師を優先する
+  const SNIPE = { behemoth: 4, ogre: 3, shaman: 2, witch: 2 };
+  function sniperTarget(u) {
+    let best = null;
+    let bs = -1e9;
+    forFoesNear(u.x, u.y, u.def.aggro, u.team, (e) => {
+      if (e.stealthOn || e.kind !== 'unit') return;
+      const sc = (e.boss ? 5 : SNIPE[e.type] || 1) * 1000 - Math.hypot(e.x - u.x, e.y - u.y);
+      if (sc > bs && los(u.x, u.y, e.x, e.y)) {
+        bs = sc;
+        best = e;
+      }
+    });
+    return best;
+  }
+
+  // 吹き飛ばされない重い相手
+  const heavyBody = (e) => e.kind !== 'unit' || e.boss || e.def.vehicle || e.r >= 16;
+
   function updateUnit(u, dt) {
     const def = u.def;
     u.hitT -= dt;
+    if (def.stealth) u.stealthOn = G.time > u.revealT;
     if (u.burnT > 0) {
       // 火炎放射器で燃えている
       u.burnT -= dt;
@@ -824,6 +882,11 @@
     let cdRate = 1;
     if (u.team === 1 && G.confuseT > 0 && !u.boss) { spMul = 0.7; cdRate = 0.7; }
     if (u.team === 0 && auraOn(u)) spMul = 1 + 0.05 * ab('aura');
+    if (u.slowT > 0) {
+      // 呪術師の呪い
+      u.slowT -= dt;
+      spMul *= 0.6;
+    }
     if (u.downT > 0) {
       // グール: 倒れているあいだ。時間がたつと起き上がる
       u.downT -= dt;
@@ -863,6 +926,7 @@
       const d = Math.hypot(dx, dy) || 1;
       reach = def.melee ? u.r + tr + def.range : def.range + tr;
       u.face = Math.atan2(dy, dx);
+      if (def.stealth && d < reach + 70) u.revealT = Math.max(u.revealT, G.time + 1); // 攻撃の直前に姿を見せる
       if (d <= reach) {
         if (u.cd <= 0) {
           u.cd = def.rof * (u.rofMul || 1) * rand(0.9, 1.1);
@@ -874,6 +938,23 @@
         my = dy / d;
         if (d > def.aggro * 1.4) { u.target = null; u.tStruct = null; }
       }
+    } else if (u.repairS && u.repairS.alive && u.repairS.hp < u.repairS.maxHp) {
+      // 工兵の修理
+      const st = u.repairS;
+      const p = rectPoint(st, u.x, u.y);
+      const dx = p.x - u.x;
+      const dy = p.y - u.y;
+      const d = Math.hypot(dx, dy) || 1;
+      u.face = Math.atan2(dy, dx);
+      if (d > u.r + 24) {
+        mx = dx / d;
+        my = dy / d;
+      } else {
+        st.hp = Math.min(st.maxHp, st.hp + def.repair * dt);
+        if (Math.random() < dt * 6) spawnParticles(p.x, p.y, 2, '#ffe08a', 60, 0.3, 2);
+      }
+    } else if (u.hold) {
+      // 祈祷師は相手が近いと止まる
     } else {
       // レーンに沿って進む
       const lane = G.lanes[u.lane];
@@ -910,6 +991,12 @@
       }
     }
     const sp = u.speed * spMul * dt;
+    u.moving = !!(mx || my);
+    // オーガと破城獣は、ぶつかった遮蔽物を壊しながら進む
+    if (u.moving && (def.smash || def.wrecker)) {
+      const k = tileAt(u.x + mx * (u.r + 8), u.y + my * (u.r + 8));
+      if (k >= 0 && G.coverAt[k] >= 0) hurtCover(G.covers[G.coverAt[k]], 150 * dt);
+    }
     u.x += mx * sp;
     u.y += my * sp;
     if (mx || my) u.walk += dt * u.speed * 0.08;
@@ -941,22 +1028,61 @@
     return false;
   }
 
+  function nearShaman(u) {
+    for (const s of G.shamans) {
+      if (s !== u && (u.x - s.x) ** 2 + (u.y - s.y) ** 2 < s.def.buffRange * s.def.buffRange) return true;
+    }
+    return false;
+  }
+
   function attack(u, tx, ty) {
     const def = u.def;
     let dmg = def.dmg * u.dmgMul;
     if (u.team === 0 && auraOn(u)) dmg *= 1 + 0.1 * ab('aura');
     if (u.team === 1 && !u.boss && nearCaptain(u)) dmg *= 1.15;
     if (pointOwned('ammo', u.team)) dmg *= 1.15;
+    if (u.team === 1 && nearShaman(u)) dmg *= 1.2;
+    if (def.bomb) {
+      // 自爆デーモン: その場で爆発する
+      u.exploded = true;
+      blast(u.x, u.y, def.bomb, dmg, u.team, u, 1);
+      killUnit(u, false, null);
+      return;
+    }
+    if (def.smash) {
+      // オーガ: まわりをなぎ払って吹き飛ばす
+      forFoesNear(tx, ty, def.smash, u.team, (e) => {
+        hurt(e, dmg, u.x, u.y, u);
+        if (!heavyBody(e)) {
+          const a = Math.atan2(e.y - u.y, e.x - u.x);
+          e.x += Math.cos(a) * 40;
+          e.y += Math.sin(a) * 40;
+          collideTiles(e);
+        }
+      });
+      if (u.tStruct) hurtStruct(u.tStruct, dmg, u);
+      G.rings.push({ x: tx, y: ty, r: def.smash, life: 0.3, max: 0.3, color: '#c9a070' });
+      G.shake = Math.min(8, G.shake + (onScreen(u.x, u.y, 0) ? 2 : 0));
+      return;
+    }
+    if (def.lob) {
+      // 擲弾兵: 放り投げる
+      G.shells.push({ x0: u.x, y0: u.y, x: tx + rand(-20, 20), y: ty + rand(-20, 20), t: 0, T: 0.7, r: def.lob, dmg, team: u.team, src: u, look: 'grenade' });
+      return;
+    }
     if (def.melee) {
       if (u.target) hurt(u.target, dmg, u.x, u.y, u);
       else if (u.tStruct) hurtStruct(u.tStruct, dmg, u);
       spawnParticles(tx, ty, 3, u.team ? '#ff8a6a' : '#cfe0ff', 60, 0.2, 1.5);
       return;
     }
-    const a = Math.atan2(ty - u.y, tx - u.x) + rand(-def.spread, def.spread);
+    const a = Math.atan2(ty - u.y, tx - u.x);
     const ox = u.x + Math.cos(a) * (u.r + 4);
     const oy = u.y + Math.sin(a) * (u.r + 4);
-    fireBullet(ox, oy, a, def.bulletSpeed, dmg, u.team, u, def.range * 1.25, u.team === 1 ? 'magic' : 'tracer');
+    for (let i = 0; i < (def.pellets || 1); i++) {
+      const b = fireBullet(ox, oy, a + rand(-def.spread, def.spread), def.bulletSpeed, dmg, u.team, u, def.range * 1.25, def.curse ? 'curse' : u.team === 1 ? 'magic' : def.sniper ? 'snipe' : 'tracer');
+      if (b && def.curse) b.slow = def.curse;
+    }
     G.stats.shots[u.team]++;
     if (onScreen(u.x, u.y, 0)) {
       if (u.team === 0) muzzle(ox, oy, a);
@@ -993,6 +1119,8 @@
       return;
     }
     if (nearOwnBase(e)) amt *= GUARD;
+    if (e.def.stone && !e.moving) amt *= e.def.stone; // ガーゴイルは止まっていると石になる
+    if (e.def.stealth) e.revealT = G.time + 2;
     if (e.def.shield && sx != null) {
       const a = Math.atan2(sy - e.y, sx - e.x);
       if (Math.abs(angleDiff(a, e.face)) < 1.0) amt *= 1 - e.def.shield;
@@ -1033,10 +1161,18 @@
   function killUnit(u, byPlayer, src) {
     u.alive = false;
     G.stats.dead[u.team]++;
-    if (u.home) u.home.count--;
+    if (u.home) {
+      u.home.count--;
+      u.home.types[u.type]--;
+    }
     if (u.boss) {
       captainDown(u);
       return;
+    }
+    if (u.def.bomb && !u.exploded) {
+      // 撃たれた自爆デーモンは、まわりの悪魔を巻き込んで爆発する
+      u.exploded = true;
+      blast(u.x, u.y, u.def.bomb, u.def.dmg * u.dmgMul * 0.8, 0, byPlayer ? G.player : null, 0);
     }
     // 隊長は自軍の兵士を倒すと体力が少し回復する
     if (u.team === 0 && src && src.boss) src.hp = Math.min(src.maxHp, src.hp + src.maxHp * 0.04);
@@ -1065,7 +1201,7 @@
   function hurtStruct(s, amt, src) {
     if (!s.alive) return;
     if (s.kind === 'hq' && hasBarracks(s.team)) amt *= BARRIER;
-    if (src && src.kind === 'unit' && !src.boss) amt *= UNIT_VS_STRUCT;
+    if (src && src.kind === 'unit' && !src.boss) amt *= src.def.siege ?? UNIT_VS_STRUCT;
     s.hp -= amt;
     s.hitT = G.time;
     if (src && src.kind === 'player') gainXp(amt * 0.02);
@@ -1211,6 +1347,7 @@
         if (hit) {
           if (b.aoe) blast(b.x, b.y, b.aoe, b.dmg, b.team, b.src);
           else hurt(hit, b.dmg, b.x - b.vx * 0.05, b.y - b.vy * 0.05, b.src);
+          if (b.slow && (hit.kind === 'unit' || hit.kind === 'player')) hit.slowT = b.slow;
           if (b.burn && hit.kind === 'unit') {
             hit.burnT = 2;
             hit.burnDps = b.burn;
@@ -1431,6 +1568,10 @@
     const w = weapon();
     let speed = PLAYER.speed * P.speedMul * (unleashed ? 1.35 : 1);
     if (w.spin && !w.noSlow && P.spin > 0.05) speed *= 0.6; // ガトリングを撃っている間は遅い
+    if (P.slowT > 0) {
+      P.slowT -= dt;
+      speed *= 0.6;
+    }
     if (P.leapT > 0) {
       // 灯火の跳躍: 建物を飛び越える (跳んでいる間は当たり判定なし)
       P.leapT -= dt;
@@ -1470,7 +1611,7 @@
         let bd = 1e9;
         const range = Math.max(300, w.range);
         for (const u of G.units) {
-          if (!u.alive || u.team === 0) continue;
+          if (!u.alive || u.team === 0 || u.stealthOn) continue;
           const dx = u.x - P.x;
           const dy = u.y - P.y;
           const d = Math.hypot(dx, dy);
@@ -1656,7 +1797,7 @@
   function blast(x, y, r, dmg, team, src, structMul = 1, look = 'fire') {
     forFoesNear(x, y, r, team, (e) => hurt(e, dmg, x, y, src));
     for (const s of G.structs) {
-      if (!s.alive || s.team === team) continue;
+      if (!s.alive || s.team === team || structMul <= 0) continue;
       const p = rectPoint(s, x, y);
       if (Math.hypot(p.x - x, p.y - y) < r) hurtStruct(s, dmg * structMul, src);
     }
@@ -1809,7 +1950,7 @@
   // 射程の中の悪魔 (見通しのあるもの)
   function foesInRange(x, y, r) {
     const out = [];
-    forFoesNear(x, y, r, 0, (u) => { if (u.kind === 'unit' && los(x, y, u.x, u.y)) out.push(u); });
+    forFoesNear(x, y, r, 0, (u) => { if (u.kind === 'unit' && !u.stealthOn && los(x, y, u.x, u.y)) out.push(u); });
     return out;
   }
 
@@ -1917,7 +2058,7 @@
       if (P.chargeHit.has(u)) return;
       P.chargeHit.add(u);
       hurt(u, 40 * (1 + 0.25 * (L - 1)) * P.atkMul, P.x, P.y, P);
-      if (!u.boss) {
+      if (!heavyBody(u)) {
         u.x += P.dx * 50;
         u.y += P.dy * 50;
         collideTiles(u);
@@ -1961,6 +2102,7 @@
       for (const u of G.units) {
         if (u.alive && u.team === 1 && onScreen(u.x, u.y, 0)) {
           hurt(u, dmg, null, null, P);
+          u.revealT = G.time + 5;
           spawnParticles(u.x, u.y, 4, '#fff2b0', 100, 0.5, 3, 'glow');
         }
       }
@@ -2064,7 +2206,13 @@
         const dy = Math.max(s.py - e.y, 0, e.y - s.py - s.ph);
         return dx * dx + dy * dy < RUIN_R * RUIN_R;
       };
-      for (const u of G.units) if (u.alive && near(u)) n[u.team]++;
+      let eng = false;
+      for (const u of G.units) {
+        if (u.alive && near(u)) {
+          n[u.team]++;
+          if (u.def.repair) eng = true;
+        }
+      }
       const pHere = P.alive && near(P);
       if (pHere) n[0]++;
       r.pHere = pHere;
@@ -2074,7 +2222,8 @@
         continue;
       }
       // プレイヤーがいると 2 倍、工兵の心得でさらに速い
-      const mul = builder === 0 && pHere ? 2 * (1 + 0.25 * ab('engineer')) : 1;
+      let mul = builder === 0 && pHere ? 2 * (1 + 0.25 * ab('engineer')) : 1;
+      if (builder === 0 && eng) mul *= 1.5; // 工兵がいると 1.5 倍
       if (r.team !== builder && r.prog > 0) {
         r.prog = Math.max(0, r.prog - (dt / REBUILD) * mul);
         continue;
@@ -2098,6 +2247,7 @@
     s.hp = s.maxHp;
     s.count = 0;
     s.ready = 0;
+    s.types = {};
     s.spawnT = 1;
     s.hitT = -99;
     for (let j = s.ty; j < s.ty + s.th; j++) {
@@ -2390,7 +2540,7 @@
         if (u.dashHit.has(e)) return;
         u.dashHit.add(e);
         hurt(e, u.def.dmg * u.dmgMul * 1.4, u.x, u.y, u);
-        if (e.kind === 'unit') {
+        if (!heavyBody(e)) {
           e.x += u.dx * 50;
           e.y += u.dy * 50;
           collideTiles(e);
@@ -2856,6 +3006,7 @@
       note(t('nOvertime'), '#ffcf4a');
     }
     G.confuseT -= dt;
+    G.shamans = G.units.filter((u) => u.alive && u.def.buff);
     buildGrid();
     updatePlayer(dt);
     updateBarracks(dt);
@@ -2871,7 +3022,7 @@
     }
     buildGrid();
     separate();
-    for (const u of G.units) if (u.alive) collideTiles(u);
+    for (const u of G.units) if (u.alive && !u.def.fly) collideTiles(u);
     if (G.player.alive && G.player.leapT <= 0) collideTiles(G.player);
     updateHQ(dt);
     updateBullets(dt);
@@ -2942,12 +3093,13 @@
     drawStructs();
     drawDecoys();
     drawOrbs();
-    for (const u of G.units) if (onScreen(u.x, u.y, 30)) (u.boss ? drawBoss(u) : drawUnit(u));
+    for (const u of G.units) if (!u.def.fly && onScreen(u.x, u.y, 30)) (u.boss ? drawBoss(u) : drawUnit(u));
     drawPlayer();
     drawAbilityWorld();
     drawBullets();
     drawParticles();
     drawRoofs(i0, i1, j0, j1);
+    for (const u of G.units) if (u.def.fly && onScreen(u.x, u.y, 30)) drawUnit(u);
     drawPlayer(true);
     drawLights();
     drawStructBars();
@@ -3286,9 +3438,12 @@
       ctx.restore();
       return;
     }
+    // 姿を消している暗殺者は、うっすらとしか見えない
+    if (u.stealthOn) ctx.globalAlpha = 0.14;
+    const fly = def.fly ? 10 + Math.sin(u.walk * 0.6) * 2 : 0;
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
-    ctx.ellipse(2, 4, u.r, u.r * 0.7, 0, 0, TAU);
+    ctx.ellipse(2 + fly * 0.4, 4 + fly, u.r * (def.vehicle ? 1.4 : 1), u.r * 0.7, 0, 0, TAU);
     ctx.fill();
     const bob = Math.sin(u.walk) * 1.2;
     if (u.elite) {
@@ -3299,10 +3454,29 @@
       ctx.stroke();
     }
     ctx.rotate(u.face);
-    if (u.team === 0) {
-      // 銃
+    if (u.type === 'apc') {
+      // 装甲車
+      ctx.fillStyle = u.hitT > 0 ? '#fff' : def.color;
+      ctx.strokeStyle = def.dark;
+      ctx.lineWidth = 3;
+      roundRect(-u.r * 1.3, -u.r * 0.85, u.r * 2.6, u.r * 1.7, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#1a2230';
+      ctx.fillRect(-u.r * 1.2, -u.r * 0.95, u.r * 2.4, 4);
+      ctx.fillRect(-u.r * 1.2, u.r * 0.95 - 4, u.r * 2.4, 4);
       ctx.fillStyle = '#1a1d24';
-      ctx.fillRect(u.r - 4, -2 + bob * 0.3, u.r + 4, 4);
+      ctx.fillRect(4, -2.5, u.r + 10, 5);
+      ctx.fillStyle = def.dark;
+      ctx.beginPath();
+      ctx.arc(2, 0, u.r * 0.5, 0, TAU);
+      ctx.fill();
+    } else if (u.team === 0) {
+      // 銃 (狙撃兵は長い銃、擲弾兵は太い筒、工兵は短い散弾銃)
+      ctx.fillStyle = '#1a1d24';
+      if (def.sniper) ctx.fillRect(u.r - 4, -1.5, u.r + 14, 3);
+      else if (def.lob) ctx.fillRect(u.r - 4, -3.5 + bob * 0.3, u.r + 2, 7);
+      else ctx.fillRect(u.r - 4, -2 + bob * 0.3, def.repair ? u.r : u.r + 4, 4);
       ctx.fillStyle = u.hitT > 0 ? '#fff' : def.color;
       ctx.strokeStyle = def.dark;
       ctx.lineWidth = 2;
@@ -3328,6 +3502,16 @@
           ctx.stroke();
         }
       }
+      if (def.repair) {
+        ctx.fillStyle = '#ffd24a';
+        ctx.fillRect(-4, -4, 8, 8);
+      }
+      if (def.sniper) {
+        ctx.fillStyle = '#9fe0ff';
+        ctx.beginPath();
+        ctx.arc(u.r + 2, 0, 2, 0, TAU);
+        ctx.fill();
+      }
       if (def.shield) {
         ctx.strokeStyle = '#a9c8f0';
         ctx.lineWidth = 5;
@@ -3350,6 +3534,70 @@
         ctx.fillRect(u.r * 1.3, -3, 2, 2);
         ctx.fillRect(u.r * 1.3, 1, 2, 2);
       } else {
+        ctx.translate(0, -fly);
+        if (def.fly) {
+          // 翼 (止まって石になっているときは閉じる)
+          const open = u.moving ? 1 + Math.sin(u.walk * 2) * 0.25 : 0.5;
+          ctx.fillStyle = u.moving ? '#5a5f6a' : '#4a4d55';
+          for (const sd of [-1, 1]) {
+            ctx.beginPath();
+            ctx.moveTo(-2, sd * 4);
+            ctx.lineTo(-u.r * 0.6, sd * u.r * 2.1 * open);
+            ctx.lineTo(-u.r * 1.4, sd * u.r * 1.2 * open);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+        if (u.type === 'witch') {
+          ctx.fillStyle = 'rgba(200,90,255,0.6)';
+          ctx.beginPath();
+          ctx.arc(u.r + 6, 0, 4 + Math.sin(G.time * 8) * 1, 0, TAU);
+          ctx.fill();
+        }
+        if (u.type === 'shaman') {
+          ctx.strokeStyle = '#2a1a0a';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-2, -6);
+          ctx.lineTo(u.r + 6, -6);
+          ctx.stroke();
+          ctx.fillStyle = '#7dffa0';
+          ctx.beginPath();
+          ctx.arc(u.r + 7, -6, 3.5, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(125,255,160,0.25)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, 0, def.buffRange * 0.5 + Math.sin(G.time * 3) * 4, 0, TAU);
+          ctx.stroke();
+        }
+        if (u.type === 'shadow') {
+          ctx.strokeStyle = '#c9b8ff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(u.r - 2, 5);
+          ctx.lineTo(u.r + 9, 5);
+          ctx.stroke();
+        }
+        if (u.type === 'ogre' || u.type === 'behemoth') {
+          // 棍棒 / 牙
+          ctx.fillStyle = u.type === 'ogre' ? '#4a3420' : '#e8dcc0';
+          if (u.type === 'ogre') {
+            ctx.save();
+            ctx.rotate(0.5 + Math.max(0, u.cd) * 0.6);
+            roundRect(u.r * 0.4, u.r * 0.5, u.r * 1.4, 9, 4);
+            ctx.fill();
+            ctx.restore();
+          } else {
+            for (const sd of [-1, 1]) {
+              ctx.beginPath();
+              ctx.moveTo(u.r * 0.7, sd * u.r * 0.35);
+              ctx.lineTo(u.r * 1.45, sd * u.r * 0.55);
+              ctx.lineTo(u.r * 0.8, sd * u.r * 0.6);
+              ctx.fill();
+            }
+          }
+        }
         if (u.type === 'soldier') {
           // 杖と魔石
           ctx.strokeStyle = '#2a1018';
@@ -3374,15 +3622,47 @@
           ctx.lineTo(u.r + 6, u.r * 0.5);
           ctx.stroke();
         }
-        ctx.fillStyle = body;
+        const stone = def.stone && !u.moving;
+        ctx.fillStyle = stone && u.hitT <= 0 ? '#6a6d75' : body;
+        if (def.bomb) {
+          // 自爆デーモン: 近づくほど赤く点滅する
+          const hot = u.target || u.tStruct ? 0.5 + 0.5 * Math.sin(G.time * 20) : 0;
+          ctx.fillStyle = hot > 0.6 ? '#ffe08a' : body;
+        }
         ctx.strokeStyle = def.dark;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = u.r >= 16 ? 3 : 2;
         ctx.beginPath();
         ctx.arc(0, 0, u.r, 0, TAU);
         ctx.fill();
         ctx.stroke();
+        if (stone) {
+          ctx.strokeStyle = 'rgba(30,30,35,0.6)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(-u.r * 0.5, -u.r * 0.6);
+          ctx.lineTo(0, 0);
+          ctx.lineTo(-u.r * 0.2, u.r * 0.7);
+          ctx.stroke();
+        }
+        if (def.bomb) {
+          ctx.fillStyle = Math.random() < 0.5 ? '#ffe14a' : '#ff6a2a';
+          ctx.beginPath();
+          ctx.arc(-u.r * 0.7, -u.r * 0.7, 2.5, 0, TAU);
+          ctx.fill();
+        }
+        if (u.type === 'witch') {
+          // とんがり帽子 (上から見た円と、つば)
+          ctx.fillStyle = '#2e0d45';
+          ctx.beginPath();
+          ctx.arc(-1, 0, u.r * 0.75, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#5a1a8a';
+          ctx.beginPath();
+          ctx.arc(-1, 0, u.r * 0.35, 0, TAU);
+          ctx.fill();
+        }
         // 角
-        if (u.type !== 'ghoul') {
+        if (u.type !== 'ghoul' && u.type !== 'witch' && !def.bomb) {
           ctx.fillStyle = '#2a0c10';
           for (const s of [-1, 1]) {
             ctx.beginPath();
@@ -3393,13 +3673,13 @@
           }
         }
         // 光る目
-        ctx.fillStyle = u.type === 'ghoul' ? '#d8ff7a' : '#ffe14a';
+        ctx.fillStyle = u.type === 'ghoul' ? '#d8ff7a' : u.type === 'shadow' ? '#c9a0ff' : '#ffe14a';
         ctx.fillRect(u.r * 0.45, -u.r * 0.4, 2.5, 2.5);
         ctx.fillRect(u.r * 0.45, u.r * 0.4 - 2.5, 2.5, 2.5);
       }
     }
     ctx.restore();
-    if (u.hp < u.maxHp) {
+    if (u.hp < u.maxHp && !u.stealthOn) {
       const w = u.r * 2;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(u.x - w / 2, u.y - u.r - 8, w, 3);
@@ -3473,6 +3753,15 @@
         ctx.fillStyle = '#ff7a2a';
         ctx.fillRect(-10, -2, 3, 4);
         ctx.restore();
+      } else if (b.look === 'curse') {
+        ctx.fillStyle = 'rgba(160,60,255,0.4)';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 8, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = '#e0c0ff';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 3, 0, TAU);
+        ctx.fill();
       } else if (b.look === 'magic') {
         ctx.fillStyle = 'rgba(255,80,200,0.35)';
         ctx.beginPath();
@@ -3483,7 +3772,7 @@
         ctx.arc(b.x, b.y, 2.5, 0, TAU);
         ctx.fill();
       } else {
-        const len = b.look === 'player' ? 16 : b.look === 'cannon' ? 14 : 10;
+        const len = b.look === 'player' ? 16 : b.look === 'cannon' ? 14 : b.look === 'snipe' ? 30 : 10;
         ctx.strokeStyle = b.look === 'player' ? '#ffd27a' : b.look === 'cannon' || b.look === 'drone' ? '#9fd0ff' : '#fff2b0';
         ctx.lineWidth = b.look === 'cannon' ? 4 : 2;
         ctx.beginPath();

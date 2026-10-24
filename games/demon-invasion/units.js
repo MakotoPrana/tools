@@ -5,6 +5,8 @@
  *     melee: 近接攻撃なら true / range: 射程 (px) / aggro: 敵に気づいて向かっていく距離
  *     dmg: 1回のダメージ / rof: 攻撃の間隔 (秒) / spread: 弾のぶれ (ラジアン) / bulletSpeed: 弾の速さ
  *     xp: 倒したときの経験値 (魂の灯)
+ *     maxPer: 1 つの兵舎から同時に出せる数の上限 / siege: 建物へのダメージの割合 (書いていなければ 15%)
+ *     fly: 空を飛ぶ (建物を越える) / stealth: 姿を消して近づく / support: 自分では攻撃しない (祈祷師)
  */
 (() => {
   'use strict';
@@ -28,6 +30,30 @@
       heal: 5, healRange: 130, // 近くの一番弱っている味方を 1 秒に 5 回復する
       color: '#e9eef5', dark: '#5b6b80',
     },
+    sniper: {
+      team: 0, name: '狙撃兵', en: { name: 'Sniper' },
+      hp: 70, r: 10, speed: 62, range: 520, aggro: 540, dmg: 45, rof: 2.6, spread: 0.01, bulletSpeed: 1400,
+      sniper: true, // 大きな悪魔・隊長・祈祷師・呪術師を優先して撃つ
+      color: '#5a86c8', dark: '#22385e',
+    },
+    grenadier: {
+      team: 0, name: '擲弾兵', en: { name: 'Grenadier' },
+      hp: 110, r: 10, speed: 64, range: 320, aggro: 340, dmg: 28, rof: 2.2, spread: 0, bulletSpeed: 0,
+      lob: 55, siege: 0.5, // 弾を放り投げて、着いた所で半径 55 の爆発。建物に強い
+      color: '#4f7fd6', dark: '#24406e',
+    },
+    engineer: {
+      team: 0, name: '工兵', en: { name: 'Engineer' },
+      hp: 100, r: 10, speed: 68, range: 160, aggro: 220, dmg: 5, rof: 1.0, spread: 0.25, bulletSpeed: 750, pellets: 4,
+      repair: 15, // 近くの傷ついた自軍の建物を 1 秒に 15 修理する。兵舎跡の再建も 1.5 倍
+      color: '#d9a441', dark: '#6a4a10',
+    },
+    apc: {
+      team: 0, name: '装甲車', en: { name: 'Armored Car' },
+      hp: 900, r: 18, speed: 45, range: 330, aggro: 350, dmg: 7, rof: 0.15, spread: 0.09, bulletSpeed: 900,
+      maxPer: 1, vehicle: true,
+      color: '#3d5a86', dark: '#1a2a44',
+    },
 
     // ---------------- 敵軍 ----------------
     imp: {
@@ -50,6 +76,48 @@
       team: 1, name: 'ヘルハウンド', en: { name: 'Hellhound' },
       hp: 90, r: 10, speed: 150, melee: true, range: 22, aggro: 320, dmg: 14, rof: 0.5, xp: 8,
       color: '#e07a2a', dark: '#5e2a06',
+    },
+    gargoyle: {
+      team: 1, name: 'ガーゴイル', en: { name: 'Gargoyle' },
+      hp: 120, r: 11, speed: 95, melee: true, range: 22, aggro: 300, dmg: 14, rof: 0.7, xp: 10,
+      fly: true, stone: 0.2, // 建物を越えて飛ぶ。止まっているあいだは石になり、受けるダメージが 20% になる
+      color: '#8a8f9a', dark: '#3a3d45',
+    },
+    witch: {
+      team: 1, name: '呪術師', en: { name: 'Witch' },
+      hp: 80, r: 10, speed: 60, range: 380, aggro: 400, dmg: 7, rof: 1.4, spread: 0.04, bulletSpeed: 300, xp: 10,
+      curse: 3, // 当たった相手を 3 秒鈍らせる
+      color: '#7a3aa8', dark: '#2e0d45',
+    },
+    bomber: {
+      team: 1, name: '自爆デーモン', en: { name: 'Bomber' },
+      hp: 70, r: 10, speed: 125, melee: true, range: 14, aggro: 300, dmg: 60, rof: 1, xp: 6,
+      bomb: 80, siege: 1, // 相手にたどり着くと半径 80 で爆発する。撃たれて倒れても爆発し、まわりの悪魔を巻き込む
+      color: '#ff6a2a', dark: '#6a1a04',
+    },
+    shaman: {
+      team: 1, name: '祈祷師', en: { name: 'Shaman' },
+      hp: 110, r: 10, speed: 58, range: 0, aggro: 280, dmg: 0, rof: 1, xp: 14,
+      support: true, heal: 8, healRange: 170, buff: 0.2, buffRange: 180, // まわりの悪魔を回復し、攻撃力を 20% 上げる
+      color: '#3a8a7a', dark: '#0e3a32',
+    },
+    shadow: {
+      team: 1, name: '影の暗殺者', en: { name: 'Shadow' },
+      hp: 90, r: 10, speed: 120, melee: true, range: 20, aggro: 500, dmg: 35, rof: 1.2, xp: 12,
+      stealth: true, // 攻撃の直前と、攻撃を受けたときだけ姿が見える。プレイヤーをねらう
+      color: '#2a2030', dark: '#0a060e',
+    },
+    ogre: {
+      team: 1, name: 'オーガ', en: { name: 'Ogre' },
+      hp: 600, r: 16, speed: 50, melee: true, range: 26, aggro: 260, dmg: 30, rof: 1.4, xp: 40,
+      maxPer: 2, smash: 60, // 棍棒で半径 60 をなぎ払い、吹き飛ばす。遮蔽物を壊しながら進む
+      color: '#7a5a3a', dark: '#2e1e0e',
+    },
+    behemoth: {
+      team: 1, name: '破城獣', en: { name: 'Behemoth' },
+      hp: 2000, r: 24, speed: 40, melee: true, range: 30, aggro: 300, dmg: 40, rof: 1.5, xp: 80,
+      maxPer: 1, siege: 3, wrecker: true, // 建物を優先してねらい、建物に 3 倍のダメージ
+      color: '#5a2a2a', dark: '#200808',
     },
   };
 
@@ -76,15 +144,15 @@
   const MIX = {
     0: {
       s: [['infantry', 100]],
-      m: [['infantry', 70], ['heavy', 20], ['medic', 10]],
-      l: [['infantry', 60], ['heavy', 25], ['medic', 15]],
-      xl: [['infantry', 60], ['heavy', 25], ['medic', 15]],
+      m: [['infantry', 60], ['heavy', 20], ['medic', 10], ['engineer', 10]],
+      l: [['infantry', 45], ['heavy', 15], ['medic', 10], ['engineer', 10], ['sniper', 10], ['grenadier', 10]],
+      xl: [['infantry', 45], ['heavy', 15], ['medic', 10], ['engineer', 10], ['sniper', 10], ['grenadier', 10], ['apc', 6]],
     },
     1: {
       s: [['imp', 45], ['ghoul', 25], ['soldier', 30]],
-      m: [['imp', 30], ['ghoul', 20], ['soldier', 30], ['hound', 20]],
-      l: [['imp', 30], ['ghoul', 20], ['soldier', 30], ['hound', 20]],
-      xl: [['imp', 30], ['ghoul', 20], ['soldier', 30], ['hound', 20]],
+      m: [['imp', 25], ['ghoul', 15], ['soldier', 25], ['hound', 15], ['gargoyle', 10], ['witch', 5], ['bomber', 5]],
+      l: [['imp', 20], ['ghoul', 12], ['soldier', 22], ['hound', 12], ['gargoyle', 8], ['witch', 6], ['bomber', 6], ['shaman', 5], ['shadow', 5], ['ogre', 4]],
+      xl: [['imp', 20], ['ghoul', 12], ['soldier', 22], ['hound', 12], ['gargoyle', 8], ['witch', 6], ['bomber', 6], ['shaman', 5], ['shadow', 5], ['ogre', 4], ['behemoth', 3]],
     },
   };
 
