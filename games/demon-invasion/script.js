@@ -44,6 +44,8 @@
   // 次のレベルまでに必要な経験値
   const xpNeed = (l) => Math.round(20 + 12 * (l - 1) + 1.5 * (l - 1) * (l - 1));
   const SAVE_KEY = 'demon-invasion-save';
+  // テスト版: <meta name="di-test-unlock"> があると、全ステージ・全ヒーロー・ハード・初期装備を最初から選べる (公開版には入れない)
+  const TEST_UNLOCK = !!document.querySelector('meta[name="di-test-unlock"]');
   const LANG_KEY = 'demon-invasion-lang';
 
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -121,7 +123,7 @@
       setd_autoAim: 'スマホ: 倒した方向の近くの敵にねらいを合わせる', setd_autoFire: 'パソコン: ねらった方向に敵がいれば自動で撃つ', setd_lite: 'エフェクトと街灯を減らして軽くする',
       codex: '図鑑', codex_allies: '自軍', codex_demons: '悪魔', codex_captains: '隊長', codex_heroes: 'ヒーロー',
       codexSub: (a, b) => `見つけた数 ${a} / ${b}`, codexUnknown: 'まだ出会っていない',
-      stampWin: '勝利！', stampLose: '敗北…',
+      stampWin: '勝利！', stampLose: '敗北…', testOnly: 'テスト用',
       nGuardian: (n) => `${n}が魔界門から現れた！`, nPhase: (n, p) => `${n}の力が増した… (第 ${p} 段階)`, nRevive: (n) => `${n}が倒れた悪魔をよみがえらせた！`,
       lockedPrev: '前の地区を取り返すと選べる', normal: 'ノーマル', hard: 'ハード', training: '訓練所', army: '防衛隊本部',
       heroesTitle: (n, m) => `連れていくヒーロー (${n}/${m})`, heroLocked: (n) => `ステージ ${n} をクリアすると仲間になる`,
@@ -163,7 +165,7 @@
       setd_autoAim: 'Phone: aim snaps to nearby foes in the stick direction', setd_autoFire: 'PC: fire automatically when a foe is in your sights', setd_lite: 'Fewer effects and street lights for slower devices',
       codex: 'Codex', codex_allies: 'Allies', codex_demons: 'Demons', codex_captains: 'Captains', codex_heroes: 'Heroes',
       codexSub: (a, b) => `Discovered ${a} / ${b}`, codexUnknown: 'Not encountered yet',
-      stampWin: 'VICTORY!', stampLose: 'DEFEAT…',
+      stampWin: 'VICTORY!', stampLose: 'DEFEAT…', testOnly: 'test only',
       nGuardian: (n) => `${n} emerges from the Demon Gate!`, nPhase: (n, p) => `${n} grows stronger… (phase ${p})`, nRevive: (n) => `${n} raised the fallen demons!`,
       lockedPrev: 'Retake the previous district first', normal: 'Normal', hard: 'Hard', training: 'Training Ground', army: 'Defense Force HQ',
       heroesTitle: (n, m) => `Heroes to bring (${n}/${m})`, heroLocked: (n) => `Joins after you clear stage ${n}`,
@@ -5636,8 +5638,8 @@
   const rec = (id, mode = 'n') => (save.stages[id] && save.stages[id][mode]) || null;
   const cleared = (id) => !!(rec(id) && rec(id).clear);
   const stars = (id) => Math.max(rec(id, 'n') ? rec(id, 'n').stars || 0 : 0, rec(id, 'h') ? rec(id, 'h').stars || 0 : 0);
-  const heroUnlocked = (id) => HEROES[id].unlock === 0 || cleared(HEROES[id].unlock);
-  const loadoutUnlocked = (l) => l.id === 'none' || (cleared(l.stage) && stars(l.stage) >= l.stars);
+  const heroUnlocked = (id) => TEST_UNLOCK || HEROES[id].unlock === 0 || cleared(HEROES[id].unlock);
+  const loadoutUnlocked = (l) => TEST_UNLOCK || l.id === 'none' || (cleared(l.stage) && stars(l.stage) >= l.stars);
   const heroSlots = (st) => (st.id >= 5 ? 2 : 1) + (save.army.room || 0);
   const starStr = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
 
@@ -5648,7 +5650,7 @@
     pauseBtn.style.visibility = 'hidden';
     const cards = STAGES.map((st, i) => {
       const r = rec(st.id);
-      const open = !st.locked && (i === 0 || cleared(STAGES[i - 1].id));
+      const open = !st.locked && (TEST_UNLOCK || i === 0 || cleared(STAGES[i - 1].id));
       const meta = st.locked ? t('locked') : !open ? t('lockedPrev') : r && r.clear ? `${starStr(stars(st.id))} ・ ${t('best')} ${fmtTime(r.best)}${rec(st.id, 'h') && rec(st.id, 'h').clear ? ` ・ ${t('hard')}✓` : ''}` : t('notCleared');
       return `
         <button type="button" class="stage ${r && r.clear ? 'cleared' : ''}" data-act="brief" data-i="${i}" ${open ? '' : 'disabled'}>
@@ -5666,6 +5668,7 @@
           <button type="button" class="btn" data-act="army">🏢 ${t('army')}</button>
           <button type="button" class="btn" data-act="codex">📖 ${t('codex')}</button>
           <button type="button" class="btn" data-act="settings">⚙ ${t('settings')}</button>
+          ${TEST_UNLOCK ? `<button type="button" class="btn" data-act="testMerit">🎖️ +5000 (${t('testOnly')})</button>` : ''}
         </div>
       </div>`, true);
   }
@@ -5688,7 +5691,7 @@
     backAction = showStages;
     rerender = () => showBrief(i);
     const slots = heroSlots(st);
-    const hardOk = cleared(st.id);
+    const hardOk = TEST_UNLOCK || cleared(st.id);
     const caps = (st.captains || []).map((id) => `${L(CAPTAINS[id], 'name')} (${L(CAPTAINS[id], 'title')})`).join(' / ');
     const heroCards = Object.entries(HEROES).map(([id, h]) => {
       const ok = heroUnlocked(id);
@@ -6004,6 +6007,11 @@
     buy: (el) => buy(el.dataset.key),
     reroll: () => rerollLevelUp(),
     settings: () => showSettings(),
+    testMerit: () => {
+      save.merit += 5000;
+      writeSave();
+      showStages();
+    },
     closeSettings: () => closeSettings(),
     codex: () => showCodex(),
     codexTab: (el) => { codexTab = el.dataset.k; showCodex(); },
