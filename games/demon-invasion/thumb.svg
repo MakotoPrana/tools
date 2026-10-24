@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <!-- ゲーム一覧 (games/index.html) のタイル画像。夜の通りで、左の自軍 (青) と右の悪魔 (赤) がぶつかる -->
+  <defs>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffb04a" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#ffb04a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lamp" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffd890" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffd890" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="spire" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff4060" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#ff4060" stop-opacity="0"/>
+    </radialGradient>
+    <symbol id="ally" viewBox="-12 -12 24 24">
+      <rect x="6" y="-2" width="10" height="4" fill="#1a1d24"/>
+      <circle r="9" fill="#4f7fd6" stroke="#24406e" stroke-width="2"/>
+      <circle cx="-1" r="5" fill="#24406e"/>
+    </symbol>
+    <symbol id="imp" viewBox="-12 -12 24 24">
+      <circle r="8" fill="#e2483d" stroke="#6e1611" stroke-width="2"/>
+      <path d="M-2 -5 L-7 -11 L-4 -3 Z M-2 5 L-7 11 L-4 3 Z" fill="#2a0c10"/>
+      <rect x="-5" y="-3" width="2.5" height="2.5" fill="#ffe14a"/>
+      <rect x="-5" y="1" width="2.5" height="2.5" fill="#ffe14a"/>
+    </symbol>
+    <symbol id="soldier" viewBox="-14 -14 28 28">
+      <line x1="0" y1="4" x2="-18" y2="4" stroke="#2a1018" stroke-width="3"/>
+      <circle cx="-18" cy="4" r="3" fill="#ff5ad0"/>
+      <circle r="10" fill="#8a2a52" stroke="#3b0b22" stroke-width="2"/>
+      <path d="M-2 -6 L-8 -12 L-5 -3 Z M-2 6 L-8 12 L-5 3 Z" fill="#2a0c10"/>
+    </symbol>
+  </defs>
+  <rect width="320" height="200" fill="#1a1b22"/>
+  <!-- 建物の屋根 -->
+  <rect x="0" y="0" width="320" height="52" fill="#5a5266"/>
+  <rect x="96" y="0" width="80" height="52" fill="#4e5d6b"/>
+  <rect x="236" y="0" width="84" height="52" fill="#675560"/>
+  <rect x="0" y="152" width="320" height="48" fill="#62574e"/>
+  <rect x="120" y="152" width="90" height="48" fill="#525a70"/>
+  <!-- 通り -->
+  <rect x="0" y="52" width="320" height="100" fill="#292c33"/>
+  <rect x="0" y="52" width="320" height="10" fill="#1d1c24"/>
+  <g fill="#ffd68c" opacity="0.7">
+    <rect x="10" y="54" width="20" height="5"/><rect x="50" y="54" width="20" height="5"/><rect x="130" y="54" width="20" height="5"/>
+    <rect x="200" y="54" width="20" height="5"/><rect x="260" y="54" width="20" height="5"/>
+  </g>
+  <g fill="#c0392b"><rect x="8" y="59" width="24" height="3"/><rect x="198" y="59" width="24" height="3"/></g>
+  <g fill="#2e86c1"><rect x="48" y="59" width="24" height="3"/><rect x="258" y="59" width="24" height="3"/></g>
+  <g stroke="#e6c85a" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="12 14"><line x1="0" y1="102" x2="320" y2="102"/></g>
+  <circle cx="70" cy="70" r="40" fill="url(#lamp)"/>
+  <circle cx="230" cy="70" r="40" fill="url(#lamp)"/>
+  <!-- 敵の本拠地 (魔界の楔) -->
+  <circle cx="300" cy="102" r="40" fill="url(#spire)"/>
+  <path d="M300 70 L318 102 L300 134 L282 102 Z" fill="#5a1640"/>
+  <path d="M300 84 L310 102 L300 120 L290 102 Z" fill="#ff7a90"/>
+  <!-- 弾 -->
+  <g stroke="#fff2b0" stroke-width="2">
+    <line x1="58" y1="88" x2="70" y2="88"/><line x1="64" y1="118" x2="76" y2="116"/><line x1="40" y1="104" x2="52" y2="104"/>
+  </g>
+  <g fill="#ff6ad8"><circle cx="200" cy="96" r="3"/><circle cx="214" cy="118" r="3"/><circle cx="186" cy="82" r="3"/></g>
+  <!-- 爆発 -->
+  <circle cx="176" cy="106" r="20" fill="#ffab3d" opacity="0.55"/>
+  <circle cx="176" cy="106" r="10" fill="#ffe08a"/>
+  <!-- 自軍 -->
+  <use href="#ally" x="20" y="74" width="22" height="22"/>
+  <use href="#ally" x="34" y="94" width="22" height="22"/>
+  <use href="#ally" x="16" y="112" width="22" height="22"/>
+  <use href="#ally" x="44" y="124" width="22" height="22"/>
+  <!-- 悪魔 -->
+  <use href="#imp" x="196" y="70" width="22" height="22"/>
+  <use href="#imp" x="214" y="124" width="22" height="22"/>
+  <use href="#soldier" x="228" y="84" width="28" height="28"/>
+  <use href="#soldier" x="246" y="110" width="28" height="28"/>
+  <use href="#imp" x="232" y="64" width="20" height="20"/>
+  <!-- プレイヤー (灯火のヒーロー) -->
+  <circle cx="122" cy="104" r="34" fill="url(#glow)"/>
+  <rect x="130" y="101" width="22" height="6" fill="#15181f"/>
+  <circle cx="122" cy="104" r="12" fill="#f2f5ff" stroke="#ffab3d" stroke-width="4"/>
+  <circle cx="121" cy="104" r="6.5" fill="#2c3a58"/>
+</svg>

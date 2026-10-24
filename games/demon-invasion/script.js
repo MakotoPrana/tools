@@ -117,6 +117,11 @@
       kind_main: 'メイン武器', kind_sub: '灯火の武器', kind_skill: 'スキル', kind_ult: '必殺技', kind_passive: 'パッシブ', kind_command: '指揮',
       captains: '倒した隊長', confused: '混乱', rebuilt: '再建した兵舎', temp: '仮設', kind_evo: '進化',
       nBehemoth: '破城獣が現れた！ 兵舎を守れ！',
+      settings: '設定', set_sfx: '効果音', set_bgm: 'BGM', set_autoAim: 'オートエイム', set_autoFire: 'オート射撃', set_lite: '軽量モード',
+      setd_autoAim: 'スマホ: 倒した方向の近くの敵にねらいを合わせる', setd_autoFire: 'パソコン: ねらった方向に敵がいれば自動で撃つ', setd_lite: 'エフェクトと街灯を減らして軽くする',
+      codex: '図鑑', codex_allies: '自軍', codex_demons: '悪魔', codex_captains: '隊長', codex_heroes: 'ヒーロー',
+      codexSub: (a, b) => `見つけた数 ${a} / ${b}`, codexUnknown: 'まだ出会っていない',
+      stampWin: '勝利！', stampLose: '敗北…',
       nGuardian: (n) => `${n}が魔界門から現れた！`, nPhase: (n, p) => `${n}の力が増した… (第 ${p} 段階)`, nRevive: (n) => `${n}が倒れた悪魔をよみがえらせた！`,
       lockedPrev: '前の地区を取り返すと選べる', normal: 'ノーマル', hard: 'ハード', training: '訓練所', army: '防衛隊本部',
       heroesTitle: (n, m) => `連れていくヒーロー (${n}/${m})`, heroLocked: (n) => `ステージ ${n} をクリアすると仲間になる`,
@@ -154,6 +159,11 @@
       kind_main: 'Main weapon', kind_sub: 'Ember weapon', kind_skill: 'Skill', kind_ult: 'Ultimate', kind_passive: 'Passive', kind_command: 'Command',
       captains: 'Captains defeated', confused: 'Disarray', rebuilt: 'Barracks rebuilt', temp: 'Temp ', kind_evo: 'Evolution',
       nBehemoth: 'A Behemoth has appeared! Protect the barracks!',
+      settings: 'Settings', set_sfx: 'Sound effects', set_bgm: 'Music', set_autoAim: 'Auto aim', set_autoFire: 'Auto fire', set_lite: 'Light mode',
+      setd_autoAim: 'Phone: aim snaps to nearby foes in the stick direction', setd_autoFire: 'PC: fire automatically when a foe is in your sights', setd_lite: 'Fewer effects and street lights for slower devices',
+      codex: 'Codex', codex_allies: 'Allies', codex_demons: 'Demons', codex_captains: 'Captains', codex_heroes: 'Heroes',
+      codexSub: (a, b) => `Discovered ${a} / ${b}`, codexUnknown: 'Not encountered yet',
+      stampWin: 'VICTORY!', stampLose: 'DEFEAT…',
       nGuardian: (n) => `${n} emerges from the Demon Gate!`, nPhase: (n, p) => `${n} grows stronger… (phase ${p})`, nRevive: (n) => `${n} raised the fallen demons!`,
       lockedPrev: 'Retake the previous district first', normal: 'Normal', hard: 'Hard', training: 'Training Ground', army: 'Defense Force HQ',
       heroesTitle: (n, m) => `Heroes to bring (${n}/${m})`, heroLocked: (n) => `Joins after you clear stage ${n}`,
@@ -186,7 +196,10 @@
       for (const id in s.stages) s.stages[id] = { n: { ...s.stages[id], stars: 1 } };
       s.v = 2;
     }
-    return { merit: 0, train: {}, army: {}, unitTr: {}, unitIm: {}, heroUp: {}, lastHeroes: ['onizuka'], lastLoadout: 'none', ...s };
+    const out = { merit: 0, train: {}, army: {}, unitTr: {}, unitIm: {}, heroUp: {}, lastHeroes: ['onizuka'], lastLoadout: 'none', seen: {}, ...s };
+    // 設定 (音量は 0〜100)
+    out.settings = { sfx: 70, bgm: 50, autoAim: true, autoFire: false, lite: false, ...(s.settings || {}) };
+    return out;
   };
   const save = loadSave();
   const writeSave = () => {
@@ -198,7 +211,8 @@
   // ===================================================================
   const Sound = (() => {
     let ac = null;
-    let master = null;
+    let master = null; // 効果音
+    let bgm = null; // BGM
     let noise = null;
     const last = {};
     const init = () => {
@@ -206,38 +220,47 @@
       try {
         ac = new (window.AudioContext || window.webkitAudioContext)();
         master = ac.createGain();
-        master.gain.value = 0.5;
         master.connect(ac.destination);
+        bgm = ac.createGain();
+        bgm.connect(ac.destination);
+        setVolume();
         noise = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate);
         const d = noise.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       } catch (e) { ac = null; }
     };
-    const burst = (dur, freq, vol, q = 1) => {
+    // 設定の音量 (0〜100) を反映する
+    const setVolume = () => {
+      if (!ac) return;
+      master.gain.value = (save.settings.sfx / 100) * 0.5;
+      bgm.gain.value = (save.settings.bgm / 100) * 0.3;
+    };
+    // at: 鳴らし始める時刻 (省略すると今すぐ)、out: つなぐ先 (省略すると効果音)
+    const burst = (dur, freq, vol, q = 1, at = 0, out = master, type = 'bandpass') => {
       const src = ac.createBufferSource();
       src.buffer = noise;
       const f = ac.createBiquadFilter();
-      f.type = 'bandpass';
+      f.type = type;
       f.frequency.value = freq;
       f.Q.value = q;
       const g = ac.createGain();
-      const now = ac.currentTime;
+      const now = at || ac.currentTime;
       g.gain.setValueAtTime(vol, now);
       g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-      src.connect(f).connect(g).connect(master);
+      src.connect(f).connect(g).connect(out);
       src.start(now);
       src.stop(now + dur + 0.02);
     };
-    const tone = (dur, f0, f1, vol, type = 'square') => {
+    const tone = (dur, f0, f1, vol, type = 'square', at = 0, out = master) => {
       const o = ac.createOscillator();
       o.type = type;
       const g = ac.createGain();
-      const now = ac.currentTime;
+      const now = at || ac.currentTime;
       o.frequency.setValueAtTime(f0, now);
       o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), now + dur);
       g.gain.setValueAtTime(vol, now);
       g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-      o.connect(g).connect(master);
+      o.connect(g).connect(out);
       o.start(now);
       o.stop(now + dur + 0.02);
     };
@@ -254,7 +277,7 @@
         case 'enemy': tone(0.12, 520, 160, 0.04, 'sawtooth'); break;
         case 'hit': tone(0.08, 180, 60, 0.12); break;
         case 'boom': burst(0.6, 200, 0.6, 0.5); tone(0.5, 120, 30, 0.3, 'sine'); break;
-        case 'level': [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => ac && tone(0.18, f, f, 0.1), i * 70)); break;
+        case 'level': [523, 659, 784, 1046].forEach((f, i) => tone(0.18, f, f, 0.1, 'square', now + i * 0.07)); break;
         case 'pick': tone(0.06, 900, 1400, 0.04, 'sine'); break;
         case 'dash': burst(0.12, 900, 0.12, 0.6); break;
         case 'click': tone(0.04, 700, 700, 0.05); break;
@@ -263,17 +286,110 @@
         case 'missile': burst(0.25, 1200, 0.08, 0.5); break;
         case 'zap': tone(0.15, 2400, 300, 0.07, 'square'); burst(0.1, 4000, 0.1, 0.6); break;
         case 'wall': tone(0.3, 300, 600, 0.08, 'sine'); break;
-        case 'heal': [660, 880, 1100].forEach((f, i) => setTimeout(() => ac && tone(0.15, f, f, 0.07, 'sine'), i * 60)); break;
+        case 'heal': [660, 880, 1100].forEach((f, i) => tone(0.15, f, f, 0.07, 'sine', now + i * 0.06)); break;
         case 'plane': tone(1.2, 220, 120, 0.1, 'sawtooth'); break;
         case 'roar': tone(0.5, 140, 50, 0.25, 'sawtooth'); burst(0.4, 300, 0.2, 0.4); break;
+        case 'cutin': tone(0.6, 110, 55, 0.3, 'sawtooth'); burst(0.5, 400, 0.3, 0.4); tone(0.3, 880, 440, 0.06, 'square', now + 0.1); break;
+        case 'win': [523, 659, 784, 1046, 1318].forEach((f, i) => tone(0.4, f, f, 0.1, 'triangle', now + i * 0.12)); break;
+        case 'lose': [392, 349, 311, 262].forEach((f, i) => tone(0.5, f, f * 0.98, 0.1, 'triangle', now + i * 0.25)); break;
         default: break;
       }
     };
     const resume = () => {
       init();
       if (ac && ac.state === 'suspended') ac.resume();
+      Music.start();
     };
-    return { init, play, resume };
+
+    // ---- BGM: 16 分音符のステップシーケンサー ----
+    // 曲: bpm、root (ベースの基準の MIDI ノート)、bars (4 小節ぶんの和音 [ベースの音, 和音の音...] の基準からの半音)
+    //   bass: 1 小節 16 ステップのベースの動き (和音の根音からの半音、null は休み)
+    //   drums: k (キック)・s (スネア)・h (ハイハット) の 16 ステップ。lead: 1 小節ごとのメロディ (和音の根音からの半音)
+    const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
+    const SONGS = {
+      menu: {
+        bpm: 84, root: 45, wave: 'triangle',
+        bars: [[0, 12, 15, 19], [-4, 8, 12, 15], [-2, 10, 14, 17], [-5, 7, 10, 14]],
+        bass: [0, null, null, null, null, null, 0, null, null, null, null, null, 7, null, null, null],
+        drums: { k: 'x...............', s: '................', h: '....x.......x...' },
+        lead: [12, null, null, null, 15, null, null, null, 19, null, 17, null, 15, null, null, null],
+      },
+      lose: {
+        bpm: 124, root: 45, wave: 'sawtooth',
+        bars: [[0, 12, 15, 19], [0, 12, 15, 19], [-2, 10, 14, 17], [-4, 8, 12, 15]],
+        bass: [0, null, 0, 12, 0, null, 0, 12, 0, null, 0, 12, 1, null, 1, 13],
+        drums: { k: 'x.....x.x.......', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.' },
+        lead: [null, null, null, null, 12, null, 13, null, 12, null, null, null, 10, null, null, null],
+      },
+      even: {
+        bpm: 134, root: 50, wave: 'square',
+        bars: [[0, 12, 15, 19], [-4, 8, 12, 15], [-2, 10, 14, 17], [-7, 5, 8, 12]],
+        bass: [0, null, 12, null, 0, 0, 12, null, 0, null, 12, null, 0, 0, 10, 12],
+        drums: { k: 'x...x...x...x...', s: '....x.......x..x', h: '..x...x...x...x.' },
+        lead: [12, null, 15, null, 19, null, 17, 15, 14, null, 12, null, 10, null, 12, null],
+      },
+      win: {
+        bpm: 142, root: 48, wave: 'square',
+        bars: [[0, 12, 16, 19], [5, 17, 21, 24], [7, 19, 23, 26], [0, 12, 16, 19]],
+        bass: [0, null, 12, 0, null, 0, 12, null, 0, null, 12, 0, null, 7, 12, null],
+        drums: { k: 'x...x...x...x...', s: '....x.......x...', h: 'xxx.xxx.xxx.xxx.' },
+        lead: [12, 16, 19, 24, null, 19, null, 16, 17, null, 19, null, 21, 19, 16, null],
+      },
+      boss: {
+        bpm: 156, root: 40, wave: 'sawtooth',
+        bars: [[0, 12, 15, 18], [0, 12, 15, 18], [1, 13, 16, 19], [-1, 11, 14, 17]],
+        bass: [0, 0, 12, 0, 0, 13, 0, 0, 12, 0, 0, 11, 0, 12, 13, 15],
+        drums: { k: 'x.x.x..xx.x.x..x', s: '....x.......x.xx', h: 'x.x.x.x.x.x.x.x.' },
+        lead: [24, null, 23, null, 24, null, 27, null, 26, null, 24, null, 23, null, 20, null],
+      },
+    };
+    const Music = (() => {
+      let timer = null;
+      let cur = null;
+      let want = 'menu';
+      let step = 0;
+      let nextT = 0;
+      const schedule = (song, st, t) => {
+        const bar = song.bars[Math.floor(st / 16) % song.bars.length];
+        const s = st % 16;
+        const root = song.root + bar[0];
+        const len = 60 / song.bpm / 4;
+        if (song.bass[s] != null) tone(len * 1.6, midi(root + song.bass[s]), midi(root + song.bass[s]), 0.16, song.wave === 'triangle' ? 'triangle' : 'square', t, bgm);
+        if (s === 0) for (const n of bar.slice(1)) tone(len * 15, midi(song.root + 12 + n), midi(song.root + 12 + n), 0.03, song.wave, t, bgm);
+        if (song.lead[s] != null) tone(len * 1.8, midi(root + 12 + song.lead[s]), midi(root + 12 + song.lead[s]), 0.05, 'triangle', t, bgm);
+        if (song.drums.k[s] === 'x') tone(0.18, 150, 40, 0.5, 'sine', t, bgm);
+        if (song.drums.s[s] === 'x') burst(0.14, 1800, 0.28, 0.7, t, bgm);
+        if (song.drums.h[s] === 'x') burst(0.04, 8000, 0.08, 1, t, bgm, 'highpass');
+      };
+      const tick = () => {
+        if (!ac || ac.state !== 'running') return;
+        if (save.settings.bgm <= 0) {
+          nextT = ac.currentTime;
+          return;
+        }
+        if (nextT < ac.currentTime) nextT = ac.currentTime + 0.05;
+        while (nextT < ac.currentTime + 0.15) {
+          // 曲は小節の頭で切り替える
+          if (step % 16 === 0 && want !== cur) {
+            cur = want;
+            step = 0;
+          }
+          const song = SONGS[cur];
+          schedule(song, step, nextT);
+          nextT += 60 / song.bpm / 4;
+          step++;
+        }
+      };
+      return {
+        start: () => {
+          if (!timer && ac) timer = setInterval(tick, 30);
+        },
+        set: (name) => { want = name; },
+        get current() { return cur; },
+      };
+    })();
+
+    return { init, play, resume, setVolume, music: Music };
   })();
 
   // ===================================================================
@@ -768,6 +884,7 @@
   function spawnUnit(type, team, x, y, home, laneIdx) {
     if (G.units.length >= MAX_UNITS) return null;
     const def = UNITS[type];
+    save.seen[type] = 1; // 図鑑
     const mul = team === 1 ? G.st.enemyMul || 1 : 1;
     const lane = G.lanes[laneIdx];
     const pr = laneProject(lane, x, y);
@@ -1749,7 +1866,7 @@
           const dy = u.y - P.y;
           const d = Math.hypot(dx, dy);
           if (d > range || d > bd) continue;
-          if (Math.abs(angleDiff(Math.atan2(dy, dx), as.a)) > 0.52) continue;
+          if (!save.settings.autoAim || Math.abs(angleDiff(Math.atan2(dy, dx), as.a)) > 0.52) continue;
           if (!los(P.x, P.y, u.x, u.y)) continue;
           bd = d;
           best = u;
@@ -1763,6 +1880,11 @@
       const wy = G.cam.y + (input.my - ch / 2) / zoom;
       P.face = Math.atan2(wy - P.y, wx - P.x);
       firing = input.mouseFire;
+      // オート射撃: ねらっている方向 (±20°) の射程の中に敵がいれば撃つ
+      if (!firing && save.settings.autoFire) {
+        const foe = nearestFoe(P.x, P.y, 0, Math.max(200, w.range) * 0.95);
+        if (foe && Math.abs(angleDiff(Math.atan2(foe.y - P.y, foe.x - P.x), P.face)) < 0.35) firing = true;
+      }
     }
     if (bot && w.rail && P.charge >= w.charge) firing = false;
     fireMain(P, w, firing, dt);
@@ -3027,6 +3149,9 @@
     };
     c.u = u;
     c.spawned = true;
+    save.seen[c.id] = 1;
+    G.cutin = { d, t: 2.4 }; // 登場のカットイン
+    Sound.play('cutin');
     setCaptainLevel(c, captainLevel(c));
     u.hp = u.maxHp;
     G.units.push(u);
@@ -3616,6 +3741,7 @@
 
   function spawnParticles(x, y, n, color, speed, life, size, kind = 'spark') {
     if (!onScreen(x, y, 120)) return;
+    if (save.settings.lite) n = Math.ceil(n * 0.35); // 軽量モード
     for (let i = 0; i < n && G.particles.length < MAX_PARTICLES; i++) {
       const a = Math.random() * TAU;
       const s = speed * rand(0.3, 1);
@@ -4205,6 +4331,7 @@
   }
 
   function drawLights() {
+    if (save.settings.lite) return;
     ctx.globalCompositeOperation = 'lighter';
     for (const l of G.lamps) {
       if (!onScreen(l.x, l.y, 120)) continue;
@@ -5278,6 +5405,8 @@
       ctx.fillStyle = `rgba(255,250,220,${G.flash})`;
       ctx.fillRect(0, 0, cw, ch);
     }
+    drawCutin();
+    drawStamp();
     // 倒されているとき
     if (!P.alive && !G.over) {
       ctx.fillStyle = 'rgba(40,0,0,0.35)';
@@ -5323,6 +5452,62 @@
     }
   }
 
+  // 隊長の登場: 画面の真ん中に帯を出して、名前を流す
+  function drawCutin() {
+    const c = G.cutin;
+    if (!c || G.over) return;
+    c.t -= 1 / 60;
+    if (c.t <= 0) {
+      G.cutin = null;
+      return;
+    }
+    const life = 2.4 - c.t;
+    const open = Math.min(1, life / 0.2, c.t / 0.3);
+    const bh = 86 * open;
+    const y = ch * 0.38;
+    ctx.fillStyle = 'rgba(40,0,6,0.82)';
+    ctx.fillRect(0, y - bh / 2, cw, bh);
+    ctx.fillStyle = c.d.color;
+    ctx.fillRect(0, y - bh / 2, cw, 3);
+    ctx.fillRect(0, y + bh / 2 - 3, cw, 3);
+    if (open < 0.6) return;
+    const slide = Math.max(0, 1 - life / 0.35);
+    ctx.save();
+    ctx.translate(cw / 2 + slide * cw * 0.5, y);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `900 ${cw < 560 ? 26 : 34}px system-ui, sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(L(c.d, 'name'), 0, -8);
+    ctx.font = '800 13px system-ui, sans-serif';
+    ctx.fillStyle = '#ffb0a0';
+    ctx.fillText(`― ${L(c.d, 'title')} ―`, 0, 22);
+    ctx.restore();
+  }
+
+  // 勝ち / 負けの判子
+  function drawStamp() {
+    if (!G.over || G.stampT == null) return;
+    G.stampT += 1 / 60;
+    const f = Math.min(1, G.stampT / 0.35);
+    const sc = 2.2 - 1.2 * f;
+    ctx.save();
+    ctx.translate(cw / 2, ch / 2);
+    ctx.rotate(-0.12);
+    ctx.scale(sc, sc);
+    ctx.globalAlpha = f;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 54px system-ui, sans-serif';
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    const txt = G.result ? t('stampWin') : t('stampLose');
+    ctx.strokeText(txt, 0, 0);
+    ctx.fillStyle = G.result ? '#8fc0ff' : '#ff6a5a';
+    ctx.fillText(txt, 0, 0);
+    ctx.restore();
+  }
+
   function roundRectScreen(x, y, w, h, r) {
     roundRect(x, y, w, h, r);
   }
@@ -5365,6 +5550,10 @@
         <h2 class="logo"><small>${t('titleSub')}</small>${lang === 'en' ? 'Demon Invasion' : 'デモン・<br>インベージョン'}</h2>
         <p class="tagline">${t('titleTag')}</p>
         <div class="actions"><button type="button" class="btn primary" data-act="stages">${t('start')}</button></div>
+        <div class="actions">
+          <button type="button" class="btn" data-act="codex">📖 ${t('codex')}</button>
+          <button type="button" class="btn" data-act="settings">⚙ ${t('settings')}</button>
+        </div>
       </div>`, true);
   }
 
@@ -5400,7 +5589,7 @@
       }
     }
     // 2 体目の隊長は 40 秒遅れて出撃する。魔王は門が攻められるまで出てこない
-    G.captains = (st.captains || []).map((id, i) => ({ def: CAPTAINS[id], u: null, lv: 0, respawnT: 20 + i * 40 }));
+    G.captains = (st.captains || []).map((id, i) => ({ id, def: CAPTAINS[id], u: null, lv: 0, respawnT: 20 + i * 40 }));
     note(t('nStart'), '#ffcf4a');
     hideOverlay();
     screen = 'play';
@@ -5430,6 +5619,7 @@
           <button type="button" class="btn primary" data-act="resume">${t('resume')}</button>
           <button type="button" class="btn" data-act="retry">${t('retry')}</button>
           <button type="button" class="btn" data-act="stages">${t('toStages')}</button>
+          <button type="button" class="btn" data-act="settings">⚙ ${t('settings')}</button>
         </div>
       </div>`);
   }
@@ -5474,6 +5664,8 @@
         <div class="actions">
           <button type="button" class="btn" data-act="training">⬆ ${t('training')}</button>
           <button type="button" class="btn" data-act="army">🏢 ${t('army')}</button>
+          <button type="button" class="btn" data-act="codex">📖 ${t('codex')}</button>
+          <button type="button" class="btn" data-act="settings">⚙ ${t('settings')}</button>
         </div>
       </div>`, true);
   }
@@ -5501,6 +5693,8 @@
     const heroCards = Object.entries(HEROES).map(([id, h]) => {
       const ok = heroUnlocked(id);
       const on = brief.heroes.includes(id);
+      // まだ仲間になっていないヒーローは小さく出す
+      if (!ok) return `<div class="hero-card locked"><span>🔒</span><small>${esc(t('heroLocked', h.unlock))}</small></div>`;
       return `
         <button type="button" class="hero-card ${on ? 'on' : ''}" data-act="pickHero" data-id="${id}" ${ok ? '' : 'disabled'}>
           <span class="hero-icon">${ok ? h.icon : '🔒'}</span>
@@ -5524,7 +5718,7 @@
         <div class="hero-grid">${heroCards}</div>
         <h3>${t('loadout')}</h3>
         <div class="chip-row">${loads}</div>
-        <div class="actions"><button type="button" class="btn primary" data-act="go">${t('deploy')}</button></div>
+        <div class="actions sticky"><button type="button" class="btn primary" data-act="go">${t('deploy')}</button></div>
       </div>`, true);
   }
 
@@ -5663,7 +5857,9 @@
       }
       writeSave();
     }
-    setTimeout(showResult, 1600);
+    G.stampT = 0;
+    Sound.play(win ? 'win' : 'lose');
+    setTimeout(showResult, 2200);
   }
 
   function showResult() {
@@ -5700,9 +5896,98 @@
       </div>`);
   }
 
+  // ---- 設定 ----
+  let settingsBack = null;
+  function showSettings() {
+    if (screen !== 'settings') settingsBack = screen === 'pause' ? showPause : screen === 'title' ? showTitle : showStages;
+    const fromPause = settingsBack === showPause;
+    screen = 'settings';
+    backAction = closeSettings;
+    rerender = showSettings;
+    const S = save.settings;
+    const slider = (k) => `
+      <label class="set-row"><span>${t('set_' + k)}</span>
+        <input type="range" min="0" max="100" step="5" value="${S[k]}" data-set="${k}"><b>${S[k]}</b></label>`;
+    const toggle = (k) => `
+      <label class="set-row"><span>${t('set_' + k)}<small>${t('setd_' + k)}</small></span>
+        <input type="checkbox" ${S[k] ? 'checked' : ''} data-set="${k}"></label>`;
+    showOverlay(`
+      <div class="panel">
+        <div class="panel-head">
+          <button type="button" class="back-btn" data-act="closeSettings">${t('back')}</button>
+          <h2>${t('settings')}</h2>
+          <button type="button" class="back-btn ghost" tabindex="-1" aria-hidden="true">${t('back')}</button>
+        </div>
+        <div class="set-list">${slider('sfx')}${slider('bgm')}${toggle('autoAim')}${toggle('autoFire')}${toggle('lite')}</div>
+      </div>`, !fromPause);
+  }
+  function closeSettings() {
+    if (settingsBack === showPause) {
+      // 一時停止の画面へ戻る
+      screen = 'pause';
+      backAction = resumeGame;
+      rerender = showPause;
+      showPause();
+      return;
+    }
+    screen = 'menu';
+    settingsBack();
+  }
+  overlay.addEventListener('input', (e) => {
+    const k = e.target.dataset && e.target.dataset.set;
+    if (!k) return;
+    save.settings[k] = e.target.type === 'checkbox' ? e.target.checked : Number(e.target.value);
+    if (e.target.type === 'range') e.target.nextElementSibling.textContent = e.target.value;
+    Sound.setVolume();
+    writeSave();
+  });
+
+  // ---- 図鑑 ----
+  let codexTab = 'demons';
+  const ALLY_LIST = ['infantry', 'heavy', 'medic', 'engineer', 'sniper', 'grenadier', 'apc'];
+  const DEMON_LIST = ['imp', 'ghoul', 'soldier', 'hound', 'gargoyle', 'witch', 'bomber', 'shaman', 'shadow', 'ogre', 'behemoth'];
+  function showCodex() {
+    if (screen !== 'codex') codexBack = G && G.over ? showResult : screen === 'title' ? showTitle : showStages;
+    screen = 'codex';
+    backAction = () => codexBack();
+    rerender = showCodex;
+    const card = (ok, color, icon, name, sub, desc) => `
+      <div class="codex-card ${ok ? '' : 'unknown'}">
+        <span class="codex-swatch" style="background:${ok ? color : '#333'}">${ok ? icon : '?'}</span>
+        <span class="codex-body"><b>${ok ? esc(name) : '???'}</b>${ok && sub ? ` <small>${esc(sub)}</small>` : ''}
+          <span class="codex-desc">${ok ? esc(desc) : t('codexUnknown')}</span></span>
+      </div>`;
+    let list = '';
+    if (codexTab === 'allies' || codexTab === 'demons') {
+      list = (codexTab === 'allies' ? ALLY_LIST : DEMON_LIST).map((k) => {
+        const d = UNITS[k];
+        return card(save.seen[k], d.color, '', L(d, 'name'), `HP ${d.hp}`, L(d, 'desc'));
+      }).join('');
+    } else if (codexTab === 'captains') {
+      list = Object.entries(CAPTAINS).map(([id, d]) => card(save.seen[id], d.color, '☠', L(d, 'name'), L(d, 'title'), L(d, 'desc'))).join('');
+    } else {
+      list = Object.entries(HEROES).map(([id, h]) => card(heroUnlocked(id), h.color, h.icon, L(h, 'name'), `${L(h, 'title')} ・ ${L(h, 'role')}`, lang === 'en' ? h.descEn : h.desc)).join('');
+    }
+    const all = [...ALLY_LIST, ...DEMON_LIST, ...Object.keys(CAPTAINS)];
+    const got = all.filter((k) => save.seen[k]).length + Object.keys(HEROES).filter(heroUnlocked).length;
+    const tab = (k) => `<button type="button" class="seg-btn ${codexTab === k ? 'on' : ''}" data-act="codexTab" data-k="${k}">${t('codex_' + k)}</button>`;
+    showOverlay(`
+      <div class="panel wide">
+        ${panelHead(t('codex'), 'codexBack')}
+        <p class="sub">${t('codexSub', got, all.length + Object.keys(HEROES).length)}</p>
+        <div class="seg">${tab('allies')}${tab('demons')}${tab('captains')}${tab('heroes')}</div>
+        <div class="codex-grid">${list}</div>
+      </div>`, true);
+  }
+  let codexBack = showStages;
+
   const actions = {
     title: showTitle,
-    stages: () => { G = null; showStages(); },
+    stages: () => {
+      G = null;
+      writeSave();
+      showStages();
+    },
     brief: (el) => showBrief(Number(el.dataset.i)),
     pickHero: (el) => pickHero(el.dataset.id),
     pickLoad: (el) => { brief.loadout = el.dataset.id; showBrief(brief.i); },
@@ -5718,6 +6003,11 @@
     armyTab: (el) => { armyTab = el.dataset.k; showArmy(); },
     buy: (el) => buy(el.dataset.key),
     reroll: () => rerollLevelUp(),
+    settings: () => showSettings(),
+    closeSettings: () => closeSettings(),
+    codex: () => showCodex(),
+    codexTab: (el) => { codexTab = el.dataset.k; showCodex(); },
+    codexBack: () => codexBack(),
     resume: resumeGame,
     retry: () => startBattle(stageIdx, G ? G.opts : {}),
     pick: (el) => pickLevelUp(Number(el.dataset.i)),
@@ -5760,11 +6050,19 @@
   // ===================================================================
   // メインループ
   // ===================================================================
+  // BGM: 隊長が近い / 劣勢 / 互角 / 優勢。戦っていないときはメニューの曲
+  function musicMood() {
+    if (!G || G.over || !['play', 'pause', 'levelup'].includes(screen)) return 'menu';
+    if (G.captains.some((c) => c.u && Math.hypot(c.u.x - G.cam.x, c.u.y - G.cam.y) < 700)) return 'boss';
+    return G.gauge < 0.4 ? 'lose' : G.gauge > 0.6 ? 'win' : 'even';
+  }
+
   let lastT = performance.now();
   function frame(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000);
     lastT = now;
     if (G && (screen === 'play' || (G.over && screen !== 'select'))) update(dt);
+    Sound.music.set(musicMood());
     if (G && screen === 'play' && !G.over && G.player.pending > 0) {
       if (bot) autoPick();
       else showLevelUp();
