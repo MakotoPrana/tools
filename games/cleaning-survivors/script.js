@@ -450,19 +450,19 @@
     },
   ];
 
-  // 恒久スキル (コインで上げる。次のプレイからずっと効く)
+  // 恒久スキル (コインで上げる。次のプレイからずっと効く)。段階数は前の2倍 (選択肢の数だけはそのまま)
   const SHOP = [
-    { id: 'hp', name: '体力', desc: '最大体力 +12', max: 10, cost: 40 },
-    { id: 'might', name: '攻撃力', desc: '攻撃力 +8%', max: 10, cost: 60 },
-    { id: 'clean', name: '清掃力', desc: '歩いて磨く範囲 +12%・ギアが床を磨く範囲 +6%', max: 5, cost: 70 },
-    { id: 'speed', name: '移動速度', desc: '移動速度 +4%', max: 5, cost: 60 },
-    { id: 'armor', name: '防御', desc: '受けるダメージ -1', max: 3, cost: 250 },
-    { id: 'regen', name: '自然回復', desc: '体力が毎秒 0.2 回復', max: 3, cost: 150 },
-    { id: 'magnet', name: '回収範囲', desc: '回収範囲 +10%', max: 5, cost: 40 },
-    { id: 'xp', name: '経験値', desc: 'もらえる経験値 +8%', max: 5, cost: 80 },
-    { id: 'box', name: 'ダストボックス容量', desc: '容量 +20', max: 3, cost: 50 },
-    { id: 'coin', name: 'コイン', desc: 'もらえるコイン +10%', max: 5, cost: 100 },
-    { id: 'reroll', name: 'リロール', desc: 'レベルアップの選び直し +1回', max: 3, cost: 100 },
+    { id: 'hp', name: '体力', desc: '最大体力 +12', max: 20, cost: 40 },
+    { id: 'might', name: '攻撃力', desc: '攻撃力 +8%', max: 20, cost: 60 },
+    { id: 'clean', name: '清掃力', desc: '歩いて磨く範囲 +12%・ギアが床を磨く範囲 +6%', max: 10, cost: 70 },
+    { id: 'speed', name: '移動速度', desc: '移動速度 +4%', max: 10, cost: 60 },
+    { id: 'armor', name: '防御', desc: '受けるダメージ -1', max: 6, cost: 250 },
+    { id: 'regen', name: '自然回復', desc: '体力が毎秒 0.2 回復', max: 6, cost: 150 },
+    { id: 'magnet', name: '回収範囲', desc: '回収範囲 +10%', max: 10, cost: 40 },
+    { id: 'xp', name: '経験値', desc: 'もらえる経験値 +8%', max: 10, cost: 80 },
+    { id: 'box', name: 'ダストボックス容量', desc: '容量 +20', max: 6, cost: 50 },
+    { id: 'coin', name: 'コイン', desc: 'もらえるコイン +10%', max: 10, cost: 100 },
+    { id: 'reroll', name: 'リロール', desc: 'レベルアップの選び直し +1回', max: 6, cost: 100 },
     { id: 'choices', name: '選択肢の数', desc: 'レベルアップの候補 3 → 4', max: 1, cost: 500 },
   ];
   const shopCost = (item, lv) => item.cost * (lv + 1);
@@ -3068,7 +3068,7 @@
     r *= G.stats.cleanArea || 1;
     const r2 = r * r;
     forTilesInBox(x - r, y - r, x + r, y + r, (i, cx, cy) => {
-      if ((cx - x) ** 2 + (cy - y) ** 2 <= r2) lowerTile(i, p);
+      if ((cx - x) ** 2 + (cy - y) ** 2 <= r2 && reachTile(x, y, i, cx, cy)) lowerTile(i, p);
     });
   }
 
@@ -3081,6 +3081,7 @@
       const d2 = dx * dx + dy * dy;
       if (d2 > r2) return;
       if (d2 > 200 && Math.abs(angleDiff(Math.atan2(dy, dx), ang)) > half) return;
+      if (!reachTile(x, y, i, cx, cy)) return;
       lowerTile(i, p);
     });
   }
@@ -3095,7 +3096,7 @@
       const t = clamp(((cx - x1) * dx + (cy - y1) * dy) / len2, 0, 1);
       const px = x1 + dx * t - cx;
       const py = y1 + dy * t - cy;
-      if (px * px + py * py <= hw2) lowerTile(i, p);
+      if (px * px + py * py <= hw2 && reachTile(x1 + dx * t, y1 + dy * t, i, cx, cy)) lowerTile(i, p);
     });
   }
 
@@ -3142,6 +3143,57 @@
     const by = Math.floor(y / BLOCK);
     if (bx < 0 || by < 0 || bx >= BN || by >= BN) return true;
     return G.blocked[by * BN + bx] !== 0;
+  }
+
+  // ---- 攻撃は壁を貫通しない ----
+  // (x1, y1) から (x2, y2) までの間に壁 (家の中の壁・外壁) があるか。段ボールは低いので攻撃は越える
+  function wallBetween(x1, y1, x2, y2) {
+    let cx = Math.floor(x1 / BLOCK);
+    let cy = Math.floor(y1 / BLOCK);
+    const ex = Math.floor(x2 / BLOCK);
+    const ey = Math.floor(y2 / BLOCK);
+    if (cx < 0 || cy < 0 || cx >= BN || cy >= BN) return true;
+    const b0 = G.blocked[cy * BN + cx];
+    if (b0 === 1 || b0 === 3) return true; // 壁の中からは届かない
+    if (cx === ex && cy === ey) return false;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const sx = dx > 0 ? 1 : -1;
+    const sy = dy > 0 ? 1 : -1;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+    let tx = adx ? (sx > 0 ? (cx + 1) * BLOCK - x1 : x1 - cx * BLOCK) / adx : Infinity;
+    let ty = ady ? (sy > 0 ? (cy + 1) * BLOCK - y1 : y1 - cy * BLOCK) / ady : Infinity;
+    const stepX = adx ? BLOCK / adx : Infinity;
+    const stepY = ady ? BLOCK / ady : Infinity;
+    for (let n = 0; n < BN * 2; n++) {
+      if (tx < ty) {
+        cx += sx;
+        tx += stepX;
+      } else {
+        cy += sy;
+        ty += stepY;
+      }
+      if (cx < 0 || cy < 0 || cx >= BN || cy >= BN) return true;
+      const b = G.blocked[cy * BN + cx];
+      if (b === 1 || b === 3) return true;
+      if (cx === ex && cy === ey) return false;
+    }
+    return false;
+  }
+
+  // 攻撃の出どころ (ox, oy) から (x, y) に届くか。同じ部屋の中なら壁はないので、すぐに届く
+  function canReach(ox, oy, x, y) {
+    const ro = roomAt(ox, oy);
+    if (ro >= 0 && ro === roomAt(x, y)) return true;
+    return !wallBetween(ox, oy, x, y);
+  }
+
+  // 床のマス i に (ox, oy) から届くか (掃除も壁の向こうへは届かない)
+  function reachTile(ox, oy, i, cx, cy) {
+    const ro = roomAt(ox, oy);
+    if (ro >= 0 && G.tileRoom[i] === ro) return true;
+    return !wallBetween(ox, oy, cx, cy);
   }
 
   function pushOut(o, r) {
@@ -3926,7 +3978,7 @@
     for (let k = 0; k < c; k++) {
       const e = qbuf[k];
       const d2 = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
-      if (d2 < best) {
+      if (d2 < best && canReach(p.x, p.y, e.x, e.y)) {
         best = d2;
         aim = Math.atan2(e.y - p.y, e.x - p.x);
       }
@@ -3959,6 +4011,7 @@
         const d = Math.hypot(dx, dy) || 1;
         if (d > s.range + e.r) continue;
         if (d > e.r && Math.abs(angleDiff(Math.atan2(dy, dx), w.ang)) > half + e.r / d) continue;
+        if (!canReach(p.x, p.y, e.x, e.y)) continue;
         hurtEnemy(e, dmg, 0, 0);
         hits++;
       }
@@ -3976,8 +4029,12 @@
       w.vt -= dt;
       if (w.vt <= 0) {
         w.vt = s.vcd;
-        const x = clamp(p.x + Math.cos(w.ang) * 130, 20, ROOM - 20);
-        const y = clamp(p.y + Math.sin(w.ang) * 130, 20, ROOM - 20);
+        // 壁の手前に出す
+        let dist = 130;
+        while (dist > 0 && !canReach(p.x, p.y, p.x + Math.cos(w.ang) * dist, p.y + Math.sin(w.ang) * dist)) dist -= 16;
+        dist = Math.max(0, dist - 16);
+        const x = clamp(p.x + Math.cos(w.ang) * dist, 20, ROOM - 20);
+        const y = clamp(p.y + Math.sin(w.ang) * dist, 20, ROOM - 20);
         G.zones.push({ kind: 'vortex', x, y, r: s.vr, life: s.vdur, max: s.vdur, tick: 0, dmg: s.vdmg, power: 2 });
         Sound.play('suck');
       }
@@ -3995,7 +4052,7 @@
     for (let k = 0; k < n; k++) {
       const e = qbuf[k];
       const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
-      if (d < best) {
+      if (d < best && canReach(p.x, p.y, e.x, e.y)) {
         best = d;
         target = e;
       }
@@ -4031,6 +4088,7 @@
       const px = x1 + cos * t - e.x;
       const py = y1 + sin * t - e.y;
       if (px * px + py * py > (s.width / 2 + e.r) ** 2) continue;
+      if (!canReach(x1 + cos * t, y1 + sin * t, e.x, e.y)) continue;
       hurtEnemy(e, dmg, cos * 160, sin * 160);
     }
     cleanLine(x1, y1, x2, y2, s.width, s.power);
@@ -4095,6 +4153,8 @@
         b.y += (dy / d) * sp;
         pushOut(b, s.size);
       }
+      // 壁の向こう (や壁の中) を回っているロボは、攻撃も掃除もしない
+      if (!canReach(p.x, p.y, b.x, b.y)) continue;
       const m = query(b.x, b.y, s.size + 70);
       for (let k = 0; k < m; k++) {
         const e = qbuf[k];
@@ -4102,7 +4162,7 @@
         const dx = e.x - b.x;
         const dy = e.y - b.y;
         const d = Math.hypot(dx, dy) || 1;
-        if (d > s.size + e.r) continue;
+        if (d > s.size + e.r || !canReach(b.x, b.y, e.x, e.y)) continue;
         e.robotHit = G.time + 0.45;
         hurtEnemy(e, dmg, (dx / d) * 90, (dy / d) * 90);
       }
@@ -4133,6 +4193,12 @@
       }
       x = clamp(x, 10, ROOM - 10);
       y = clamp(y, 10, ROOM - 10);
+      // 壁の向こうには出さない (届く所まで主人公の方へ寄せる)
+      for (let k = 0; k < 8 && !canReach(p.x, p.y, x, y); k++) {
+        x = p.x + (x - p.x) * 0.7;
+        y = p.y + (y - p.y) * 0.7;
+      }
+      if (!canReach(p.x, p.y, x, y)) continue;
       G.zones.push({ kind: w.evo ? 'acid' : 'spray', x, y, r: s.radius, life: s.dur, max: s.dur, tick: rand(0, 0.1), dmg: s.dmg, power: s.power, delay: w.evo ? rand(0, 0.5) : 0 });
     }
   }
@@ -4153,7 +4219,7 @@
         if (e.rollHit > G.time) continue;
         const dx = e.x - pos.x;
         const dy = e.y - pos.y;
-        if (dx * dx + dy * dy > (hr + e.r) ** 2) continue;
+        if (dx * dx + dy * dy > (hr + e.r) ** 2 || !canReach(pos.x, pos.y, e.x, e.y)) continue;
         e.rollHit = G.time + 0.35;
         hurtEnemy(e, dmg, 0, 0);
       }
@@ -4170,7 +4236,7 @@
     for (let k = 0; k < n; k++) {
       const e = qbuf[k];
       const d2 = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
-      if (d2 < best) {
+      if (d2 < best && canReach(p.x, p.y, e.x, e.y)) {
         best = d2;
         aim = Math.atan2(e.y - p.y, e.x - p.x);
       }
@@ -4195,6 +4261,7 @@
       const d = Math.hypot(dx, dy) || 1;
       if (d > s.range + e.r) continue;
       if (!full && d > e.r && Math.abs(angleDiff(Math.atan2(dy, dx), aim)) > half + e.r / d) continue;
+      if (!canReach(p.x, p.y, e.x, e.y)) continue;
       hurtEnemy(e, dmg, (dx / d) * 260, (dy / d) * 260);
     }
     cleanCone(p.x, p.y, aim, half, s.range, s.power);
@@ -4229,6 +4296,7 @@
         let best = -1;
         for (let k = 0; k < 6; k++) {
           const e = qbuf[(Math.random() * n) | 0];
+          if (!canReach(p.x, p.y, e.x, e.y)) continue;
           let c = 0;
           for (let j = 0; j < n; j++) if ((qbuf[j].x - e.x) ** 2 + (qbuf[j].y - e.y) ** 2 < s.radius * s.radius) c++;
           if (c > best) {
@@ -4240,6 +4308,11 @@
       }
       tx += rand(-12, 12) * i;
       ty += rand(-12, 12) * i;
+      // 壁の向こうには投げない (届く所まで手前に寄せる)
+      for (let k = 0; k < 8 && !canReach(p.x, p.y, tx, ty); k++) {
+        tx = p.x + (tx - p.x) * 0.7;
+        ty = p.y + (ty - p.y) * 0.7;
+      }
       G.bombs.push({ x0: p.x, y0: p.y, x: p.x, y: p.y, tx: clamp(tx, 10, ROOM - 10), ty: clamp(ty, 10, ROOM - 10), t: 0, dur: 0.5 + i * 0.08, s, evo: w.evo });
     }
     Sound.play('throw');
@@ -4259,7 +4332,7 @@
       const dx = e.x - p.x;
       const dy = e.y - p.y;
       const d = Math.hypot(dx, dy) || 1;
-      if (d > s.radius + e.r) continue;
+      if (d > s.radius + e.r || !canReach(p.x, p.y, e.x, e.y)) continue;
       hurtEnemy(e, dmg, (dx / d) * 280, (dy / d) * 280);
     }
     cleanCircle(p.x, p.y, s.radius, s.power);
@@ -4288,7 +4361,7 @@
       const dx = e.x - p.x;
       const dy = e.y - p.y;
       const d = Math.hypot(dx, dy) || 1;
-      if (d > s.radius + e.r) continue;
+      if (d > s.radius + e.r || !canReach(p.x, p.y, e.x, e.y)) continue;
       hurtEnemy(e, dmg, (dx / d) * 110, (dy / d) * 110);
     }
     cleanCircle(p.x, p.y, s.radius * 0.8, s.power);
@@ -4317,10 +4390,16 @@
       const s = b.s;
       b.spin += dt * 14;
       if (!b.back) {
-        b.d += s.speed * dt;
-        b.x += Math.cos(b.a) * s.speed * dt;
-        b.y += Math.sin(b.a) * s.speed * dt;
-        if (b.d >= s.len || isBlocked(b.x, b.y)) {
+        const nx = b.x + Math.cos(b.a) * s.speed * dt;
+        const ny = b.y + Math.sin(b.a) * s.speed * dt;
+        // 壁や段ボールに当たったら、めりこまずにその手前で引き返す
+        const stop = isBlocked(nx, ny);
+        if (!stop) {
+          b.d += s.speed * dt;
+          b.x = nx;
+          b.y = ny;
+        }
+        if (stop || b.d >= s.len) {
           b.back = true;
           b.hits.clear(); // 帰りも当たる
         }
@@ -4333,8 +4412,16 @@
           continue;
         }
         const sp = s.speed * 1.15 * dt;
-        b.x += (dx / d) * Math.min(d, sp);
-        b.y += (dy / d) * Math.min(d, sp);
+        const nx = b.x + (dx / d) * Math.min(d, sp);
+        const ny = b.y + (dy / d) * Math.min(d, sp);
+        // 帰り道に壁があったら、そこで消える
+        if (wallBetween(b.x, b.y, nx, ny)) {
+          puff(b.x, b.y, '#e8e2d0', 4);
+          G.booms.splice(i, 1);
+          continue;
+        }
+        b.x = nx;
+        b.y = ny;
       }
       const dmg = s.dmg * dmgMul();
       const m = query(b.x, b.y, s.size + 70);
@@ -4344,7 +4431,7 @@
         const dx = e.x - b.x;
         const dy = e.y - b.y;
         const d = Math.hypot(dx, dy) || 1;
-        if (d > s.size + e.r) continue;
+        if (d > s.size + e.r || !canReach(b.x, b.y, e.x, e.y)) continue;
         b.hits.add(e);
         hurtEnemy(e, dmg, (dx / d) * 120, (dy / d) * 120);
       }
@@ -4373,7 +4460,7 @@
         const dx = e.x - b.x;
         const dy = e.y - b.y;
         const d = Math.hypot(dx, dy) || 1;
-        if (d > s.radius + e.r) continue;
+        if (d > s.radius + e.r || !canReach(b.x, b.y, e.x, e.y)) continue;
         hurtEnemy(e, dmg, (dx / d) * 200, (dy / d) * 200);
       }
       cleanCircle(b.x, b.y, s.radius, s.power);
@@ -4417,7 +4504,7 @@
         const dx = e.x - b.x;
         const dy = e.y - b.y;
         const d = Math.hypot(dx, dy) || 1;
-        if (d > s.size + e.r) continue;
+        if (d > s.size + e.r || !canReach(b.x, b.y, e.x, e.y)) continue;
         e.spongeHit = G.time + 0.3;
         hurtEnemy(e, dmg, (dx / d) * 80, (dy / d) * 80);
       }
@@ -4472,7 +4559,7 @@
         const e = qbuf[k];
         const dx = e.x - z.x;
         const dy = e.y - z.y;
-        if (dx * dx + dy * dy > (z.r + e.r) ** 2) continue;
+        if (dx * dx + dy * dy > (z.r + e.r) ** 2 || !canReach(z.x, z.y, e.x, e.y)) continue;
         const mul = (z.kind === 'spray' || z.kind === 'acid') && e.def.mold ? 2 : 1;
         hurtEnemy(e, dmg * mul, 0, 0);
       }
@@ -6562,8 +6649,8 @@
     const evo = WEAPONS[r.gear].evo;
     const haveG = G.weapons.some((w) => w.id === r.gear);
     const haveP = !!G.passives[r.passive];
-    const ic = (id, have, title) => `<img class="rc-ic${have ? ' have' : ''}" src="${iconURL(id)}" alt="${esc(title)}" title="${esc(title)}">`;
-    return `<span class="recipe" aria-label="${esc(t('recipeAria', L(WEAPONS[r.gear], 'name'), L(PASSIVES[r.passive], 'name'), L(EVOS[evo], 'name')))}">${ic(r.gear, haveG, L(WEAPONS[r.gear], 'name'))}<b>+</b>${ic(r.passive, haveP, L(PASSIVES[r.passive], 'name'))}<b>→</b>${ic(evo, haveG && haveP, L(EVOS[evo], 'name'))}<span class="rc-evo">${esc(L(EVOS[evo], 'name'))}</span></span>`;
+    const ic = (id, have, title, goal) => `<img class="rc-ic${goal ? ' rc-goal' : ''}${have ? ' have' : ''}" src="${iconURL(id)}" alt="${esc(title)}" title="${esc(title)}">`;
+    return `<span class="recipe" aria-label="${esc(t('recipeAria', L(WEAPONS[r.gear], 'name'), L(PASSIVES[r.passive], 'name'), L(EVOS[evo], 'name')))}">${ic(r.gear, haveG, L(WEAPONS[r.gear], 'name'))}<b>+</b>${ic(r.passive, haveP, L(PASSIVES[r.passive], 'name'))}<b>→</b>${ic(evo, haveG && haveP, L(EVOS[evo], 'name'), true)}<span class="rc-evo">${esc(L(EVOS[evo], 'name'))}</span></span>`;
   }
 
   // ギアかパッシブかの札
@@ -6833,7 +6920,7 @@
       const pips = Array.from({ length: it.max }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('');
       return `<div class="shop-item">
         <img src="${iconURL(shopIcon(it.id))}" alt="" width="36" height="36">
-        <div class="shop-body"><span class="shop-name">${esc(L(it, 'name'))}</span><span class="pips">${pips}</span><br><span class="shop-desc">${esc(L(it, 'desc'))}</span></div>
+        <div class="shop-body"><span class="shop-name">${esc(L(it, 'name'))}</span><span class="pips${it.max > 10 ? ' many' : ''}">${pips}</span><br><span class="shop-desc">${esc(L(it, 'desc'))}</span></div>
         <button type="button" class="btn small" data-act="buy" data-arg="${it.id}" ${maxed || save.coins < cost ? 'disabled' : ''}>${maxed ? t('max') : t('cost', cost)}</button>
       </div>`;
     }).join('');

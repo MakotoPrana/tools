@@ -562,7 +562,9 @@ body {
 .shop-body { flex: 1; min-width: 0; }
 .shop-name { font-weight: 800; font-size: 0.92rem; }
 .shop-desc { font-size: 0.78rem; color: var(--panel-muted); }
-.pips { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.pips { display: inline-flex; flex-wrap: wrap; gap: 3px; max-width: 100%; margin-left: 6px; vertical-align: middle; }
+.pips.many { gap: 2px; }
+.pips.many i { width: 6px; height: 6px; }
 .pips i { width: 8px; height: 8px; border-radius: 50%; background: var(--panel-3); }
 .pips i.on { background: var(--mint); }
 
@@ -720,7 +722,11 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 
 .recipe { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; padding: 2px 8px 2px 4px; border-radius: 8px; background: rgba(255, 255, 255, 0.06); font-size: 0.72rem; }
 .recipe b { color: var(--panel-muted); font-weight: 800; }
 .card .recipe img.rc-ic, .rc-ic { flex: none; width: 22px; height: 22px; margin: 0; border-radius: 5px; background: rgba(0, 0, 0, 0.3); opacity: 0.4; filter: grayscale(0.8); }
-.rc-ic.have { opacity: 1; filter: none; box-shadow: 0 0 0 1.5px var(--mint); }
+/* 既に持っているギア・パッシブ: ミントの枠線と淡い光で目立たせる */
+.card .recipe img.rc-ic.have, .rc-ic.have { opacity: 1; filter: none; background: rgba(79, 224, 182, 0.22); box-shadow: 0 0 0 2px var(--mint), 0 0 8px rgba(79, 224, 182, 0.65); }
+/* 進化後のアイコンは「両方そろった」ときだけ金色の枠 */
+.card .recipe img.rc-ic.rc-goal.have, .rc-ic.rc-goal.have { background: rgba(255, 207, 74, 0.2); box-shadow: 0 0 0 2px var(--gold), 0 0 8px rgba(255, 207, 74, 0.6); }
+.recipe b + .rc-ic, .recipe .rc-ic + b { margin-left: 2px; }
 .recipe { max-width: 100%; }
 .rc-evo { min-width: 0; margin-left: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gold); font-weight: 700; }
 
