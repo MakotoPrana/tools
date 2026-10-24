@@ -255,10 +255,19 @@
     { id: 'tome', name: '片付け名人 トメ', weapons: ['vacuum', 'roller'], hp: 130, speed: 0.9, unlock: 9, trait: '年の功', traitDesc: '2つのギアで出撃・経験値 +25%', desc: '屋敷の昔の管理人。足は遅いが、知恵と経験は誰にも負けない。', mods: { xp: 0.25 } },
   ];
 
-  // モード。ハードは恒久スキルを上げてから挑む想定
+  // モード。ハードは恒久スキルを半分ほど上げてから挑む想定
   const MODES = {
     normal: { key: 'n', name: 'ノーマル', hp: 1, dmg: 1, density: 1, src: 1, coin: 1 },
-    hard: { key: 'h', name: 'ハード', hp: 1.7, dmg: 1.5, density: 1.2, src: 1.4, coin: 1.6 },
+    hard: { key: 'h', name: 'ハード', hp: 3, dmg: 2.7, density: 1.2, src: 2.5, coin: 1.6 },
+  };
+  // ハードのステージごとの強さ (ゴミの HP・接触ダメージ・発生源の HP にかける)。自動プレイで、
+  // 恒久スキルが半分未満だとまずクリアできず、半分でクリアが見えてくるようにそろえた。
+  // 最終ステージは恒久スキルを 8 割ほど上げて、勝率が半分くらいになる強さ
+  const HARD_STAGE = [2.5, 1.65, 1.25, 1.2, 1.45, 1.6, 1.05, 1, 0.95, 0.95];
+  const modeOf = (mode, stageIdx) => {
+    const md = MODES[mode];
+    const k = mode === 'hard' ? HARD_STAGE[stageIdx] || 1 : 1;
+    return { ...md, hp: md.hp * k, dmg: md.dmg * k, src: md.src * k };
   };
 
   // 部屋を完全に清掃したときの特典
@@ -712,7 +721,7 @@
       stageSelect: 'ステージを選ぶ',
       recordOf: (name) => `${name} の記録`,
       coins: 'コイン',
-      hardNote: 'ハード: ゴミの HP ×1.7・ダメージ ×1.5・数 ×1.2、発生源の HP ×1.4。コイン ×1.6。恒久スキルを上げてから挑もう',
+      hardNote: 'ハード: ゴミと発生源の HP・ダメージがノーマルの約3〜7倍 (ステージで違う)、数 ×1.2。コイン ×1.6。恒久スキルを半分ほど上げてから挑もう。最終ステージは8割ほど上げても五分五分',
       lockedPrev: '前のステージをノーマルでクリアすると入れる',
       lockedHard: 'このステージをノーマルでクリアすると挑戦できる',
       bestRooms: (r, n) => `清掃した部屋 最高 ${r}/${n}`,
@@ -881,7 +890,7 @@
       stageSelect: 'Select a Stage',
       recordOf: (name) => `${name}'s records`,
       coins: 'Coins',
-      hardNote: 'Hard: trash HP ×1.7, damage ×1.5, count ×1.2; source HP ×1.4. Coins ×1.6. Raise your permanent skills first.',
+      hardNote: 'Hard: trash and source HP and damage are about 3–7× Normal (varies by stage), count ×1.2. Coins ×1.6. Raise your permanent skills to about half first. The final stage is a coin flip even at 80%.',
       lockedPrev: 'Clear the previous stage on Normal to enter',
       lockedHard: 'Clear this stage on Normal to unlock Hard',
       bestRooms: (r, n) => `Best rooms cleaned ${r}/${n}`,
@@ -2669,7 +2678,7 @@
       stage,
       ch,
       mode,
-      md: MODES[mode],
+      md: modeOf(mode, stageIdx),
       state: 'play', // play / win / dead
       paused: false,
       time: 0,
