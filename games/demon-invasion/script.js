@@ -115,7 +115,9 @@
       nCaptainDown: (n) => `${n}を倒した！ 悪魔たちが混乱している`, nCaptainRetreat: (n) => `${n}が退いていく… 追撃のチャンス！`,
       levelUpTitle: 'レベルアップ！', levelUpSub: (lv) => `Lv ${lv} ― 能力を 1 つ選ぶ`, newTag: 'NEW', swap: '持ち替え',
       kind_main: 'メイン武器', kind_sub: '灯火の武器', kind_skill: 'スキル', kind_ult: '必殺技', kind_passive: 'パッシブ', kind_command: '指揮',
-      captains: '倒した隊長', confused: '混乱',
+      captains: '倒した隊長', confused: '混乱', rebuilt: '再建した兵舎', temp: '仮設', kind_evo: '進化',
+      nRebuilt: '兵舎跡に仮設の兵舎を建てた！', nEnemyRebuilt: '悪魔が兵舎跡に巣を作った…',
+      nPointTaken: (n) => `${n}を占領した！`, nPointLost: (n) => `${n}を悪魔に奪われた…`,
     },
     en: {
       pageTitle: 'Demon Invasion',
@@ -139,7 +141,9 @@
       nCaptainDown: (n) => `${n} is down! The demons are in disarray`, nCaptainRetreat: (n) => `${n} is falling back… chase them down!`,
       levelUpTitle: 'Level Up!', levelUpSub: (lv) => `Lv ${lv} - choose one ability`, newTag: 'NEW', swap: 'Swap',
       kind_main: 'Main weapon', kind_sub: 'Ember weapon', kind_skill: 'Skill', kind_ult: 'Ultimate', kind_passive: 'Passive', kind_command: 'Command',
-      captains: 'Captains defeated', confused: 'Disarray',
+      captains: 'Captains defeated', confused: 'Disarray', rebuilt: 'Barracks rebuilt', temp: 'Temp ', kind_evo: 'Evolution',
+      nRebuilt: 'A temporary barracks now stands on the ruins!', nEnemyRebuilt: 'The demons built a nest on the ruins…',
+      nPointTaken: (n) => `${n} captured!`, nPointLost: (n) => `The demons took the ${n}…`,
     },
   };
   const t = (k, ...a) => {
@@ -418,11 +422,11 @@
       units: [], bullets: [], particles: [], orbs: [], texts: [], notes: [],
       time: 0, over: false, result: null, frontT: 0, front: [], gauge: 0.5,
       shake: 0, cam: { x: 0, y: 0 },
-      stats: { kills: 0, destroyed: 0, deaths: 0, captains: 0, dead: [0, 0], dmg: [0, 0], shots: [0, 0], heal: 0 },
+      stats: { kills: 0, destroyed: 0, deaths: 0, captains: 0, rebuilt: 0, dead: [0, 0], dmg: [0, 0], shots: [0, 0], heal: 0 },
       barrierDown: [false, false], overtime: false,
       mmDirty: true, mm: null, lamps: [],
       shells: [], strikes: [], mines: [], walls: [], beams: [], bolts: [], rings: [], flash: 0,
-      captains: [], confuseT: 0,
+      captains: [], confuseT: 0, points: [], decoys: [], sightT: 0,
     };
     for (const [x, y, w, h, kind] of st.open) {
       for (let j = y; j < y + h; j++) {
@@ -473,7 +477,7 @@
     for (const h of st.hq) {
       g.hq[h.team] = addStruct({ kind: 'hq', team: h.team, tx: h.x, ty: h.y, tw: HQ_SIZE, th: HQ_SIZE, hp: HQ_HP, maxHp: HQ_HP, cd: 0 });
     }
-    for (const b of st.barracks) {
+    const addBarracks = (b) => {
       const def = BARRACKS[b.size];
       // 縦向きの入口 (東西) のときは横長の兵舎を立てる
       const tw = b.face === 'e' || b.face === 'w' ? def.h : def.w;
@@ -485,7 +489,26 @@
       const off = TILE * 0.7;
       s.sx = b.face === 'e' ? s.px + s.pw + off : b.face === 'w' ? s.px - off : s.cx;
       s.sy = b.face === 's' ? s.py + s.ph + off : b.face === 'n' ? s.py - off : s.cy;
+      return s;
+    };
+    for (const b of st.barracks) addBarracks(b);
+    // 最初から兵舎跡になっている場所
+    for (const b of st.ruins || []) {
+      const s = addBarracks(b);
+      s.alive = false;
+      s.hp = 0;
+      s.ruin = { prog: 0, team: -1 };
+      for (let j = s.ty; j < s.ty + s.th; j++) {
+        for (let i = s.tx; i < s.tx + s.tw; i++) {
+          const k = j * C + i;
+          g.solid[k] = 0;
+          g.block[k] = 0;
+          g.structAt[k] = -1;
+          g.floor[k] = FLOOR.rubble;
+        }
+      }
     }
+    g.points = (st.points || []).map((p) => ({ k: p.k, x: p.x * TILE, y: p.y * TILE, prog: 0, owner: -1 }));
     // 建物 (つながった建物マス) に番号をつける
     let nb = 0;
     const stack = [];
@@ -531,6 +554,7 @@
     g.GC = Math.ceil(g.W / CELL);
     g.GR = Math.ceil(g.H / CELL);
     g.grid = Array.from({ length: g.GC * g.GR }, () => []);
+    g.sight = new Uint8Array(g.GC * g.GR);
     return g;
   }
 
@@ -612,6 +636,7 @@
     };
     for (const u of G.units) if (u.alive) put(u);
     if (G.player.alive) put(G.player);
+    for (const d of G.decoys) put(d);
   }
 
   // 一番近い相手 (兵士・プレイヤー)。見通しがあるものだけ
@@ -721,7 +746,8 @@
         if (s.spawnT <= 0) {
           const weak = s.hp < s.maxHp * 0.5 ? 1.5 : 1;
           const logi = s.team === 0 ? 1 - 0.08 * ab('logistics') : 1;
-          s.spawnT = s.def.interval * weak * logi;
+          const radio = pointOwned('radio', s.team) ? 0.8 : 1;
+          s.spawnT = s.def.interval * weak * logi * radio;
           s.ready++;
         }
       }
@@ -751,7 +777,14 @@
   function retarget(u) {
     const def = u.def;
     u.retT = 0.25;
-    u.target = nearestFoe(u.x, u.y, u.team, def.aggro);
+    u.target = null;
+    // 囮人形: 近くの悪魔は人形をねらう
+    if (u.team === 1 && G.decoys.length) {
+      for (const d of G.decoys) {
+        if ((d.x - u.x) ** 2 + (d.y - u.y) ** 2 < 300 * 300 && los(u.x, u.y, d.x, d.y)) { u.target = d; break; }
+      }
+    }
+    if (!u.target) u.target = nearestFoe(u.x, u.y, u.team, def.aggro);
     u.tStruct = u.target ? null : nearestFoeStruct(u.x, u.y, u.team, def.melee ? def.aggro * 0.7 : def.range);
     u.prog = laneProject(G.lanes[u.lane], u.x, u.y).s / G.lanes[u.lane].len;
     if (def.heal) {
@@ -913,6 +946,7 @@
     let dmg = def.dmg * u.dmgMul;
     if (u.team === 0 && auraOn(u)) dmg *= 1 + 0.1 * ab('aura');
     if (u.team === 1 && !u.boss && nearCaptain(u)) dmg *= 1.15;
+    if (pointOwned('ammo', u.team)) dmg *= 1.15;
     if (def.melee) {
       if (u.target) hurt(u.target, dmg, u.x, u.y, u);
       else if (u.tStruct) hurtStruct(u.tStruct, dmg, u);
@@ -937,6 +971,11 @@
   function hurt(e, amt, sx, sy, src) {
     if (!e.alive) return;
     const byPlayer = src && src.kind === 'player';
+    if (e.kind === 'decoy') {
+      e.hp -= amt;
+      e.hitT = 0.08;
+      return;
+    }
     if (e.kind === 'player') {
       if (e.invT > 0) return;
       if (nearOwnBase(e)) amt *= GUARD;
@@ -1053,6 +1092,11 @@
     }
     G.mmDirty = true;
     explosion(s.cx, s.cy, Math.max(s.pw, s.ph) * 0.6);
+    if (s.kind === 'barracks') {
+      // 兵舎跡になる。残った兵士はこの兵舎から切り離す (再建された兵舎の兵力に数えない)
+      s.ruin = { prog: 0, team: -1 };
+      for (const u of G.units) if (u.home === s) u.home = null;
+    }
     if (s.kind === 'hq') {
       endBattle(s.team === 1);
       return;
@@ -1155,7 +1199,7 @@
             const cell = G.grid[yj * G.GC + xi];
             for (let m = 0; m < cell.length; m++) {
               const e = cell[m];
-              if (e.team === b.team || !e.alive) continue;
+              if (e.team === b.team || !e.alive || e === b.passed) continue;
               const rr = e.r + 3;
               if (Math.abs(e.x - b.x) < rr && Math.abs(e.y - b.y) < rr && (e.x - b.x) ** 2 + (e.y - b.y) ** 2 < rr * rr) {
                 hit = e;
@@ -1167,8 +1211,18 @@
         if (hit) {
           if (b.aoe) blast(b.x, b.y, b.aoe, b.dmg, b.team, b.src);
           else hurt(hit, b.dmg, b.x - b.vx * 0.05, b.y - b.vy * 0.05, b.src);
+          if (b.burn && hit.kind === 'unit') {
+            hit.burnT = 2;
+            hit.burnDps = b.burn;
+          }
           spark(b.x, b.y, b.look);
-          dead = true;
+          if (b.pierce > 0) {
+            // 貫通: 同じ敵に何度も当たらないように覚えておく
+            b.pierce--;
+            b.passed = hit;
+          } else {
+            dead = true;
+          }
         }
       }
       if (!dead) B[w++] = b;
@@ -1215,7 +1269,7 @@
       hp: PLAYER.hp, maxHp: PLAYER.hp, atkMul: 1, lvl: 1, xp: 0, pending: 0, face: 0, fireCd: 0, mag: 0, reloadT: 0,
       dashT: 0, dashCd: 0, dx: 0, dy: 0, invT: 0, hurtT: 0, lastHurt: -99, respawnT: 0, lvlFx: 0, walk: 0,
       // 能力: ab[id] = レベル。main はメイン武器、subs は灯火の武器、skills は Q・E、ult は必殺技
-      ab: { rifle: 1 }, main: 'rifle', subs: [], skills: [], ult: null, cds: {}, ultG: 0,
+      ab: { rifle: 1 }, main: 'rifle', subs: [], skills: [], ult: null, cds: {}, ultG: 0, evo: {}, leapT: 0,
       spin: 0, charge: 0, chargeT: 0, chargeHit: null, unleashT: 0, orbitA: 0, drones: [], subT: {},
     };
     G.player = P;
@@ -1253,7 +1307,20 @@
     railgun: (L) => ({ dmg: 45 * (1 + 0.2 * (L - 1)), dmgMax: 140 * (1 + 0.2 * (L - 1)), charge: 1, mag: 6, reload: 1.6, range: 720, rail: true }),
     flame: (L) => ({ dmg: 5 * (1 + 0.15 * (L - 1)), tick: 0.1, range: 170 + 15 * (L - 1), arc: 0.38, mag: 80, reload: 1.6, flame: true, burn: 4 * (1 + 0.15 * (L - 1)) }),
   };
-  const weapon = () => MAIN[G.player.main](ab(G.player.main));
+  // 進化したメイン武器
+  const EVO_MAIN = {
+    rifle: (w) => { w.dmg *= 1.5; w.rof *= 0.8; w.pierce = 1; },
+    shotgun: (w) => { w.pellets += 3; w.burn = 6; },
+    gatling: (w) => { w.noSlow = true; w.rofMin *= 0.7; w.spinUp = 2; },
+    railgun: (w) => { w.charge = 0.5; w.wide = 10; w.boom = true; },
+    flame: (w) => { w.range += 60; w.arc += 0.1; w.burn *= 2; w.heal = true; },
+  };
+  const weapon = () => {
+    const P = G.player;
+    const w = MAIN[P.main](ab(P.main));
+    if (P.evo[P.main]) EVO_MAIN[P.main](w);
+    return w;
+  };
   const magMax = () => Math.round(weapon().mag * G.player.magMul);
 
   function gainXp(v) {
@@ -1363,8 +1430,20 @@
     input.dash = false;
     const w = weapon();
     let speed = PLAYER.speed * P.speedMul * (unleashed ? 1.35 : 1);
-    if (w.spin && P.spin > 0.05) speed *= 0.6; // ガトリングを撃っている間は遅い
-    if (P.chargeT > 0) {
+    if (w.spin && !w.noSlow && P.spin > 0.05) speed *= 0.6; // ガトリングを撃っている間は遅い
+    if (P.leapT > 0) {
+      // 灯火の跳躍: 建物を飛び越える (跳んでいる間は当たり判定なし)
+      P.leapT -= dt;
+      const f = 1 - Math.max(0, P.leapT) / P.leap.T;
+      P.x = lerp(P.leap.x0, P.leap.x1, f);
+      P.y = lerp(P.leap.y0, P.leap.y1, f);
+      P.leapH = Math.sin(f * Math.PI) * 40;
+      if (P.leapT <= 0) {
+        P.leapH = 0;
+        collideTiles(P);
+        blast(P.x, P.y, 90, P.leap.dmg, 0, P, 1);
+      }
+    } else if (P.chargeT > 0) {
       updateChargeSkill(P, dt);
     } else if (P.dashT > 0) {
       P.dashT -= dt;
@@ -1376,7 +1455,7 @@
       P.y += my * speed * dt;
     }
     if (mx || my) P.walk += dt * 12;
-    collideTiles(P);
+    if (P.leapT <= 0) collideTiles(P);
 
     // ねらい
     let firing = false;
@@ -1454,7 +1533,7 @@
     }
     input.reload = false;
     const ready = P.reloadT <= 0 && P.mag > 0 && P.dashT <= 0 && P.chargeT <= 0;
-    const atk = P.atkMul * (P.unleashT > 0 ? 1.6 + 0.1 * (ab('unleash') - 1) : 1);
+    const atk = P.atkMul * (P.unleashT > 0 ? 1.6 + 0.1 * (ab('unleash') - 1) : 1) * (pointOwned('ammo', 0) ? 1.15 : 1);
     const ox = P.x + Math.cos(P.face) * 16;
     const oy = P.y + Math.sin(P.face) * 16;
     if (w.rail) {
@@ -1464,7 +1543,7 @@
       } else if (P.charge > 0.12 && ready) {
         const f = P.charge / w.charge;
         P.mag--;
-        railShot(P, ox, oy, P.face, w.range, lerp(w.dmg, w.dmgMax, f) * atk, f);
+        railShot(P, ox, oy, P.face, w.range, lerp(w.dmg, w.dmgMax, f) * atk, f, w);
         P.charge = 0;
       } else if (!firing) {
         P.charge = 0;
@@ -1476,16 +1555,21 @@
         P.fireCd = w.tick;
         P.mag--;
         flameTick(P, w, atk);
+        if (w.heal) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.002);
       }
       return;
     }
-    if (w.spin) P.spin = firing && ready ? Math.min(1, P.spin + dt / 1.5) : Math.max(0, P.spin - dt * 2);
+    if (w.spin) P.spin = firing && ready ? Math.min(1, P.spin + (dt / 1.5) * (w.spinUp || 1)) : Math.max(0, P.spin - dt * 2);
     if (firing && ready && P.fireCd <= 0) {
       P.fireCd = w.spin ? lerp(w.rof, w.rofMin, P.spin) : w.rof;
       P.mag--;
       for (let i = 0; i < w.pellets; i++) {
         const a = P.face + rand(-w.spread, w.spread);
-        fireBullet(ox, oy, a, w.speed * rand(0.92, 1.05), w.dmg * atk, 0, P, w.range * (w.pellets > 1 ? rand(0.8, 1) : 1), 'player');
+        const b = fireBullet(ox, oy, a, w.speed * rand(0.92, 1.05), w.dmg * atk, 0, P, w.range * (w.pellets > 1 ? rand(0.8, 1) : 1), 'player');
+        if (b) {
+          b.pierce = w.pierce || 0;
+          b.burn = w.burn ? w.burn * atk : 0;
+        }
       }
       muzzle(ox, oy, P.face, true);
       Sound.play('shot');
@@ -1493,7 +1577,7 @@
   }
 
   // レールガン: 壁に当たるまでの直線上の敵をすべて貫く
-  function railShot(P, x, y, a, range, dmg, f) {
+  function railShot(P, x, y, a, range, dmg, f, w) {
     const cx = Math.cos(a);
     const cy = Math.sin(a);
     let len = range;
@@ -1516,9 +1600,10 @@
       const py = u.y - y;
       const along = px * cx + py * cy;
       if (along < 0 || along > len) continue;
-      if (Math.abs(px * cy - py * cx) < u.r + 6 + f * 6) hurt(u, dmg, x, y, P);
+      if (Math.abs(px * cy - py * cx) < u.r + 6 + f * 6 + (w.wide || 0)) hurt(u, dmg, x, y, P);
     }
     if (hitStruct) hurtStruct(hitStruct, dmg, P);
+    if (w.boom) blast(x + cx * len, y + cy * len, 110, dmg * 0.6, 0, P, 1, 'holy');
     G.beams.push({ x1: x, y1: y, x2: x + cx * len, y2: y + cy * len, life: 0.3, max: 0.3, color: '#ffcf7a', w: 4 + f * 8 });
     G.shake = Math.min(10, G.shake + 2 + f * 4);
     Sound.play('rail');
@@ -1606,7 +1691,7 @@
       const L = ab(id);
       P.subT[id] = (P.subT[id] ?? 1) - dt;
       if (id === 'drone') {
-        const n = 1 + Math.floor((L - 1) / 2);
+        const n = 1 + Math.floor((L - 1) / 2) + (P.evo.drone ? 2 : 0);
         while (P.drones.length < n) P.drones.push({ x: P.x, y: P.y, cd: 0.5 });
         P.drones.forEach((d, i) => {
           const a = P.orbitA * 1.5 + (i * TAU) / n;
@@ -1616,16 +1701,27 @@
           if (d.cd > 0) return;
           const foe = nearestFoe(d.x, d.y, 0, 330);
           if (!foe) return;
-          d.cd = 0.45;
+          d.cd = P.evo.drone ? 0.3 : 0.45;
           const fa = Math.atan2(foe.y - d.y, foe.x - d.x);
           fireBullet(d.x, d.y, fa, 820, 7 * (1 + 0.15 * (L - 1)) * atk, 0, P, 360, 'drone');
         });
         continue;
       }
       if (id === 'blades') {
-        const n = 1 + L;
-        const rr = 72;
+        const n = 1 + L + (P.evo.blades ? 2 : 0);
+        const rr = P.evo.blades ? 90 : 72;
         P.bladeN = n;
+        P.bladeR = rr;
+        if (P.evo.blades) {
+          // 光輪の守護: 刃に触れた敵の弾を消す
+          for (const b of G.bullets) {
+            if (b.team !== 1 || (b.x - P.x) ** 2 + (b.y - P.y) ** 2 > (rr + 16) ** 2) continue;
+            for (let i = 0; i < n; i++) {
+              const a = P.orbitA * 3.2 + (i * TAU) / n;
+              if ((b.x - P.x - Math.cos(a) * rr) ** 2 + (b.y - P.y - Math.sin(a) * rr) ** 2 < 18 * 18) { b.life = 0; break; }
+            }
+          }
+        }
         forFoesNear(P.x, P.y, rr + 22, 0, (u) => {
           if (u.kind !== 'unit' || (u.bladeT || 0) > G.time) return;
           for (let i = 0; i < n; i++) {
@@ -1647,12 +1743,12 @@
         P.subT[id] = 2.6 - 0.2 * (L - 1);
         const foes = foesInRange(P.x, P.y, 520);
         if (!foes.length) { P.subT[id] = 0.3; continue; }
-        const n = 1 + Math.floor(L / 2);
+        const n = (1 + Math.floor(L / 2)) * (P.evo.missile ? 2 : 1);
         for (let i = 0; i < n; i++) {
           const tg = foes[Math.floor(Math.random() * foes.length)];
           const a = P.face + Math.PI + rand(-1.2, 1.2);
           const b = fireBullet(P.x, P.y, a, 380, 22 * (1 + 0.2 * (L - 1)) * atk, 0, P, 1400, 'missile');
-          if (b) { b.homing = tg; b.aoe = 45; }
+          if (b) { b.homing = tg; b.aoe = P.evo.missile ? 70 : 45; }
         }
         Sound.play('missile');
       } else if (id === 'mortar') {
@@ -1676,7 +1772,12 @@
           }
         }
         if (tx == null) { P.subT[id] = 0.4; continue; }
-        G.shells.push({ x0: P.x, y0: P.y, x: tx, y: ty, t: 0, T: 0.9, r: 85, dmg: 45 * (1 + 0.2 * (L - 1)) * atk, team: 0, src: P, look: 'mortar' });
+        const volley = P.evo.mortar ? 3 : 1;
+        for (let i = 0; i < volley; i++) {
+          const ox = i ? rand(-70, 70) : 0;
+          const oy = i ? rand(-70, 70) : 0;
+          G.shells.push({ x0: P.x, y0: P.y, x: tx + ox, y: ty + oy, t: -i * 0.15, T: 0.9, r: 85, dmg: 45 * (1 + 0.2 * (L - 1)) * atk, team: 0, src: P, look: 'mortar' });
+        }
       } else if (id === 'lightning') {
         P.subT[id] = 2.2 - 0.2 * (L - 1);
         const foes = G.units.filter((u) => u.alive && u.team === 1 && onScreen(u.x, u.y, -10));
@@ -1684,9 +1785,21 @@
         const n = 1 + Math.floor((L - 1) / 2);
         for (let i = 0; i < n; i++) {
           const tg = foes[Math.floor(Math.random() * foes.length)];
-          hurt(tg, 32 * (1 + 0.2 * (L - 1)) * atk, null, null, P);
+          const dmg = 32 * (1 + 0.2 * (L - 1)) * atk;
+          hurt(tg, dmg, null, null, P);
           G.bolts.push({ x: tg.x, y: tg.y, life: 0.25, max: 0.25, seed: Math.random() * 1000 });
           spawnParticles(tg.x, tg.y, 6, '#bfe4ff', 120, 0.25, 2, 'glow');
+          if (P.evo.lightning) {
+            // 雷神の裁き: 近くの敵 2 体に飛び移る
+            let from = tg;
+            for (let c = 0; c < 2; c++) {
+              const next = foes.find((f) => f !== from && f.alive && (f.x - from.x) ** 2 + (f.y - from.y) ** 2 < 160 * 160);
+              if (!next) break;
+              hurt(next, dmg * 0.7, null, null, P);
+              G.beams.push({ x1: from.x, y1: from.y, x2: next.x, y2: next.y, life: 0.2, max: 0.2, color: '#cfeaff', w: 3 });
+              from = next;
+            }
+          }
         }
         Sound.play('zap');
       }
@@ -1707,6 +1820,9 @@
     charge: (L) => 8 - 0.6 * (L - 1),
     heal: (L) => 20 - 2 * (L - 1),
     mine: (L) => 10 - 1 * (L - 1),
+    decoy: (L) => 16 - 1 * (L - 1),
+    leap: (L) => 12 - 1 * (L - 1),
+    engineer: (L) => 12 - 0.5 * (L - 1),
   };
   const skillCd = (id) => SKILL_CD[id](ab(id)) * G.player.cdMul;
 
@@ -1745,6 +1861,43 @@
       }
       G.rings.push({ x: P.x, y: P.y, r: 220, life: 0.6, max: 0.6, color: '#7dffa0' });
       spawnParticles(P.x, P.y, 30, '#7dffa0', 200, 0.8, 3, 'glow');
+      Sound.play('heal');
+    } else if (id === 'decoy') {
+      const hp = 200 * (1 + 0.3 * (L - 1));
+      const d = { kind: 'decoy', team: 0, x: P.x + cx * 60, y: P.y + cy * 60, r: 12, hp, maxHp: hp, alive: true, life: 8 + (L - 1), hitT: 0 };
+      collideTiles(d);
+      G.decoys.push(d);
+      if (G.decoys.length > 2) G.decoys.shift().alive = false;
+      Sound.play('wall');
+    } else if (id === 'leap') {
+      // 着地できる場所を、遠いほうから探す
+      let tx = P.x;
+      let ty = P.y;
+      for (let d = 230; d > 0; d -= 10) {
+        const x = P.x + cx * d;
+        const y = P.y + cy * d;
+        const k = tileAt(x, y);
+        if (k >= 0 && !G.solid[k] && !isSolid(Math.floor((x + 12) / TILE), Math.floor(y / TILE)) && !isSolid(Math.floor((x - 12) / TILE), Math.floor(y / TILE))) {
+          tx = x;
+          ty = y;
+          break;
+        }
+      }
+      P.leap = { x0: P.x, y0: P.y, x1: tx, y1: ty, T: 0.45, dmg: 50 * (1 + 0.25 * (L - 1)) * atk };
+      P.leapT = 0.45;
+      P.invT = Math.max(P.invT, 0.55);
+      Sound.play('dash');
+    } else if (id === 'engineer') {
+      const pct = 0.08 + 0.02 * (L - 1);
+      for (const s of G.structs) {
+        if (!s.alive || s.team !== 0) continue;
+        const p = rectPoint(s, P.x, P.y);
+        if (Math.hypot(p.x - P.x, p.y - P.y) < 260) {
+          s.hp = Math.min(s.maxHp, s.hp + s.maxHp * pct);
+          spawnParticles(s.cx, s.cy, 14, '#9fe08f', 120, 0.6, 3, 'glow');
+        }
+      }
+      G.rings.push({ x: P.x, y: P.y, r: 260, life: 0.6, max: 0.6, color: '#9fe08f' });
       Sound.play('heal');
     } else if (id === 'mine') {
       G.mines.push({ x: P.x, y: P.y, arm: 0.5, r: 85 + 5 * (L - 1), dmg: 70 * (1 + 0.25 * (L - 1)) * atk });
@@ -1878,7 +2031,7 @@
   function applyDefense() {
     for (const s of G.structs) {
       if (s.team !== 0 || !s.alive) continue;
-      const base = s.kind === 'hq' ? HQ_HP : s.def.hp;
+      const base = s.kind === 'hq' ? HQ_HP : s.def.hp * (s.temp ? 0.7 : 1);
       const nm = base * (1 + 0.1 * ab('defense'));
       s.hp += nm - s.maxHp;
       s.maxHp = nm;
@@ -1891,6 +2044,248 @@
     for (const s of G.structs) {
       if (s.team === 0 && s.alive) s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.004 * L * dt);
     }
+  }
+
+  // ===================================================================
+  // 兵舎跡の再建
+  // ===================================================================
+  // 兵舎跡のまわり (建物の四角から RUIN_R 以内) に片方の陣営だけがいると、REBUILD 秒で仮設の兵舎が建つ
+  const RUIN_R = 100;
+  const REBUILD = 10;
+
+  function updateRuins(dt) {
+    const P = G.player;
+    for (const s of G.structs) {
+      const r = s.ruin;
+      if (!r) continue;
+      const n = [0, 0];
+      const near = (e) => {
+        const dx = Math.max(s.px - e.x, 0, e.x - s.px - s.pw);
+        const dy = Math.max(s.py - e.y, 0, e.y - s.py - s.ph);
+        return dx * dx + dy * dy < RUIN_R * RUIN_R;
+      };
+      for (const u of G.units) if (u.alive && near(u)) n[u.team]++;
+      const pHere = P.alive && near(P);
+      if (pHere) n[0]++;
+      r.pHere = pHere;
+      const builder = n[0] && !n[1] ? 0 : n[1] && !n[0] ? 1 : -1;
+      if (builder < 0) {
+        if (!n[0] && !n[1]) r.prog = Math.max(0, r.prog - dt / 30);
+        continue;
+      }
+      // プレイヤーがいると 2 倍、工兵の心得でさらに速い
+      const mul = builder === 0 && pHere ? 2 * (1 + 0.25 * ab('engineer')) : 1;
+      if (r.team !== builder && r.prog > 0) {
+        r.prog = Math.max(0, r.prog - (dt / REBUILD) * mul);
+        continue;
+      }
+      r.team = builder;
+      r.prog += (dt / REBUILD) * mul;
+      if (r.prog >= 1) rebuild(s, builder, pHere);
+    }
+  }
+
+  // 兵舎跡に、仮設の兵舎 (小・HP 70%) を建てる
+  function rebuild(s, team, byPlayer) {
+    const def = BARRACKS.s;
+    s.team = team;
+    s.def = def;
+    s.size = 's';
+    s.temp = true;
+    s.ruin = null;
+    s.alive = true;
+    s.maxHp = def.hp * 0.7 * (team === 0 ? 1 + 0.1 * ab('defense') : 1);
+    s.hp = s.maxHp;
+    s.count = 0;
+    s.ready = 0;
+    s.spawnT = 1;
+    s.hitT = -99;
+    for (let j = s.ty; j < s.ty + s.th; j++) {
+      for (let i = s.tx; i < s.tx + s.tw; i++) {
+        const k = j * G.C + i;
+        G.solid[k] = 1;
+        G.block[k] = 1;
+        G.structAt[k] = s.id;
+      }
+    }
+    // 建った場所にいた兵士は外へ押し出す
+    for (const u of G.units) if (u.alive) collideTiles(u);
+    if (G.player.alive) collideTiles(G.player);
+    G.barrierDown[team] = false;
+    G.mmDirty = true;
+    spawnParticles(s.cx, s.cy, 30, team === 0 ? '#9cc4ff' : '#ff6a5a', 160, 0.8, 3, 'glow');
+    Sound.play('wall');
+    if (team === 0) {
+      G.stats.rebuilt++;
+      note(t('nRebuilt'), '#8fc0ff');
+      if (byPlayer) gainXp(30);
+    } else {
+      note(t('nEnemyRebuilt'), '#ff8a7a');
+    }
+  }
+
+  // ===================================================================
+  // 占領ポイント
+  // ===================================================================
+  const POINT_R = 120;
+  const POINTS = {
+    water: { icon: '🚰', name: '給水塔', en: { name: 'Water Tower' } },
+    radio: { icon: '📡', name: '電波塔', en: { name: 'Radio Tower' } },
+    ammo: { icon: '📦', name: '弾薬庫', en: { name: 'Ammo Depot' } },
+    tower: { icon: '🗼', name: '見張り塔', en: { name: 'Watchtower' } },
+  };
+  const pointOwned = (k, team) => G.points.some((p) => p.k === k && p.owner === team);
+
+  function updatePoints(dt) {
+    const P = G.player;
+    for (const p of G.points) {
+      // 円の中の兵士の数の差 (プレイヤーは 3 人ぶん) で、ゲージが傾く
+      let n = 0;
+      for (const u of G.units) {
+        if (u.alive && (u.x - p.x) ** 2 + (u.y - p.y) ** 2 < POINT_R * POINT_R) n += u.team === 0 ? 1 : -1;
+      }
+      const pHere = P.alive && (P.x - p.x) ** 2 + (P.y - p.y) ** 2 < POINT_R * POINT_R;
+      if (pHere) n += 3;
+      p.prog = clamp(p.prog + clamp(n, -6, 6) * dt * 0.04, -1, 1);
+      const name = L(POINTS[p.k], 'name');
+      if (p.prog >= 1 && p.owner !== 0) {
+        p.owner = 0;
+        note(t('nPointTaken', name), '#8fc0ff');
+        if (pHere) gainXp(30);
+      } else if (p.prog <= -1 && p.owner !== 1) {
+        p.owner = 1;
+        note(t('nPointLost', name), '#ff8a7a');
+      } else if ((p.owner === 0 && p.prog < 0) || (p.owner === 1 && p.prog > 0)) {
+        p.owner = -1;
+      }
+      // 給水塔: 持っている陣営の兵士とプレイヤーは、近くで体力が回復する
+      if (p.k === 'water' && p.owner >= 0) {
+        for (const u of G.units) {
+          if (u.alive && u.team === p.owner && (u.x - p.x) ** 2 + (u.y - p.y) ** 2 < 300 * 300) u.hp = Math.min(u.maxHp, u.hp + 2 * dt);
+        }
+        if (p.owner === 0 && P.alive && (P.x - p.x) ** 2 + (P.y - p.y) ** 2 < 300 * 300) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.02 * dt);
+      }
+    }
+  }
+
+  // ミニマップに映る敵: 見張り塔を持っていなければ、自軍のまわりの敵だけ
+  function updateSight(dt) {
+    G.sightT -= dt;
+    if (G.sightT > 0) return;
+    G.sightT = 0.3;
+    const v = G.sight;
+    v.fill(0);
+    const R = 4;
+    const mark = (x, y) => {
+      const gi = Math.floor(x / CELL);
+      const gj = Math.floor(y / CELL);
+      for (let j = Math.max(0, gj - R); j <= Math.min(G.GR - 1, gj + R); j++) {
+        for (let i = Math.max(0, gi - R); i <= Math.min(G.GC - 1, gi + R); i++) {
+          if ((i - gi) ** 2 + (j - gj) ** 2 <= R * R + 1) v[j * G.GC + i] = 1;
+        }
+      }
+    };
+    for (const u of G.units) if (u.alive && u.team === 0) mark(u.x, u.y);
+    for (const s of G.structs) if (s.alive && s.team === 0) mark(s.cx, s.cy);
+    if (G.player.alive) mark(G.player.x, G.player.y);
+  }
+  const seen = (x, y) => pointOwned('tower', 0) || G.sight[clamp(Math.floor(y / CELL), 0, G.GR - 1) * G.GC + clamp(Math.floor(x / CELL), 0, G.GC - 1)] === 1;
+
+  function drawPointsAndRuins() {
+    for (const p of G.points) {
+      if (!onScreen(p.x, p.y, POINT_R + 20)) continue;
+      const col = p.owner === 0 ? '91,143,240' : p.owner === 1 ? '255,90,74' : '220,220,230';
+      ctx.fillStyle = `rgba(${col},0.1)`;
+      ctx.strokeStyle = `rgba(${col},0.55)`;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([12, 8]);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, POINT_R, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // ゲージ (青は右回り、赤は左回り)
+      if (Math.abs(p.prog) > 0.01) {
+        ctx.strokeStyle = p.prog > 0 ? '#5b8ff0' : '#ff5a4a';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 34, -Math.PI / 2, -Math.PI / 2 + TAU * p.prog, p.prog < 0);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(10,12,18,0.75)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 28, 0, TAU);
+      ctx.fill();
+      ctx.font = '26px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(POINTS[p.k].icon, p.x, p.y + 1);
+    }
+    for (const s of G.structs) {
+      const r = s.ruin;
+      if (!r || !onScreen(s.cx, s.cy, 120)) continue;
+      ctx.strokeStyle = 'rgba(200,200,210,0.35)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.strokeRect(s.px - 4, s.py - 4, s.pw + 8, s.ph + 8);
+      ctx.setLineDash([]);
+      if (r.prog > 0) {
+        ctx.strokeStyle = r.team === 0 ? '#5b8ff0' : '#ff5a4a';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(s.cx, s.cy, 26, -Math.PI / 2, -Math.PI / 2 + TAU * r.prog);
+        ctx.stroke();
+      }
+      ctx.font = '22px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.fillText('🚧', s.cx, s.cy);
+    }
+  }
+
+  // ---- 囮人形 ----
+  function drawDecoys() {
+    for (const d of G.decoys) {
+      if (!onScreen(d.x, d.y, 30)) continue;
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(d.x + 2, d.y + 6, 12, 7, 0, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = '#6a4a2a';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(d.x - 14, d.y - 4);
+      ctx.lineTo(d.x + 14, d.y - 4);
+      ctx.stroke();
+      ctx.fillStyle = d.hitT > 0 ? '#fff' : '#d8c49a';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#ffab3d';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y - 2, 4, 0, TAU);
+      ctx.fill();
+      const w = 26;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(d.x - w / 2, d.y - 20, w, 3);
+      ctx.fillStyle = '#d8c49a';
+      ctx.fillRect(d.x - w / 2, d.y - 20, w * clamp(d.hp / d.maxHp, 0, 1), 3);
+      d.hitT -= 1 / 60;
+    }
+  }
+
+  function updateDecoys(dt) {
+    G.decoys = G.decoys.filter((d) => {
+      d.life -= dt;
+      if (d.life <= 0 || d.hp <= 0) {
+        d.alive = false;
+        spawnParticles(d.x, d.y, 12, '#d8c49a', 100, 0.6, 3);
+        return false;
+      }
+      return true;
+    });
   }
 
   // ===================================================================
@@ -2099,6 +2494,11 @@
       else if (a.kind !== 'main' && owned(a.kind) < SLOTS[a.kind]) pool.push({ a, w: a.kind === 'passive' ? 1 : 1.3 });
     }
     const picks = [];
+    // 進化できる武器があれば、必ず選択肢に出す
+    for (const id of [P.main, ...P.subs]) {
+      const e = ABIL.EVOLUTIONS[id];
+      if (e && !P.evo[id] && ab(id) >= ABIL.MAX_LV && ab(e.need) > 0 && picks.length < 2) picks.push({ a: e, evo: id });
+    }
     while (picks.length < 3 && pool.length) {
       let sum = 0;
       for (const p of pool) sum += p.w;
@@ -2128,6 +2528,12 @@
       P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.5);
       return;
     }
+    if (c.evo) {
+      P.evo[c.evo] = true;
+      P.mag = Math.min(P.mag, magMax());
+      note(`${L(a, 'name')}!`, '#ffcf4a');
+      return;
+    }
     if (c.swap) {
       // メイン武器の持ち替え (レベルは引き継ぐ)
       const lv = ab(P.main);
@@ -2153,7 +2559,7 @@
   }
 
   // テストや自動プレイでは、選択肢から自動で選ぶ
-  const BOT_PREF = { main: 3, sub: 3, ult: 2.5, skill: 2, passive: 1.5, command: 1.2, fallback: 0 };
+  const BOT_PREF = { main: 3, sub: 3, ult: 2.5, skill: 2, passive: 1.5, command: 1.2, fallback: 0, evo: 99 };
   function autoPick() {
     while (G.player.pending > 0) {
       const ch = rollChoices();
@@ -2161,7 +2567,7 @@
       let best = ch[0];
       let bs = -1e9;
       for (const c of ch) {
-        const sc = (c.swap ? -5 : BOT_PREF[c.a.kind]) + (ab(c.a.id) ? 1 : 0) + Math.random();
+        const sc = c.evo ? 99 : (c.swap ? -5 : BOT_PREF[c.a.kind]) + (ab(c.a.id) ? 1 : 0) + Math.random();
         if (sc > bs) { bs = sc; best = c; }
       }
       applyChoice(best);
@@ -2185,9 +2591,10 @@
     const P = G.player;
     const cards = lvChoices.map((c, i) => {
       const a = c.a;
-      const lv = ab(a.id);
-      const tag = a.kind === 'fallback' ? '' : c.swap ? `<span class="card-lv swap">${t('swap')}</span>`
-        : lv ? `<span class="card-lv">Lv${lv} → ${lv + 1}</span>` : `<span class="card-lv new">${t('newTag')}</span>`;
+      const lv = c.evo ? 0 : ab(a.id);
+      const tag = a.kind === 'fallback' ? '' : c.evo ? `<span class="card-lv evo">${a.icon} ${esc(abName(c.evo))} + ${esc(abName(a.need))}</span>`
+        : c.swap ? `<span class="card-lv swap">${t('swap')}</span>`
+          : lv ? `<span class="card-lv">Lv${lv} → ${lv + 1}</span>` : `<span class="card-lv new">${t('newTag')}</span>`;
       const desc = lv && !c.swap ? L(a, 'up') : L(a, 'desc');
       return `
         <button type="button" class="card k-${a.kind}" data-act="pick" data-i="${i}">
@@ -2200,7 +2607,7 @@
           <span class="card-key">${i + 1}</span>
         </button>`;
     }).join('');
-    const have = ABIL.ABILITIES.filter((a) => ab(a.id) > 0).map((a) => `<span class="chip k-${a.kind}" title="${esc(L(a, 'name'))}">${a.icon}<small>${ab(a.id)}</small></span>`).join('');
+    const have = ABIL.ABILITIES.filter((a) => ab(a.id) > 0).map((a) => `<span class="chip k-${a.kind}" title="${esc(L(a, 'name'))}">${P.evo[a.id] ? ABIL.EVOLUTIONS[a.id].icon : a.icon}<small>${ab(a.id)}</small></span>`).join('');
     showOverlay(`
       <div class="panel">
         <h2 class="lvup-title">${t('levelUpTitle')}</h2>
@@ -2317,8 +2724,8 @@
                 const nx = dx / d;
                 const ny = dy / d;
                 // プレイヤーは押されにくい
-                const we = e.kind === 'player' ? 0.15 : 1;
-                const wf = f.kind === 'player' ? 0.15 : 1;
+                const we = e.kind === 'player' ? 0.15 : e.kind === 'decoy' ? 0 : 1;
+                const wf = f.kind === 'player' ? 0.15 : f.kind === 'decoy' ? 0 : 1;
                 e.x -= nx * push * we;
                 e.y -= ny * push * we;
                 f.x += nx * push * wf;
@@ -2454,6 +2861,10 @@
     updateBarracks(dt);
     updateCaptains(dt);
     updateCommands(dt);
+    updateRuins(dt);
+    updatePoints(dt);
+    updateSight(dt);
+    updateDecoys(dt);
     for (let i = 0; i < G.units.length; i++) {
       const u = G.units[i];
       if (u.alive) updateUnit(u, dt);
@@ -2461,7 +2872,7 @@
     buildGrid();
     separate();
     for (const u of G.units) if (u.alive) collideTiles(u);
-    if (G.player.alive) collideTiles(G.player);
+    if (G.player.alive && G.player.leapT <= 0) collideTiles(G.player);
     updateHQ(dt);
     updateBullets(dt);
     updateAbilityObjects(dt);
@@ -2527,7 +2938,9 @@
     const j1 = Math.min(G.R - 1, Math.floor((G.cam.y + hh) / TILE) + 1);
     drawFloor(i0, i1, j0, j1);
     drawCovers(i0, i1, j0, j1);
+    drawPointsAndRuins();
     drawStructs();
+    drawDecoys();
     drawOrbs();
     for (const u of G.units) if (onScreen(u.x, u.y, 30)) (u.boss ? drawBoss(u) : drawUnit(u));
     drawPlayer();
@@ -2535,6 +2948,7 @@
     drawBullets();
     drawParticles();
     drawRoofs(i0, i1, j0, j1);
+    drawPlayer(true);
     drawLights();
     drawStructBars();
     drawTexts();
@@ -2845,7 +3259,7 @@
       ctx.fillStyle = '#fff';
       const label = s.kind === 'hq'
         ? (s.team === 0 ? (lang === 'en' ? 'Defense HQ' : '防衛司令部') : (lang === 'en' ? 'Demon Spire' : '魔界の楔'))
-        : `${L(s.def, 'name')} ${s.count + s.ready}/${capOf(s)}`;
+        : `${s.temp ? t('temp') : ''}${L(s.def, 'name')} ${s.count + s.ready}/${capOf(s)}`;
       ctx.fillText(label, s.cx, y - 3);
     }
   }
@@ -2994,11 +3408,12 @@
     }
   }
 
-  function drawPlayer() {
+  // top: 跳躍中は建物の屋根より上に描く
+  function drawPlayer(top = false) {
     const P = G.player;
-    if (!P.alive) return;
+    if (!P.alive || (P.leapT > 0) !== top) return;
     ctx.save();
-    ctx.translate(P.x, P.y);
+    ctx.translate(P.x, P.y - (P.leapH || 0));
     // レベルが上がるほど、灯火のオーラが強くなる
     const aura = Math.min(1, (P.lvl - 1) / 20);
     ctx.globalCompositeOperation = 'lighter';
@@ -3246,11 +3661,12 @@
         ctx.fill();
       }
       if (ab('blades')) {
-        const n = 1 + ab('blades');
+        const n = P.bladeN || 2;
+        const rr = P.bladeR || 72;
         for (let i = 0; i < n; i++) {
           const a = P.orbitA * 3.2 + (i * TAU) / n;
-          const bx = P.x + Math.cos(a) * 72;
-          const by = P.y + Math.sin(a) * 72;
+          const bx = P.x + Math.cos(a) * rr;
+          const by = P.y + Math.sin(a) * rr;
           ctx.save();
           ctx.translate(bx, by);
           ctx.rotate(a + Math.PI / 2);
@@ -3512,12 +3928,25 @@
       ctx.fillStyle = s.team === 0 ? '#7fb0ff' : '#ff6a5a';
       ctx.fillRect(mx + s.px * sxm, my + s.py * sym, Math.max(3, s.pw * sxm), Math.max(3, s.ph * sym));
     }
+    for (const s of G.structs) {
+      if (!s.ruin) continue;
+      ctx.strokeStyle = s.ruin.prog > 0 ? (s.ruin.team === 0 ? '#7fb0ff' : '#ff6a5a') : '#9a9aa8';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(mx + s.px * sxm + 0.5, my + s.py * sym + 0.5, Math.max(3, s.pw * sxm), Math.max(3, s.ph * sym));
+    }
+    for (const p of G.points) {
+      ctx.fillStyle = p.owner === 0 ? '#7fb0ff' : p.owner === 1 ? '#ff6a5a' : '#d8d8e0';
+      ctx.beginPath();
+      ctx.arc(mx + p.x * sxm, my + p.y * sym, 3, 0, TAU);
+      ctx.fill();
+    }
     for (const u of G.units) {
+      if (u.team === 1 && !seen(u.x, u.y)) continue;
       ctx.fillStyle = u.team === 0 ? '#9cc4ff' : '#ff7a6a';
       ctx.fillRect(mx + u.x * sxm - 0.75, my + u.y * sym - 0.75, 1.5, 1.5);
     }
     for (const c of G.captains) {
-      if (!c.u) continue;
+      if (!c.u || !seen(c.u.x, c.u.y)) continue;
       ctx.fillStyle = '#ff2a1a';
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 1;
@@ -3581,7 +4010,7 @@
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#fff'; // 絵文字も fillStyle の透明度で薄くなるので、不透明な色にしておく
-        ctx.fillText(a.icon, x + sz / 2, y + sz / 2 + 1);
+        ctx.fillText(G.player.evo[a.id] ? ABIL.EVOLUTIONS[a.id].icon : a.icon, x + sz / 2, y + sz / 2 + 1);
         ctx.font = '800 9px system-ui, sans-serif';
         ctx.fillStyle = '#fff';
         ctx.fillText(String(ab(a.id)), x + sz - 4, y + sz - 4);
@@ -3836,6 +4265,7 @@
           <li><span>${t('destroyed')}</span><b>${G.stats.destroyed}</b></li>
           <li><span>${t('level')}</span><b>${G.player.lvl}</b></li>
           <li><span>${t('captains')}</span><b>${G.stats.captains}</b></li>
+          <li><span>${t('rebuilt')}</span><b>${G.stats.rebuilt}</b></li>
           <li><span>${t('deaths')}</span><b>${G.stats.deaths}</b></li>
         </ul>
         <div class="actions">

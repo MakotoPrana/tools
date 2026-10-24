@@ -2,6 +2,7 @@
  * デモン・インベージョン: レベルアップで選ぶ能力のデータ (名前・説明・アイコン)
  *   動きは script.js の「能力」の章にある。各能力は最大レベル 5。
  *   kind: main (メイン武器・プレイヤーが撃つ) / sub (灯火の武器・自動で撃つ) / skill (Q・E) / ult (必殺技・R) / passive / command (指揮)
+ *   EVOLUTIONS は武器の進化 (武器のレベル 5 + 対応する能力)
  *   desc は「レベル 1 で何ができるか」、up は「レベルを上げると何が強くなるか」
  */
 (() => {
@@ -46,6 +47,13 @@
     A('mine', 'skill', '⚠️', '地雷設置', '足元に地雷を置く (最大 5 個)。踏んだ敵の群れを吹き飛ばす。', '爆発が強くなり、クールダウンが短くなる',
       { name: 'Land Mine', desc: 'Drop a mine at your feet (up to 5). It blows up the foes that step on it.', up: 'A bigger blast and a shorter cooldown' }),
 
+    A('decoy', 'skill', '🎎', '囮人形', '悪魔の注意を引く人形を置く。近くの悪魔は人形を狙う。', '人形が硬く、長持ちになる',
+      { name: 'Decoy', desc: 'Places a dummy that draws attention. Nearby demons attack it instead.', up: 'A tougher, longer-lasting decoy' }),
+    A('leap', 'skill', '🦘', '灯火の跳躍', '建物を飛び越えて前へ跳ぶ。着地でまわりにダメージ。', '着地の威力が上がり、クールダウンが短くなる',
+      { name: 'Ember Leap', desc: 'Leap forward over buildings. Landing damages everything around you.', up: 'A stronger landing and a shorter cooldown' }),
+    A('engineer', 'skill', '🔧', '工兵の心得', 'いつでも兵舎跡の再建が速くなる。使うと、近くの自軍の建物を修理する。', '再建と修理が速くなる',
+      { name: 'Field Engineer', desc: 'Always rebuild ruined barracks faster. Use it to repair nearby allied buildings.', up: 'Faster rebuilding and repairs' }),
+
     // ---------------- 必殺技 (1 つだけ。R。敵を倒すとたまるゲージを使う) ----------------
     A('airstrike', 'ult', '✈️', '空爆要請', '向いている方向に一直線の爆撃を落とす。兵舎にも大ダメージ。', '爆撃の威力が上がる',
       { name: 'Air Strike', desc: 'Calls a line of bombs in the direction you face. Heavy damage to barracks.', up: 'More powerful bombs' }),
@@ -89,6 +97,31 @@
       { name: 'Reserves', desc: 'All allied barracks hold 10% more soldiers.', up: '+10% more per level' }),
   ];
 
+  // 武器の進化: 武器をレベル 5 にして、need の能力を持っていると、次のレベルアップで進化を選べる
+  const E = (id, need, icon, name, desc, en) => ({ id, need, kind: 'evo', icon, name, desc, en });
+  const EVOLUTIONS = {
+    rifle: E('rifle', 'ammo', '🔫', '灯火の制圧銃', '威力 1.5 倍・連射が速くなり、弾が敵を 1 体貫く。',
+      { name: 'Ember Suppressor', desc: '1.5x damage, faster fire, and bullets pierce one foe.' }),
+    shotgun: E('shotgun', 'power', '🐉', '竜の咆哮', '散弾が 3 粒増え、当たった敵を燃やす。',
+      { name: "Dragon's Roar", desc: '3 more pellets, and every pellet sets foes ablaze.' }),
+    gatling: E('gatling', 'armor', '🌪️', '鋼鉄の嵐', '撃っていても足が遅くならず、最高の連射がさらに速くなる。',
+      { name: 'Steel Storm', desc: 'No slowdown while firing, and an even higher top speed.' }),
+    railgun: E('railgun', 'focus', '🌠', '天穿ち', '溜めが半分の時間で済み、光線が太く、終点で爆発する。',
+      { name: 'Sky Piercer', desc: 'Charges twice as fast, fires a wider beam, and explodes where it lands.' }),
+    flame: E('flame', 'regen', '🐦‍🔥', '不死鳥の炎', '炎が遠くまで広く届き、燃える力が 2 倍。撃っている間は体力が回復する。',
+      { name: 'Phoenix Flame', desc: 'Longer, wider flames with double burn, and you heal while firing.' }),
+    missile: E('missile', 'soul', '👻', '魂の群れ', 'ミサイルが 2 倍に増え、爆発が大きくなる。',
+      { name: 'Soul Swarm', desc: 'Twice as many missiles with bigger explosions.' }),
+    drone: E('drone', 'aura', '🛰️', 'ドローン中隊', 'ドローンが 2 台増え、撃つのが速くなる。',
+      { name: 'Drone Squadron', desc: 'Two more drones that fire faster.' }),
+    blades: E('blades', 'vital', '⭕', '光輪の守護', '刃が 2 本増えて大きく回り、触れた敵の弾を消す。',
+      { name: 'Halo Guardian', desc: 'Two more blades on a wider orbit that also destroy enemy shots.' }),
+    mortar: E('mortar', 'swift', '🎆', '絨毯砲撃', '一度に 3 発ずつ撃ち込む。',
+      { name: 'Carpet Barrage', desc: 'Fires three shells per volley.' }),
+    lightning: E('lightning', 'inspire', '🌩️', '雷神の裁き', '雷が近くの敵 2 体に飛び移る。',
+      { name: 'Thunder God', desc: 'Each bolt jumps to two more nearby foes.' }),
+  };
+
   // 選択肢がないときに出すもの
   const FALLBACK = A('ration', 'fallback', '🍙', '応急手当', '体力を 50% 回復する。', '',
     { name: 'First Aid', desc: 'Restore 50% HP.', up: '' });
@@ -96,5 +129,5 @@
   const BY_ID = {};
   for (const a of ABILITIES) BY_ID[a.id] = a;
 
-  window.DI_ABILITIES = { ABILITIES, BY_ID, FALLBACK, MAX_LV: 5 };
+  window.DI_ABILITIES = { ABILITIES, BY_ID, EVOLUTIONS, FALLBACK, MAX_LV: 5 };
 })();
