@@ -302,6 +302,8 @@
   const STAGES = [
     {
       name: 'ゴミ屋敷の1階', desc: 'リビングまわり。ホコリ・紙くず・空き缶が中心。', dirt: [74, 64, 52], weights: {}, spawnMul: 1, hpMul: 1, growth: 1, boss: 'kaiju',
+      // ハードは恒久スキルを半分ほど上げてからクリアできる強さ (自動プレイで、半分上げて勝率 5 割ほど)
+      hard: { hp: 3.4, dmg: 2.5, density: 1.5, src: 5.5 },
       rooms: [
         { id: 'genkan', name: '玄関', rect: [24, 28, 16, 12], floor: 'stone', bonus: 'speed', danger: 1, src: ['pile'] },
         { id: 'rouka', name: '廊下', rect: [24, 20, 16, 8], floor: 'wood', bonus: 'magnet', danger: 1, src: ['pile'] },
@@ -712,7 +714,7 @@
       stageSelect: 'ステージを選ぶ',
       recordOf: (name) => `${name} の記録`,
       coins: 'コイン',
-      hardNote: 'ハード: ゴミの HP ×1.7・ダメージ ×1.5・数 ×1.2、発生源の HP ×1.4。コイン ×1.6。恒久スキルを上げてから挑もう',
+      hardNote: 'ハード: ゴミの HP ×1.7・ダメージ ×1.5・数 ×1.2、発生源の HP ×1.4 (ステージ 1 はさらに強い)。コイン ×1.6。恒久スキルを上げてから挑もう',
       lockedPrev: '前のステージをノーマルでクリアすると入れる',
       lockedHard: 'このステージをノーマルでクリアすると挑戦できる',
       bestRooms: (r, n) => `清掃した部屋 最高 ${r}/${n}`,
@@ -881,7 +883,7 @@
       stageSelect: 'Select a Stage',
       recordOf: (name) => `${name}'s records`,
       coins: 'Coins',
-      hardNote: 'Hard: trash HP ×1.7, damage ×1.5, count ×1.2; source HP ×1.4. Coins ×1.6. Raise your permanent skills first.',
+      hardNote: 'Hard: trash HP ×1.7, damage ×1.5, count ×1.2; source HP ×1.4 (even tougher on Stage 1). Coins ×1.6. Raise your permanent skills first.',
       lockedPrev: 'Clear the previous stage on Normal to enter',
       lockedHard: 'Clear this stage on Normal to unlock Hard',
       bestRooms: (r, n) => `Best rooms cleaned ${r}/${n}`,
@@ -2669,7 +2671,8 @@
       stage,
       ch,
       mode,
-      md: MODES[mode],
+      // ステージごとにハードの強さを上書きできる (stage.hard)
+      md: mode === 'hard' && stage.hard ? { ...MODES.hard, ...stage.hard } : MODES[mode],
       state: 'play', // play / win / dead
       paused: false,
       time: 0,
