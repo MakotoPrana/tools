@@ -3022,6 +3022,18 @@
   function drawHero(u) {
     const h = u.hero;
     const d = u.def;
+    if (!d.vehicle && SPR.DEFS[h.id]) {
+      // ヒーローは金色の輪の上に立つ
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.3;
+      ctx.drawImage(glowSprite, u.x - 30, u.y - 34, 60, 60);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = u.stealthOn ? 0.4 : 1;
+      const top = drawSprite(u, h.id, 1.25 * VIS, { ring: '#ffcf4a', tint: u.hitT > 0 ? 'flash' : null });
+      ctx.globalAlpha = 1;
+      heroLabel(u, top);
+      return;
+    }
     ctx.save();
     ctx.translate(u.x, u.y);
     if (u.stealthOn) ctx.globalAlpha = 0.4;
@@ -3082,20 +3094,27 @@
       }
     }
     ctx.restore();
+    heroLabel(u, u.y - u.r - 4);
+  }
+
+  // ヒーローの名前・レベル・体力 (top: 頭の上の y)
+  function heroLabel(u, top) {
+    const h = u.hero;
+    const d = u.def;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.font = '800 11px system-ui, sans-serif';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(0,0,0,0.75)';
     const label = `${d.icon} ${L(d, 'name')} Lv${h.lv}`;
-    ctx.strokeText(label, u.x, u.y - u.r - 10);
+    ctx.strokeText(label, u.x, top - 8);
     ctx.fillStyle = '#cfe0ff';
-    ctx.fillText(label, u.x, u.y - u.r - 10);
+    ctx.fillText(label, u.x, top - 8);
     const w = 40;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(u.x - w / 2, u.y - u.r - 8, w, 4);
+    ctx.fillRect(u.x - w / 2, top - 6, w, 4);
     ctx.fillStyle = '#7fb0ff';
-    ctx.fillRect(u.x - w / 2, u.y - u.r - 8, w * clamp(u.hp / u.maxHp, 0, 1), 4);
+    ctx.fillRect(u.x - w / 2, top - 6, w * clamp(u.hp / u.maxHp, 0, 1), 4);
   }
 
   function drawZones() {
@@ -3909,8 +3928,17 @@
     drawDecoys();
     drawOrbs();
     drawZones();
-    for (const u of G.units) if (!u.def.fly && onScreen(u.x, u.y, 30)) (u.boss || u.clone ? drawBoss(u) : u.hero ? drawHero(u) : drawUnit(u));
-    drawPlayer();
+    // 手前 (y が大きい) ほどあとに描く
+    const list = [];
+    for (const u of G.units) if (!u.def.fly && onScreen(u.x, u.y, 60)) list.push(u);
+    if (G.player.alive) list.push(G.player);
+    list.sort((a, b) => a.y - b.y);
+    for (const u of list) {
+      if (u.kind === 'player') drawPlayer();
+      else if (u.boss || u.clone) drawBoss(u);
+      else if (u.hero) drawHero(u);
+      else drawUnit(u);
+    }
     drawAbilityWorld();
     drawBullets();
     drawParticles();
@@ -4342,8 +4370,88 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // ---- キャラクターの絵 (sprites.js) ----
+  const SPR = window.DI_SPRITES;
+  const FOOT = 11; // 当たりの中心から足もとまでの距離 (大きさ 1 のとき)
+  const VIS = 1.3; // 絵は当たりより少し大きく描く (見やすさのため)
+  const PLAYER_GUN = { rifle: 'rifle', shotgun: 'shotgun', gatling: 'gatling', railgun: 'rail', flame: 'flamer' };
+
+  // 絵で描く: 足もとの影・輪・絵・盾・武器。頭の上の y を返す
+  //   o: { lift: 宙に浮く高さ, ring: 足もとの輪の色, tint: 'flash' / 'stone', weapon: 武器を変える }
+  function drawSprite(u, key, size, o = {}) {
+    const flip = Math.cos(u.face) < 0;
+    const frame = u.moving !== false ? Math.floor(u.walk || 0) % 2 : 0;
+    const gy = u.y + FOOT * size;
+    const fy = gy - (o.lift || 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(u.x, gy, 9 * size, 3.5 * size, 0, 0, TAU);
+    ctx.fill();
+    if (o.ring) {
+      ctx.strokeStyle = o.ring;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(u.x, gy, 11 * size, 4.5 * size, 0, 0, TAU);
+      ctx.stroke();
+    }
+    SPR.draw(ctx, key, u.x, fy, size, flip, frame, o.tint);
+    const d = SPR.DEFS[key];
+    if (d.shield) SPR.shield(ctx, u.x, fy, size, flip);
+    const hnd = SPR.hand(size, flip);
+    SPR.weapon(ctx, o.weapon || d.weapon, u.x + hnd.x, fy + hnd.y, u.face, size, d.orb);
+    return fy - 31 * size;
+  }
+
+  // 兵士を絵で描く
+  function drawUnitSprite(u) {
+    const def = u.def;
+    const size = (u.r / 10) * VIS;
+    if (u.downT > 0) {
+      // 倒れているグール: 横になって灰色
+      ctx.save();
+      ctx.translate(u.x, u.y + 4);
+      ctx.rotate(Math.PI / 2);
+      ctx.globalAlpha = 0.75;
+      SPR.draw(ctx, u.type, 0, 6, size, false, 0, 'stone');
+      ctx.restore();
+      return;
+    }
+    if (u.stealthOn) ctx.globalAlpha = 0.14;
+    const stone = def.stone && !u.moving;
+    const hot = def.bomb && (u.target || u.tStruct) && Math.sin(G.time * 20) > 0.3;
+    const lift = def.fly ? 10 + Math.sin(u.walk * 0.6) * 2 : 0;
+    const top = drawSprite(u, u.type, size, { lift, ring: u.elite ? '#ffcf4a' : null, tint: u.hitT > 0 || hot ? 'flash' : stone ? 'stone' : null });
+    ctx.globalAlpha = 1;
+    if (def.heal && u.healTarget && u.team === 0) {
+      ctx.strokeStyle = 'rgba(120,255,160,0.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(u.x, u.y);
+      ctx.lineTo(u.healTarget.x, u.healTarget.y);
+      ctx.stroke();
+    }
+    if (def.buff) {
+      ctx.strokeStyle = 'rgba(125,255,160,0.25)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(u.x, u.y, def.buffRange * 0.5 + Math.sin(G.time * 3) * 4, 0, TAU);
+      ctx.stroke();
+    }
+    if (u.hp < u.maxHp && !u.stealthOn) {
+      const w = Math.max(18, u.r * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(u.x - w / 2, top - 4, w, 3);
+      ctx.fillStyle = u.team === 0 ? '#7fb0ff' : '#ff6a5a';
+      ctx.fillRect(u.x - w / 2, top - 4, w * clamp(u.hp / u.maxHp, 0, 1), 3);
+    }
+  }
+
   function drawUnit(u) {
     const def = u.def;
+    if (SPR.DEFS[u.type]) {
+      drawUnitSprite(u);
+      return;
+    }
     ctx.save();
     ctx.translate(u.x, u.y);
     if (u.downT > 0) {
@@ -4609,44 +4717,29 @@
   function drawPlayer(top = false) {
     const P = G.player;
     if (!P.alive || (P.leapT > 0) !== top) return;
-    ctx.save();
-    ctx.translate(P.x, P.y - (P.leapH || 0));
     // レベルが上がるほど、灯火のオーラが強くなる
     const aura = Math.min(1, (P.lvl - 1) / 20);
+    const size = 1.15 * VIS;
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.25 + aura * 0.5 + P.lvlFx * 0.5;
-    ctx.drawImage(glowSprite, -30 - aura * 20, -30 - aura * 20, 60 + aura * 40, 60 + aura * 40);
+    const ar = 32 + aura * 20;
+    ctx.drawImage(glowSprite, P.x - ar, P.y - 6 - ar - (P.leapH || 0), ar * 2, ar * 2);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(2, 5, P.r, P.r * 0.7, 0, 0, TAU);
-    ctx.fill();
     if (P.invT > 0 && Math.floor(P.invT * 20) % 2 === 0) ctx.globalAlpha = 0.5;
-    ctx.rotate(P.face);
-    ctx.fillStyle = '#15181f';
-    ctx.fillRect(P.r - 4, -2.5, P.r + 8, 5);
-    ctx.fillStyle = P.hurtT > 0 ? '#ff9a8a' : '#f2f5ff';
-    ctx.strokeStyle = '#ffab3d';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, P.r, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#2c3a58';
-    ctx.beginPath();
-    ctx.arc(-1, 0, P.r * 0.55, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = '#ffab3d';
-    ctx.fillRect(-3, -P.r * 0.55, 3, P.r * 1.1);
-    ctx.restore();
+    // 歩くたびに足を動かす (止まっているときは立ちポーズ)
+    const view = { x: P.x, y: P.y, face: P.face, walk: P.walk / 2.2, moving: P.walk !== P.lastWalk };
+    P.lastWalk = P.walk;
+    drawSprite(view, 'player', size, { lift: P.leapH || 0, ring: '#ffab3d', tint: P.hurtT > 0 ? 'flash' : null, weapon: PLAYER_GUN[P.main] });
+    ctx.globalAlpha = 1;
     // 足もとの体力
     const w = 30;
     const ratio = clamp(P.hp / P.maxHp, 0, 1);
+    const fy = P.y + FOOT * size + 6;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(P.x - w / 2 - 1, P.y + P.r + 5, w + 2, 5);
+    ctx.fillRect(P.x - w / 2 - 1, fy, w + 2, 5);
     ctx.fillStyle = ratio > 0.6 ? '#5ee07a' : ratio > 0.3 ? '#ffd24a' : '#ff5a4a';
-    ctx.fillRect(P.x - w / 2, P.y + P.r + 6, w * ratio, 3);
+    ctx.fillRect(P.x - w / 2, fy + 1, w * ratio, 3);
   }
 
   function drawBullets() {
@@ -4946,6 +5039,18 @@
   function drawBoss(u) {
     const cap = u.boss || u.clone;
     const d = cap.def;
+    if (SPR.DEFS[cap.id]) {
+      const size = clamp(u.r / 10, 1.4, 3) * VIS;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.45 + Math.sin(G.time * 6) * 0.15;
+      ctx.drawImage(glowSprite, u.x - 26 * size, u.y - 34 * size, 52 * size, 52 * size);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      const lift = d.fly ? 12 + Math.sin(G.time * 3) * 3 : 0;
+      const top = drawSprite(u, cap.id, size, { lift, tint: u.hitT > 0 ? 'flash' : null });
+      bossLabel(u, cap, top);
+      return;
+    }
     ctx.save();
     ctx.translate(u.x, u.y);
     ctx.globalCompositeOperation = 'lighter';
@@ -5039,20 +5144,25 @@
     ctx.fillRect(u.r * 0.45, -u.r * 0.4, 4, 4);
     ctx.fillRect(u.r * 0.45, u.r * 0.4 - 4, 4, 4);
     ctx.restore();
+    bossLabel(u, cap, u.y - u.r - 2);
+  }
+
+  // 隊長の名前・レベル・体力 (top: 頭の上の y)
+  function bossLabel(u, cap, top) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.font = '800 12px system-ui, sans-serif';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-    const label = `${L(d, 'name')} Lv${cap.lv}`;
-    ctx.strokeText(label, u.x, u.y - u.r - 12);
+    const label = `${L(cap.def, 'name')} Lv${cap.lv}`;
+    ctx.strokeText(label, u.x, top - 10);
     ctx.fillStyle = '#ffb0a0';
-    ctx.fillText(label, u.x, u.y - u.r - 12);
+    ctx.fillText(label, u.x, top - 10);
     const w = 50;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(u.x - w / 2, u.y - u.r - 10, w, 5);
+    ctx.fillRect(u.x - w / 2, top - 8, w, 5);
     ctx.fillStyle = '#ff4a3a';
-    ctx.fillRect(u.x - w / 2, u.y - u.r - 10, w * clamp(u.hp / u.maxHp, 0, 1), 5);
+    ctx.fillRect(u.x - w / 2, top - 8, w * clamp(u.hp / u.maxHp, 0, 1), 5);
   }
 
   // 能力のボタン (アイコン・クールダウン)
@@ -5954,22 +6064,25 @@
     screen = 'codex';
     backAction = () => codexBack();
     rerender = showCodex;
-    const card = (ok, color, icon, name, sub, desc) => `
+    const card = (ok, color, icon, name, sub, desc, key) => {
+      const img = ok && key ? SPR.icon(key) : null;
+      return `
       <div class="codex-card ${ok ? '' : 'unknown'}">
-        <span class="codex-swatch" style="background:${ok ? color : '#333'}">${ok ? icon : '?'}</span>
+        ${img ? `<img class="codex-pic" src="${img}" alt="">` : `<span class="codex-swatch" style="background:${ok ? color : '#333'}">${ok ? icon : '?'}</span>`}
         <span class="codex-body"><b>${ok ? esc(name) : '???'}</b>${ok && sub ? ` <small>${esc(sub)}</small>` : ''}
           <span class="codex-desc">${ok ? esc(desc) : t('codexUnknown')}</span></span>
       </div>`;
+    };
     let list = '';
     if (codexTab === 'allies' || codexTab === 'demons') {
       list = (codexTab === 'allies' ? ALLY_LIST : DEMON_LIST).map((k) => {
         const d = UNITS[k];
-        return card(save.seen[k], d.color, '', L(d, 'name'), `HP ${d.hp}`, L(d, 'desc'));
+        return card(save.seen[k], d.color, '', L(d, 'name'), `HP ${d.hp}`, L(d, 'desc'), k);
       }).join('');
     } else if (codexTab === 'captains') {
-      list = Object.entries(CAPTAINS).map(([id, d]) => card(save.seen[id], d.color, '☠', L(d, 'name'), L(d, 'title'), L(d, 'desc'))).join('');
+      list = Object.entries(CAPTAINS).map(([id, d]) => card(save.seen[id], d.color, '☠', L(d, 'name'), L(d, 'title'), L(d, 'desc'), id)).join('');
     } else {
-      list = Object.entries(HEROES).map(([id, h]) => card(heroUnlocked(id), h.color, h.icon, L(h, 'name'), `${L(h, 'title')} ・ ${L(h, 'role')}`, lang === 'en' ? h.descEn : h.desc)).join('');
+      list = Object.entries(HEROES).map(([id, h]) => card(heroUnlocked(id), h.color, h.icon, L(h, 'name'), `${L(h, 'title')} ・ ${L(h, 'role')}`, lang === 'en' ? h.descEn : h.desc, id)).join('');
     }
     const all = [...ALLY_LIST, ...DEMON_LIST, ...Object.keys(CAPTAINS)];
     const got = all.filter((k) => save.seen[k]).length + Object.keys(HEROES).filter(heroUnlocked).length;

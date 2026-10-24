@@ -373,3 +373,4 @@ footer { padding: 16px; text-align: center; color: var(--muted); font-size: 0.8r
 .codex-desc { display: block; font-size: 0.75rem; color: var(--panel-muted); }
 .hero-card.locked { align-items: center; gap: 6px; padding: 6px 10px; opacity: 0.5; cursor: default; font-size: 0.75rem; }
 .actions.sticky { position: sticky; bottom: -16px; margin: 14px -20px -20px; padding: 12px 20px 16px; background: linear-gradient(transparent, var(--panel) 30%); border-radius: 0 0 16px 16px; }
+.codex-pic { flex: none; width: 48px; height: 48px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
