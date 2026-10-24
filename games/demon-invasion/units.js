@@ -122,13 +122,40 @@
   };
 
   // 敵の隊長 (魔将)。レベル 1 のときの値。レベルが上がるごとに hpUp・dmgUp の割合で強くなる
-  //   skills: 覚える技とそのレベル (charge: 突進 / wave: 炎の斬撃 / ring: 炎の円 / summon: 手下を呼ぶ / rage: 怒り)
+  //   skills: 覚える技とそのレベル
+  //     charge: 突進 / wave: 弾を扇形に撃つ (waveN 発・見た目 waveLook) / ring: まわりに爆発 / summon: 手下を呼ぶ (summonType を summonN 体)
+  //     rage: 怒り (体力が半分を切ると速くなる) / blink: 相手の後ろへ瞬間移動 / clone: 分身を 2 体出す / howl: まわりの悪魔の攻撃力を上げる
+  //   ranged: 遠くから撃つ (bulletSpeed・look・curse は兵士と同じ) / siege: 建物へのダメージの倍率 / weapon: 見た目 (sword / staff / claws / daggers)
   const CAPTAINS = {
     varga: {
       name: '魔将ヴァルガ', title: '獄炎の戦鬼', en: { name: 'Varga', title: 'Hellfire Warlord' },
       hp: 900, hpUp: 0.12, dmg: 22, dmgUp: 0.06, r: 18, speed: 85, range: 30, aggro: 340, rof: 0.9, startLv: 3,
       skills: { charge: 1, wave: 5, ring: 10, summon: 15, rage: 20 },
+      waveN: 3, waveLook: 'fire', summonType: 'imp', summonN: 4, weapon: 'sword',
       xp: 160, color: '#c4281d', dark: '#4a0904',
+    },
+    nephilis: {
+      name: '魔女ネフィリス', title: '呪いの女王', en: { name: 'Nephilis', title: 'Queen of Curses' },
+      hp: 700, hpUp: 0.12, dmg: 14, dmgUp: 0.06, r: 16, speed: 75, range: 380, aggro: 420, rof: 0.8, startLv: 3,
+      ranged: true, bulletSpeed: 360, spread: 0.05, curse: 2,
+      skills: { wave: 1, summon: 5, ring: 10, blink: 15, rage: 20 },
+      waveN: 5, waveLook: 'curse', summonType: 'gargoyle', summonN: 2, weapon: 'staff',
+      xp: 170, color: '#7a3aa8', dark: '#2e0d45',
+    },
+    grados: {
+      name: '魔獣グラドス', title: '鉄牙の獣王', en: { name: 'Grados', title: 'Ironfang Beast King' },
+      hp: 1100, hpUp: 0.12, dmg: 24, dmgUp: 0.06, r: 20, speed: 115, range: 30, aggro: 360, rof: 0.8, startLv: 3,
+      siege: 2,
+      skills: { charge: 1, summon: 5, howl: 10, ring: 15, rage: 20 },
+      summonType: 'hound', summonN: 3, weapon: 'claws',
+      xp: 180, color: '#c06a20', dark: '#4a2006',
+    },
+    mirage: {
+      name: '影将ミラージュ', title: '千の影', en: { name: 'Mirage', title: 'Thousand Shadows' },
+      hp: 800, hpUp: 0.12, dmg: 30, dmgUp: 0.06, r: 16, speed: 100, range: 26, aggro: 380, rof: 0.7, startLv: 3,
+      skills: { blink: 1, clone: 5, wave: 10, summon: 15, rage: 20 },
+      waveN: 4, waveLook: 'dagger', summonType: 'shadow', summonN: 2, weapon: 'daggers',
+      xp: 190, color: '#4a3a6a', dark: '#0e0814',
     },
   };
 

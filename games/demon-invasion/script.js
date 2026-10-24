@@ -428,13 +428,14 @@
   // 戦場 (G)
   // ===================================================================
   let G = null;
-  const FLOOR = { building: 0, road: 1, plaza: 2, alley: 3, rubble: 4 };
+  const FLOOR = { building: 0, road: 1, plaza: 2, alley: 3, rubble: 4, yard: 5, bridge: 6, rail: 7 };
   const ROOF_COLORS = ['#5a5266', '#62574e', '#4e5d6b', '#675560', '#56604f', '#5d5d6e', '#6b5a4b', '#525a70'];
   const AWNING = ['#c0392b', '#2e86c1', '#d68910', '#239b56', '#8e44ad', '#e67e22'];
   const COVER = {
     car: { hp: 420, blocks: true },
     barricade: { hp: 260, blocks: true },
     planter: { hp: 200, blocks: false },
+    container: { hp: 900, blocks: true },
   };
 
   function buildStage(st) {
@@ -463,9 +464,20 @@
       for (let j = y; j < y + h; j++) {
         for (let i = x; i < x + w; i++) {
           const k = j * C + i;
-          g.solid[k] = 0;
+          // 線路は通れないが、弾は越える
+          g.solid[k] = kind === 'rail' ? 1 : 0;
           g.block[k] = 0;
           g.floor[k] = FLOOR[kind];
+        }
+      }
+    }
+    for (const [x, y, w, h] of st.blocks || []) {
+      for (let j = y; j < y + h; j++) {
+        for (let i = x; i < x + w; i++) {
+          const k = j * C + i;
+          g.solid[k] = 1;
+          g.block[k] = 1;
+          g.floor[k] = FLOOR.building;
         }
       }
     }
@@ -544,7 +556,7 @@
     let nb = 0;
     const stack = [];
     for (let k = 0; k < N; k++) {
-      if (!g.solid[k] || g.coverAt[k] >= 0 || g.structAt[k] >= 0 || g.bid[k] >= 0) continue;
+      if (!g.solid[k] || g.floor[k] === FLOOR.rail || g.coverAt[k] >= 0 || g.structAt[k] >= 0 || g.bid[k] >= 0) continue;
       g.bid[k] = nb;
       stack.push(k);
       while (stack.length) {
@@ -558,7 +570,7 @@
           if (nx < 0 || ny < 0 || nx >= C || ny >= R) continue;
           if (dx !== 0 && (Math.max(qx, nx) % 7 === 0)) continue;
           const n2 = ny * C + nx;
-          if (!g.solid[n2] || g.coverAt[n2] >= 0 || g.structAt[n2] >= 0 || g.bid[n2] >= 0) continue;
+          if (!g.solid[n2] || g.floor[n2] === FLOOR.rail || g.coverAt[n2] >= 0 || g.structAt[n2] >= 0 || g.bid[n2] >= 0) continue;
           g.bid[n2] = nb;
           stack.push(n2);
         }
@@ -1077,11 +1089,12 @@
     return ab('aura') > 0 && P.alive && (u.x - P.x) ** 2 + (u.y - P.y) ** 2 < auroraR2;
   }
   // 隊長の近くの悪魔は攻撃力が上がる
-  function nearCaptain(u) {
+  // 隊長の近くの悪魔の攻撃力の倍率 (ふだん 1.15、雄叫びの間は 1.4)
+  function captainBuff(u) {
     for (const c of G.captains) {
-      if (c.u && c.u !== u && (u.x - c.u.x) ** 2 + (u.y - c.u.y) ** 2 < 320 * 320) return true;
+      if (c.u && c.u !== u && (u.x - c.u.x) ** 2 + (u.y - c.u.y) ** 2 < 320 * 320) return c.u.howlT > 0 ? 1.4 : 1.15;
     }
-    return false;
+    return 1;
   }
 
   function nearShaman(u) {
@@ -1096,7 +1109,7 @@
     let dmg = def.dmg * u.dmgMul;
     if (u.team === 0 && auraOn(u)) dmg *= 1 + 0.1 * ab('aura');
     if (u.team === 0 && !u.hero && G.heroes.length && nearHero(u)) dmg *= 1.1; // ヒーローの近くの兵士は攻撃力 +10%
-    if (u.team === 1 && !u.boss && nearCaptain(u)) dmg *= 1.15;
+    if (u.team === 1 && !u.boss) dmg *= captainBuff(u);
     if (pointOwned('ammo', u.team)) dmg *= 1.15;
     if (u.team === 1 && nearShaman(u)) dmg *= 1.2;
     if (def.bomb) {
@@ -1279,6 +1292,7 @@
     if (!s.alive) return;
     if (s.kind === 'hq' && hasBarracks(s.team)) amt *= BARRIER;
     if (src && src.kind === 'unit' && !src.boss) amt *= src.def.siege ?? UNIT_VS_STRUCT;
+    if (src && src.boss && src.boss.def.siege) amt *= src.boss.def.siege;
     if (s.team === 0 && save.unitIm.engineer && G.time - (s.repairT || -9) < 0.5) amt *= 0.7; // 工兵の改良
     s.hp -= amt;
     s.hitT = G.time;
@@ -1481,7 +1495,7 @@
   function makePlayer(loadout) {
     const h = G.hq[0];
     const P = {
-      kind: 'player', team: 0, x: h.cx + h.pw / 2 + 50, y: h.cy, r: PLAYER.r, alive: true,
+      kind: 'player', team: 0, x: homePoint().x, y: homePoint().y, r: PLAYER.r, alive: true,
       hp: PLAYER.hp, maxHp: PLAYER.hp, atkMul: 1, lvl: 1, xp: 0, pending: 0, face: 0, fireCd: 0, mag: 0, reloadT: 0,
       dashT: 0, dashCd: 0, dx: 0, dy: 0, invT: 0, hurtT: 0, lastHurt: -99, respawnT: 0, lvlFx: 0, walk: 0,
       // 能力: ab[id] = レベル。main はメイン武器、subs は灯火の武器、skills は Q・E、ult は必殺技
@@ -1601,8 +1615,10 @@
     }
     if (best) return { x: best.sx, y: best.sy };
     const h = G.hq[0];
-    return { x: h.cx + h.pw / 2 + 40, y: h.cy };
+    return homePoint();
   }
+  // 自軍の本拠地の前 (最初のレーンの始まり)
+  const homePoint = () => ({ x: G.lanes[0].pts[0][0].x, y: G.lanes[0].pts[0][0].y });
 
   function updatePlayer(dt) {
     const P = G.player;
@@ -2329,7 +2345,8 @@
         continue;
       }
       // プレイヤーがいると 2 倍、工兵の心得でさらに速い
-      let mul = builder === 0 && pHere ? 2 * (1 + 0.25 * ab('engineer')) : 1;
+      // 悪魔は巣を作るのに 2 倍の時間がかかる
+      let mul = builder === 0 && pHere ? 2 * (1 + 0.25 * ab('engineer')) : builder === 1 ? 0.5 : 1;
       if (builder === 0 && eng) mul *= 1.5; // 工兵がいると 1.5 倍
       if (r.team !== builder && r.prog > 0) {
         r.prog = Math.max(0, r.prog - (dt / REBUILD) * mul);
@@ -2836,8 +2853,8 @@
         if (!best || s.hp / s.maxHp < best.hp / best.maxHp) best = s;
       }
       if (!best) return false;
-      gx = best.sx ?? best.cx + best.pw / 2 + 40;
-      gy = best.sy ?? best.cy;
+      gx = best.kind === 'hq' ? homePoint().x : best.sx;
+      gy = best.kind === 'hq' ? homePoint().y : best.sy;
       const dd = Math.hypot(gx - u.x, gy - u.y);
       if ((u.target || u.tStruct) && dd < 300) return false;
       stop = 40;
@@ -2977,12 +2994,15 @@
     const laneIdx = pushLane();
     const lane = G.lanes[laneIdx];
     const p = lane.pts[1][0];
-    const def = { melee: true, range: d.range, aggro: d.aggro, rof: d.rof, dmg: d.dmg, xp: 0, color: d.color, dark: d.dark };
+    const def = {
+      melee: !d.ranged, range: d.range, aggro: d.aggro, rof: d.rof, dmg: d.dmg, xp: 0, color: d.color, dark: d.dark,
+      spread: d.spread || 0, bulletSpeed: d.bulletSpeed || 0, curse: d.curse || 0,
+    };
     const u = {
       kind: 'unit', type: 'captain', boss: c, def, team: 1, x: p.x, y: p.y, r: d.r, hp: 1, maxHp: 1, dmgMul: 1, speed: d.speed,
       cd: 0, target: null, tStruct: null, retT: 0, lane: laneIdx, wp: 1, off: rand(-20, 20), face: Math.PI,
       home: null, alive: true, hitT: 0, downT: 0, revived: true, playerHitT: -99, prog: 1, stuckT: 0, lx: p.x, ly: p.y, walk: 0,
-      sk: { charge: 2, wave: 3, ring: 4, summon: 10 }, dashT: 0, retreated: false, retreatT: 0, laneT: 12, rofMul: 1,
+      sk: { charge: 2, wave: 3, ring: 4, summon: 10, blink: 3, clone: 6, howl: 5 }, dashT: 0, retreated: false, retreatT: 0, laneT: 12, rofMul: 1, howlT: 0,
     };
     c.u = u;
     setCaptainLevel(c, captainLevel(c));
@@ -3024,7 +3044,7 @@
     const c = u.boss;
     const d = c.def;
     for (const k in u.sk) u.sk[k] -= dt;
-    const rage = c.lv >= d.skills.rage && u.hp < u.maxHp * 0.5;
+    const rage = d.skills.rage && c.lv >= d.skills.rage && u.hp < u.maxHp * 0.5;
     u.rofMul = rage ? 0.6 : 1;
     u.speed = d.speed * (rage ? 1.2 : 1);
     // 体力が 30% を切ったら、一度だけ下がって回復しようとする
@@ -3057,6 +3077,7 @@
       u.dashT -= dt;
       u.x += u.dx * 520 * dt;
       u.y += u.dy * 520 * dt;
+      collideTiles(u);
       forFoesNear(u.x, u.y, u.r + 8, 1, (e) => {
         if (u.dashHit.has(e)) return;
         u.dashHit.add(e);
@@ -3083,12 +3104,29 @@
         }
       }
     }
+    const has = (k) => d.skills[k] && c.lv >= d.skills[k];
+    u.howlT -= dt;
     const tg = u.target;
     if (tg) {
       const dx = tg.x - u.x;
       const dy = tg.y - u.y;
       const dist = Math.hypot(dx, dy);
-      if (u.sk.charge <= 0 && dist > 110 && dist < 330 && los(u.x, u.y, tg.x, tg.y)) {
+      if (has('blink') && u.sk.blink <= 0 && dist > 120 && dist < 420) {
+        // 影渡り: 相手の後ろへ瞬間移動する
+        const a = Math.atan2(dy, dx);
+        const nx = tg.x + Math.cos(a) * 34;
+        const ny = tg.y + Math.sin(a) * 34;
+        const k = tileAt(nx, ny);
+        if (k >= 0 && !G.solid[k]) {
+          spawnParticles(u.x, u.y, 16, d.color, 120, 0.5, 4, 'glow');
+          u.x = nx;
+          u.y = ny;
+          u.face = a + Math.PI;
+          spawnParticles(u.x, u.y, 16, d.color, 120, 0.5, 4, 'glow');
+          u.sk.blink = 8;
+        }
+      }
+      if (has('charge') && u.sk.charge <= 0 && dist > 110 && dist < 330 && los(u.x, u.y, tg.x, tg.y)) {
         u.sk.charge = 7;
         u.dashT = 0.4;
         u.dx = dx / dist;
@@ -3098,16 +3136,46 @@
         Sound.play('roar');
         return true;
       }
-      if (c.lv >= d.skills.wave && u.sk.wave <= 0 && dist < 400) {
-        // 炎の斬撃: 炎の弾を 3 つ扇形に飛ばす
+      if (has('wave') && u.sk.wave <= 0 && dist < 420) {
+        // 弾を waveN 発、扇形に飛ばす (ヴァルガは炎の斬撃、ネフィリスは呪いの弾、ミラージュは影の短剣)
         u.sk.wave = 5;
         const a = Math.atan2(dy, dx);
-        for (const s of [-0.25, 0, 0.25]) {
-          fireBullet(u.x + Math.cos(a) * 20, u.y + Math.sin(a) * 20, a + s, 380, u.def.dmg * u.dmgMul, 1, u, 440, 'fire');
+        const n = d.waveN || 3;
+        const dmg = (d.ranged ? 1.4 : 1) * u.def.dmg * u.dmgMul;
+        for (let i = 0; i < n; i++) {
+          const s = n > 1 ? -0.3 + (0.6 * i) / (n - 1) : 0;
+          const b = fireBullet(u.x + Math.cos(a) * 20, u.y + Math.sin(a) * 20, a + s, d.waveLook === 'dagger' ? 560 : 380, dmg, 1, u, 460, d.waveLook || 'fire');
+          if (b && d.waveLook === 'curse') b.slow = 2;
         }
       }
     }
-    if (c.lv >= d.skills.ring && u.sk.ring <= 0) {
+    if (has('howl') && u.sk.howl <= 0 && (u.target || u.tStruct)) {
+      // 雄叫び: 6 秒間、まわりの悪魔の攻撃力 +40%
+      u.sk.howl = 16;
+      u.howlT = 6;
+      G.rings.push({ x: u.x, y: u.y, r: 320, life: 0.8, max: 0.8, color: '#ff8a3a' });
+      Sound.play('roar');
+    }
+    if (has('clone') && u.sk.clone <= 0 && (u.target || u.tStruct)) {
+      // 分身: 見た目は同じだが、体力が少なく、攻撃も弱い。14 秒で消える
+      u.sk.clone = 18;
+      for (let i = 0; i < 2; i++) {
+        const m = spawnUnit('imp', 1, u.x + rand(-50, 50), u.y + rand(-50, 50), null, u.lane);
+        if (!m) break;
+        m.type = 'clone';
+        m.clone = c;
+        m.def = { ...u.def, xp: 0 };
+        m.r = u.r;
+        m.speed = d.speed;
+        m.maxHp = m.hp = u.maxHp * 0.12;
+        m.dmgMul = u.dmgMul * 0.35;
+        m.lifeT = 14;
+        m.face = u.face;
+        collideTiles(m);
+      }
+      spawnParticles(u.x, u.y, 20, d.color, 140, 0.6, 4, 'glow');
+    }
+    if (has('ring') && u.sk.ring <= 0) {
       let n = 0;
       forFoesNear(u.x, u.y, 130, 1, () => n++);
       if (n >= 3) {
@@ -3115,10 +3183,10 @@
         blast(u.x, u.y, 140, u.def.dmg * u.dmgMul * 1.6, 1, u, 1);
       }
     }
-    if (c.lv >= d.skills.summon && u.sk.summon <= 0 && (u.target || u.tStruct)) {
+    if (has('summon') && u.sk.summon <= 0 && (u.target || u.tStruct)) {
       u.sk.summon = 25;
-      for (let i = 0; i < 4; i++) {
-        const m = spawnUnit('imp', 1, u.x + rand(-40, 40), u.y + rand(-40, 40), null, u.lane);
+      for (let i = 0; i < (d.summonN || 4); i++) {
+        const m = spawnUnit(d.summonType || 'imp', 1, u.x + rand(-40, 40), u.y + rand(-40, 40), null, u.lane);
         if (m) collideTiles(m);
       }
       spawnParticles(u.x, u.y, 20, '#ff3a2a', 160, 0.6, 3, 'glow');
@@ -3625,7 +3693,7 @@
     drawDecoys();
     drawOrbs();
     drawZones();
-    for (const u of G.units) if (!u.def.fly && onScreen(u.x, u.y, 30)) (u.boss ? drawBoss(u) : u.hero ? drawHero(u) : drawUnit(u));
+    for (const u of G.units) if (!u.def.fly && onScreen(u.x, u.y, 30)) (u.boss || u.clone ? drawBoss(u) : u.hero ? drawHero(u) : drawUnit(u));
     drawPlayer();
     drawAbilityWorld();
     drawBullets();
@@ -3637,7 +3705,21 @@
     drawStructBars();
     drawTexts();
     ctx.restore();
+    if (G.st.fog) drawFog();
     drawHud();
+  }
+
+  // 夜霧: プレイヤー (倒れているときは画面の真ん中) から離れるほど暗くなる
+  function drawFog() {
+    const P = G.player;
+    const fx = P.alive ? cw / 2 + (P.x - G.cam.x) * zoom : cw / 2;
+    const fy = P.alive ? ch / 2 + (P.y - G.cam.y) * zoom : ch / 2;
+    const r = G.st.fog * zoom;
+    const gr = ctx.createRadialGradient(fx, fy, r * 0.55, fx, fy, r * 1.15);
+    gr.addColorStop(0, 'rgba(14,18,26,0)');
+    gr.addColorStop(1, 'rgba(14,18,26,0.88)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, cw, ch);
   }
 
   function drawFloor(i0, i1, j0, j1) {
@@ -3650,7 +3732,30 @@
         const x = i * TILE;
         const y = j * TILE;
         const h = hash(k);
-        if (f === FLOOR.road) {
+        if (f === FLOOR.yard) {
+          // コンテナ置き場のコンクリート
+          ctx.fillStyle = (i + j) & 1 ? '#30343a' : '#2d3137';
+          ctx.fillRect(x, y, TILE, TILE);
+          if (i % 4 === 0) {
+            ctx.fillStyle = 'rgba(230,200,90,0.18)';
+            ctx.fillRect(x, y, 3, TILE);
+          }
+        } else if (f === FLOOR.bridge) {
+          ctx.fillStyle = (h & 7) === 0 ? '#34373f' : '#31343c';
+          ctx.fillRect(x, y, TILE, TILE);
+          if (i > 0 && G.floor[k - 1] !== FLOOR.bridge) { ctx.fillStyle = '#6a6e7a'; ctx.fillRect(x, y, 5, TILE); }
+          if (i < C - 1 && G.floor[k + 1] !== FLOOR.bridge) { ctx.fillStyle = '#6a6e7a'; ctx.fillRect(x + TILE - 5, y, 5, TILE); }
+        } else if (f === FLOOR.rail) {
+          // 線路: 砂利・まくら木・レール
+          ctx.fillStyle = '#3a3532';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = '#4a3a2a';
+          ctx.fillRect(x + 6, y + 4, 8, TILE - 8);
+          ctx.fillRect(x + 26, y + 4, 8, TILE - 8);
+          ctx.fillStyle = '#9aa0aa';
+          ctx.fillRect(x, y + 10, TILE, 3);
+          ctx.fillRect(x, y + 27, TILE, 3);
+        } else if (f === FLOOR.road) {
           ctx.fillStyle = (h & 7) === 0 ? '#2c2f37' : '#292c33';
           ctx.fillRect(x, y, TILE, TILE);
           if ((h & 31) === 3) { ctx.fillStyle = '#25272d'; ctx.fillRect(x + (h % 20), y + ((h >> 5) % 24), 12, 8); }
@@ -3778,6 +3883,15 @@
           ctx.fillRect(x + 8, y + h * 0.28, w - 16, h * 0.16);
           ctx.fillRect(x + 8, y + h * 0.62, w - 16, h * 0.1);
         }
+      } else if (cv.k === 'container') {
+        const cols = ['#9a3a2a', '#2a5a8a', '#3a7a4a', '#b07a2a'];
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(x + 4, y + 6, w - 2, h - 2);
+        ctx.fillStyle = cols[cv.seed % cols.length];
+        ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        if (w > h) for (let q = 6; q < w - 4; q += 8) ctx.fillRect(x + q, y + 3, 2, h - 6);
+        else for (let q = 6; q < h - 4; q += 8) ctx.fillRect(x + 3, y + q, w - 6, 2);
       } else if (cv.k === 'barricade') {
         ctx.fillStyle = '#5a5248';
         ctx.fillRect(x + 3, y + 8, w - 6, h - 16);
@@ -4285,6 +4399,18 @@
         ctx.fillStyle = '#ff7a2a';
         ctx.fillRect(-10, -2, 3, 4);
         ctx.restore();
+      } else if (b.look === 'dagger') {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.a);
+        ctx.fillStyle = '#c9b8ff';
+        ctx.beginPath();
+        ctx.moveTo(8, 0);
+        ctx.lineTo(-6, -3);
+        ctx.lineTo(-6, 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
       } else if (b.look === 'curse') {
         ctx.fillStyle = 'rgba(160,60,255,0.4)';
         ctx.beginPath();
@@ -4526,8 +4652,10 @@
   }
 
   // 隊長
+  // 隊長 (分身も同じ見た目で描く)
   function drawBoss(u) {
-    const d = u.boss.def;
+    const cap = u.boss || u.clone;
+    const d = cap.def;
     ctx.save();
     ctx.translate(u.x, u.y);
     ctx.globalCompositeOperation = 'lighter';
@@ -4540,16 +4668,50 @@
     ctx.ellipse(3, 6, u.r, u.r * 0.7, 0, 0, TAU);
     ctx.fill();
     ctx.rotate(u.face);
-    // 大剣
-    ctx.strokeStyle = '#2a0a06';
-    ctx.lineWidth = 7;
-    ctx.beginPath();
-    ctx.moveTo(2, u.r * 0.7);
-    ctx.lineTo(u.r + 26, u.r * 0.7);
-    ctx.stroke();
-    ctx.strokeStyle = '#ff7a2a';
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    if (d.weapon === 'staff') {
+      // 杖と呪いの宝珠
+      ctx.strokeStyle = '#2a1030';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(-4, u.r * 0.7);
+      ctx.lineTo(u.r + 18, u.r * 0.7);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(200,90,255,${0.7 + Math.sin(G.time * 6) * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(u.r + 20, u.r * 0.7, 6, 0, TAU);
+      ctx.fill();
+    } else if (d.weapon === 'claws') {
+      ctx.strokeStyle = '#f0e0c0';
+      ctx.lineWidth = 3;
+      for (const sd of [-1, 1]) {
+        for (let q = 0; q < 3; q++) {
+          ctx.beginPath();
+          ctx.moveTo(u.r * 0.8, sd * (u.r * 0.5 + q * 4));
+          ctx.lineTo(u.r + 12, sd * (u.r * 0.6 + q * 5));
+          ctx.stroke();
+        }
+      }
+    } else if (d.weapon === 'daggers') {
+      ctx.strokeStyle = '#c9b8ff';
+      ctx.lineWidth = 3;
+      for (const sd of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(u.r * 0.6, sd * u.r * 0.7);
+        ctx.lineTo(u.r + 14, sd * u.r * 0.9);
+        ctx.stroke();
+      }
+    } else {
+      // 大剣
+      ctx.strokeStyle = '#2a0a06';
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(2, u.r * 0.7);
+      ctx.lineTo(u.r + 26, u.r * 0.7);
+      ctx.stroke();
+      ctx.strokeStyle = '#ff7a2a';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
     ctx.fillStyle = u.hitT > 0 ? '#fff' : d.color;
     ctx.strokeStyle = d.dark;
     ctx.lineWidth = 3;
@@ -4574,7 +4736,7 @@
     ctx.font = '800 12px system-ui, sans-serif';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-    const label = `${L(d, 'name')} Lv${u.boss.lv}`;
+    const label = `${L(d, 'name')} Lv${cap.lv}`;
     ctx.strokeText(label, u.x, u.y - u.r - 12);
     ctx.fillStyle = '#ffb0a0';
     ctx.fillText(label, u.x, u.y - u.r - 12);
@@ -4644,11 +4806,12 @@
     const img = g.createImageData(G.C, G.R);
     const col = {
       [FLOOR.road]: [74, 78, 92], [FLOOR.plaza]: [86, 90, 107], [FLOOR.alley]: [63, 62, 69], [FLOOR.rubble]: [90, 79, 69],
+      [FLOOR.yard]: [78, 84, 92], [FLOOR.bridge]: [96, 100, 112], [FLOOR.rail]: [58, 50, 44],
     };
     for (let k = 0; k < G.C * G.R; k++) {
       let c3 = [24, 26, 34];
       if (G.coverAt[k] >= 0) c3 = [100, 104, 120];
-      else if (!G.solid[k] || G.structAt[k] >= 0) c3 = col[G.floor[k]] || c3;
+      else if (!G.solid[k] || G.structAt[k] >= 0 || G.floor[k] === FLOOR.rail) c3 = col[G.floor[k]] || c3;
       img.data[k * 4] = c3[0];
       img.data[k * 4 + 1] = c3[1];
       img.data[k * 4 + 2] = c3[2];
@@ -4733,7 +4896,9 @@
 
     // 右上: ミニマップ
     if (G.mmDirty) buildMinimap();
-    const mmw = small ? clamp(cw - bw - 58 - 30, 60, 110) : 200;
+    // 縦長のステージでも高くなりすぎないように、高さの上限に合わせて幅を決める
+    const mmMaxH = small ? 64 : 120;
+    const mmw = Math.min(small ? clamp(cw - bw - 58 - 30, 60, 110) : 200, (mmMaxH * G.C) / G.R);
     const mmh = (mmw * G.R) / G.C;
     const mx = cw - mmw - 10;
     const my = 10;
