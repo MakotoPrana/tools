@@ -177,24 +177,14 @@ body {
   background: repeating-linear-gradient(135deg, #c7b48a 0 5px, #b09a6c 5px 10px);
   transition: height 0.2s;
 }
-/* 半分の線 (ここまでたまるとゴミ圧縮できる) */
-.can-body::after { content: ""; position: absolute; left: 0; right: 0; bottom: 50%; border-top: 2px dashed rgba(255, 207, 74, 0.7); }
 .dust-label { font-size: 0.72rem; font-weight: 800; line-height: 1.1; white-space: nowrap; }
-.dustbox.ready {
-  border-color: var(--gold);
-  background: rgba(150, 80, 20, 0.85);
-  box-shadow: 0 0 18px rgba(255, 190, 60, 0.7);
-  cursor: pointer;
-  animation: bomb-pulse 0.9s ease-in-out infinite alternate;
-}
-.dustbox.ready .can-fill { background: repeating-linear-gradient(135deg, #ffcf4a 0 5px, #e8a92a 5px 10px); }
-.dustbox.ready .dust-label { color: var(--gold); }
-.dustbox.full { border-color: #ff6b6b; }
-.dustbox.full .dust-label { color: #ff8a8a; }
-.bomb-key { display: none; font-size: 0.6rem; opacity: 0.75; font-weight: 600; }
-.dustbox.ready .bomb-key { display: block; }
-
-@media (hover: none) { .dustbox.ready .bomb-key { display: none; } }
+.dustbox { pointer-events: none; }
+.dustbox.near { border-color: #ffa23a; }
+.dustbox.near .can-fill { background: repeating-linear-gradient(135deg, #ffb35a 0 5px, #e8862a 5px 10px); }
+.dustbox.near .dust-label { color: #ffb35a; }
+.dustbox.full { border-color: #ff5a5a; background: rgba(120, 20, 20, 0.85); box-shadow: 0 0 20px rgba(255, 80, 80, 0.75); animation: bomb-pulse 0.5s ease-in-out infinite alternate; }
+.dustbox.full .can-fill { background: repeating-linear-gradient(135deg, #ff7a6a 0 5px, #d94a3a 5px 10px); }
+.dustbox.full .dust-label { color: #fff; }
 
 @keyframes bomb-pulse { from { transform: scale(1); } to { transform: scale(1.06); } }
 
@@ -725,3 +715,17 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 
   .inv-slot.empty .inv-name { display: inline; }
 }
 .chest-inv { margin-top: 12px; }
+
+/* 進化の組み合わせ (レベルアップのカード) */
+.recipe { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; padding: 2px 8px 2px 4px; border-radius: 8px; background: rgba(255, 255, 255, 0.06); font-size: 0.72rem; }
+.recipe b { color: var(--panel-muted); font-weight: 800; }
+.card .recipe img.rc-ic, .rc-ic { flex: none; width: 22px; height: 22px; margin: 0; border-radius: 5px; background: rgba(0, 0, 0, 0.3); opacity: 0.4; filter: grayscale(0.8); }
+.rc-ic.have { opacity: 1; filter: none; box-shadow: 0 0 0 1.5px var(--mint); }
+.recipe { max-width: 100%; }
+.rc-evo { min-width: 0; margin-left: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gold); font-weight: 700; }
+
+/* 恒久スキルへの導線 */
+.shop-btn { position: relative; white-space: nowrap; }
+.shop-btn.can { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 0 2px rgba(255, 207, 74, 0.25), 0 0 14px rgba(255, 207, 74, 0.35); }
+.cta-badge { position: absolute; top: -8px; right: -8px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #ff5a5a; color: #fff; font-size: 0.72rem; font-weight: 800; box-shadow: 0 0 0 2px var(--panel); }
+.shop-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255, 207, 74, 0.5); background: rgba(255, 207, 74, 0.1); font-size: 0.85rem; text-align: center; }
