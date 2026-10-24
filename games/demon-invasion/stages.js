@@ -6,6 +6,7 @@
  *     hq: 本拠地 (4×4 マス) { team, x, y }
  *     barracks: 兵舎 { team, size: s/m/l/xl, x, y, face: 入口の向き n/s/e/w, lane: 兵士が進むレーン (-1 = 交互) }
  *     lanes: 自軍の本拠地 → 敵の本拠地へ向かう道筋 (マスの座標。小数は使ってよい)。敵はこれを逆にたどる
+ *     captains: 敵の隊長 (units.js の CAPTAINS)
  *   locked: true のステージはまだ遊べない (開発中)
  */
 (() => {
@@ -70,8 +71,9 @@
         [[9, 21], [12, 12], [78, 12], [84, 21]],
         [[9, 29], [12, 38], [78, 38], [84, 29]],
       ],
+      captains: ['varga'], // 敵の隊長
       // 敵の兵士の強さの倍率 (HP・攻撃力)。敵優勢のバランスを決める
-      enemyMul: 1.1,
+      enemyMul: 1.0,
     },
     { id: 2, name: '住宅街', en: { name: 'Residential Area' }, locked: true },
     { id: 3, name: '駅前', en: { name: 'Station Square' }, locked: true },

@@ -53,6 +53,17 @@
     },
   };
 
+  // 敵の隊長 (魔将)。レベル 1 のときの値。レベルが上がるごとに hpUp・dmgUp の割合で強くなる
+  //   skills: 覚える技とそのレベル (charge: 突進 / wave: 炎の斬撃 / ring: 炎の円 / summon: 手下を呼ぶ / rage: 怒り)
+  const CAPTAINS = {
+    varga: {
+      name: '魔将ヴァルガ', title: '獄炎の戦鬼', en: { name: 'Varga', title: 'Hellfire Warlord' },
+      hp: 900, hpUp: 0.12, dmg: 22, dmgUp: 0.06, r: 18, speed: 85, range: 30, aggro: 340, rof: 0.9, startLv: 3,
+      skills: { charge: 1, wave: 5, ring: 10, summon: 15, rage: 20 },
+      xp: 160, color: '#c4281d', dark: '#4a0904',
+    },
+  };
+
   // 兵舎の大きさ。cap: 兵力 (同時に出せる兵士の最大数)、w・h: 大きさ (マス)
   const BARRACKS = {
     s: { cap: 10, hp: 1200, interval: 3.0, w: 3, h: 3, name: '小', en: { name: 'S' } },
@@ -77,5 +88,5 @@
     },
   };
 
-  window.DI_UNITS = { UNITS, BARRACKS, MIX };
+  window.DI_UNITS = { UNITS, BARRACKS, MIX, CAPTAINS };
 })();

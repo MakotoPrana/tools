@@ -17,7 +17,7 @@
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <main class="app">
@@ -51,13 +51,22 @@
       <h3>レベルアップ</h3>
       <p>あなたの強さは最初、自軍の歩兵とほとんど同じです。悪魔を倒すと落ちる「魂の灯」(オレンジの光) を拾うと経験値になり、レベルが上がるほど体力と攻撃力が上がります。倒されても負けにはならず、少し待つと自軍の兵舎か本拠地から復帰します。</p>
 
+      <h3>能力と必殺技</h3>
+      <p>レベルが上がるたびに、3 つの中から能力を 1 つ選びます。メイン武器の持ち替え・自動で撃つ「灯火の武器」(2 つまで)・スキル (Q / E、2 つまで)・必殺技 (R、悪魔を倒すとたまるゲージを使う)・パッシブ (6 つまで)・自軍の兵士や兵舎を強くする「指揮」(3 つまで) があります。同じ能力をもう一度選ぶとレベルが上がります (最大 5)。</p>
+
+      <h3>敵の隊長</h3>
+      <p>戦場には悪魔の隊長 (魔将) がいます。隊長は時間がたつほどレベルが上がり、一番押しているレーンの先頭で兵舎を壊しに来ます。倒すと大量の経験値が落ち、悪魔たちが 15 秒間混乱します (動きと攻撃が遅くなる)。隊長は 60 秒後に戻ってきます。</p>
+
       <h3>パソコンの操作</h3>
       <table>
         <tbody>
           <tr><th>WASD / 矢印キー</th><td>移動</td></tr>
           <tr><th>マウス</th><td>ねらう (左クリックを押しっぱなしで射撃)</td></tr>
           <tr><th>Space / 右クリック</th><td>回避 (ダッシュ。一瞬だけ無敵)</td></tr>
-          <tr><th>R</th><td>リロード</td></tr>
+          <tr><th>Q / E</th><td>スキル</td></tr>
+          <tr><th>R</th><td>必殺技 (ゲージがたまったとき)</td></tr>
+          <tr><th>X</th><td>リロード (弾が切れると自動でリロードします)</td></tr>
+          <tr><th>1〜3</th><td>レベルアップの能力を選ぶ</td></tr>
           <tr><th>P / Esc</th><td>一時停止</td></tr>
         </tbody>
       </table>
@@ -67,7 +76,7 @@
         <tbody>
           <tr><th>画面の左半分</th><td>移動 (指を置いた場所がスティックの中心)</td></tr>
           <tr><th>画面の右半分</th><td>倒した方向に射撃 (近くの敵へ自動でねらいを合わせます)</td></tr>
-          <tr><th>右下のボタン</th><td>回避</td></tr>
+          <tr><th>右下のボタン</th><td>回避・スキル・必殺技</td></tr>
           <tr><th>右上の Ⅱ</th><td>一時停止</td></tr>
         </tbody>
       </table>
@@ -86,13 +95,22 @@
       <h3>Leveling Up</h3>
       <p>You start out about as strong as a regular infantry soldier. Pick up the "soul embers" (orange lights) that defeated demons drop to gain experience; each level raises your HP and attack. Being defeated doesn't lose the battle: after a short wait you return from one of your barracks or your base.</p>
 
+      <h3>Abilities and Ultimates</h3>
+      <p>Every time you level up, choose one of three abilities: swap your main weapon, automatic "ember weapons" (up to 2), skills (Q / E, up to 2), an ultimate (R, powered by a gauge that fills as you defeat demons), passives (up to 6), and "commands" that strengthen your soldiers and barracks (up to 3). Picking an ability again raises its level (max 5).</p>
+
+      <h3>Enemy Captains</h3>
+      <p>A demon captain (warlord) leads the enemy. Captains level up over time and lead the charge on whichever lane the demons are winning, smashing barracks. Defeat one to drop a pile of experience and throw the demons into disarray for 15 seconds (they move and attack slower). Captains return after 60 seconds.</p>
+
       <h3>PC Controls</h3>
       <table>
         <tbody>
           <tr><th>WASD / Arrow keys</th><td>Move</td></tr>
           <tr><th>Mouse</th><td>Aim (hold the left button to fire)</td></tr>
           <tr><th>Space / Right click</th><td>Dodge (a dash with a moment of invincibility)</td></tr>
-          <tr><th>R</th><td>Reload</td></tr>
+          <tr><th>Q / E</th><td>Skills</td></tr>
+          <tr><th>R</th><td>Ultimate (when the gauge is full)</td></tr>
+          <tr><th>X</th><td>Reload (you also reload automatically when empty)</td></tr>
+          <tr><th>1–3</th><td>Pick a level-up ability</td></tr>
           <tr><th>P / Esc</th><td>Pause</td></tr>
         </tbody>
       </table>
@@ -102,7 +120,7 @@
         <tbody>
           <tr><th>Left half of the screen</th><td>Move (where you first touch becomes the center of the stick)</td></tr>
           <tr><th>Right half of the screen</th><td>Fire in the direction you push (aim snaps to nearby enemies)</td></tr>
-          <tr><th>Bottom-right button</th><td>Dodge</td></tr>
+          <tr><th>Bottom-right buttons</th><td>Dodge, skills and ultimate</td></tr>
           <tr><th>Ⅱ in the top right</th><td>Pause</td></tr>
         </tbody>
       </table>
@@ -114,8 +132,9 @@
   <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
-  <script src="units.js?v=1"></script>
-  <script src="stages.js?v=1"></script>
-  <script src="script.js?v=1"></script>
+  <script src="units.js?v=2"></script>
+  <script src="abilities.js?v=1"></script>
+  <script src="stages.js?v=2"></script>
+  <script src="script.js?v=2"></script>
 </body>
 </html>
