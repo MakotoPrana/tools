@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>デモン・インベージョン</title>
+  <meta name="description" content="悪魔に侵略された街を取り返す、見下ろし型の 2D 戦争シューティング。兵舎から湧く兵士たちと一緒に戦い、ステージの中でレベルアップして戦局を変えるヒーローになろう。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../" data-i18n="backToGames">‹ ゲーム一覧</a>
+      <h1 data-i18n="gameTitle">デモン・インベージョン</h1>
+      <div class="top-btns">
+        <div class="lang-toggle" id="lang-btn" role="group" aria-label="言語 / Language">
+          <button type="button" data-set-lang="ja" lang="ja" aria-pressed="true">日本語</button>
+          <button type="button" data-set-lang="en" lang="en" aria-pressed="false">EN</button>
+        </div>
+        <button type="button" id="pause-btn" class="icon-btn" data-i18n-aria="pause" aria-label="一時停止" tabindex="-1" style="visibility: hidden">Ⅱ</button>
+      </div>
+    </header>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" data-i18n-aria="board" aria-label="ゲーム画面"></canvas>
+      <div class="overlay" id="overlay" hidden></div>
+    </div>
+
+    <section class="help" data-lang="ja">
+      <h2>遊び方</h2>
+      <p>悪魔の軍勢に侵略された街で、防衛隊の新兵として戦います。<b>敵の本拠地「魔界の楔」を壊せば勝ち、自軍の本拠地「防衛司令部」を壊されたら負け</b>です。戦いは敵が優勢な状態から始まります。</p>
+
+      <h3>兵舎と兵士</h3>
+      <p>両軍の兵士は兵舎から湧いて、通りに沿って相手の本拠地へ進みます。兵舎の大きさ (小 10・中 20・大 35・特大 50) が、同時に出せる兵士の数です。倒された兵士は、兵舎が残っている限り同じ兵舎からまた湧いてきます。<b>兵舎を壊すと、そこからはもう兵士が湧きません。</b></p>
+
+      <h3>本拠地の障壁</h3>
+      <p>兵舎が 1 つでも残っているあいだ、その陣営の本拠地は障壁に守られて、受けるダメージが 70% 減ります。まず敵の兵舎を壊してから本拠地を攻めましょう。自軍の兵舎がすべて落ちると、自軍の本拠地も危なくなります。</p>
+
+      <h3>レベルアップ</h3>
+      <p>あなたの強さは最初、自軍の歩兵とほとんど同じです。悪魔を倒すと落ちる「魂の灯」(オレンジの光) を拾うと経験値になり、レベルが上がるほど体力と攻撃力が上がります。倒されても負けにはならず、少し待つと自軍の兵舎か本拠地から復帰します。</p>
+
+      <h3>パソコンの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>WASD / 矢印キー</th><td>移動</td></tr>
+          <tr><th>マウス</th><td>ねらう (左クリックを押しっぱなしで射撃)</td></tr>
+          <tr><th>Space / 右クリック</th><td>回避 (ダッシュ。一瞬だけ無敵)</td></tr>
+          <tr><th>R</th><td>リロード</td></tr>
+          <tr><th>P / Esc</th><td>一時停止</td></tr>
+        </tbody>
+      </table>
+
+      <h3>スマホの操作</h3>
+      <table>
+        <tbody>
+          <tr><th>画面の左半分</th><td>移動 (指を置いた場所がスティックの中心)</td></tr>
+          <tr><th>画面の右半分</th><td>倒した方向に射撃 (近くの敵へ自動でねらいを合わせます)</td></tr>
+          <tr><th>右下のボタン</th><td>回避</td></tr>
+          <tr><th>右上の Ⅱ</th><td>一時停止</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="help" data-lang="en" hidden>
+      <h2>How to Play</h2>
+      <p>Fight as a rookie of the city's defense force in a town invaded by a demon army. <b>Destroy the enemy base, the "Demon Spire", to win. If your base, the "Defense HQ", is destroyed, you lose.</b> The battle starts with the enemy in the lead.</p>
+
+      <h3>Barracks and Soldiers</h3>
+      <p>Soldiers of both armies spawn from barracks and march along the streets toward the enemy base. A barracks' size (S 10, M 20, L 35, XL 50) is how many soldiers it can have out at once. Fallen soldiers keep coming back from the same barracks as long as it stands. <b>Destroy a barracks and no more soldiers will spawn from it.</b></p>
+
+      <h3>Base Barrier</h3>
+      <p>While a side still has at least one barracks, its base is protected by a barrier that cuts damage by 70%. Take out the enemy barracks first, then assault the base. If all of your barracks fall, your own base is in danger.</p>
+
+      <h3>Leveling Up</h3>
+      <p>You start out about as strong as a regular infantry soldier. Pick up the "soul embers" (orange lights) that defeated demons drop to gain experience; each level raises your HP and attack. Being defeated doesn't lose the battle: after a short wait you return from one of your barracks or your base.</p>
+
+      <h3>PC Controls</h3>
+      <table>
+        <tbody>
+          <tr><th>WASD / Arrow keys</th><td>Move</td></tr>
+          <tr><th>Mouse</th><td>Aim (hold the left button to fire)</td></tr>
+          <tr><th>Space / Right click</th><td>Dodge (a dash with a moment of invincibility)</td></tr>
+          <tr><th>R</th><td>Reload</td></tr>
+          <tr><th>P / Esc</th><td>Pause</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Smartphone Controls</h3>
+      <table>
+        <tbody>
+          <tr><th>Left half of the screen</th><td>Move (where you first touch becomes the center of the stick)</td></tr>
+          <tr><th>Right half of the screen</th><td>Fire in the direction you push (aim snaps to nearby enemies)</td></tr>
+          <tr><th>Bottom-right button</th><td>Dodge</td></tr>
+          <tr><th>Ⅱ in the top right</th><td>Pause</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>&copy; tools.e-seventh.com</footer>
+
+  <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
+  <script src="../origami-intro.js"></script>
+  <script>OrigamiIntro.play();</script>
+  <script src="units.js?v=1"></script>
+  <script src="stages.js?v=1"></script>
+  <script src="script.js?v=1"></script>
+</body>
+</html>
