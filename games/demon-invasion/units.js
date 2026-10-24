@@ -125,7 +125,9 @@
   //   skills: 覚える技とそのレベル
   //     charge: 突進 / wave: 弾を扇形に撃つ (waveN 発・見た目 waveLook) / ring: まわりに爆発 / summon: 手下を呼ぶ (summonType を summonN 体)
   //     rage: 怒り (体力が半分を切ると速くなる) / blink: 相手の後ろへ瞬間移動 / clone: 分身を 2 体出す / howl: まわりの悪魔の攻撃力を上げる
-  //   ranged: 遠くから撃つ (bulletSpeed・look・curse は兵士と同じ) / siege: 建物へのダメージの倍率 / weapon: 見た目 (sword / staff / claws / daggers)
+  //     pillar: 光の柱を落とす / revive: 倒れた悪魔をよみがえらせる
+  //   ranged: 遠くから撃つ (bulletSpeed・look・curse は兵士と同じ) / siege: 建物へのダメージの倍率 / fly: 空を飛ぶ
+  //   weapon: 見た目 (sword / staff / claws / daggers / club / wings) / twin: 相方の隊長 / guardian: 本拠地を守る魔王
   const CAPTAINS = {
     varga: {
       name: '魔将ヴァルガ', title: '獄炎の戦鬼', en: { name: 'Varga', title: 'Hellfire Warlord' },
@@ -156,6 +158,51 @@
       skills: { blink: 1, clone: 5, wave: 10, summon: 15, rage: 20 },
       waveN: 4, waveLook: 'dagger', summonType: 'shadow', summonN: 2, weapon: 'daggers',
       xp: 190, color: '#4a3a6a', dark: '#0e0814',
+    },
+    bargon: {
+      name: '巨魔バルゴン', title: '城砕き', en: { name: 'Bargon', title: 'Castle Crusher' },
+      hp: 2000, hpUp: 0.12, dmg: 40, dmgUp: 0.06, r: 26, speed: 55, range: 34, aggro: 320, rof: 1.5, startLv: 3,
+      siege: 4,
+      skills: { ring: 1, summon: 5, charge: 10, howl: 15, rage: 20 },
+      summonType: 'ogre', summonN: 1, weapon: 'club',
+      xp: 220, color: '#6a4a3a', dark: '#2a1a10',
+    },
+    raki: {
+      name: '双魔ラキ', title: '紅の双剣', en: { name: 'Raki', title: 'Crimson Blades' },
+      hp: 900, hpUp: 0.12, dmg: 20, dmgUp: 0.06, r: 15, speed: 110, range: 26, aggro: 380, rof: 0.45, startLv: 3,
+      twin: 'shiki', // 相方。近くにいると互いに攻撃力 +25%、相方が倒れると怒る
+      skills: { blink: 1, charge: 5, wave: 10, rage: 20 },
+      waveN: 3, waveLook: 'dagger', weapon: 'daggers',
+      xp: 170, color: '#d03040', dark: '#4a0810',
+    },
+    shiki: {
+      name: '双魔シキ', title: '蒼の魔術師', en: { name: 'Shiki', title: 'Azure Sorcerer' },
+      hp: 750, hpUp: 0.12, dmg: 16, dmgUp: 0.06, r: 15, speed: 80, range: 360, aggro: 400, rof: 0.7, startLv: 3,
+      ranged: true, bulletSpeed: 420, spread: 0.05, twin: 'raki',
+      skills: { wave: 1, summon: 5, ring: 10, rage: 20 },
+      waveN: 5, waveLook: 'fire', summonType: 'imp', summonN: 3, weapon: 'staff',
+      xp: 170, color: '#3050d0', dark: '#0a1450',
+    },
+    seraphiel: {
+      name: '堕天使セラフィエル', title: '偽りの光', en: { name: 'Seraphiel', title: 'The False Light' },
+      hp: 1300, hpUp: 0.12, dmg: 18, dmgUp: 0.06, r: 18, speed: 90, range: 340, aggro: 400, rof: 0.6, startLv: 3,
+      ranged: true, bulletSpeed: 500, spread: 0.04, look: 'holy', fly: true,
+      // pillar: 光の柱を落とす / revive: 近くで倒れた悪魔をよみがえらせる
+      skills: { wave: 1, pillar: 5, revive: 10, blink: 15, rage: 20 },
+      waveN: 5, waveLook: 'holy', weapon: 'wings',
+      xp: 220, color: '#e8e0c0', dark: '#6a5a30',
+    },
+    asmodeus: {
+      name: '魔王アスモデウス', title: '魔界門の主', en: { name: 'Asmodeus', title: 'Lord of the Demon Gate' },
+      hp: 4000, hpUp: 0.08, dmg: 40, dmgUp: 0.05, r: 30, speed: 70, range: 40, aggro: 420, rof: 1.0, startLv: 10,
+      siege: 2,
+      // guardian: 魔界門を守る。門が攻撃されるか、プレイヤーが近づくと現れる。生きているあいだ、門の被ダメージ -50%
+      //   技はレベルではなく、体力で 3 段階に変わる (phaseSkills)
+      guardian: true,
+      phaseSkills: [['charge', 'wave'], ['charge', 'wave', 'summon', 'ring'], ['charge', 'wave', 'summon', 'ring', 'pillar', 'rage']],
+      skills: {},
+      waveN: 7, waveLook: 'fire', summonType: 'ogre', summonN: 2, weapon: 'sword',
+      xp: 400, color: '#5a0a2a', dark: '#1a0008',
     },
   };
 

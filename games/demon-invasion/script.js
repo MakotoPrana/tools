@@ -117,6 +117,7 @@
       kind_main: 'メイン武器', kind_sub: '灯火の武器', kind_skill: 'スキル', kind_ult: '必殺技', kind_passive: 'パッシブ', kind_command: '指揮',
       captains: '倒した隊長', confused: '混乱', rebuilt: '再建した兵舎', temp: '仮設', kind_evo: '進化',
       nBehemoth: '破城獣が現れた！ 兵舎を守れ！',
+      nGuardian: (n) => `${n}が魔界門から現れた！`, nPhase: (n, p) => `${n}の力が増した… (第 ${p} 段階)`, nRevive: (n) => `${n}が倒れた悪魔をよみがえらせた！`,
       lockedPrev: '前の地区を取り返すと選べる', normal: 'ノーマル', hard: 'ハード', training: '訓練所', army: '防衛隊本部',
       heroesTitle: (n, m) => `連れていくヒーロー (${n}/${m})`, heroLocked: (n) => `ステージ ${n} をクリアすると仲間になる`,
       loadout: '初期装備', deploy: '出撃！', next: 'つぎの段階', trainingSub: '自分を鍛える', armySub: '自軍を強くする',
@@ -153,6 +154,7 @@
       kind_main: 'Main weapon', kind_sub: 'Ember weapon', kind_skill: 'Skill', kind_ult: 'Ultimate', kind_passive: 'Passive', kind_command: 'Command',
       captains: 'Captains defeated', confused: 'Disarray', rebuilt: 'Barracks rebuilt', temp: 'Temp ', kind_evo: 'Evolution',
       nBehemoth: 'A Behemoth has appeared! Protect the barracks!',
+      nGuardian: (n) => `${n} emerges from the Demon Gate!`, nPhase: (n, p) => `${n} grows stronger… (phase ${p})`, nRevive: (n) => `${n} raised the fallen demons!`,
       lockedPrev: 'Retake the previous district first', normal: 'Normal', hard: 'Hard', training: 'Training Ground', army: 'Defense Force HQ',
       heroesTitle: (n, m) => `Heroes to bring (${n}/${m})`, heroLocked: (n) => `Joins after you clear stage ${n}`,
       loadout: 'Starting loadout', deploy: 'Deploy!', next: 'next rank', trainingSub: 'Train yourself', armySub: 'Strengthen your army',
@@ -428,7 +430,9 @@
   // 戦場 (G)
   // ===================================================================
   let G = null;
-  const FLOOR = { building: 0, road: 1, plaza: 2, alley: 3, rubble: 4, yard: 5, bridge: 6, rail: 7 };
+  const FLOOR = { building: 0, road: 1, plaza: 2, alley: 3, rubble: 4, yard: 5, bridge: 6, rail: 7, river: 8, lava: 9, ash: 10 };
+  // 通れないが、弾は越える床
+  const LOW = new Set([FLOOR.rail, FLOOR.river, FLOOR.lava]);
   const ROOF_COLORS = ['#5a5266', '#62574e', '#4e5d6b', '#675560', '#56604f', '#5d5d6e', '#6b5a4b', '#525a70'];
   const AWNING = ['#c0392b', '#2e86c1', '#d68910', '#239b56', '#8e44ad', '#e67e22'];
   const COVER = {
@@ -436,6 +440,8 @@
     barricade: { hp: 260, blocks: true },
     planter: { hp: 200, blocks: false },
     container: { hp: 900, blocks: true },
+    office: { hp: 2500, blocks: true },
+    gas: { hp: 100, blocks: true },
   };
 
   function buildStage(st) {
@@ -458,14 +464,14 @@
       barrierDown: [false, false], overtime: false,
       mmDirty: true, mm: null, lamps: [],
       shells: [], strikes: [], mines: [], walls: [], beams: [], bolts: [], rings: [], flash: 0,
-      captains: [], confuseT: 0, points: [], decoys: [], sightT: 0, shamans: [], heroes: [], guards: [], wards: [],
+      captains: [], confuseT: 0, points: [], decoys: [], sightT: 0, shamans: [], heroes: [], guards: [], wards: [], fallen: [],
     };
     for (const [x, y, w, h, kind] of st.open) {
       for (let j = y; j < y + h; j++) {
         for (let i = x; i < x + w; i++) {
           const k = j * C + i;
           // 線路は通れないが、弾は越える
-          g.solid[k] = kind === 'rail' ? 1 : 0;
+          g.solid[k] = LOW.has(FLOOR[kind]) ? 1 : 0;
           g.block[k] = 0;
           g.floor[k] = FLOOR[kind];
         }
@@ -556,7 +562,7 @@
     let nb = 0;
     const stack = [];
     for (let k = 0; k < N; k++) {
-      if (!g.solid[k] || g.floor[k] === FLOOR.rail || g.coverAt[k] >= 0 || g.structAt[k] >= 0 || g.bid[k] >= 0) continue;
+      if (!g.solid[k] || LOW.has(g.floor[k]) || g.coverAt[k] >= 0 || g.structAt[k] >= 0 || g.bid[k] >= 0) continue;
       g.bid[k] = nb;
       stack.push(k);
       while (stack.length) {
@@ -570,7 +576,7 @@
           if (nx < 0 || ny < 0 || nx >= C || ny >= R) continue;
           if (dx !== 0 && (Math.max(qx, nx) % 7 === 0)) continue;
           const n2 = ny * C + nx;
-          if (!g.solid[n2] || g.floor[n2] === FLOOR.rail || g.coverAt[n2] >= 0 || g.structAt[n2] >= 0 || g.bid[n2] >= 0) continue;
+          if (!g.solid[n2] || LOW.has(g.floor[n2]) || g.coverAt[n2] >= 0 || g.structAt[n2] >= 0 || g.bid[n2] >= 0) continue;
           g.bid[n2] = nb;
           stack.push(n2);
         }
@@ -1106,7 +1112,7 @@
 
   function attack(u, tx, ty) {
     const def = u.def;
-    let dmg = def.dmg * u.dmgMul;
+    let dmg = def.dmg * u.dmgMul * (u.extraMul || 1);
     if (u.team === 0 && auraOn(u)) dmg *= 1 + 0.1 * ab('aura');
     if (u.team === 0 && !u.hero && G.heroes.length && nearHero(u)) dmg *= 1.1; // ヒーローの近くの兵士は攻撃力 +10%
     if (u.team === 1 && !u.boss) dmg *= captainBuff(u);
@@ -1155,7 +1161,7 @@
     const ox = u.x + Math.cos(a) * (u.r + 4);
     const oy = u.y + Math.sin(a) * (u.r + 4);
     for (let i = 0; i < (def.pellets || 1); i++) {
-      const b = fireBullet(ox, oy, a + rand(-def.spread, def.spread), def.bulletSpeed, dmg, u.team, u, def.range * 1.25, def.curse ? 'curse' : u.team === 1 ? 'magic' : def.sniper ? 'snipe' : 'tracer');
+      const b = fireBullet(ox, oy, a + rand(-def.spread, def.spread), def.bulletSpeed, dmg, u.team, u, def.range * 1.25, def.curse ? 'curse' : u.team === 1 ? def.look || 'magic' : def.sniper ? 'snipe' : 'tracer');
       if (b && def.curse) b.slow = def.curse;
       if (b && def.sniper && u.team === 0 && save.unitIm.sniper) b.pierce = 1;
     }
@@ -1276,6 +1282,10 @@
         if (P.alive) P.hp = Math.min(P.maxHp, P.hp + 2 * L2);
       }
     }
+    if (u.team === 1 && !u.clone) {
+      G.fallen.push({ type: u.type, x: u.x, y: u.y, t: G.time, lane: u.lane });
+      if (G.fallen.length > 40) G.fallen.shift();
+    }
     if (u.team === 1) {
       spawnParticles(u.x, u.y, 10, '#1a1015', 70, 0.8, 4, 'smoke');
       spawnParticles(u.x, u.y, 8, '#ff5a2a', 120, 0.5, 2);
@@ -1291,6 +1301,7 @@
   function hurtStruct(s, amt, src) {
     if (!s.alive) return;
     if (s.kind === 'hq' && hasBarracks(s.team)) amt *= BARRIER;
+    if (s.kind === 'hq' && s.team === 1 && G.captains.some((c) => c.u && c.def.guardian)) amt *= 0.5; // 魔王と一体化した門
     if (src && src.kind === 'unit' && !src.boss) amt *= src.def.siege ?? UNIT_VS_STRUCT;
     if (src && src.boss && src.boss.def.siege) amt *= src.boss.def.siege;
     if (s.team === 0 && save.unitIm.engineer && G.time - (s.repairT || -9) < 0.5) amt *= 0.7; // 工兵の改良
@@ -1359,7 +1370,17 @@
     const cx = (cv.x + cv.w / 2) * TILE;
     const cy = (cv.y + cv.h / 2) * TILE;
     if (cv.k === 'car') explosion(cx, cy, 50);
-    else spawnParticles(cx, cy, 14, '#8a7a66', 120, 0.6, 3);
+    else if (cv.k === 'gas') {
+      // ガス管: 敵味方どちらにもダメージ
+      blast(cx, cy, 110, 90, 0, null, 0);
+      blast(cx, cy, 110, 90, 1, null, 0);
+      explosion(cx, cy, 90);
+    } else if (cv.k === 'office') {
+      // ビルが崩れて、がれきの道になる
+      for (let j = cv.y; j < cv.y + cv.h; j++) for (let i = cv.x; i < cv.x + cv.w; i++) G.floor[j * G.C + i] = FLOOR.rubble;
+      explosion(cx, cy, 120);
+      spawnParticles(cx, cy, 40, '#5a5050', 160, 1.6, 12, 'smoke');
+    } else spawnParticles(cx, cy, 14, '#8a7a66', 120, 0.6, 3);
   }
 
   // ===================================================================
@@ -2996,19 +3017,21 @@
     const p = lane.pts[1][0];
     const def = {
       melee: !d.ranged, range: d.range, aggro: d.aggro, rof: d.rof, dmg: d.dmg, xp: 0, color: d.color, dark: d.dark,
-      spread: d.spread || 0, bulletSpeed: d.bulletSpeed || 0, curse: d.curse || 0,
+      spread: d.spread || 0, bulletSpeed: d.bulletSpeed || 0, curse: d.curse || 0, look: d.look, fly: !!d.fly,
     };
     const u = {
       kind: 'unit', type: 'captain', boss: c, def, team: 1, x: p.x, y: p.y, r: d.r, hp: 1, maxHp: 1, dmgMul: 1, speed: d.speed,
       cd: 0, target: null, tStruct: null, retT: 0, lane: laneIdx, wp: 1, off: rand(-20, 20), face: Math.PI,
       home: null, alive: true, hitT: 0, downT: 0, revived: true, playerHitT: -99, prog: 1, stuckT: 0, lx: p.x, ly: p.y, walk: 0,
-      sk: { charge: 2, wave: 3, ring: 4, summon: 10, blink: 3, clone: 6, howl: 5 }, dashT: 0, retreated: false, retreatT: 0, laneT: 12, rofMul: 1, howlT: 0,
+      sk: { charge: 2, wave: 3, ring: 4, summon: 10, blink: 3, clone: 6, howl: 5, pillar: 4, revive: 8 }, dashT: 0, retreated: false, retreatT: 0, laneT: 12, rofMul: 1, howlT: 0,
     };
     c.u = u;
+    c.spawned = true;
     setCaptainLevel(c, captainLevel(c));
     u.hp = u.maxHp;
     G.units.push(u);
-    note(t('nCaptain', L(d, 'name')), '#ff8a7a');
+    note(d.guardian ? t('nGuardian', L(d, 'name')) : t('nCaptain', L(d, 'name')), '#ff8a7a');
+    if (d.guardian) G.shake = 14;
     Sound.play('roar');
   }
 
@@ -3027,7 +3050,15 @@
     for (const c of G.captains) {
       if (!c.u) {
         c.respawnT -= dt;
-        if (c.respawnT <= 0 && G.hq[1].alive) spawnCaptain(c);
+        if (c.respawnT > 0 || !G.hq[1].alive) continue;
+        if (c.def.guardian) {
+          // 魔王: 門が傷つくか、プレイヤーが門に近づくと現れる
+          const h = G.hq[1];
+          const P = G.player;
+          const near = P.alive && Math.hypot(P.x - h.cx, P.y - h.cy) < 700;
+          if (h.hp >= h.maxHp * 0.97 && !near) continue;
+        }
+        spawnCaptain(c);
         continue;
       }
       const lv = captainLevel(c);
@@ -3044,11 +3075,29 @@
     const c = u.boss;
     const d = c.def;
     for (const k in u.sk) u.sk[k] -= dt;
-    const rage = d.skills.rage && c.lv >= d.skills.rage && u.hp < u.maxHp * 0.5;
+    // 魔王は体力で 3 段階に、ほかの隊長はレベルで技を覚える
+    const phase = u.hp > u.maxHp * 0.66 ? 0 : u.hp > u.maxHp * 0.33 ? 1 : 2;
+    const has = (k) => (d.guardian ? d.phaseSkills[phase].includes(k) : d.skills[k] && c.lv >= d.skills[k]);
+    if (d.guardian && phase !== u.phase) {
+      if (u.phase != null) note(t('nPhase', L(d, 'name'), phase + 1), '#ff5a4a');
+      u.phase = phase;
+    }
+    // 双魔: 相方が近くにいると互いに攻撃力 +25%。相方が倒れていると怒る
+    let partnerDown = false;
+    u.extraMul = 1;
+    if (d.twin) {
+      const p = G.captains.find((x) => x.def === CAPTAINS[d.twin]);
+      if (p && p.u && (p.u.x - u.x) ** 2 + (p.u.y - u.y) ** 2 < 450 * 450) u.extraMul = 1.25;
+      if (p && !p.u && p.spawned) {
+        partnerDown = true;
+        u.extraMul = 1.3;
+      }
+    }
+    const rage = (has('rage') && u.hp < u.maxHp * 0.5) || partnerDown;
     u.rofMul = rage ? 0.6 : 1;
     u.speed = d.speed * (rage ? 1.2 : 1);
     // 体力が 30% を切ったら、一度だけ下がって回復しようとする
-    if (!u.retreated && u.hp < u.maxHp * 0.3) {
+    if (!u.retreated && !d.guardian && u.hp < u.maxHp * 0.3) {
       u.retreated = true;
       u.retreatT = 8;
       u.dashT = 0;
@@ -3077,7 +3126,7 @@
       u.dashT -= dt;
       u.x += u.dx * 520 * dt;
       u.y += u.dy * 520 * dt;
-      collideTiles(u);
+      if (!d.fly) collideTiles(u);
       forFoesNear(u.x, u.y, u.r + 8, 1, (e) => {
         if (u.dashHit.has(e)) return;
         u.dashHit.add(e);
@@ -3091,8 +3140,28 @@
       spawnParticles(u.x, u.y, 2, '#ff6a2a', 40, 0.4, 5, 'glow');
       return true;
     }
+    // 魔王: 門から離れすぎない。戦っていないときは門の前へ戻る
+    if (d.guardian) {
+      const home = G.lanes[u.lane].pts[1][0];
+      const far = Math.hypot(home.x - u.x, home.y - u.y);
+      if (far > 650) {
+        u.target = null;
+        u.tStruct = null;
+      }
+      if (!u.target && !u.tStruct) {
+        u.retT -= dt;
+        if (u.retT <= 0) retarget(u);
+        if (far > 60) {
+          u.x += ((home.x - u.x) / far) * u.speed * dt;
+          u.y += ((home.y - u.y) / far) * u.speed * dt;
+          u.face = Math.atan2(home.y - u.y, home.x - u.x);
+          u.walk += dt * 8;
+        }
+        return true;
+      }
+    }
     // 戦っていないときは、ときどき一番押しているレーンへ移る
-    if (!u.target && !u.tStruct) {
+    if (!d.guardian && !u.target && !u.tStruct) {
       u.laneT -= dt;
       if (u.laneT <= 0) {
         u.laneT = 12;
@@ -3104,7 +3173,6 @@
         }
       }
     }
-    const has = (k) => d.skills[k] && c.lv >= d.skills[k];
     u.howlT -= dt;
     const tg = u.target;
     if (tg) {
@@ -3175,6 +3243,26 @@
       }
       spawnParticles(u.x, u.y, 20, d.color, 140, 0.6, 4, 'glow');
     }
+    if (has('pillar') && u.sk.pillar <= 0 && tg) {
+      // 光の柱: 相手と、そのまわりの 2 体に、少し遅れて光の柱が落ちる
+      u.sk.pillar = 9;
+      const spots = [tg];
+      forFoesNear(tg.x, tg.y, 200, 1, (e) => { if (spots.length < 3 && e !== tg) spots.push(e); });
+      for (const e of spots) G.shells.push({ x0: e.x, y0: e.y, x: e.x, y: e.y, t: 0, T: 1.1, r: 70, dmg: u.def.dmg * u.dmgMul * 1.8, team: 1, src: u, look: 'pillar' });
+    }
+    if (has('revive') && u.sk.revive <= 0) {
+      // よみがえり: 20 秒以内に近くで倒れた悪魔を、6 体までよみがえらせる
+      const list = G.fallen.filter((f) => G.time - f.t < 20 && (f.x - u.x) ** 2 + (f.y - u.y) ** 2 < 450 * 450).slice(0, 6);
+      if (list.length >= 3) {
+        u.sk.revive = 30;
+        for (const f of list) {
+          const m = spawnUnit(f.type, 1, f.x, f.y, null, f.lane);
+          if (m) spawnParticles(f.x, f.y, 10, '#fff2b0', 80, 0.6, 3, 'glow');
+          G.fallen.splice(G.fallen.indexOf(f), 1);
+        }
+        note(t('nRevive', L(d, 'name')), '#ffcf4a');
+      }
+    }
     if (has('ring') && u.sk.ring <= 0) {
       let n = 0;
       forFoesNear(u.x, u.y, 130, 1, () => n++);
@@ -3198,7 +3286,7 @@
   function captainDown(u) {
     const c = u.boss;
     c.u = null;
-    c.respawnT = 60 * (G.barrierDown[1] ? 2 : 1);
+    c.respawnT = (c.def.guardian ? 90 : 60) * (G.barrierDown[1] ? 2 : 1);
     G.confuseT = 15;
     G.stats.captains++;
     note(t('nCaptainDown', L(c.def, 'name')), '#8fc0ff');
@@ -3699,7 +3787,7 @@
     drawBullets();
     drawParticles();
     drawRoofs(i0, i1, j0, j1);
-    for (const u of G.units) if (u.def.fly && onScreen(u.x, u.y, 30)) drawUnit(u);
+    for (const u of G.units) if (u.def.fly && onScreen(u.x, u.y, 30)) (u.boss ? drawBoss(u) : drawUnit(u));
     drawPlayer(true);
     drawLights();
     drawStructBars();
@@ -3745,6 +3833,31 @@
           ctx.fillRect(x, y, TILE, TILE);
           if (i > 0 && G.floor[k - 1] !== FLOOR.bridge) { ctx.fillStyle = '#6a6e7a'; ctx.fillRect(x, y, 5, TILE); }
           if (i < C - 1 && G.floor[k + 1] !== FLOOR.bridge) { ctx.fillStyle = '#6a6e7a'; ctx.fillRect(x + TILE - 5, y, 5, TILE); }
+        } else if (f === FLOOR.river) {
+          ctx.fillStyle = '#1c3a5e';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = 'rgba(160,210,255,0.18)';
+          const w = (G.time * 20 + j * 13) % TILE;
+          ctx.fillRect(x + w * 0.5, y + 10, 14, 2);
+          ctx.fillRect(x + ((w + 20) % TILE) * 0.6, y + 28, 10, 2);
+        } else if (f === FLOOR.lava) {
+          // 溶岩: ゆっくり明るさが変わる
+          ctx.fillStyle = '#3a0c06';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = `rgba(255,${90 + Math.sin(G.time * 2 + i + j) * 40},20,0.85)`;
+          ctx.fillRect(x + 6, y + 4, TILE - 12, TILE - 8);
+        } else if (f === FLOOR.ash) {
+          ctx.fillStyle = (h & 7) === 0 ? '#2e2626' : '#2a2323';
+          ctx.fillRect(x, y, TILE, TILE);
+          if ((h & 15) === 2) {
+            ctx.strokeStyle = 'rgba(255,90,40,0.35)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x + 6, y + (h % 30));
+            ctx.lineTo(x + 20, y + 20);
+            ctx.lineTo(x + 34, y + ((h >> 5) % 30));
+            ctx.stroke();
+          }
         } else if (f === FLOOR.rail) {
           // 線路: 砂利・まくら木・レール
           ctx.fillStyle = '#3a3532';
@@ -3883,6 +3996,35 @@
           ctx.fillRect(x + 8, y + h * 0.28, w - 16, h * 0.16);
           ctx.fillRect(x + 8, y + h * 0.62, w - 16, h * 0.1);
         }
+      } else if (cv.k === 'office') {
+        // 壊せるビル: 屋上と窓
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.fillRect(x + 8, y + 8, w, h);
+        ctx.fillStyle = '#4a5468';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#5a6680';
+        ctx.fillRect(x + 6, y + 6, w - 12, h - 12);
+        ctx.fillStyle = 'rgba(255,220,150,0.35)';
+        for (let q = 0; q < cv.w; q++) for (let r = 0; r < cv.h; r++) if ((hash(cv.id * 97 + q * 13 + r) & 3) === 0) ctx.fillRect(x + q * TILE + 14, y + r * TILE + 14, 10, 10);
+        if (dmg > 0.2) {
+          ctx.strokeStyle = 'rgba(20,20,25,0.7)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x + w * 0.2, y);
+          ctx.lineTo(x + w * 0.5, y + h * 0.4);
+          ctx.lineTo(x + w * 0.3, y + h * dmg);
+          ctx.stroke();
+        }
+      } else if (cv.k === 'gas') {
+        ctx.fillStyle = '#c0b030';
+        ctx.beginPath();
+        ctx.arc(x + 20, y + 20, 14, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = '#2a2a20';
+        ctx.font = '900 16px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('!', x + 20, y + 21);
       } else if (cv.k === 'container') {
         const cols = ['#9a3a2a', '#2a5a8a', '#3a7a4a', '#b07a2a'];
         ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -4399,6 +4541,15 @@
         ctx.fillStyle = '#ff7a2a';
         ctx.fillRect(-10, -2, 3, 4);
         ctx.restore();
+      } else if (b.look === 'holy') {
+        ctx.fillStyle = 'rgba(255,240,170,0.45)';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 8, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = '#fffbe0';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 3, 0, TAU);
+        ctx.fill();
       } else if (b.look === 'dagger') {
         ctx.save();
         ctx.translate(b.x, b.y);
@@ -4538,7 +4689,17 @@
       ctx.lineCap = 'butt';
     }
     for (const s of G.shells) {
-      const f = s.t / s.T;
+      const f = Math.max(0, s.t) / s.T;
+      if (s.look === 'pillar') {
+        // 光の柱: 落ちる場所が光り、だんだん明るくなる
+        ctx.fillStyle = `rgba(255,240,180,${0.15 + f * 0.4})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * (0.5 + f * 0.5), 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,255,230,${f * 0.8})`;
+        ctx.fillRect(s.x - 6 * f, s.y - 300, 12 * f, 300);
+        continue;
+      }
       const x = lerp(s.x0, s.x, f);
       const y = lerp(s.y0, s.y, f) - Math.sin(f * Math.PI) * (s.look === 'grenade' ? 50 : 120);
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -4691,6 +4852,24 @@
           ctx.stroke();
         }
       }
+    } else if (d.weapon === 'club') {
+      ctx.fillStyle = '#3a2814';
+      ctx.save();
+      ctx.rotate(0.4 + Math.max(0, u.cd) * 0.5);
+      roundRect(u.r * 0.3, u.r * 0.4, u.r * 1.5, 14, 6);
+      ctx.fill();
+      ctx.restore();
+    } else if (d.weapon === 'wings') {
+      // 光の翼と輪
+      ctx.fillStyle = 'rgba(255,245,210,0.75)';
+      for (const sd of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(-4, sd * 6);
+        ctx.lineTo(-u.r * 1.1, sd * u.r * 2.2);
+        ctx.lineTo(-u.r * 1.8, sd * u.r * 1.1);
+        ctx.closePath();
+        ctx.fill();
+      }
     } else if (d.weapon === 'daggers') {
       ctx.strokeStyle = '#c9b8ff';
       ctx.lineWidth = 3;
@@ -4807,11 +4986,12 @@
     const col = {
       [FLOOR.road]: [74, 78, 92], [FLOOR.plaza]: [86, 90, 107], [FLOOR.alley]: [63, 62, 69], [FLOOR.rubble]: [90, 79, 69],
       [FLOOR.yard]: [78, 84, 92], [FLOOR.bridge]: [96, 100, 112], [FLOOR.rail]: [58, 50, 44],
+      [FLOOR.river]: [40, 80, 130], [FLOOR.lava]: [200, 70, 30], [FLOOR.ash]: [70, 58, 58],
     };
     for (let k = 0; k < G.C * G.R; k++) {
       let c3 = [24, 26, 34];
       if (G.coverAt[k] >= 0) c3 = [100, 104, 120];
-      else if (!G.solid[k] || G.structAt[k] >= 0 || G.floor[k] === FLOOR.rail) c3 = col[G.floor[k]] || c3;
+      else if (!G.solid[k] || G.structAt[k] >= 0 || LOW.has(G.floor[k])) c3 = col[G.floor[k]] || c3;
       img.data[k * 4] = c3[0];
       img.data[k * 4 + 1] = c3[1];
       img.data[k * 4 + 2] = c3[2];
@@ -5219,7 +5399,8 @@
         collideTiles(u);
       }
     }
-    G.captains = (st.captains || []).map((id) => ({ def: CAPTAINS[id], u: null, lv: 0, respawnT: 20 }));
+    // 2 体目の隊長は 40 秒遅れて出撃する。魔王は門が攻められるまで出てこない
+    G.captains = (st.captains || []).map((id, i) => ({ def: CAPTAINS[id], u: null, lv: 0, respawnT: 20 + i * 40 }));
     note(t('nStart'), '#ffcf4a');
     hideOverlay();
     screen = 'play';
