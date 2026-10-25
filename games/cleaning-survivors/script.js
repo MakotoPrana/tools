@@ -226,7 +226,7 @@
   const EVOS = {
     blackhole: { name: 'ブラックホール掃除機', desc: '前方に吸引の渦を置き、渦の中のゴミにまとめてダメージを与える' },
     steam: { name: '超高温スチームカノン', desc: '太く長い蒸気ビームで、通った線を一気にピカピカにする' },
-    army: { name: 'お掃除ロボ軍団', desc: 'ロボが自分で汚れとゴミを探して部屋を巡回する' },
+    army: { name: 'お掃除ロボ軍団', desc: 'ロボが増えて大きくなり、まわりを速く回りながらゴミを粉砕し、床も広く磨く' },
     acid: { name: '酸性雨ミスト', desc: '画面中に除菌の雨を降らせる' },
     giant: { name: '巨大圧雪ローラー', desc: '太いローラーで通り道を全部ピカピカにし、ゴミを潰す' },
     tornado: { name: '竜巻モップ', desc: 'まわり全部を高速でなぎ払い続ける' },
@@ -255,17 +255,24 @@
   const MAX_GEARS = 4;
   const MAX_PASSIVES = 4;
 
-  // 清掃員。unlock: その番号のステージの宝物を見つけると仲間になる (-1 は最初から)
+  // 清掃員。unlock: その番号のステージのノーマルの宝物を見つけると仲間になる (-1 は最初から)
+  //   power: 強さのめやす (★1〜5。★1 はやりこみ向けの弱い清掃員)。最初のギア (weapons) が得意なギアで、攻撃力が fav 倍 (書いていなければ FAV_MUL)
   //   mods: 個性 (scrub: 歩いて磨く範囲 / might: 攻撃力 / noDirtSlow: 汚れた床で遅くならない / magnet: 回収範囲 /
   //   box: ダストボックス容量 / allergyImmune: アレルギー無効 / mold: カビ系へのダメージ / xp: 経験値)
   const CHARS = [
-    { id: 'cleaner', name: '清掃員 ハジメ', weapons: ['vacuum'], hp: 100, speed: 1, unlock: -1, trait: '床みがきの達人', traitDesc: '歩くだけで床を磨く範囲 +40%', desc: '伝説の清掃員。どんな汚れも見逃さない、まじめなベテラン。', mods: { scrub: 0.4 } },
-    { id: 'mizuki', name: '洗浄屋 ミズキ', weapons: ['washer'], hp: 90, speed: 1.05, unlock: 1, trait: '水圧マニア', traitDesc: '攻撃力 +15%', desc: '高圧洗浄機を愛する、せっかちな洗浄屋。', mods: { might: 0.15 } },
-    { id: 'runta', name: 'お掃除ロボ ルン太', weapons: ['robot'], hp: 95, speed: 1.1, unlock: 3, trait: '全地形タイヤ', traitDesc: '汚れた床でも遅くならない', desc: '物置の設計図から生まれたお掃除ロボ。', mods: { noDirtSlow: true } },
-    { id: 'koroko', name: 'コロコロ使い コロ子', weapons: ['roller'], hp: 110, speed: 1, unlock: 5, trait: '拾い上手', traitDesc: '回収範囲 +40%・ダストボックス +40', desc: '伝説のコロコロを受け継いだ、片付け好きの女の子。', mods: { magnet: 0.4, box: 40 } },
-    { id: 'kiyoshi', name: '除菌博士 キヨシ', weapons: ['spray'], hp: 85, speed: 1, unlock: 7, trait: '免疫ばっちり', traitDesc: 'アレルギーにならない・カビ系へのダメージ +50%', desc: 'カビの研究ひとすじの博士。なくした研究ノートを探していた。', mods: { allergyImmune: true, mold: 0.5 } },
-    { id: 'tome', name: '片付け名人 トメ', weapons: ['vacuum', 'roller'], hp: 130, speed: 0.9, unlock: 9, trait: '年の功', traitDesc: '2つのギアで出撃・経験値 +25%', desc: '屋敷の昔の管理人。足は遅いが、知恵と経験は誰にも負けない。', mods: { xp: 0.25 } },
+    { id: 'cleaner', name: '清掃員 ハジメ', weapons: ['vacuum'], hp: 100, speed: 1, unlock: -1, power: 3, trait: '床みがきの達人', traitDesc: '歩くだけで床を磨く範囲 +40%', desc: '伝説の清掃員。どんな汚れも見逃さない、まじめなベテラン。', mods: { scrub: 0.4 } },
+    { id: 'tsugumi', name: '見習い ツグミ', weapons: ['sponge'], hp: 70, speed: 1, unlock: 0, power: 1, trait: 'まだ見習い', traitDesc: '攻撃力 -20%・経験値 +10%', desc: '屋敷に来たばかりの見習い。メラミンスポンジだけは誰にも負けない。', mods: { might: -0.2, xp: 0.1 } },
+    { id: 'mizuki', name: '洗浄屋 ミズキ', weapons: ['washer'], hp: 90, speed: 1.05, unlock: 1, power: 3, trait: '水圧マニア', traitDesc: '攻撃力 +15%', desc: '高圧洗浄機を愛する、せっかちな洗浄屋。', mods: { might: 0.15 } },
+    { id: 'hayate', name: '疾風 ハヤテ', weapons: ['duster'], hp: 80, speed: 1.2, unlock: 2, power: 3, trait: '疾風のはたき', traitDesc: '攻撃間隔 -10%', desc: 'はたきを風のように投げる、足の速い掃除人。打たれ弱いのが玉にきず。', mods: { cd: 0.1 } },
+    { id: 'runta', name: 'お掃除ロボ ルン太', weapons: ['robot'], hp: 95, speed: 1.1, unlock: 3, power: 4, trait: '全地形タイヤ', traitDesc: '汚れた床でも遅くならない', desc: '物置の設計図から生まれたお掃除ロボ。', mods: { noDirtSlow: true } },
+    { id: 'reika', name: 'お嬢様 レイカ', weapons: ['purifier'], hp: 60, speed: 0.9, unlock: 4, power: 1, trait: '箱入り娘', traitDesc: '体力が低く足も遅く、攻撃力 -15%。そのかわり、もらえるコイン +30%', desc: 'お屋敷育ちのお嬢様。空気清浄機がないと一歩も動けない。', mods: { coin: 0.3, might: -0.15 } },
+    { id: 'koroko', name: 'コロコロ使い コロ子', weapons: ['roller'], hp: 110, speed: 1, unlock: 5, power: 3, trait: '拾い上手', traitDesc: '回収範囲 +40%・ダストボックス +40', desc: '伝説のコロコロを受け継いだ、片付け好きの女の子。', mods: { magnet: 0.4, box: 40 } },
+    { id: 'kiyoshi', name: '除菌博士 キヨシ', weapons: ['spray'], hp: 85, speed: 1, unlock: 7, power: 3, trait: '免疫ばっちり', traitDesc: 'アレルギーにならない・カビ系へのダメージ +50%', desc: 'カビの研究ひとすじの博士。なくした研究ノートを探していた。', mods: { allergyImmune: true, mold: 0.5 } },
+    { id: 'gou', name: 'お掃除番長 ゴウ', weapons: ['mop'], fav: 1.6, hp: 160, speed: 0.95, unlock: 8, power: 5, trait: '番長の気合', traitDesc: '攻撃力 +15%・受けるダメージ -2', desc: 'モップ一本で町じゅうを掃除してきた番長。打たれ強さは屋敷いち。', mods: { might: 0.15, armor: 2 } },
+    { id: 'tome', name: '片付け名人 トメ', weapons: ['vacuum', 'roller'], hp: 130, speed: 0.9, unlock: 9, power: 4, trait: '年の功', traitDesc: '2つのギアで出撃・経験値 +25%', desc: '屋敷の昔の管理人。足は遅いが、知恵と経験は誰にも負けない。', mods: { xp: 0.25 } },
   ];
+
+  const FAV_MUL = 1.25; // 得意なギア (清掃員の最初のギア) の攻撃力
 
   // モード。ハードは恒久スキルを半分ほど上げてから挑む想定
   const MODES = {
@@ -333,6 +340,8 @@
       doors: [['genkan', 'rouka'], ['rouka', 'washitsu'], ['rouka', 'living'], ['rouka', 'dining'], ['living', 'dining']],
       start: 'genkan',
       treasure: { room: 'living', name: '家族のアルバム', desc: 'ゴミの下から出てきた、屋敷の家族の古いアルバム。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: '招き猫の置物', desc: '玄関の靴箱の上に埋もれていた、金色の招き猫。' },
       dumps: [['rouka', 0.5, 0.5], ['living', 0.3, 0.3]],
     },
     {
@@ -348,6 +357,8 @@
       doors: [['rouka', 'dining'], ['rouka', 'kitchen'], ['dining', 'kitchen'], ['rouka', 'pantry'], ['rouka', 'laundry'], ['rouka', 'katte']],
       start: 'katte',
       treasure: { room: 'kitchen', name: '金の蛇口', desc: 'ピカピカに光る純金の蛇口。水の使い手が欲しがっていた。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: '銀のお玉', desc: '屋敷の料理番が愛用していた、ずっしり重い銀のお玉。' },
       dumps: [['rouka', 0.2, 0.5], ['rouka', 0.8, 0.5]],
     },
     {
@@ -362,6 +373,8 @@
       doors: [['rouka', 'bath'], ['rouka', 'datsui'], ['rouka', 'toilet'], ['rouka', 'senmen'], ['bath', 'datsui']],
       start: 'rouka',
       treasure: { room: 'bath', name: '真珠の石けん', desc: '泡が真珠のように光る、不思議な石けん。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: '幸運のサイコロ', desc: '湯船の底に沈んでいた、運命を選び直せるというサイコロ。', perk: 'reroll' },
       dumps: [['rouka', 0.5, 0.25], ['datsui', 0.5, 0.6]],
     },
     {
@@ -376,6 +389,8 @@
       doors: [['hall', 'kids'], ['hall', 'study'], ['hall', 'storage'], ['study', 'nando'], ['storage', 'nando']],
       start: 'hall',
       treasure: { room: 'storage', name: 'ロボットの設計図', desc: '物置の奥にしまわれていた、お掃除ロボの設計図。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: 'からくり人形', desc: 'ねじを巻くと、ほうきで床を掃くしぐさをする古い人形。' },
       dumps: [['hall', 0.5, 0.5], ['study', 0.5, 0.75]],
     },
     {
@@ -392,6 +407,8 @@
       doors: [['gate', 'path'], ['gate', 'front'], ['path', 'front'], ['path', 'flower'], ['path', 'shed'], ['path', 'pond'], ['path', 'yard'], ['yard', 'pond'], ['flower', 'shed']],
       start: 'gate',
       treasure: { room: 'pond', name: '四つ葉のクローバー', desc: '池のほとりに一本だけ生えていた、幸運の四つ葉。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: '金のじょうろ', desc: '花壇の土に埋まっていた、金色に輝くじょうろ。' },
       dumps: [['path', 0.5, 0.4], ['front', 0.5, 0.5]],
     },
     {
@@ -408,6 +425,8 @@
       doors: [['stairs', 'passage'], ['nook', 'passage'], ['secret', 'passage'], ['passage', 'oldclothes'], ['passage', 'chests'], ['passage', 'skylight']],
       start: 'stairs',
       treasure: { room: 'secret', name: '伝説のコロコロ', desc: 'どんなゴミでも巻き取るという、伝説の粘着ローラー。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: '不死鳥の羽根ぼうき', desc: '屋根裏の奥に隠されていた、何度でもよみがえるという羽根ぼうき。', perk: 'revive' },
       dumps: [['passage', 0.2, 0.5], ['passage', 0.8, 0.5]],
     },
     {
@@ -423,6 +442,8 @@
       doors: [['under', 'corridor'], ['store', 'corridor'], ['corridor', 'cellar'], ['corridor', 'washroom'], ['corridor', 'boiler'], ['under', 'store']],
       start: 'under',
       treasure: { room: 'boiler', name: '古い懐中時計', desc: 'ボイラーの裏で見つかった、まだ動いている懐中時計。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: '真鍮の歯車', desc: 'ボイラーの心臓部から外れた、ピカピカの大きな歯車。' },
       dumps: [['corridor', 0.25, 0.5], ['corridor', 0.75, 0.5]],
     },
     {
@@ -438,6 +459,8 @@
       doors: [['side', 'bench'], ['side', 'garage'], ['bench', 'garage'], ['bench', 'tools'], ['garage', 'tires'], ['tools', 'tires'], ['tires', 'back'], ['garage', 'back']],
       start: 'side',
       treasure: { room: 'back', name: '除菌博士の研究ノート', desc: 'カビと戦い続けた博士の研究ノート。持ち主が探している。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: 'レトロなラジオ', desc: 'ガラクタの山から出てきた、まだ音が鳴る古いラジオ。' },
       dumps: [['garage', 0.3, 0.3], ['garage', 0.5, 0.85]],
     },
     {
@@ -453,6 +476,8 @@
       doors: [['lobby', 'cloak'], ['lobby', 'pantry'], ['lobby', 'hall'], ['cloak', 'hall'], ['hall', 'stage'], ['hall', 'green'], ['green', 'stage'], ['green', 'pantry']],
       start: 'lobby',
       treasure: { room: 'stage', name: '銀の燭台', desc: '舞台の上に残されていた、幽霊のお気に入りの燭台。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: '幽霊の招待状', desc: '宴に招かれた幽霊たちの名前が並ぶ、古い招待状。' },
       dumps: [['hall', 0.3, 0.85], ['lobby', 0.5, 0.5]],
     },
     {
@@ -467,6 +492,8 @@
       doors: [['hall', 'shoko'], ['hall', 'bedroom'], ['shoko', 'bedroom'], ['bedroom', 'closet'], ['closet', 'master'], ['hall', 'master']],
       start: 'hall',
       treasure: { room: 'master', name: '屋敷の鍵', desc: '屋敷じゅうの扉を開けられる古い鍵。昔の管理人が持っていた。' },
+      // ハードの宝物 (見つかる部屋はノーマルと同じ)
+      treasureH: { name: '黄金のちりとり', desc: '屋敷の主が最後まで手放さなかった、純金のちりとり。' },
       dumps: [['hall', 0.3, 0.3], ['master', 0.5, 0.85]],
     },
   ];
@@ -532,7 +559,7 @@
   const EN_EVOS = {
     blackhole: ['Black Hole Vacuum', 'Places a suction vortex ahead that damages all trash inside it.'],
     steam: ['Superheated Steam Cannon', 'A thick, long steam beam that instantly polishes everything along its line.'],
-    army: ['Robot Cleaning Squad', 'Robots seek out dirt and trash on their own and patrol the room.'],
+    army: ['Robot Cleaning Squad', 'More, bigger robots spin around you faster, smashing trash and polishing a wider path.'],
     acid: ['Acid Rain Mist', 'Rains sanitizer all over the screen.'],
     giant: ['Giant Steamroller', 'A huge roller that polishes everything along your path and crushes trash.'],
     tornado: ['Tornado Mop', 'Keeps sweeping all around you at high speed.'],
@@ -562,6 +589,10 @@
     runta: ['Runta the Robo', 'All-Terrain Wheels', 'Not slowed by dirty floors', 'A cleaning robot built from the blueprints in the storeroom.'],
     koroko: ['Koroko the Roller', 'Good Picker', 'Pickup range +40%, dust box +40', 'A tidy-loving girl who inherited the legendary lint roller.'],
     kiyoshi: ['Dr. Kiyoshi', 'Strong Immunity', 'Immune to allergies, +50% damage to mold', 'A doctor devoted to mold research. He was looking for his lost notebook.'],
+    tsugumi: ['Tsugumi the Trainee', 'Still Learning', 'Damage −20%, XP +10%', 'A trainee who just arrived at the mansion. Nobody beats her with a magic sponge, though.'],
+    hayate: ['Hayate the Gale', 'Gale Duster', 'Attack interval −10%', 'A fast cleaner who throws dusters like the wind. Not great at taking hits.'],
+    reika: ['Lady Reika', 'Sheltered Princess', 'Low HP, slow and damage −15%, but coins +30%', 'A young lady raised in a mansion. She can\'t take a step without her air purifier.'],
+    gou: ['Gou the Boss', 'Boss\'s Grit', 'Damage +15%, damage taken −2', 'A tough boss who has cleaned the whole town with just a mop. Nobody in the mansion is sturdier.'],
     tome: ['Grandma Tome', 'Wisdom of Age', 'Starts with 2 gears, XP +25%', 'The mansion\'s former caretaker. Slow on her feet, but nobody beats her wisdom and experience.'],
   };
   const EN_BONUS = {
@@ -641,8 +672,22 @@
   };
   const stageOf = (i) => (i === TUT ? TUTORIAL : STAGES[i]);
 
+  // ハードの宝物の英語 [名前, 説明] (ステージ順)
+  const EN_HARD_TREASURES = [
+    ['Lucky Cat Figurine', 'A golden beckoning cat buried on top of the shoe cabinet in the entrance.'],
+    ['Silver Ladle', 'The heavy silver ladle the mansion\'s cook loved to use.'],
+    ['Lucky Die', 'A die from the bottom of the bathtub, said to let you reroll your fate.'],
+    ['Clockwork Doll', 'An old doll that sweeps the floor with a tiny broom when you wind it up.'],
+    ['Golden Watering Can', 'A shining golden watering can buried in the flower bed.'],
+    ['Phoenix Feather Duster', 'A feather duster hidden deep in the attic, said to rise again and again.'],
+    ['Brass Gear', 'A big, gleaming gear that came loose from the heart of the boiler.'],
+    ['Retro Radio', 'An old radio dug out of the junk pile. It still plays.'],
+    ['Ghostly Invitation', 'An old invitation listing the names of the ghosts invited to the feast.'],
+    ['Golden Dustpan', 'A pure-gold dustpan the Lord of the house never let go of.'],
+  ];
+
   // 日本語以外の名前と説明を、それぞれのデータの .en・.zh・.ko に入れる
-  //   P: { enemies, weapons, evos, passives, chars, bonus, shop, modes, stages, tutorial } (形は EN_* と同じ)
+  //   P: { enemies, weapons, evos, passives, chars, bonus, shop, modes, stages, hardTreasures, tutorial } (形は EN_* と同じ)
   const BONUS_TEXT = { ja: ROOM_BONUS };
   function addLang(code, P) {
     for (const k in P.enemies) ENEMIES[k][code] = { name: P.enemies[k][0], desc: P.enemies[k][1] };
@@ -660,6 +705,7 @@
       st[code] = { name, desc };
       for (const r of st.rooms) r[code] = { name: rooms[r.id] };
       st.treasure[code] = { name: tName, desc: tDesc };
+      if (P.hardTreasures) st.treasureH[code] = { name: P.hardTreasures[i][0], desc: P.hardTreasures[i][1] };
     });
     const [tutName, tutDesc, tutRooms] = P.tutorial;
     TUTORIAL[code] = { name: tutName, desc: tutDesc };
@@ -670,6 +716,7 @@
     enemies: EN_ENEMIES, weapons: EN_WEAPONS, evos: EN_EVOS, passives: EN_PASSIVES, chars: EN_CHARS, bonus: EN_BONUS, shop: EN_SHOP,
     modes: { normal: 'Normal', hard: 'Hard' },
     stages: EN_STAGES,
+    hardTreasures: EN_HARD_TREASURES,
     tutorial: ['Tutorial', 'A tiny three-room house for learning how to play.', { genkan: 'Entrance', living: 'Living Room', washitsu: 'Tatami Room' }],
   });
   for (const code of PACK_CODES) addLang(code, I18N[code]);
@@ -740,7 +787,7 @@
       tutDump: '拾ったダストは左下の<b>ゴミ箱</b> (ダストボックス) にたまる。<b>満タンになると攻撃力が半分・ダストが拾えない・足が重くなる</b>。どの部屋にもある<b>緑のゴミ捨て場</b>に立って空にしよう',
       tutDanger: '★が多い部屋ほど汚れがキツく、ゴミも強い。<b>★の少ない部屋から</b>片付けよう。本番は<b>10分以内に全部屋</b>をピカピカにすればクリア。残りの部屋も片付けよう!',
       achievements: '実績',
-      achClears: '清掃員ごとのクリア状況 (おまけ)',
+      achClears: '清掃員ごとのクリア状況',
       settings: '設定',
       stageSelect: 'ステージを選ぶ',
       recordOf: (name) => `${name} の記録`,
@@ -759,6 +806,8 @@
       unlockText: (n, stage) => `ステージ${n}「${stage}」の宝物を見つけると仲間になる`,
       trait: (name, desc) => `個性「${name}」 ${desc}`,
       charStats: (hp, gears) => `体力 ${hp}・最初のギア: ${gears}`,
+      charPower: (s) => `強さ ${s}`,
+      charFav: (b, n) => `得意なビルド: ${b} (得意なギアの攻撃力 +${n}%)`,
       sep: '・',
       stageTitle: (n, name) => `ステージ${n} ${name}`,
       planAlt: '間取り図',
@@ -773,7 +822,7 @@
       pickCleaner: '出撃する清掃員',
       deploy: (mode) => `${mode}で出撃!`,
       back: '戻る',
-      charsSub: '達成率には入らない、やりこみ用の記録。清掃員を選ぶと、ステージ・モードごとのクリア状況が見られる',
+      charsSub: '清掃員ごとの、各ステージ・各モードのクリアも達成率に入る。清掃員を選ぶと、ステージ・モードごとのクリア状況が見られる',
       treasures: (a, b) => `宝物 (${a}/${b})`,
       roomsCell: (r, n) => `${r}/${n}部屋`,
       clears: (a, b) => `クリア ${a}/${b}`,
@@ -852,7 +901,7 @@
       shake: '画面の揺れ・フラッシュ',
       haze: '汚れの靄',
       reviveTitle: 'もう一度がんばる?',
-      reviveText: '体力が全回復して、その場で復活できる。復活できるのは1回のプレイで1回だけ。',
+      reviveText: '体力が全回復して、その場で復活できる。',
       reviveBtn: '復活する',
       giveUp: 'あきらめる',
       revived: '復活! もうひとふんばり!',
@@ -862,6 +911,18 @@
       withAd: (s) => `📺 広告を見て${s}`,
       adLoading: '広告を準備中…',
       adFailed: '広告を読み込めなかった。少し待ってからもう一度試してね',
+      howToPlay: '遊び方',
+      perkReroll: 'リロール',
+      perkRerollDesc: '毎回のプレイで、レベルアップの選び直しが1回できる',
+      perkRevive: '復活',
+      perkReviveDesc: '毎回のプレイで1回、力尽きても体力が全回復して立ち上がれる',
+      perkHow: (n, mode) => `ステージ${n}・${mode}の宝物を見つけると開放`,
+      perkOn: '開放済み (宝物で開放)',
+      perkGot: (name) => `恒久スキル「${name}」を開放した!`,
+      perkTeaser: (name) => `見つけると恒久スキル「${name}」を開放`,
+      treasureClue: (stage, mode) => `ヒント: ${stage}の${mode}で、いちばん汚れた部屋の奥に眠っている`,
+      treasurePerks: '宝物で開放する恒久スキル',
+      reviveFree: '宝物の力で復活する',
     },
     en: {
       pageTitle: 'Cleaning Survivors',
@@ -921,7 +982,7 @@
       tutDump: 'Dust you pick up fills the <b>trash can</b> (dust box) at the bottom left. When it\'s <b>full, your damage is halved, you can\'t pick up dust and you move slower</b>. Stand on the <b>green trash dump</b> found in every room to empty it',
       tutDanger: 'Rooms with more ★ are filthier with tougher trash, so <b>start with fewer ★</b>. In real stages you win by cleaning <b>every room within 10 minutes</b>. Clean up the remaining rooms!',
       achievements: 'Achievements',
-      achClears: 'Clears by cleaner (bonus)',
+      achClears: 'Clears by cleaner',
       settings: 'Settings',
       stageSelect: 'Select a Stage',
       recordOf: (name) => `${name}'s records`,
@@ -940,6 +1001,8 @@
       unlockText: (n, stage) => `Joins when you find the treasure of Stage ${n}, "${stage}"`,
       trait: (name, desc) => `Trait "${name}": ${desc}`,
       charStats: (hp, gears) => `HP ${hp} · Starting gear: ${gears}`,
+      charPower: (s) => `Strength ${s}`,
+      charFav: (b, n) => `Favorite build: ${b} (favorite gear damage +${n}%)`,
       sep: ', ',
       stageTitle: (n, name) => `Stage ${n}: ${name}`,
       planAlt: 'Floor plan',
@@ -954,7 +1017,7 @@
       pickCleaner: 'Choose your cleaner',
       deploy: (mode) => `Start (${mode})`,
       back: 'Back',
-      charsSub: 'Extra records for completionists; they don\'t count toward completion. Select a cleaner to see their clears for each stage and mode',
+      charsSub: 'Every cleaner\'s clears of each stage and mode count toward completion. Select a cleaner to see their clears for each stage and mode',
       treasures: (a, b) => `Treasures (${a}/${b})`,
       roomsCell: (r, n) => `${r}/${n} rooms`,
       clears: (a, b) => `Clears ${a}/${b}`,
@@ -1033,7 +1096,7 @@
       shake: 'Screen shake & flash',
       haze: 'Grime haze',
       reviveTitle: 'Give it another go?',
-      reviveText: 'Get back up right where you fell with full HP. You can revive only once per run.',
+      reviveText: 'Get back up right where you fell with full HP.',
       reviveBtn: 'Revive',
       giveUp: 'Give up',
       revived: 'Revived! Keep going!',
@@ -1043,6 +1106,18 @@
       withAd: (s) => `📺 Watch an ad: ${s}`,
       adLoading: 'Loading ad…',
       adFailed: 'Couldn\'t load an ad. Wait a moment and try again',
+      howToPlay: 'How to Play',
+      perkReroll: 'Reroll',
+      perkRerollDesc: 'One level-up reroll in every run',
+      perkRevive: 'Revive',
+      perkReviveDesc: 'Once per run, get back up with full HP when you\'re worn out',
+      perkHow: (n, mode) => `Unlocked by finding the treasure of Stage ${n} (${mode})`,
+      perkOn: 'Unlocked (by a treasure)',
+      perkGot: (name) => `Unlocked the permanent skill "${name}"!`,
+      perkTeaser: (name) => `Unlocks the permanent skill "${name}" when found`,
+      treasureClue: (stage, mode) => `Hint: in ${stage} (${mode}), it sleeps deep in the filthiest room`,
+      treasurePerks: 'Permanent skills unlocked by treasures',
+      reviveFree: 'Revive with the treasure\'s power',
     },
   };
 
@@ -1076,7 +1151,8 @@
     coins: 0,
     shop: Object.fromEntries(SHOP.map((it) => [it.id, 0])),
     rec: {},
-    treasures: STAGES.map(() => false),
+    treasures: STAGES.map(() => false), // ノーマルの宝物
+    treasuresH: STAGES.map(() => false), // ハードの宝物
     kills: {},
     settings: { se: 70, bgm: 50, shake: true, haze: true },
     char: 'cleaner',
@@ -1105,6 +1181,7 @@
       if (d.v === 2) {
         if (d.rec && typeof d.rec === 'object') s.rec = d.rec;
         if (Array.isArray(d.treasures)) d.treasures.forEach((v, i) => { if (i < s.treasures.length) s.treasures[i] = !!v; });
+        if (Array.isArray(d.treasuresH)) d.treasuresH.forEach((v, i) => { if (i < s.treasuresH.length) s.treasuresH[i] = !!v; });
       } else if (Array.isArray(d.cleared)) {
         // 5ステージだったころの記録は、清掃員ハジメのノーマルの記録として引き継ぐ (旧ステージ5 は今のステージ10)
         const map = [0, 1, 2, 3, 9];
@@ -1138,16 +1215,38 @@
   const stageUnlocked = (i) => TEST_UNLOCK || i === 0 || stageCleared(i - 1, 'normal');
   const hardUnlocked = (i) => TEST_UNLOCK || stageCleared(i, 'normal');
   const charUnlocked = (c) => TEST_UNLOCK || c.unlock < 0 || save.treasures[c.unlock];
+  // 宝物はステージごと・モードごとに 1 つ (ハードの宝物はノーマルと同じ部屋で見つかる)
+  const treasureOf = (i, mode) => (mode === 'hard' ? STAGES[i].treasureH : STAGES[i].treasure);
+  const treasureList = (mode) => (mode === 'hard' ? save.treasuresH : save.treasures);
+  const hasTreasure = (i, mode) => !!treasureList(mode)[i];
+  const treasureCount = () => save.treasures.filter(Boolean).length + save.treasuresH.filter(Boolean).length;
+  // 宝物で開放する恒久スキル (リロール・復活。どちらも 1 段階だけ)
+  const PERKS = ['reroll', 'revive'];
+  const perkSource = (id) => {
+    for (let i = 0; i < STAGES.length; i++) if (STAGES[i].treasureH.perk === id) return { i, mode: 'hard' };
+    return null;
+  };
+  const hasPerk = (id) => {
+    const src = perkSource(id);
+    return !!src && hasTreasure(src.i, src.mode);
+  };
+  const perkName = (id) => t(id === 'reroll' ? 'perkReroll' : 'perkRevive');
+  const perkDesc = (id) => t(id === 'reroll' ? 'perkRerollDesc' : 'perkReviveDesc');
 
   // 達成率 = (各ステージ・各モードのクリア + 宝物) ÷ その総数。クリアはどの清掃員でもよい
   // (清掃員ごとのクリア状況は、実績画面のおまけとして見せるだけで達成率には入れない)
   function completion() {
+    // 実績 (達成率) = 清掃員ごとの、各ステージ・各モードのクリア (10人 × 10ステージ × 2モード = 200点)
+    //   + 宝物 (20個 × 5点 = 100点)。合計 300点
     let clears = 0;
-    for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (stageCleared(i, m)) clears++;
-    const tre = save.treasures.filter(Boolean).length;
-    const clearTotal = STAGES.length * Object.keys(MODES).length;
-    return { pct: ((clears + tre) / (clearTotal + STAGES.length)) * 100, clears, clearTotal, tre, treTotal: STAGES.length };
+    for (const c of CHARS) for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (peekRec(c.id, i, m).c) clears++;
+    const clearTotal = CHARS.length * STAGES.length * Object.keys(MODES).length;
+    const tre = treasureCount();
+    const treTotal = STAGES.length * Object.keys(MODES).length;
+    return { pct: ((clears + tre * TREASURE_PTS) / (clearTotal + treTotal * TREASURE_PTS)) * 100, clears, clearTotal, tre, treTotal };
   }
+  const TREASURE_PTS = 5;
+
 
   function persist() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* 保存できなくても遊べる */ }
@@ -1892,6 +1991,53 @@
           c.fillStyle = '#666';
           c.fillRect(15, -3, 5, 3);
           break;
+        case 'mop':
+          c.strokeStyle = '#9aa3ad';
+          c.lineWidth = 3;
+          c.beginPath();
+          c.moveTo(0, 4);
+          c.lineTo(18, 2);
+          c.stroke();
+          c.fillStyle = '#e8eef3';
+          for (let k = -6; k <= 8; k += 3.5) {
+            c.beginPath();
+            c.ellipse(21, k, 4, 2, 0.3, 0, TAU);
+            c.fill();
+          }
+          break;
+        case 'duster':
+          c.strokeStyle = '#8a5a2a';
+          c.lineWidth = 2.5;
+          c.beginPath();
+          c.moveTo(2, 3);
+          c.lineTo(15, 2);
+          c.stroke();
+          c.fillStyle = '#f2c230';
+          c.beginPath();
+          c.ellipse(20, 1, 7, 5, 0, 0, TAU);
+          c.fill();
+          c.fillStyle = '#e86aa0';
+          c.beginPath();
+          c.ellipse(22, 2, 4, 3, 0, 0, TAU);
+          c.fill();
+          break;
+        case 'sponge':
+          c.fillStyle = '#f4f7fb';
+          c.beginPath();
+          c.roundRect(8, -4, 11, 8, 2);
+          c.fill();
+          c.fillStyle = '#7fc8ff';
+          c.fillRect(8, 2, 11, 2);
+          break;
+        case 'purifier':
+          c.fillStyle = '#eef2f5';
+          c.beginPath();
+          c.roundRect(6, -6, 11, 13, 3);
+          c.fill();
+          c.fillStyle = '#7fe8c7';
+          c.fillRect(8, -3, 7, 2);
+          c.fillRect(8, 1, 7, 2);
+          break;
         case 'broom':
           c.strokeStyle = '#8a5a2a';
           c.lineWidth = 3;
@@ -1930,6 +2076,12 @@
       c.fillStyle = W('#c9d3dc');
       c.fillRect(-1, -4, 2, 15);
     }
+    if (look.apron) {
+      c.fillStyle = W('#f4f1e6');
+      c.beginPath();
+      c.roundRect(-6, 0, 12, 10, 3);
+      c.fill();
+    }
     // 顔
     c.fillStyle = W('#f2c79e');
     c.beginPath();
@@ -1950,6 +2102,32 @@
     if (look.bun) {
       c.beginPath();
       c.arc(0, -17, 4, 0, TAU);
+      c.fill();
+    }
+    if (look.spiky) {
+      c.beginPath();
+      for (let k = -2; k <= 2; k++) {
+        c.moveTo(k * 3.4 - 2.4, -14);
+        c.lineTo(k * 3.4, -21 + Math.abs(k));
+        c.lineTo(k * 3.4 + 2.4, -14);
+      }
+      c.fill();
+    }
+    if (look.band) {
+      c.fillStyle = W(look.band);
+      c.fillRect(-8, -13, 16, 2.6);
+    }
+    if (look.ribbon) {
+      c.fillStyle = W(look.ribbon);
+      c.beginPath();
+      c.moveTo(4, -16);
+      c.lineTo(10, -20);
+      c.lineTo(10, -12);
+      c.closePath();
+      c.moveTo(4, -16);
+      c.lineTo(-2, -20);
+      c.lineTo(-2, -12);
+      c.closePath();
       c.fill();
     }
     // 目
@@ -1986,6 +2164,10 @@
     koroko: { body: '#e86aa0', hair: '#7a3b1e', pigtails: true, tool: 'roller' },
     kiyoshi: { body: '#eef2f5', hair: '#5a5f66', coat: true, mask: true, glasses: true, tool: 'spray' },
     tome: { body: '#7a4a9a', hair: '#d9d9d9', bun: true, tool: 'broom' },
+    tsugumi: { body: '#8fbf5a', hair: '#c47a3a', apron: true, tool: 'sponge' },
+    hayate: { body: '#3b7dd8', hair: '#1f2a44', band: '#f2f2f2', tool: 'duster' },
+    reika: { body: '#f2a6c8', hair: '#f2d16b', ribbon: '#e0457b', tool: 'purifier' },
+    gou: { body: '#2b2b33', hair: '#1a1a1a', band: '#e03a3a', spiky: true, tool: 'mop' },
   };
 
   // アイコン (64×64 を基準に描く)
@@ -2516,6 +2698,105 @@
   }
   const iconURL = (id) => iconCanvas(id).toDataURL();
 
+  // ステージのアイコン (64×64)。ステージ選択で、どんな場所かがひと目でわかるように
+  const stageIconCache = {};
+  function stageIconURL(i) {
+    if (stageIconCache[i]) return stageIconCache[i];
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const c = cv.getContext('2d');
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    // 下地: ステージの汚れの色を明るくした角丸の四角
+    const [r, g, b] = STAGES[i].dirt;
+    const grad = c.createLinearGradient(0, 0, 0, 64);
+    grad.addColorStop(0, `rgb(${Math.min(255, r + 90)},${Math.min(255, g + 90)},${Math.min(255, b + 90)})`);
+    grad.addColorStop(1, `rgb(${r + 20},${g + 20},${b + 20})`);
+    c.fillStyle = grad;
+    c.beginPath();
+    c.roundRect(2, 2, 60, 60, 14);
+    c.fill();
+    const fill = (col, f) => { c.fillStyle = col; c.beginPath(); f(); c.fill(); };
+    const line = (col, w, f) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); f(); c.stroke(); };
+    switch (i) {
+      case 0: // ゴミ屋敷の1階: 家と、玄関のゴミ袋
+        fill('#c0392b', () => { c.moveTo(10, 30); c.lineTo(32, 12); c.lineTo(54, 30); c.closePath(); });
+        fill('#f4ead5', () => c.rect(16, 29, 32, 22));
+        fill('#7a4a2a', () => c.rect(28, 37, 9, 14));
+        fill('#7fc8ff', () => c.rect(19, 33, 7, 6));
+        fill('#3d3d45', () => { c.arc(46, 49, 7, 0, TAU); });
+        line('#3d3d45', 2, () => { c.moveTo(46, 42); c.lineTo(44, 38); c.moveTo(46, 42); c.lineTo(49, 38); });
+        break;
+      case 1: // 呪われた台所: フライパンと湯気
+        fill('#2c2f36', () => c.ellipse(28, 40, 16, 9, 0, 0, TAU));
+        fill('#5a5f69', () => c.ellipse(28, 38, 13, 6.5, 0, 0, TAU));
+        line('#7a4a2a', 5, () => { c.moveTo(42, 38); c.lineTo(56, 32); });
+        fill('#f6d24a', () => c.ellipse(26, 37, 6, 3.5, 0, 0, TAU));
+        line('rgba(255,255,255,0.85)', 2.5, () => { c.moveTo(20, 26); c.quadraticCurveTo(16, 20, 21, 15); c.moveTo(30, 25); c.quadraticCurveTo(26, 18, 31, 12); });
+        break;
+      case 2: // カビだらけの水まわり: 浴槽と泡
+        fill('#f4f7fb', () => c.roundRect(10, 30, 44, 18, 8));
+        fill('#7fc8ff', () => c.rect(12, 30, 40, 5));
+        fill('#c9d3dc', () => { c.rect(16, 47, 4, 6); c.rect(44, 47, 4, 6); });
+        for (const [x, y, rr] of [[20, 24, 5], [30, 19, 6], [41, 23, 5], [36, 12, 3.5]]) {
+          fill('rgba(255,255,255,0.9)', () => c.arc(x, y, rr, 0, TAU));
+          line('#7fc8ff', 1.2, () => c.arc(x, y, rr, 0, TAU));
+        }
+        fill('#4f8a3a', () => { c.arc(14, 51, 3, 0, TAU); c.arc(50, 53, 2.5, 0, TAU); });
+        break;
+      case 3: // 開かずの物置と2階: 積み上がった段ボール
+        for (const [x, y, w, h] of [[10, 34, 24, 18], [32, 38, 22, 14], [18, 16, 22, 18]]) {
+          fill('#c99a5b', () => c.rect(x, y, w, h));
+          fill('#a87a40', () => c.rect(x, y, w, 4));
+          line('#e8d0a0', 2, () => { c.moveTo(x + w / 2, y); c.lineTo(x + w / 2, y + h); });
+        }
+        break;
+      case 4: // 荒れ果てた庭: 木と生け垣
+        fill('#6b4a2a', () => c.rect(29, 30, 6, 18));
+        fill('#3f8f45', () => { c.arc(32, 24, 13, 0, TAU); c.arc(22, 30, 8, 0, TAU); c.arc(42, 30, 8, 0, TAU); });
+        fill('#2f6f35', () => c.roundRect(6, 44, 52, 10, 5));
+        fill('#ff8ad8', () => { c.arc(16, 44, 3, 0, TAU); c.arc(48, 45, 3, 0, TAU); });
+        break;
+      case 5: // ほこりの屋根裏: 三角屋根の窓とほこり
+        fill('#7a5a3a', () => { c.moveTo(8, 50); c.lineTo(32, 12); c.lineTo(56, 50); c.closePath(); });
+        fill('#3a2a1e', () => { c.moveTo(16, 48); c.lineTo(32, 22); c.lineTo(48, 48); c.closePath(); });
+        fill('#ffe9a0', () => c.arc(32, 36, 7, 0, TAU));
+        line('#7a5a3a', 2, () => { c.moveTo(25, 36); c.lineTo(39, 36); c.moveTo(32, 29); c.lineTo(32, 43); });
+        fill('rgba(220,210,190,0.9)', () => { c.arc(14, 18, 4, 0, TAU); c.arc(50, 20, 3, 0, TAU); c.arc(46, 12, 2, 0, TAU); });
+        break;
+      case 6: // 地下のボイラー室: ボイラーと炎
+        fill('#8a8f99', () => c.roundRect(14, 12, 30, 40, 8));
+        fill('#5a5f69', () => c.rect(14, 22, 30, 3));
+        fill('#2c2f36', () => c.roundRect(20, 34, 18, 12, 3));
+        fill('#ff8a3a', () => { c.moveTo(29, 45); c.quadraticCurveTo(22, 40, 29, 33); c.quadraticCurveTo(36, 40, 29, 45); });
+        line('#c9d3dc', 4, () => { c.moveTo(44, 18); c.lineTo(54, 18); c.lineTo(54, 8); });
+        break;
+      case 7: // ガラクタの車庫: タイヤと空き缶
+        fill('#2c2f36', () => c.arc(26, 34, 17, 0, TAU));
+        fill('#8a8f99', () => c.arc(26, 34, 8, 0, TAU));
+        line('#4a4f59', 2, () => c.arc(26, 34, 13, 0, TAU));
+        fill('#d94a3a', () => c.roundRect(44, 32, 11, 18, 3));
+        fill('#c9d3dc', () => c.rect(44, 32, 11, 3));
+        break;
+      case 8: // 幽霊の大宴会場: おばけとろうそく
+        fill('rgba(255,255,255,0.95)', () => {
+          c.moveTo(14, 50); c.lineTo(14, 28); c.arc(28, 28, 14, Math.PI, 0); c.lineTo(42, 50);
+          c.lineTo(37, 45); c.lineTo(32, 50); c.lineTo(28, 45); c.lineTo(23, 50); c.lineTo(19, 45); c.closePath();
+        });
+        fill('#2c2f36', () => { c.arc(23, 28, 2.4, 0, TAU); c.arc(33, 28, 2.4, 0, TAU); });
+        fill('#f4ead5', () => c.rect(48, 30, 6, 20));
+        fill('#ffcf4a', () => c.ellipse(51, 26, 3, 5, 0, 0, TAU));
+        break;
+      default: // 屋敷の主の間: 王冠
+        fill('#ffcf4a', () => { c.moveTo(12, 46); c.lineTo(12, 22); c.lineTo(22, 32); c.lineTo(32, 16); c.lineTo(42, 32); c.lineTo(52, 22); c.lineTo(52, 46); c.closePath(); });
+        fill('#d9a520', () => c.rect(12, 42, 40, 6));
+        fill('#ff5a6a', () => c.arc(32, 36, 4, 0, TAU));
+        fill('#7fc8ff', () => { c.arc(20, 38, 3, 0, TAU); c.arc(44, 38, 3, 0, TAU); });
+    }
+    stageIconCache[i] = cv.toDataURL();
+    return stageIconCache[i];
+  }
+
   const thumbCache = {};
   function enemyThumb(type, sil) {
     const key = type + (sil ? '-s' : '');
@@ -2687,7 +2968,10 @@
     view.ww = view.w / view.zoom;
     view.wh = view.h / view.zoom;
   }
-  new ResizeObserver(resize).observe(wrap);
+  new ResizeObserver(() => {
+    resize();
+    if (screen === 'levelup') fitPanel(); // 画面の大きさが変わったら、レベルアップの画面も収め直す
+  }).observe(wrap);
   resize();
 
   const keys = new Set();
@@ -2810,7 +3094,9 @@
       xp: 0,
       xpNext: xpFor(1),
       pendingLv: 0,
-      rerolls: 0, // レベルアップの選び直し。広告を見ると 2 回ぶん増える
+      rerolls: 0, // レベルアップの選び直し (宝物の恒久スキル「リロール」で 1 回。広告を見ると 2 回ぶん増える)
+      freeRevive: false, // 宝物の恒久スキル「復活」で、まだ使える復活
+      adRevived: false, // 広告で復活したか (1 回のプレイで 1 回だけ)
       box: 0,
       dumpCoins: 0,
       bossCoins: 0,
@@ -3379,14 +3665,14 @@
     s.speed = 118 * G.ch.speed * (1 + sh.speed * 0.04 + bn.speed + lv('wax') * 0.06);
     s.projSpeed = 1 + lv('wax') * 0.1;
     s.might = (1 + sh.might * 0.08 + lv('boiler') * 0.1 + bn.might + (cm.might || 0)) * BAL.might;
-    s.cd = 1 - lv('battery') * 0.08 - bn.cd;
+    s.cd = 1 - lv('battery') * 0.08 - bn.cd - (cm.cd || 0);
     s.area = 1 + lv('bleach') * 0.1 + bn.area;
     s.dur = 1 + lv('tape') * 0.1;
     s.amount = lv('roomba');
     s.magnet = 48 * (1 + sh.magnet * 0.1 + lv('dustpack') * 0.2 + bn.magnet + (cm.magnet || 0));
     s.boxCap = 150 + sh.box * 20 + lv('dustpack') * 40 + lv('hydraulic') * 15 + bn.box + (cm.box || 0);
     s.knock = 1 + lv('hydraulic') * 0.25;
-    s.armor = lv('gloves') + bn.armor + sh.armor;
+    s.armor = lv('gloves') + bn.armor + sh.armor + (cm.armor || 0);
     s.regen = bn.regen + sh.regen * 0.2 + lv('filter') * 0.25;
     s.scrub = 30 * (1 + sh.clean * 0.12 + (cm.scrub || 0));
     s.cleanArea = 1 + sh.clean * 0.06;
@@ -3407,6 +3693,7 @@
     const st = G.stats;
     s.power = d.power;
     s.dmg *= st.might;
+    if (G.ch.weapons.includes(w.id)) s.dmg *= G.ch.fav || FAV_MUL; // 得意なギア
     if (s.cd) s.cd *= st.cd;
     if (w.id !== 'roller' && s.count != null) s.count += st.amount;
     switch (w.id) {
@@ -3437,8 +3724,10 @@
         s.size *= Math.sqrt(st.area);
         if (w.evo) {
           s.count += 2;
-          s.dmg *= 1.4;
-          s.size += 4;
+          s.dmg *= 1.6;
+          s.size += 6;
+          s.radius += 18;
+          s.spin *= 1.3;
           s.power = 2;
         }
         break;
@@ -4236,50 +4525,10 @@
     const dmg = s.dmg * dmgMul();
     for (let i = 0; i < n; i++) {
       const b = w.bots[i];
-      if (!w.evo) {
-        const a = w.ang + (i / n) * TAU;
-        b.x = p.x + Math.cos(a) * s.radius;
-        b.y = p.y + Math.sin(a) * s.radius;
-      } else {
-        // 自分で汚れとゴミを探して巡回する
-        b.retarget -= dt;
-        if (b.retarget <= 0 || Math.hypot(b.tx - b.x, b.ty - b.y) < 10) {
-          b.retarget = rand(0.8, 1.6);
-          const m = query(p.x, p.y, 260);
-          if (m && Math.random() < 0.7) {
-            const e = qbuf[(Math.random() * m) | 0];
-            b.tx = e.x;
-            b.ty = e.y;
-          } else {
-            let bx = p.x;
-            let by = p.y;
-            let bd = -1;
-            for (let k = 0; k < 6; k++) {
-              const x = clamp(p.x + rand(-280, 280), 10, ROOM - 10);
-              const y = clamp(p.y + rand(-280, 280), 10, ROOM - 10);
-              const dv = dirtAt(x, y);
-              if (dv > bd) {
-                bd = dv;
-                bx = x;
-                by = y;
-              }
-            }
-            b.tx = bx;
-            b.ty = by;
-          }
-        }
-        if (Math.hypot(b.x - p.x, b.y - p.y) > 340) {
-          b.tx = p.x;
-          b.ty = p.y;
-        }
-        const dx = b.tx - b.x;
-        const dy = b.ty - b.y;
-        const d = Math.hypot(dx, dy) || 1;
-        const sp = Math.min(d, 190 * dt);
-        b.x += (dx / d) * sp;
-        b.y += (dy / d) * sp;
-        pushOut(b, s.size);
-      }
+      // 進化しても、主人公のまわりを回る動きは同じ (数・大きさ・攻撃力・回る速さが上がる)
+      const a = w.ang + (i / n) * TAU;
+      b.x = p.x + Math.cos(a) * s.radius;
+      b.y = p.y + Math.sin(a) * s.radius;
       // 壁の向こう (や壁の中) を回っているロボは、攻撃も掃除もしない
       if (!canReach(p.x, p.y, b.x, b.y)) continue;
       const m = query(b.x, b.y, s.size + 70);
@@ -4290,7 +4539,7 @@
         const dy = e.y - b.y;
         const d = Math.hypot(dx, dy) || 1;
         if (d > s.size + e.r || !canReach(b.x, b.y, e.x, e.y)) continue;
-        e.robotHit = G.time + 0.45;
+        e.robotHit = G.time + (w.evo ? 0.3 : 0.45);
         hurtEnemy(e, dmg, (dx / d) * 90, (dy / d) * 90);
       }
       if (cleanNow) cleanCircle(b.x, b.y, s.size + (w.evo ? 14 : 8), s.power);
@@ -5210,8 +5459,9 @@
     } else if (G.state === 'win' && G.endT > 2.6) {
       showResult(true);
     } else if (G.state === 'dead' && G.endT > 1.6) {
-      // 力尽きたら、1回のプレイで1回だけ復活をすすめる (時間切れは復活できない。広告が使えない場所では出さない)
-      if (!G.timeUp && !G.reviveOffered && Ads.live()) showRevive();
+      // 力尽きたら復活をすすめる (時間切れは復活できない)。宝物の「復活」があればそれを、なければ広告での復活を
+      // (広告は 1 回のプレイで 1 回だけ。広告が使えない場所では出さない)
+      if (!G.timeUp && !G.reviveAsked && (G.freeRevive || (Ads.live() && !G.adRevived))) showRevive();
       else showResult(false);
     }
   }
@@ -6480,6 +6730,7 @@
           <button type="button" class="btn${save.tutorialDone ? '' : ' tut-btn'}" data-act="start" data-arg="${TUT}">${t('tutorial')}</button>
           ${shopBtn('title')}
           <button type="button" class="btn trophy" data-act="chars" data-arg="title"><span aria-hidden="true">🏆</span> ${t('achievements')}</button>
+          <button type="button" class="btn" data-act="help" data-arg="title"><span aria-hidden="true">📖</span> ${t('howToPlay')}</button>
           <button type="button" class="btn" data-act="settings" data-arg="title">${t('settings')}</button>
         </div>
       </div>`);
@@ -6511,9 +6762,10 @@
       else if (hard && !hardUnlocked(i)) meta = t('lockedHard');
       else if (rec.r) meta = t('bestRooms', rec.r, r.rooms.length) + (rec.t ? `${t('sep')}${t('bestClear', fmtTime(rec.t))}` : '');
       else meta = `${t('roomCount', r.rooms.length)}${t('sep')}${L(r, 'desc')}`;
-      const badges = stageUnlocked(i) ? `<span class="badges"><span class="badge n${nOk ? ' on' : ''}">N</span><span class="badge h${hOk ? ' on' : ''}">H</span><span class="badge t${save.treasures[i] ? ' on' : ''}" title="${t('treasure')}">${t('badgeTreasure')}</span></span>` : '';
+      const badges = stageUnlocked(i) ? `<span class="badges"><span class="badge n${nOk ? ' on' : ''}">N</span><span class="badge h${hOk ? ' on' : ''}">H</span><span class="badge t${hasTreasure(i, save.mode) ? ' on' : ''}" title="${t('treasure')}">${t('badgeTreasure')}</span></span>` : '';
       return `<button type="button" class="room${rec.c ? ' cleared' : ''}" data-act="brief" data-arg="${i}" ${ok ? '' : 'disabled'}>
         <span class="room-no">${stageUnlocked(i) ? i + 1 : '🔒'}</span>
+        <img class="room-icon${stageUnlocked(i) ? '' : ' locked'}" src="${stageIconURL(i)}" alt="">
         <span class="room-body"><span class="room-name">${stageUnlocked(i) ? esc(L(r, 'name')) : '？？？'}</span>${badges}<br><span class="room-meta">${esc(meta)}</span></span>
       </button>`;
     }).join('');
@@ -6557,12 +6809,21 @@
   const unlockText = (c) => t('unlockText', c.unlock + 1, L(STAGES[c.unlock], 'name'));
   const traitText = (c) => t('trait', L(c, 'trait'), L(c, 'traitDesc'));
 
+  // 得意なビルド: 最初のギア + 進化に使うパッシブ → 進化後
+  const favBuild = (c) => c.weapons.map((w) => `${L(WEAPONS[w], 'name')} + ${L(PASSIVES[WEAPONS[w].passive], 'name')} → ${L(EVOS[WEAPONS[w].evo], 'name')}`).join(' / ');
+  const charClears = (c) => {
+    let n = 0;
+    for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (peekRec(c.id, i, m).c) n++;
+    return n;
+  };
+
   function charCard(c, act, on) {
     const ok = charUnlocked(c);
+    const power = `<span class="char-power p${c.power}" title="${esc(t('charPower', ''))}">${esc(t('charPower', '★'.repeat(c.power) + '☆'.repeat(5 - c.power)))}</span>`;
     return `<button type="button" class="char${on ? ' on' : ''}" data-act="${act}" data-arg="${c.id}" ${ok || act === 'charRec' ? '' : 'disabled'}>
       <img src="${charThumb(c.id, !ok)}" alt="">
-      <span class="char-name">${ok ? esc(L(c, 'name')) : '？？？'}</span><br>
-      ${ok ? `<span class="char-trait">${esc(traitText(c))}</span><br><span class="char-desc">${esc(L(c, 'desc'))} ${esc(t('charStats', c.hp, c.weapons.map((w) => L(WEAPONS[w], 'name')).join(t('sep'))))}</span>`
+      <span class="char-name">${ok ? esc(L(c, 'name')) : '？？？'}</span> ${power}${act === 'charRec' ? ` <span class="char-clears">${esc(t('clears', charClears(c), STAGES.length * Object.keys(MODES).length))}</span>` : ''}<br>
+      ${ok ? `<span class="char-trait">${esc(traitText(c))}</span><br><span class="char-fav">${esc(t('charFav', favBuild(c), Math.round(((c.fav || FAV_MUL) - 1) * 100)))}</span><br><span class="char-desc">${esc(L(c, 'desc'))} ${esc(t('charStats', c.hp, c.weapons.map((w) => L(WEAPONS[w], 'name')).join(t('sep'))))}</span>`
         : `<span class="char-desc">${esc(unlockText(c))}</span>`}
     </button>`;
   }
@@ -6578,8 +6839,9 @@
     const chars = CHARS.map((c) => charCard(c, 'char', c.id === ch.id)).join('');
     const roomList = [...r.rooms].sort((a, c) => a.danger - c.danger).map((rm) => `<li><b>${esc(L(rm, 'name'))}</b><span class="danger d${rm.danger}">${stars(rm.danger)}</span><span>${t('srcCount', rm.src.length)}</span><span class="bonus">${esc(bonusText(rm.bonus))}</span></li>`).join('');
     const tRoom = r.rooms.find((q) => q.id === r.treasure.room);
-    const found = save.treasures[briefRoom];
-    const unlocks = CHARS.find((c) => c.unlock === briefRoom);
+    const found = hasTreasure(briefRoom, save.mode);
+    const tr = treasureOf(briefRoom, save.mode);
+    const unlocks = save.mode === 'normal' ? CHARS.find((c) => c.unlock === briefRoom) : null;
     const modeName = L(MODES[save.mode], 'name');
     show('brief', `
       <div class="panel wide">
@@ -6595,7 +6857,7 @@
         </div>
         <div class="treasure-line${found ? ' found' : ''}">
           <img src="${iconURL('treasure')}" alt="">
-          <span>${found ? esc(t('treasureFoundLine', L(r.treasure, 'name'))) : esc(t('treasureHint', '★'.repeat(tRoom.danger), L(tRoom, 'name')))}${unlocks ? `<br><small>${found ? esc(t('joined', L(unlocks, 'name'))) : t('willJoin')}</small>` : ''}</span>
+          <span>${found ? esc(t('treasureFoundLine', L(tr, 'name'))) : esc(t('treasureHint', '★'.repeat(tRoom.danger), L(tRoom, 'name')))}${unlocks ? `<br><small>${found ? esc(t('joined', L(unlocks, 'name'))) : t('willJoin')}</small>` : ''}${tr.perk ? `<br><small>${esc(found ? t('perkGot', perkName(tr.perk)) : t('perkTeaser', perkName(tr.perk)))}</small>` : ''}</span>
         </div>
         <p class="brief-note">${esc(t('slotNote', MAX_GEARS, MAX_PASSIVES))}</p>
         <p class="brief-note">${esc(t('bossNote', L(ENEMIES.yokai, 'name'), L(ENEMIES[r.boss], 'name')))}</p>
@@ -6614,7 +6876,18 @@
     if (from) charsBack = from;
     rerender = () => showChars();
     const list = CHARS.map((c) => charCard(c, 'charRec', false)).join('');
-    const tre = STAGES.map((st, i) => `<li class="${save.treasures[i] ? 'found' : ''}"><img src="${iconURL('treasure')}" alt=""><span><b>${save.treasures[i] ? esc(L(st.treasure, 'name')) : '？？？'}</b><br><small>${esc(t('stageTitle', i + 1, stageUnlocked(i) ? L(st, 'name') : '？？？'))}${save.treasures[i] ? `${t('sep')}${esc(L(st.treasure, 'desc'))}` : ''}</small></span></li>`).join('');
+    // 宝物は 20 個 (10 ステージ × ノーマル・ハード)。まだのものは名前を伏せて、見つけ方のヒントを出す
+    const tre = STAGES.flatMap((st, i) => Object.keys(MODES).map((mode) => {
+      const tr = treasureOf(i, mode);
+      const got = hasTreasure(i, mode);
+      const stageName = t('stageTitle', i + 1, stageUnlocked(i) ? L(st, 'name') : '？？？');
+      const modeName = L(MODES[mode], 'name');
+      const joins = mode === 'normal' ? CHARS.find((c) => c.unlock === i) : null;
+      const extra = [];
+      if (tr.perk) extra.push(got ? t('perkGot', perkName(tr.perk)) : t('perkTeaser', perkName(tr.perk)));
+      if (joins) extra.push(got ? t('joined', L(joins, 'name')) : t('willJoin'));
+      return `<li class="${got ? 'found' : ''}${tr.perk ? ' perk' : ''}"><img src="${iconURL('treasure')}" alt=""><span><b>${got ? esc(L(tr, 'name')) : '？？？'}</b> <span class="mode-chip ${mode}">${esc(modeName)}</span><br>${got ? `<small>${esc(stageName)}</small><br><small>${esc(L(tr, 'desc'))}</small>` : `<small class="clue">${esc(t('treasureClue', stageName, modeName))}</small>`}${extra.map((x) => `<br><small class="tre-extra">${esc(x)}</small>`).join('')}</span></li>`;
+    })).join('');
     show('chars', `
       <div class="panel wide">
         ${panelHead(t('achievements'), charsBack, '', true)}
@@ -6622,7 +6895,7 @@
         <h3>${t('achClears')}</h3>
         <p class="sub left">${t('charsSub')}</p>
         <div class="chars">${list}</div>
-        <h3>${t('treasures', save.treasures.filter(Boolean).length, STAGES.length)}</h3>
+        <h3>${t('treasures', treasureCount(), STAGES.length * Object.keys(MODES).length)}</h3>
         <ul class="treasure-list">${tre}</ul>
       </div>`);
   }
@@ -6714,6 +6987,8 @@
     }
     Sound.init();
     newGame(stageIdx);
+    if (hasPerk('reroll')) G.rerolls = 1;
+    G.freeRevive = hasPerk('revive');
     rerender = null;
     hide();
     Sound.bgm('main');
@@ -6727,6 +7002,11 @@
     G.paused = true;
     Sound.bgm(null);
     Ads.gameplay(false);
+    renderPause();
+  }
+
+  function renderPause() {
+    rerender = null;
     show('pause', `
       <div class="panel">
         <h2>${t('paused')}</h2>
@@ -6737,6 +7017,7 @@
           <button type="button" class="btn primary" data-act="resume" data-back data-focus>${t('resume')}</button>
           <button type="button" class="btn" data-act="retry">${t('retry')}</button>
           <button type="button" class="btn" data-act="quit">${t('toStages')}</button>
+          <button type="button" class="btn" data-act="help" data-arg="pause">${t('howToPlay')}</button>
         </div>
         <h3>${t('settings')}</h3>
         ${settingsHtml()}
@@ -6753,7 +7034,7 @@
 
   // ---- 復活 (広告の報酬) ----
   function showRevive() {
-    G.reviveOffered = true;
+    G.reviveAsked = true;
     Ads.gameplay(false);
     rerender = renderRevive;
     renderRevive();
@@ -6767,7 +7048,9 @@
         <p class="sub">${t('reviveText')}</p>
         ${msg ? `<p class="result-note">${esc(msg)}</p>` : ''}
         <div class="actions">
-          <button type="button" class="btn primary" data-act="reviveAd" data-focus>${esc(adLabel(t('reviveBtn')))}</button>
+          ${G.freeRevive
+    ? `<button type="button" class="btn primary" data-act="reviveFree" data-focus>${esc(t('reviveFree'))}</button>`
+    : `<button type="button" class="btn primary" data-act="reviveAd" data-focus>${esc(adLabel(t('reviveBtn')))}</button>`}
           <button type="button" class="btn" data-act="giveUp" data-back>${t('giveUp')}</button>
         </div>
       </div>`, false);
@@ -6777,6 +7060,7 @@
   function revive() {
     const p = G.p;
     G.state = 'play';
+    G.reviveAsked = false;
     G.endT = 0;
     p.hp = G.stats.maxHp;
     p.inv = 3;
@@ -6891,19 +7175,30 @@
       </button>`;
     }).join('');
     show('levelup', `
-      <div class="panel reward">
-        <p class="reward-title">LEVEL UP!</p>
-        <p class="lv-badge">Lv ${G.level - G.pendingLv}</p>
+      <div class="panel reward levelup">
+        <div class="lv-head"><p class="reward-title">LEVEL UP!</p><p class="lv-badge">Lv ${G.level - G.pendingLv}</p></div>
         ${G.tutorial && G.level - G.pendingLv === 2 ? `<p class="tut-tip">${t('tutLevelUp', MAX_GEARS, MAX_PASSIVES)}</p>` : ''}
         <p class="sub">${t('pickOne')}</p>
-        <div class="cards">${cards}</div>
-        <p class="inv-title">${t('inventory')}</p>
+        <div class="cards${choices.length > 2 ? ' many' : ''}">${cards}</div>
         ${invHtml()}
         ${G.rerolls > 0
     ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button></div>`
     : Ads.live() ? `<div class="actions"><button type="button" class="btn small ad-btn" data-act="adReroll">${esc(adLabel(t('rerollPlus')))}</button></div>` : ''}
         ${levelMsg ? `<p class="result-note">${esc(levelMsg)}</p>` : ''}
       </div>`, false, { kind: 'level', lock: 450 });
+    fitPanel();
+  }
+
+  // パネルが画面の高さに収まらないときは、スクロールさせずに全体を縮めて収める (レベルアップ画面)
+  function fitPanel() {
+    const panel = overlay.querySelector('.panel.levelup');
+    if (!panel) return;
+    panel.style.zoom = '';
+    const cs = getComputedStyle(overlay);
+    // 画面 (ウィンドウ) より盤面が高いとき (横向きのスマホなど) は、見えている高さに合わせる
+    const room = Math.min(overlay.clientHeight, window.innerHeight) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const need = panel.offsetHeight;
+    if (need > room && room > 0) panel.style.zoom = String(Math.max(0.6, Math.floor((room / need) * 100) / 100));
   }
 
   function applyChoice(o) {
@@ -6927,13 +7222,18 @@
   // ---- 宝物 ----
   function foundTreasure() {
     const i = G.stageIdx;
-    const tr = G.stage.treasure;
-    const isNew = !save.treasures[i];
-    save.treasures[i] = true;
+    const tr = treasureOf(i, G.mode);
+    const isNew = !hasTreasure(i, G.mode);
+    treasureList(G.mode)[i] = true;
     persist(); // 力尽きても記録が残るように、拾ったその場で保存する
-    const unlock = isNew ? CHARS.find((c) => c.unlock === i) : null;
+    // 清掃員はノーマルの宝物で仲間になる
+    const unlock = isNew && G.mode === 'normal' ? CHARS.find((c) => c.unlock === i) : null;
     if (isNew) G.treasureNew = true;
     if (unlock) G.newChar = unlock;
+    // 恒久スキルを開放する宝物なら、このプレイからすぐに使える
+    const perk = isNew ? tr.perk : null;
+    if (perk === 'reroll') G.rerolls += 1;
+    if (perk === 'revive') G.freeRevive = true;
     Sound.play('chest-evo');
     show('treasure', `
       <div class="panel reward">
@@ -6947,6 +7247,7 @@
           <p class="treasure-name">${esc(L(tr, 'name'))}</p>
           <p class="sub">${esc(L(tr, 'desc'))}${isNew ? '' : t('owned')}</p>
           ${unlock ? `<p class="result-note">${esc(t('joinedBang', L(unlock, 'name')))}</p>` : ''}
+          ${perk ? `<p class="result-note">${esc(t('perkGot', perkName(perk)))}</p>` : ''}
         </div>
         <div class="actions chest-ok"><button type="button" class="btn primary" data-act="treasureOk" data-focus>OK</button></div>
       </div>`, false, { kind: 'evo', lock: 1000 });
@@ -7013,7 +7314,7 @@
     const killCoins = Math.floor(g.kills / 20);
     const cleanCoins = Math.floor(pct);
     const base = killCoins + cleanCoins + (win ? 50 : 0) + g.dumpCoins + g.bossCoins + g.roomCoins;
-    const mul = g.md.coin * (1 + save.shop.coin * 0.1);
+    const mul = g.md.coin * (1 + save.shop.coin * 0.1) * (1 + (g.ch.mods.coin || 0));
     const total = Math.round(base * mul);
     save.coins += total;
     if (i === TUT) {
@@ -7044,7 +7345,7 @@
     // お知らせは、あとで言語に合わせて文にする
     const notes = [];
     if (doneN === g.rooms.length) notes.push(['noteAllRooms']);
-    if (g.treasureNew) notes.push(['noteTreasure', i]);
+    if (g.treasureNew) notes.push(['noteTreasure', i, g.mode]);
     if (g.newChar) notes.push(['noteJoined', g.newChar.id]);
     if (win && g.mode === 'normal' && !wasStageCleared) {
       if (i + 1 < STAGES.length) notes.push(['noteStage', i + 1]);
@@ -7064,7 +7365,7 @@
 
   function noteText([key, a, b]) {
     switch (key) {
-      case 'noteTreasure': return t('noteTreasure', L(STAGES[a].treasure, 'name'));
+      case 'noteTreasure': return t('noteTreasure', L(treasureOf(a, b), 'name'));
       case 'noteJoined': return t('joinedBang', L(CHARS.find((c) => c.id === a), 'name'));
       case 'noteStage': return t('noteStage', a + 1, L(STAGES[a], 'name'));
       case 'noteFirst': return t('noteFirst', L(CHARS.find((c) => c.id === a), 'name'), L(MODES[b], 'name'));
@@ -7143,6 +7444,15 @@
         ${panelHead(t('skills'), shopBack, '', true)}
         <p class="sub">${t('coins')} <span class="coins">${save.coins}</span>${t('sep')}${t('shopSub')}</p>
         <div class="shop">${items}</div>
+        <h3>${t('treasurePerks')}</h3>
+        <div class="shop">${PERKS.map((id) => {
+    const on = hasPerk(id);
+    const src = perkSource(id);
+    return `<div class="shop-item perk${on ? ' on' : ''}">
+          <img src="${iconURL(id === 'reroll' ? 'tape' : 'heal')}" alt="" width="36" height="36">
+          <div class="shop-body"><span class="shop-name">${esc(perkName(id))}</span><span class="pips"><i class="${on ? 'on' : ''}"></i></span><br><span class="shop-desc">${esc(perkDesc(id))}</span><br><span class="shop-desc perk-how">${esc(on ? t('perkOn') : t('perkHow', src.i + 1, L(MODES[src.mode], 'name')))}</span></div>
+        </div>`;
+  }).join('')}</div>
       </div>`);
   }
 
@@ -7182,6 +7492,30 @@
   }
 
   let settingsBack = 'title';
+  // ---- 遊び方 (専用の画面) ----
+  // index.html に言語ごとに書いた遊び方 (.help) を、この画面に写して見せる
+  let helpBack = 'title';
+  function showHelp(from) {
+    if (from) helpBack = from;
+    rerender = () => showHelp();
+    const src = document.querySelector(`.help[data-lang="${lang}"]`) || document.querySelector('.help[data-lang="en"]');
+    const body = document.createElement('div');
+    body.innerHTML = src ? src.innerHTML : '';
+    const h2 = body.querySelector('h2');
+    if (h2) h2.remove(); // 見出しは画面の上に出す
+    body.querySelectorAll('table').forEach((tb) => {
+      const w = document.createElement('div');
+      w.className = 'help-wrap';
+      tb.replaceWith(w);
+      w.append(tb);
+    });
+    show('help', `
+      <div class="panel wide">
+        ${panelHead(t('howToPlay'), helpBack === 'pause' ? 'pauseBack' : helpBack, '', true)}
+        <div class="help-body">${body.innerHTML}</div>
+      </div>`, helpBack !== 'pause');
+  }
+
   function showSettings(from) {
     settingsBack = from || settingsBack;
     rerender = () => showSettings();
@@ -7303,8 +7637,15 @@
       adBusy();
       const ok = await Ads.rewarded();
       if (!G || screen !== 'revive') return;
-      if (ok) revive();
-      else renderRevive(t('adFailed'));
+      if (ok) {
+        G.adRevived = true;
+        revive();
+      } else renderRevive(t('adFailed'));
+    },
+    reviveFree: () => {
+      if (!G || screen !== 'revive' || !G.freeRevive) return;
+      G.freeRevive = false;
+      revive();
     },
     giveUp: () => {
       if (G && screen === 'revive') showResult(false);
@@ -7348,6 +7689,8 @@
     },
     zukan: showZukan,
     settings: (from) => showSettings(from),
+    help: (from) => showHelp(from),
+    pauseBack: () => { if (G && G.paused) renderPause(); },
   });
 
   applyLang();

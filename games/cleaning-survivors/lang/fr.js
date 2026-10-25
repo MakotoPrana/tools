@@ -58,7 +58,7 @@
     tutDump: "La poussière ramassée remplit la <b>poubelle</b> (bac à poussière) en bas à gauche. <b>Pleine, elle divise vos dégâts par deux, vous empêche de ramasser la poussière et vous ralentit</b>. Placez-vous sur la <b>benne verte</b> présente dans chaque pièce pour la vider",
     tutDanger: "Plus une pièce a de ★, plus elle est sale et ses déchets coriaces : <b>commencez par celles qui en ont peu</b>. Dans les vrais niveaux, vous gagnez en nettoyant <b>toutes les pièces en moins de 10 minutes</b>. Finissez les pièces restantes !",
     achievements: "Succès",
-    achClears: "Victoires par agent (bonus)",
+    achClears: "Victoires par agent",
     settings: "Réglages",
     stageSelect: "Choisir un niveau",
     recordOf: (name) => `Records de ${name}`,
@@ -77,6 +77,8 @@
     unlockText: (n, stage) => `Rejoint l'équipe quand vous trouvez le trésor du niveau ${n}, « ${stage} »`,
     trait: (name, desc) => `Talent « ${name} » : ${desc}`,
     charStats: (hp, gears) => `PV ${hp} · Équipement de départ : ${gears}`,
+    charPower: (s) => `Force ${s}`,
+    charFav: (b, n) => `Build favori : ${b} (dégâts de l'équipement favori +${n} %)`,
     sep: ", ",
     stageTitle: (n, name) => `Niveau ${n} : ${name}`,
     planAlt: "Plan",
@@ -91,7 +93,7 @@
     pickCleaner: "Choisissez votre agent",
     deploy: (mode) => `Partir (${mode})`,
     back: "Retour",
-    charsSub: "Records bonus pour les perfectionnistes ; ils ne comptent pas dans la progression. Choisissez un agent pour voir ses victoires par niveau et par mode",
+    charsSub: "Les victoires de chaque agent dans chaque niveau et chaque mode comptent dans la progression. Choisissez un agent pour voir ses victoires par niveau et par mode",
     treasures: (a, b) => `Trésors (${a}/${b})`,
     roomsCell: (r, n) => `${r}/${n} pièces`,
     clears: (a, b) => `Victoires ${a}/${b}`,
@@ -170,7 +172,7 @@
     shake: "Secousses et flashs",
     haze: "Brume de crasse",
     reviveTitle: "On remet ça ?",
-    reviveText: "Relevez-vous sur place avec tous vos PV. Vous ne pouvez revivre qu'une fois par partie.",
+    reviveText: "Relevez-vous sur place avec tous vos PV.",
     reviveBtn: "Revivre",
     giveUp: "Abandonner",
     revived: "De retour ! On continue !",
@@ -180,6 +182,18 @@
     withAd: (s) => `📺 Regarder une pub : ${s}`,
     adLoading: "Chargement de la pub…",
     adFailed: "Impossible de charger une pub. Patientez un instant et réessayez",
+    howToPlay: "Comment jouer",
+    perkReroll: "Relance",
+    perkRerollDesc: "Une relance au niveau supérieur à chaque partie",
+    perkRevive: "Renaissance",
+    perkReviveDesc: "Une fois par partie, relevez-vous avec tous vos PV quand vous êtes à bout de forces",
+    perkHow: (n, mode) => `Débloqué en trouvant le trésor du niveau ${n} (${mode})`,
+    perkOn: "Débloqué (par un trésor)",
+    perkGot: (name) => `Compétence permanente « ${name} » débloquée !`,
+    perkTeaser: (name) => `Débloque la compétence permanente « ${name} »`,
+    treasureClue: (stage, mode) => `Indice : dans ${stage} (${mode}), il dort au fond de la pièce la plus sale`,
+    treasurePerks: "Compétences débloquées par des trésors",
+    reviveFree: "Revivre grâce au trésor",
   },
   enemies: {
     dust: ["Mouton de poussière", "Faible, mais arrive en énormes nuées. Présent dans toutes les pièces."],
@@ -225,7 +239,7 @@
   evos: {
     blackhole: ["Aspirateur trou noir", "Place devant vous un vortex d'aspiration qui abîme tous les déchets qu'il contient."],
     steam: ["Canon à vapeur surchauffée", "Un rayon de vapeur épais et long qui fait briller d'un coup toute sa trajectoire."],
-    army: ["Escouade de robots", "Les robots cherchent seuls la saleté et les déchets et patrouillent dans la pièce."],
+    army: ["Escouade de robots", "Des robots plus nombreux et plus gros tournent plus vite autour de vous, broient les déchets et font briller une zone plus large."],
     acid: ["Brume de pluie acide", "Fait pleuvoir du désinfectant sur tout l'écran."],
     giant: ["Rouleau compresseur géant", "Un énorme rouleau qui fait briller tout votre passage et écrase les déchets."],
     tornado: ["Serpillière tornade", "Balaie sans arrêt tout autour de vous à grande vitesse."],
@@ -254,6 +268,10 @@
     runta: ["Runta le robot", "Roues tout-terrain", "Pas ralenti par les sols sales", "Un robot nettoyeur construit d'après les plans du débarras."],
     koroko: ["Koroko au rouleau", "Ramasseuse hors pair", "Portée de ramassage +40 %, bac +40", "Une fille qui adore ranger et a hérité du rouleau adhésif légendaire."],
     kiyoshi: ["Dr Kiyoshi", "Immunité de fer", "Immunisé contre les allergies, +50 % de dégâts contre la moisissure", "Un docteur dévoué à l'étude des moisissures. Il cherchait son carnet perdu."],
+    tsugumi: ["Tsugumi l'apprentie", "Encore apprentie", "Dégâts −20 %, EXP +10 %", "Une apprentie tout juste arrivée au manoir. Mais avec une éponge magique, personne ne la bat."],
+    hayate: ["Hayate le vent", "Plumeau du vent", "Intervalle d'attaque −10 %", "Un agent rapide qui lance ses plumeaux comme le vent. Il encaisse mal les coups."],
+    reika: ["Mademoiselle Reika", "Fille de bonne famille", "Peu de PV, lente et dégâts −15 %, mais pièces +30 %", "Une demoiselle élevée dans un manoir. Sans son purificateur d'air, elle ne fait pas un pas."],
+    gou: ["Gou le caïd", "Cran du caïd", "Dégâts +15 %, dégâts subis −2", "Un caïd qui a nettoyé toute la ville avec une simple serpillière. Personne au manoir n'est plus coriace."],
     tome: ["Mamie Tome", "Sagesse de l'âge", "Commence avec 2 équipements, EXP +25 %", "L'ancienne gardienne du manoir. Lente sur ses jambes, mais personne n'égale sa sagesse et son expérience."],
   },
   bonus: {
@@ -314,6 +332,18 @@
       { shoko: "Bibliothèque", bedroom: "Chambre", closet: "Garde-robe", hall: "Grand salon", master: "Chambre du maître" },
       ["Clé du manoir", "Une vieille clé qui ouvre toutes les portes du manoir. Elle appartenait à l'ancienne gardienne."]],
   ],
+  hardTreasures: [
+    ["Chat porte-bonheur", "Un maneki-neko doré enfoui sur le meuble à chaussures de l'entrée."],
+    ["Louche en argent", "La lourde louche en argent que le cuisinier du manoir adorait."],
+    ["Dé de la chance", "Un dé trouvé au fond de la baignoire, qui permettrait de relancer son destin."],
+    ["Poupée mécanique", "Une vieille poupée qui balaie le sol avec un petit balai quand on la remonte."],
+    ["Arrosoir doré", "Un arrosoir doré étincelant, enfoui dans le parterre."],
+    ["Plumeau du phénix", "Un plumeau caché au fond du grenier, qui renaîtrait encore et encore."],
+    ["Engrenage en laiton", "Un gros engrenage brillant détaché du cœur de la chaudière."],
+    ["Radio rétro", "Une vieille radio sortie du tas de bric-à-brac. Elle marche encore."],
+    ["Invitation fantôme", "Une vieille invitation où figurent les noms des fantômes conviés au banquet."],
+    ["Pelle à poussière dorée", "Une pelle à poussière en or massif que le Seigneur n'a jamais lâchée."],
+  ],
   tutorial: ["Tutoriel", "Une petite maison de trois pièces pour apprendre à jouer.", { genkan: "Entrée", living: "Salon", washitsu: "Pièce à tatamis" }],
   help: `
     <h2>Comment jouer</h2>
@@ -341,10 +371,10 @@
     <p>Quand vous êtes à bout de forces, vous pouvez vous relever sur place une fois par partie (tous vos PV, et les déchets proches sont balayés). Si les choix au niveau supérieur ne vous plaisent pas, vous pouvez obtenir 2 relances. Quand vous terminez un niveau, vous pouvez multiplier par 1,5 les pièces gagnées. Chaque récompense s'obtient en regardant une publicité et n'est disponible que sur CrazyGames.</p>
 
     <h3>Agents et trésors</h3>
-    <p>Il y a 6 agents, chacun avec un équipement de départ et un talent différents (nettoie plus large en marchant, n'est pas ralenti par les sols sales, ne fait pas d'allergie, etc.). Chaque niveau cache un trésor, qui apparaît quand vous finissez la pièce qui a le plus de ★. Les trésors sont enregistrés dès que vous les ramassez, et certains font rejoindre un nouvel agent. L'écran « Succès » (depuis le titre) montre les victoires de chaque agent par niveau et par mode, ainsi que les trésors récoltés.</p>
+    <p>Il y a 10 agents, chacun avec un équipement de départ et un talent différents. L'équipement de départ est l'équipement favori de l'agent et inflige +25 % de dégâts (son build favori est indiqué dans sa fiche). La force va de ★1 à ★5 ; les agents ★1 ont peu de PV ou de dégâts et servent de défi. Chaque niveau cache un trésor en Normal et un en Difficile, 20 en tout ; un trésor apparaît quand vous finissez la pièce qui a le plus de ★ dans ce mode. Les trésors sont enregistrés dès que vous les ramassez. Certains trésors du mode Normal font rejoindre un nouvel agent, et deux trésors du mode Difficile débloquent les compétences permanentes Relance et Renaissance. L'écran « Succès » (depuis le titre) montre les victoires de chaque agent et les trésors récoltés, avec des indices pour ceux qui manquent.</p>
 
     <h3>Progression</h3>
-    <p>La progression compte combien des 30 objectifs vous avez atteints : les victoires de chaque niveau dans chaque mode (10 niveaux × 2 modes = 20) et les trésors (10). N'importe quel agent peut obtenir une victoire. Les victoires de chaque agent s'affichent dans l'écran « Succès » comme records bonus, mais ne comptent pas dans la progression.</p>
+    <p>La progression est votre score sur 300 points : une victoire dans chaque niveau et chaque mode avec chaque agent (10 agents × 10 niveaux × 2 modes = 200 points) plus les trésors (20 × 5 points = 100 points). Terminez tous les niveaux dans tous les modes avec tous les agents et trouvez tous les trésors pour atteindre 100 %.</p>
 
     <h3>Sols sales</h3>
     <p>Le sol est sale, et plus il l'est, plus vous marchez lentement. Le sol où passe votre équipement devient propre. Sur un sol étincelant, vous marchez plus vite et ramassez la poussière de plus loin. La saleté s'étend peu à peu, et les déchets salissent là où ils passent. Tant que tout est crasseux, une brume brune couvre l'écran ; elle se dissipe à mesure que vous nettoyez autour de vous et toute la maison (désactivable dans les réglages).</p>

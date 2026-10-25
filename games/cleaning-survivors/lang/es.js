@@ -58,7 +58,7 @@
     tutDump: "El polvo recogido llena el <b>cubo</b> (depósito de polvo) de abajo a la izquierda. <b>Lleno, tu daño se reduce a la mitad, no puedes recoger polvo y te mueves más lento</b>. Ponte sobre el <b>contenedor verde</b> que hay en cada habitación para vaciarlo",
     tutDanger: "Cuantas más ★ tiene una habitación, más sucia está y más dura es su basura, así que <b>empieza por las de menos ★</b>. En los niveles de verdad ganas limpiando <b>todas las habitaciones en menos de 10 minutos</b>. ¡Limpia las que quedan!",
     achievements: "Logros",
-    achClears: "Victorias por limpiador (extra)",
+    achClears: "Victorias por limpiador",
     settings: "Ajustes",
     stageSelect: "Elige un nivel",
     recordOf: (name) => `Récords de ${name}`,
@@ -77,6 +77,8 @@
     unlockText: (n, stage) => `Se une al encontrar el tesoro del nivel ${n}, «${stage}»`,
     trait: (name, desc) => `Rasgo «${name}»: ${desc}`,
     charStats: (hp, gears) => `PV ${hp} · Equipo inicial: ${gears}`,
+    charPower: (s) => `Fuerza ${s}`,
+    charFav: (b, n) => `Build favorita: ${b} (daño del equipo favorito +${n} %)`,
     sep: ", ",
     stageTitle: (n, name) => `Nivel ${n}: ${name}`,
     planAlt: "Plano",
@@ -91,7 +93,7 @@
     pickCleaner: "Elige a tu limpiador",
     deploy: (mode) => `Empezar (${mode})`,
     back: "Volver",
-    charsSub: "Récords extra para completistas; no cuentan para el progreso. Elige un limpiador para ver sus victorias por nivel y modo",
+    charsSub: "Las victorias de cada limpiador en cada nivel y modo cuentan para el progreso. Elige un limpiador para ver sus victorias por nivel y modo",
     treasures: (a, b) => `Tesoros (${a}/${b})`,
     roomsCell: (r, n) => `${r}/${n} hab.`,
     clears: (a, b) => `Victorias ${a}/${b}`,
@@ -170,7 +172,7 @@
     shake: "Temblor y destellos",
     haze: "Neblina de mugre",
     reviveTitle: "¿Lo intentas otra vez?",
-    reviveText: "Levántate ahí mismo con todos los PV. Solo puedes revivir una vez por partida.",
+    reviveText: "Levántate ahí mismo con todos los PV.",
     reviveBtn: "Revivir",
     giveUp: "Rendirse",
     revived: "¡De vuelta! ¡Sigue así!",
@@ -180,6 +182,18 @@
     withAd: (s) => `📺 Ver un anuncio: ${s}`,
     adLoading: "Cargando anuncio…",
     adFailed: "No se pudo cargar un anuncio. Espera un momento y vuelve a intentarlo",
+    howToPlay: "Cómo jugar",
+    perkReroll: "Cambiar opciones",
+    perkRerollDesc: "Un cambio de opciones al subir de nivel en cada partida",
+    perkRevive: "Revivir",
+    perkReviveDesc: "Una vez por partida, levántate con todos los PV cuando estés agotado",
+    perkHow: (n, mode) => `Se desbloquea con el tesoro del nivel ${n} (${mode})`,
+    perkOn: "Desbloqueada (por un tesoro)",
+    perkGot: (name) => `¡Habilidad permanente «${name}» desbloqueada!`,
+    perkTeaser: (name) => `Desbloquea la habilidad permanente «${name}»`,
+    treasureClue: (stage, mode) => `Pista: en ${stage} (${mode}), duerme al fondo de la habitación más sucia`,
+    treasurePerks: "Habilidades que desbloquean los tesoros",
+    reviveFree: "Revivir con el poder del tesoro",
   },
   enemies: {
     dust: ["Pelusa", "Débil, pero llega en enjambres enormes. Está en todas las habitaciones."],
@@ -225,7 +239,7 @@
   evos: {
     blackhole: ["Aspiradora agujero negro", "Coloca delante un vórtice de succión que daña toda la basura que hay dentro."],
     steam: ["Cañón de vapor sobrecalentado", "Un rayo de vapor grueso y largo que deja reluciente toda su línea al instante."],
-    army: ["Escuadrón de robots", "Los robots buscan solos la mugre y la basura y patrullan la habitación."],
+    army: ["Escuadrón de robots", "Más robots y más grandes giran más rápido a tu alrededor, trituran la basura y abrillantan una zona más amplia."],
     acid: ["Niebla de lluvia ácida", "Hace llover desinfectante por toda la pantalla."],
     giant: ["Apisonadora gigante", "Un rodillo enorme que deja reluciente todo tu camino y aplasta la basura."],
     tornado: ["Fregona tornado", "Barre sin parar a tu alrededor a gran velocidad."],
@@ -254,6 +268,10 @@
     runta: ["Runta el robot", "Ruedas todoterreno", "No se frena en suelo sucio", "Un robot limpiador construido con los planos del trastero."],
     koroko: ["Koroko la del rodillo", "Buena recogedora", "Alcance de recogida +40 %, depósito +40", "Una chica amante del orden que heredó el rodillo quitapelusas legendario."],
     kiyoshi: ["Dr. Kiyoshi", "Inmunidad de hierro", "Inmune a las alergias, +50 % de daño al moho", "Un doctor entregado a la investigación del moho. Buscaba su cuaderno perdido."],
+    tsugumi: ["Tsugumi la aprendiz", "Aún aprendiz", "Daño −20 %, EXP +10 %", "Una aprendiz recién llegada a la mansión. Eso sí, con la esponja mágica nadie le gana."],
+    hayate: ["Hayate el vendaval", "Plumero vendaval", "Intervalo de ataque −10 %", "Un limpiador veloz que lanza plumeros como el viento. Aguanta mal los golpes."],
+    reika: ["Señorita Reika", "Niña mimada", "Pocos PV, lenta y daño −15 %, pero monedas +30 %", "Una señorita criada en una mansión. Sin su purificador de aire no da ni un paso."],
+    gou: ["Gou el jefe", "Coraje de jefe", "Daño +15 %, daño recibido −2", "Un jefe duro que ha limpiado toda la ciudad con una sola fregona. Nadie en la mansión aguanta más."],
     tome: ["Abuela Tome", "Sabiduría de los años", "Empieza con 2 equipos, EXP +25 %", "La antigua cuidadora de la mansión. Lenta de pies, pero nadie la supera en sabiduría y experiencia."],
   },
   bonus: {
@@ -314,6 +332,18 @@
       { shoko: "Biblioteca", bedroom: "Dormitorio", closet: "Vestidor", hall: "Gran salón", master: "Cámara del señor" },
       ["Llave de la mansión", "Una vieja llave que abre todas las puertas de la mansión. Era de la antigua cuidadora."]],
   ],
+  hardTreasures: [
+    ["Gato de la suerte", "Un maneki-neko dorado enterrado sobre el zapatero de la entrada."],
+    ["Cucharón de plata", "El pesado cucharón de plata que adoraba el cocinero de la mansión."],
+    ["Dado de la suerte", "Un dado del fondo de la bañera; dicen que permite volver a tirar el destino."],
+    ["Muñeca mecánica", "Una muñeca antigua que barre el suelo con una escobita al darle cuerda."],
+    ["Regadera dorada", "Una regadera dorada y reluciente enterrada en el parterre."],
+    ["Plumero del fénix", "Un plumero escondido en lo más hondo del desván que, dicen, renace una y otra vez."],
+    ["Engranaje de latón", "Un gran engranaje reluciente que se soltó del corazón de la caldera."],
+    ["Radio retro", "Una radio antigua sacada del montón de trastos. Todavía suena."],
+    ["Invitación fantasma", "Una vieja invitación con los nombres de los fantasmas invitados al banquete."],
+    ["Recogedor dorado", "Un recogedor de oro puro que el Señor de la casa nunca soltó."],
+  ],
   tutorial: ["Tutorial", "Una casita de tres habitaciones para aprender a jugar.", { genkan: "Entrada", living: "Salón", washitsu: "Sala de tatamis" }],
   help: `
     <h2>Cómo se juega</h2>
@@ -341,10 +371,10 @@
     <p>Cuando estás agotado, puedes levantarte ahí mismo una vez por partida (con todos los PV, y la basura cercana sale volando). Si no te gustan las opciones al subir de nivel, puedes conseguir 2 cambios. Al superar un nivel, puedes multiplicar por 1,5 las monedas ganadas. Cada recompensa se consigue viendo un anuncio y solo está disponible si juegas en CrazyGames.</p>
 
     <h3>Limpiadores y tesoros</h3>
-    <p>Hay 6 limpiadores, cada uno con su equipo inicial y su rasgo (abrillanta más ancho al caminar, no se frena en suelo sucio, no sufre alergias, etc.). Cada nivel esconde un tesoro, que aparece al terminar la habitación con más ★. Los tesoros se guardan en cuanto los recoges, y algunos hacen que se una un nuevo limpiador. En la pantalla «Logros» (desde el título) puedes ver las victorias de cada limpiador por nivel y modo y los tesoros reunidos.</p>
+    <p>Hay 10 limpiadores, cada uno con su equipo inicial y su rasgo. El equipo inicial es el equipo favorito del limpiador y hace +25 % de daño (su build favorita aparece en su ficha). La fuerza va de ★1 a ★5; los limpiadores ★1 tienen pocos PV o poco daño y son un reto. Cada nivel esconde un tesoro en Normal y otro en Difícil, 20 en total; un tesoro aparece al terminar la habitación con más ★ en ese modo. Los tesoros se guardan en cuanto los recoges. Algunos tesoros de Normal hacen que se una un nuevo limpiador, y dos tesoros de Difícil desbloquean las habilidades permanentes Cambiar opciones y Revivir. En la pantalla «Logros» (desde el título) puedes ver las victorias de cada limpiador y los tesoros reunidos, con pistas para los que faltan.</p>
 
     <h3>Progreso</h3>
-    <p>El progreso cuenta cuántos de 30 objetivos has logrado: victorias en cada nivel y cada modo (10 niveles × 2 modos = 20) más los tesoros (10). Cualquier limpiador puede conseguir una victoria. Las victorias de cada limpiador aparecen en la pantalla «Logros» como récords extra, pero no cuentan para el progreso.</p>
+    <p>El progreso es tu puntuación sobre 300: una victoria en cada nivel y cada modo con cada limpiador (10 limpiadores × 10 niveles × 2 modos = 200 puntos) más los tesoros (20 × 5 puntos = 100 puntos). Supera todos los niveles en todos los modos con todos los limpiadores y reúne todos los tesoros para llegar al 100 %.</p>
 
     <h3>Suelos sucios</h3>
     <p>El suelo está sucio, y cuanto más sucio, más despacio caminas. Por donde pasa tu equipo de limpieza, el suelo queda limpio. Sobre un suelo reluciente caminas más rápido y recoges el polvo desde más lejos. La mugre se extiende poco a poco, y la basura ensucia por donde pasa. Mientras todo está muy sucio, una neblina marrón cubre la pantalla; se despeja a medida que limpias tu alrededor y toda la casa (se puede desactivar en Ajustes).</p>

@@ -58,7 +58,7 @@
     tutDump: "La polvere raccolta riempie il <b>bidone</b> (contenitore polvere) in basso a sinistra. <b>Quando è pieno, il danno si dimezza, non puoi raccogliere polvere e ti muovi più lentamente</b>. Mettiti sul <b>cassonetto verde</b> presente in ogni stanza per svuotarlo",
     tutDanger: "Più ★ ha una stanza, più è sporca e più duri sono i suoi rifiuti, quindi <b>comincia da quelle con meno ★</b>. Nei livelli veri vinci pulendo <b>tutte le stanze entro 10 minuti</b>. Pulisci le stanze rimaste!",
     achievements: "Obiettivi",
-    achClears: "Vittorie per addetto (extra)",
+    achClears: "Vittorie per addetto",
     settings: "Impostazioni",
     stageSelect: "Scegli un livello",
     recordOf: (name) => `Record di ${name}`,
@@ -77,6 +77,8 @@
     unlockText: (n, stage) => `Si unisce quando trovi il tesoro del livello ${n}, «${stage}»`,
     trait: (name, desc) => `Talento «${name}»: ${desc}`,
     charStats: (hp, gears) => `PS ${hp} · Attrezzi iniziali: ${gears}`,
+    charPower: (s) => `Forza ${s}`,
+    charFav: (b, n) => `Build preferita: ${b} (danno dell'attrezzo preferito +${n}%)`,
     sep: ", ",
     stageTitle: (n, name) => `Livello ${n}: ${name}`,
     planAlt: "Pianta",
@@ -91,7 +93,7 @@
     pickCleaner: "Scegli il tuo addetto",
     deploy: (mode) => `Inizia (${mode})`,
     back: "Indietro",
-    charsSub: "Record extra per i completisti; non contano per il completamento. Scegli un addetto per vedere le sue vittorie per livello e modalità",
+    charsSub: "Le vittorie di ogni addetto in ogni livello e modalità contano per il completamento. Scegli un addetto per vedere le sue vittorie per livello e modalità",
     treasures: (a, b) => `Tesori (${a}/${b})`,
     roomsCell: (r, n) => `${r}/${n} stanze`,
     clears: (a, b) => `Vittorie ${a}/${b}`,
@@ -170,7 +172,7 @@
     shake: "Vibrazioni e lampi",
     haze: "Foschia di sporco",
     reviveTitle: "Ci riprovi?",
-    reviveText: "Rialzati sul posto con tutti i PS. Puoi rinascere solo una volta per partita.",
+    reviveText: "Rialzati sul posto con tutti i PS.",
     reviveBtn: "Rinasci",
     giveUp: "Arrenditi",
     revived: "Di nuovo in piedi! Forza!",
@@ -180,6 +182,18 @@
     withAd: (s) => `📺 Guarda una pubblicità: ${s}`,
     adLoading: "Caricamento pubblicità…",
     adFailed: "Impossibile caricare la pubblicità. Aspetta un momento e riprova",
+    howToPlay: "Come si gioca",
+    perkReroll: "Cambia scelte",
+    perkRerollDesc: "Un cambio di scelte al livello su in ogni partita",
+    perkRevive: "Rinascita",
+    perkReviveDesc: "Una volta per partita, rialzati con tutti i PS quando sei esausto",
+    perkHow: (n, mode) => `Si sblocca trovando il tesoro del livello ${n} (${mode})`,
+    perkOn: "Sbloccata (da un tesoro)",
+    perkGot: (name) => `Abilità permanente «${name}» sbloccata!`,
+    perkTeaser: (name) => `Sblocca l'abilità permanente «${name}»`,
+    treasureClue: (stage, mode) => `Indizio: in ${stage} (${mode}), dorme in fondo alla stanza più sporca`,
+    treasurePerks: "Abilità sbloccate dai tesori",
+    reviveFree: "Rinasci con il potere del tesoro",
   },
   enemies: {
     dust: ["Batuffolo di polvere", "Debole, ma arriva in sciami enormi. Si trova in ogni stanza."],
@@ -225,7 +239,7 @@
   evos: {
     blackhole: ["Aspirapolvere buco nero", "Piazza davanti a te un vortice di aspirazione che danneggia tutti i rifiuti al suo interno."],
     steam: ["Cannone a vapore surriscaldato", "Un raggio di vapore spesso e lungo che fa brillare all'istante tutta la sua traiettoria."],
-    army: ["Squadra di robot", "I robot cercano da soli sporco e rifiuti e pattugliano la stanza."],
+    army: ["Squadra di robot", "Robot più numerosi e più grandi ti girano intorno più veloci, frantumano i rifiuti e lucidano una zona più ampia."],
     acid: ["Nebbia di pioggia acida", "Fa piovere disinfettante su tutto lo schermo."],
     giant: ["Rullo compressore gigante", "Un rullo enorme che fa brillare tutto il tuo percorso e schiaccia i rifiuti."],
     tornado: ["Mocio tornado", "Spazza senza sosta tutto intorno a te ad alta velocità."],
@@ -254,6 +268,10 @@
     runta: ["Runta il robot", "Ruote fuoristrada", "Non rallenta sui pavimenti sporchi", "Un robot pulitore costruito dai progetti trovati nel ripostiglio."],
     koroko: ["Koroko del rullo", "Brava a raccogliere", "Raggio di raccolta +40%, contenitore +40", "Una ragazza amante dell'ordine che ha ereditato il leggendario rullo levapelucchi."],
     kiyoshi: ["Dott. Kiyoshi", "Immunità di ferro", "Immune alle allergie, +50% di danno alla muffa", "Un dottore dedito allo studio della muffa. Cercava il suo quaderno perduto."],
+    tsugumi: ["Tsugumi l'apprendista", "Ancora apprendista", "Danno −20%, ESP +10%", "Un'apprendista appena arrivata alla villa. Con la spugna magica, però, nessuno la batte."],
+    hayate: ["Hayate il vento", "Piumino del vento", "Intervallo d'attacco −10%", "Un addetto velocissimo che lancia piumini come il vento. Non regge bene i colpi."],
+    reika: ["Signorina Reika", "Figlia di buona famiglia", "Pochi PS, lenta e danno −15%, ma monete +30%", "Una signorina cresciuta in una villa. Senza il suo purificatore d'aria non muove un passo."],
+    gou: ["Gou il capo", "Grinta del capo", "Danno +15%, danno subito −2", "Un capo tosto che ha pulito tutta la città con un solo mocio. Nessuno nella villa è più resistente."],
     tome: ["Nonna Tome", "Saggezza degli anni", "Parte con 2 attrezzi, ESP +25%", "L'ex custode della villa. Lenta di passo, ma nessuno la batte in saggezza ed esperienza."],
   },
   bonus: {
@@ -314,6 +332,18 @@
       { shoko: "Biblioteca", bedroom: "Camera da letto", closet: "Guardaroba", hall: "Salone", master: "Stanza del padrone" },
       ["Chiave della villa", "Una vecchia chiave che apre tutte le porte della villa. Apparteneva all'ex custode."]],
   ],
+  hardTreasures: [
+    ["Gatto portafortuna", "Un maneki-neko dorato sepolto sulla scarpiera dell'ingresso."],
+    ["Mestolo d'argento", "Il pesante mestolo d'argento amato dal cuoco della villa."],
+    ["Dado fortunato", "Un dado trovato sul fondo della vasca, che permetterebbe di ritirare il destino."],
+    ["Bambola a carica", "Una vecchia bambola che spazza il pavimento con una scopetta quando la carichi."],
+    ["Annaffiatoio d'oro", "Uno splendente annaffiatoio dorato sepolto nell'aiuola."],
+    ["Piumino della fenice", "Un piumino nascosto in fondo alla soffitta che, si dice, rinasce sempre."],
+    ["Ingranaggio d'ottone", "Un grosso ingranaggio lucente staccatosi dal cuore della caldaia."],
+    ["Radio rétro", "Una vecchia radio tirata fuori dal mucchio di cianfrusaglie. Funziona ancora."],
+    ["Invito spettrale", "Un vecchio invito con i nomi dei fantasmi invitati al banchetto."],
+    ["Paletta d'oro", "Una paletta in oro massiccio da cui il Signore della casa non si è mai separato."],
+  ],
   tutorial: ["Tutorial", "Una casetta di tre stanze per imparare a giocare.", { genkan: "Ingresso", living: "Soggiorno", washitsu: "Stanza dei tatami" }],
   help: `
     <h2>Come si gioca</h2>
@@ -341,10 +371,10 @@
     <p>Quando sei esausto, puoi rialzarti sul posto una volta per partita (tutti i PS, e i rifiuti vicini vengono spazzati via). Se le scelte al livello su non ti piacciono, puoi ottenere 2 cambi. Quando completi un livello, puoi moltiplicare per 1,5 le monete guadagnate. Ogni ricompensa si ottiene guardando una pubblicità ed è disponibile solo se giochi su CrazyGames.</p>
 
     <h3>Addetti e tesori</h3>
-    <p>Ci sono 6 addetti, ognuno con attrezzi iniziali e talento diversi (lucida più largo camminando, non rallenta sui pavimenti sporchi, non soffre di allergie, ecc.). Ogni livello nasconde un tesoro, che appare quando completi la stanza con più ★. I tesori vengono salvati appena li raccogli, e alcuni fanno unire un nuovo addetto. Nella schermata «Obiettivi» (dal titolo) puoi vedere le vittorie di ogni addetto per livello e modalità e i tesori raccolti.</p>
+    <p>Ci sono 10 addetti, ognuno con attrezzi iniziali e talento diversi. L'attrezzo iniziale è l'attrezzo preferito dell'addetto e fa +25% di danno (la build preferita è indicata nella sua scheda). La forza va da ★1 a ★5; gli addetti ★1 hanno pochi PS o poco danno e sono pensati come sfida. Ogni livello nasconde un tesoro in Normale e uno in Difficile, 20 in tutto; un tesoro appare quando completi la stanza con più ★ in quella modalità. I tesori vengono salvati appena li raccogli. Alcuni tesori di Normale fanno unire un nuovo addetto, e due tesori di Difficile sbloccano le abilità permanenti Cambia scelte e Rinascita. Nella schermata «Obiettivi» (dal titolo) puoi vedere le vittorie di ogni addetto e i tesori raccolti, con indizi per quelli che mancano.</p>
 
     <h3>Completamento</h3>
-    <p>Il completamento conta quanti dei 30 obiettivi hai raggiunto: le vittorie di ogni livello in ogni modalità (10 livelli × 2 modalità = 20) più i tesori (10). Qualsiasi addetto può ottenere una vittoria. Le vittorie dei singoli addetti appaiono nella schermata «Obiettivi» come record extra, ma non contano per il completamento.</p>
+    <p>Il completamento è il tuo punteggio su 300: una vittoria in ogni livello e modalità con ogni addetto (10 addetti × 10 livelli × 2 modalità = 200 punti) più i tesori (20 × 5 punti = 100 punti). Completa ogni livello in ogni modalità con ogni addetto e trova tutti i tesori per arrivare al 100%.</p>
 
     <h3>Pavimenti sporchi</h3>
     <p>Il pavimento è sporco, e più è sporco, più cammini lentamente. Dove passano i tuoi attrezzi, il pavimento diventa pulito. Su un pavimento splendente cammini più veloce e raccogli la polvere da più lontano. Lo sporco si espande piano piano, e i rifiuti sporcano dove passano. Finché tutto è molto sporco, una foschia marrone copre lo schermo; si dirada man mano che pulisci intorno a te e tutta la casa (disattivabile nelle impostazioni).</p>
