@@ -64,8 +64,11 @@
     recordOf: (name) => `Récords de ${name}`,
     coins: "Monedas",
     hardNote: "Difícil: PV y daño de la basura y los focos de unas 3 a 7 veces los de Normal (según el nivel), cantidad ×1,2. Monedas ×1,6. Sube primero tus habilidades permanentes hasta la mitad más o menos. El último nivel es 50/50 incluso al 80 %.",
-    lockedPrev: "Supera el nivel anterior en Normal para entrar",
-    lockedHard: "Supera este nivel en Normal para desbloquear Difícil",
+    lockedPrev: "Supera el nivel anterior en Normal con este limpiador para entrar",
+    lockedHard: "Supera este nivel en Normal con este limpiador para desbloquear Difícil",
+    charSelect: "Elige un limpiador",
+    charGo: "Elegir nivel con este limpiador",
+    changeChar: "Cambiar de limpiador",
     bestRooms: (r, n) => `Mejor: ${r}/${n} habitaciones`,
     bestClear: (time) => `Mejor tiempo ${time}`,
     roomCount: (n) => `${n} habitaciones`,
@@ -374,7 +377,7 @@
     <p>Destruye todos los focos de una habitación y limpia al menos el 90 % de su suelo para terminarla (el resto se abrillanta solo). Ganas un cofre y una bonificación propia de la habitación (más velocidad, más PV máximos, etc.), y la habitación no vuelve a ensuciarse.</p>
 
     <h3>Normal y Difícil</h3>
-    <p>Cada nivel tiene modo Normal y modo Difícil. Superar un nivel en Normal desbloquea el siguiente nivel y el modo Difícil de ese nivel. En Difícil hay más basura y mucho más dura, y es casi imposible ganar hasta tener las habilidades permanentes a la mitad más o menos (el último nivel en Difícil es 50/50 incluso al 80 %). Gasta monedas en «habilidades permanentes» antes de intentarlo (Difícil da 1,6 veces más monedas).</p>
+    <p>Cada nivel tiene modo Normal y modo Difícil. Superar un nivel en Normal desbloquea el siguiente nivel y el modo Difícil de ese nivel. Los niveles se desbloquean por separado para cada limpiador, así que otro limpiador empieza desde el nivel 1. En Difícil hay más basura y mucho más dura, y es casi imposible ganar hasta tener las habilidades permanentes a la mitad más o menos (el último nivel en Difícil es 50/50 incluso al 80 %). Gasta monedas en «habilidades permanentes» antes de intentarlo (Difícil da 1,6 veces más monedas).</p>
 
     <h3>Habilidades permanentes</h3>
     <p>Gasta las monedas que ganes para subir salud, fuerza, poder de limpieza (lo ancho que abrillantas el suelo), velocidad, defensa, regeneración, alcance de recogida, experiencia, tamaño del depósito de polvo, monedas y número de opciones al subir de nivel. Valen para todos los limpiadores desde la siguiente partida. Ábrelas con el botón «⬆ Habilidades» de la pantalla de título o de la selección de nivel. Cuando puedes pagar una mejora, el botón brilla en dorado y muestra cuántas.</p>
