@@ -186,6 +186,7 @@
     giveUp: "Desistir",
     revived: "De volta! Continue!",
     rerollPlus: "+2 trocas",
+    rerollWait: (n) => `Troca com anúncio em ${n} subida${n === 1 ? '' : 's'} de nível`,
     coinsX: (n) => `Moedas ×1,5 (+${n})`,
     coinAd: "Moedas (bônus ×1,5)",
     withAd: (s) => `📺 Ver um anúncio: ${s}`,

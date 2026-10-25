@@ -186,6 +186,7 @@
     giveUp: "Abandonner",
     revived: "De retour ! On continue !",
     rerollPlus: "+2 relances",
+    rerollWait: (n) => `Relance pub dans ${n} niveau${n === 1 ? '' : 'x'}`,
     coinsX: (n) => `Pièces ×1,5 (+${n})`,
     coinAd: "Pièces (bonus ×1,5)",
     withAd: (s) => `📺 Regarder une pub : ${s}`,

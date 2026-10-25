@@ -186,6 +186,7 @@
     giveUp: '포기하기',
     revived: '부활! 조금만 더 힘내자!',
     rerollPlus: '다시 고르기 +2',
+    rerollWait: (n) => `광고 다시 고르기는 레벨업 ${n}번 후`,
     coinsX: (n) => `코인 1.5배 (+${n})`,
     coinAd: '코인(1.5배 보너스)',
     withAd: (s) => `📺 광고 보고 ${s}`,

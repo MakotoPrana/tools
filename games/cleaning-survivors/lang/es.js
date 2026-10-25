@@ -186,6 +186,7 @@
     giveUp: "Rendirse",
     revived: "¡De vuelta! ¡Sigue así!",
     rerollPlus: "+2 cambios",
+    rerollWait: (n) => `Cambio con anuncio en ${n} subida${n === 1 ? '' : 's'} de nivel`,
     coinsX: (n) => `Monedas ×1,5 (+${n})`,
     coinAd: "Monedas (bonificación ×1,5)",
     withAd: (s) => `📺 Ver un anuncio: ${s}`,

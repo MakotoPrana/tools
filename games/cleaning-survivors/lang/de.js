@@ -186,6 +186,7 @@
     giveUp: "Aufgeben",
     revived: "Wieder da! Weiter geht's!",
     rerollPlus: "+2 Neuwürfe",
+    rerollWait: (n) => `Werbe-Neuwurf in ${n} Level-up${n === 1 ? '' : 's'}`,
     coinsX: (n) => `Münzen ×1,5 (+${n})`,
     coinAd: "Münzen (×1,5-Bonus)",
     withAd: (s) => `📺 Werbung ansehen: ${s}`,
