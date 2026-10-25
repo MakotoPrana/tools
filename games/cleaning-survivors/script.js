@@ -3757,6 +3757,44 @@
     return hit;
   }
 
+  // ---- 落とし物の置き場所 ----
+  // 宝箱・宝物・回復アイテムを、壁や段ボールにめり込まない場所に置く。元の場所が埋まっていたら、
+  // 同じ部屋の中で近い順に空いているところを探す (壁の向こうの部屋には置かない)
+  const ITEM_R = 20;
+  function itemSpot(x, y, room = roomAt(x, y)) {
+    const r = ITEM_R;
+    const free = (px, py) => {
+      if (px < r || py < r || px > ROOM - r || py > ROOM - r) return false;
+      if (room >= 0 && roomAt(px, py) !== room) return false;
+      if (isBlocked(px, py)) return false;
+      // まわり (半径 r の円の 16 か所) に壁や段ボールがないか
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * TAU;
+        if (isBlocked(px + Math.cos(a) * r, py + Math.sin(a) * r)) return false;
+      }
+      return true;
+    };
+    if (free(x, y)) return { x, y };
+    for (let dist = 8; dist <= 320; dist += 8) {
+      const n = Math.max(8, Math.round(dist / 6));
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * TAU;
+        const px = x + Math.cos(a) * dist;
+        const py = y + Math.sin(a) * dist;
+        if (free(px, py)) return { x: px, y: py };
+      }
+    }
+    const o = { x, y };
+    pushOut(o, r);
+    return o;
+  }
+  function dropItem(kind, x, y, room) {
+    const spot = itemSpot(x, y, room);
+    const it = { kind, x: spot.x, y: spot.y, t: 0 };
+    G.items.push(it);
+    return it;
+  }
+
   // ---- 強さの計算 ----
   function recalcStats() {
     const s = G.stats;
@@ -4416,8 +4454,9 @@
     // ダスト
     if (e.boss) {
       for (let i = 0; i < 14; i++) dropGem(e.x + rand(-60, 60), e.y + rand(-60, 60), 2);
-      G.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 });
-      G.items.push({ kind: 'heal', x: e.x + 40, y: e.y, t: 0 });
+      const room = roomAt(e.x, e.y);
+      dropItem('chest', e.x, e.y, room);
+      dropItem('heal', e.x + 40, e.y, room);
       G.bossCoins += def.boss === 'boss' ? 40 : 20;
       showBanner(t('bossDown', L(def, 'name')), '#4fe0b6', 2.5);
       Sound.play('boss-down');
@@ -4426,7 +4465,7 @@
     } else if (def.source) {
       // 発生源を潰した
       for (let i = 0; i < 2; i++) dropGem(e.x + rand(-30, 30), e.y + rand(-30, 30), 2);
-      if (Math.random() < 0.3) G.items.push({ kind: 'heal', x: e.x + 20, y: e.y, t: 0 });
+      if (Math.random() < 0.3) dropItem('heal', e.x + 20, e.y);
       puff(e.x, e.y, '#8a6a44', 30);
       G.roomCoins += 5;
       const room = G.rooms[e.room];
@@ -4441,15 +4480,15 @@
       // 宝箱は、決まった時間に出るものは必ず、部屋で湧いたものは前の宝箱から ELITE_CHEST_GAP 秒たっていれば落とす
       if (e.eventElite || G.time - G.eliteChestT >= ELITE_CHEST_GAP) {
         G.eliteChestT = G.time;
-        G.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 });
+        dropItem('chest', e.x, e.y);
       } else {
         dropGem(e.x + 12, e.y, 2);
         dropGem(e.x - 12, e.y, 2);
-        if (Math.random() < 0.3) G.items.push({ kind: 'heal', x: e.x, y: e.y + 12, t: 0 });
+        if (Math.random() < 0.3) dropItem('heal', e.x, e.y + 12);
       }
     } else {
       dropGem(e.x, e.y, Math.min(2, def.gem + (Math.random() < DANGER[e.danger].upgrade ? 1 : 0)));
-      if (def.gem === 2 && Math.random() < 0.04) G.items.push({ kind: 'heal', x: e.x + 10, y: e.y, t: 0 });
+      if (def.gem === 2 && Math.random() < 0.04) dropItem('heal', e.x + 10, e.y);
     }
     if (def.burst) {
       for (let i = 0; i < def.burst; i++) {
@@ -5601,22 +5640,20 @@
     recalcStats();
     if (r.bonus === 'heal') G.p.hp = G.stats.maxHp;
     G.roomCoins += 15 * r.danger;
-    G.items.push({ kind: 'chest', x: G.p.x + 26, y: G.p.y, t: 0 });
+    dropItem('chest', G.p.x + 26, G.p.y, roomAt(G.p.x, G.p.y)); // 主人公のいる部屋に置く
     // 宝物の条件が「この部屋の清掃を完了」(時間つきもある) なら、部屋のまん中に宝物が現れる
     const c = G.trCond;
     const isTreasureRoom = !G.trSpawned && c && ((c.type === 'room' && r.id === G.stage.treasure.room) || (c.type === 'roomTime' && r.id === c.room && G.time <= c.t));
-    if (isTreasureRoom) spawnTreasure(...roomPoint(r.rect, 0.5, 0.5), false);
+    if (isTreasureRoom) spawnTreasure(...roomPoint(r.rect, 0.5, 0.5), false, r.idx);
     showBanner(isTreasureRoom ? t('roomTreasure', L(r, 'name')) : t('roomDone', L(r, 'name'), bonusText(r.bonus)), '#4fe0b6', 3);
     Sound.play('room-clear');
     G.shake = Math.max(G.shake, 6);
   }
 
   // 宝物を床に出す (条件を満たしたとき)
-  function spawnTreasure(x, y, banner = true) {
+  function spawnTreasure(x, y, banner = true, room = roomAt(x, y)) {
     G.trSpawned = true;
-    const spot = { x, y };
-    pushOut(spot, 16);
-    G.items.push({ kind: 'treasure', x: spot.x, y: spot.y, t: 0 });
+    const spot = dropItem('treasure', x, y, room);
     for (let k = 0; k < 30; k++) addPart(spot.x, spot.y, rand(-120, 120), rand(-160, -20), rand(0.6, 1.2), rand(3, 6), pick(['#ffd34a', '#fff3b0', '#ffffff']), 'twinkle');
     if (banner) {
       showBanner(t('treasureAppeared'), '#ffcf4a', 2.6);
@@ -5633,7 +5670,7 @@
     else if (c.type === 'dumps') ok = G.dumpCount >= c.n;
     else if (c.type === 'srcTime') ok = G.time <= c.t && G.rooms.every((r) => r.src === 0);
     else if (c.type === 'boss') ok = (G.killsByType[c.boss] || 0) > 0;
-    if (ok) spawnTreasure(G.p.x + 40, G.p.y - 20);
+    if (ok) spawnTreasure(G.p.x + 40, G.p.y - 20, true, roomAt(G.p.x, G.p.y)); // 主人公のいる部屋に出す
   }
 
   function timeUp() {
