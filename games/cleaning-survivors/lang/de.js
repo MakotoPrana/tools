@@ -58,7 +58,7 @@
     tutDump: "Aufgesammelter Staub landet im <b>Mülleimer</b> (Staubbox) unten links. <b>Ist er voll, halbiert sich dein Schaden, du kannst keinen Staub mehr sammeln und wirst langsamer</b>. Stell dich auf den <b>grünen Müllplatz</b>, den es in jedem Raum gibt, um ihn zu leeren",
     tutDanger: "Räume mit mehr ★ sind dreckiger und ihr Müll ist zäher, also <b>fang mit wenigen ★ an</b>. In echten Leveln gewinnst du, wenn du <b>alle Räume in 10 Minuten</b> putzt. Putz die restlichen Räume!",
     achievements: "Erfolge",
-    achClears: "Siege nach Putzkraft (Extra)",
+    achClears: "Siege nach Putzkraft",
     settings: "Einstellungen",
     stageSelect: "Level wählen",
     recordOf: (name) => `Rekorde von ${name}`,
@@ -77,6 +77,8 @@
     unlockText: (n, stage) => `Kommt dazu, wenn du den Schatz von Level ${n}, „${stage}“, findest`,
     trait: (name, desc) => `Talent „${name}“: ${desc}`,
     charStats: (hp, gears) => `LP ${hp} · Startausrüstung: ${gears}`,
+    charPower: (s) => `Stärke ${s}`,
+    charFav: (b, n) => `Lieblings-Build: ${b} (Schaden der Lieblingsausrüstung +${n} %)`,
     sep: ", ",
     stageTitle: (n, name) => `Level ${n}: ${name}`,
     planAlt: "Grundriss",
@@ -91,7 +93,7 @@
     pickCleaner: "Wähle deine Putzkraft",
     deploy: (mode) => `Los (${mode})`,
     back: "Zurück",
-    charsSub: "Extra-Rekorde für Komplettierer; sie zählen nicht zum Fortschritt. Wähle eine Putzkraft, um ihre Siege pro Level und Modus zu sehen",
+    charsSub: "Die Siege jeder Putzkraft in jedem Level und Modus zählen zum Fortschritt. Wähle eine Putzkraft, um ihre Siege pro Level und Modus zu sehen",
     treasures: (a, b) => `Schätze (${a}/${b})`,
     roomsCell: (r, n) => `${r}/${n} Räume`,
     clears: (a, b) => `Siege ${a}/${b}`,
@@ -237,7 +239,7 @@
   evos: {
     blackhole: ["Schwarzes-Loch-Sauger", "Setzt vor dir einen Saugwirbel, der allen Müll darin beschädigt."],
     steam: ["Heißdampfkanone", "Ein dicker, langer Dampfstrahl, der alles auf seiner Linie sofort blank poliert."],
-    army: ["Putzroboter-Trupp", "Die Roboter suchen selbst nach Dreck und Müll und patrouillieren durch den Raum."],
+    army: ["Putzroboter-Trupp", "Mehr und größere Roboter kreisen schneller um dich, zermalmen Müll und polieren eine breitere Bahn."],
     acid: ["Säureregen-Nebel", "Lässt Desinfektionsmittel über den ganzen Bildschirm regnen."],
     giant: ["Riesenwalze", "Eine riesige Walze, die deinen ganzen Weg poliert und Müll zerquetscht."],
     tornado: ["Tornado-Mopp", "Fegt ununterbrochen mit hoher Geschwindigkeit rund um dich."],
@@ -266,6 +268,10 @@
     runta: ["Runta der Robo", "Geländereifen", "Auf dreckigem Boden nicht langsamer", "Ein Putzroboter, gebaut nach den Plänen aus der Abstellkammer."],
     koroko: ["Koroko mit der Rolle", "Sammeltalent", "Sammelreichweite +40 %, Staubbox +40", "Ein ordnungsliebendes Mädchen, das die legendäre Fusselrolle geerbt hat."],
     kiyoshi: ["Dr. Kiyoshi", "Starkes Immunsystem", "Immun gegen Allergien, +50 % Schaden gegen Schimmel", "Ein Doktor, der sein Leben der Schimmelforschung widmet. Er suchte sein verlorenes Notizbuch."],
+    tsugumi: ["Tsugumi die Azubine", "Noch in Ausbildung", "Schaden −20 %, EP +10 %", "Eine Auszubildende, die gerade in der Villa angefangen hat. Mit dem Schmutzradierer schlägt sie aber jeden."],
+    hayate: ["Hayate der Wind", "Sturmwedel", "Angriffsintervall −10 %", "Ein flinker Putzer, der Staubwedel wie der Wind wirft. Leider nicht sehr robust."],
+    reika: ["Fräulein Reika", "Behütete Tochter", "Wenig LP, langsam und Schaden −15 %, aber Münzen +30 %", "Eine junge Dame aus gutem Haus. Ohne Luftreiniger macht sie keinen Schritt."],
+    gou: ["Boss Gou", "Boss-Biss", "Schaden +15 %, erlittener Schaden −2", "Ein harter Boss, der die ganze Stadt nur mit einem Wischmopp geputzt hat. Niemand in der Villa ist zäher."],
     tome: ["Oma Tome", "Weisheit des Alters", "Startet mit 2 Ausrüstungen, EP +25 %", "Die frühere Verwalterin der Villa. Langsam auf den Beinen, aber an Weisheit und Erfahrung kommt niemand an sie heran."],
   },
   bonus: {
@@ -365,10 +371,10 @@
     <p>Bist du erschöpft, kannst du einmal pro Runde an Ort und Stelle wieder aufstehen (volle LP, und Müll in der Nähe wird weggefegt). Gefallen dir die Level-up-Auswahlen nicht, kannst du 2 Neuwürfe dazubekommen. Schaffst du ein Level, kannst du die verdienten Münzen mit 1,5 multiplizieren. Jede Belohnung gibt es fürs Ansehen einer Werbung, und nur, wenn du auf CrazyGames spielst.</p>
 
     <h3>Putzkräfte und Schätze</h3>
-    <p>Es gibt 6 Putzkräfte, jede mit eigener Startausrüstung und eigenem Talent (poliert beim Laufen breiter, wird auf dreckigem Boden nicht langsamer, bekommt keine Allergien usw.). Jedes Level versteckt einen Schatz in Normal und einen in Schwer, insgesamt 20; ein Schatz erscheint, wenn du den Raum mit den meisten ★ in diesem Modus abschließt. Schätze werden beim Aufheben sofort gespeichert. Bestimmte Normal-Schätze bringen eine neue Putzkraft ins Team, und zwei der Schwer-Schätze schalten die Dauer-Upgrades „Neu würfeln“ und „Wiederbeleben“ frei. Im Bildschirm „Erfolge“ (über den Titel) siehst du die Siege jeder Putzkraft und die gesammelten Schätze, mit Tipps zu den noch fehlenden.</p>
+    <p>Es gibt 10 Putzkräfte, jede mit eigener Startausrüstung und eigenem Talent. Die Startausrüstung ist die Lieblingsausrüstung der Putzkraft und macht +25 % Schaden (der Lieblings-Build steht im Profil). Die Stärke reicht von ★1 bis ★5; ★1-Putzkräfte haben wenig LP oder Schaden und sind als Herausforderung gedacht. Jedes Level versteckt einen Schatz in Normal und einen in Schwer, insgesamt 20; ein Schatz erscheint, wenn du den Raum mit den meisten ★ in diesem Modus abschließt. Schätze werden beim Aufheben sofort gespeichert. Bestimmte Normal-Schätze bringen eine neue Putzkraft ins Team, und zwei der Schwer-Schätze schalten die Dauer-Upgrades „Neu würfeln“ und „Wiederbeleben“ frei. Im Bildschirm „Erfolge“ (über den Titel) siehst du die Siege jeder Putzkraft und die gesammelten Schätze, mit Tipps zu den noch fehlenden.</p>
 
     <h3>Fortschritt</h3>
-    <p>Der Fortschritt zählt, wie viele von 40 Zielen du erreicht hast: Siege in jedem Level in jedem Modus (10 Level × 2 Modi = 20) plus die Schätze (20). Jede Putzkraft kann einen Sieg holen. Die Siege der einzelnen Putzkräfte werden im Bildschirm „Erfolge“ als Extra-Rekorde gezeigt, zählen aber nicht zum Fortschritt.</p>
+    <p>Der Fortschritt ist deine Punktzahl von 300: ein Sieg in jedem Level in jedem Modus mit jeder Putzkraft (10 Putzkräfte × 10 Level × 2 Modi = 200 Punkte) plus die Schätze (20 × 5 Punkte = 100 Punkte). Schaffe jedes Level in jedem Modus mit jeder Putzkraft und sammle alle Schätze, um 100 % zu erreichen.</p>
 
     <h3>Dreckige Böden</h3>
     <p>Der Boden ist dreckig, und je dreckiger er ist, desto langsamer läufst du. Wo deine Putzausrüstung entlangkommt, wird der Boden sauber. Auf blitzblankem Boden läufst du schneller und sammelst Staub aus größerer Entfernung. Der Dreck breitet sich langsam aus, und Müll hinterlässt Dreck, wo er läuft. Solange alles verdreckt ist, liegt ein brauner Dunst über dem Bild; er lichtet sich, je mehr du deine Umgebung und das ganze Haus putzt (in den Einstellungen abschaltbar).</p>

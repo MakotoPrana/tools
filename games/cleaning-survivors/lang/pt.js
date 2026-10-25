@@ -58,7 +58,7 @@
     tutDump: "A poeira recolhida enche a <b>lixeira</b> (caixa de poeira) no canto inferior esquerdo. <b>Cheia, seu dano cai pela metade, você não recolhe poeira e fica mais lento</b>. Fique em cima do <b>ponto de coleta verde</b> que existe em cada cômodo para esvaziá-la",
     tutDanger: "Quanto mais ★ um cômodo tem, mais sujo ele está e mais duro é o lixo, então <b>comece pelos de menos ★</b>. Nas fases de verdade, você vence limpando <b>todos os cômodos em até 10 minutos</b>. Limpe os cômodos que faltam!",
     achievements: "Conquistas",
-    achClears: "Vitórias por faxineiro (extra)",
+    achClears: "Vitórias por faxineiro",
     settings: "Configurações",
     stageSelect: "Escolha uma fase",
     recordOf: (name) => `Recordes de ${name}`,
@@ -77,6 +77,8 @@
     unlockText: (n, stage) => `Entra para a equipe quando você encontrar o tesouro da fase ${n}, "${stage}"`,
     trait: (name, desc) => `Traço "${name}": ${desc}`,
     charStats: (hp, gears) => `PV ${hp} · Equipamento inicial: ${gears}`,
+    charPower: (s) => `Força ${s}`,
+    charFav: (b, n) => `Build favorita: ${b} (dano do equipamento favorito +${n}%)`,
     sep: ", ",
     stageTitle: (n, name) => `Fase ${n}: ${name}`,
     planAlt: "Planta",
@@ -91,7 +93,7 @@
     pickCleaner: "Escolha seu faxineiro",
     deploy: (mode) => `Começar (${mode})`,
     back: "Voltar",
-    charsSub: "Recordes extras para quem quer completar tudo; não contam para o progresso. Escolha um faxineiro para ver as vitórias dele por fase e modo",
+    charsSub: "As vitórias de cada faxineiro em cada fase e modo contam para o progresso. Escolha um faxineiro para ver as vitórias dele por fase e modo",
     treasures: (a, b) => `Tesouros (${a}/${b})`,
     roomsCell: (r, n) => `${r}/${n} cômodos`,
     clears: (a, b) => `Vitórias ${a}/${b}`,
@@ -237,7 +239,7 @@
   evos: {
     blackhole: ["Aspirador buraco negro", "Coloca à frente um vórtice de sucção que causa dano a todo o lixo dentro dele."],
     steam: ["Canhão de vapor superaquecido", "Um raio de vapor grosso e longo que deixa brilhando na hora tudo em sua linha."],
-    army: ["Esquadrão de robôs", "Os robôs procuram sozinhos sujeira e lixo e patrulham o cômodo."],
+    army: ["Esquadrão de robôs", "Robôs em maior número e maiores giram mais rápido ao seu redor, esmagam o lixo e dão brilho a uma área maior."],
     acid: ["Névoa de chuva ácida", "Faz chover desinfetante na tela inteira."],
     giant: ["Rolo compressor gigante", "Um rolo enorme que deixa brilhando todo o seu caminho e esmaga o lixo."],
     tornado: ["Esfregão tornado", "Varre sem parar ao seu redor em alta velocidade."],
@@ -266,6 +268,10 @@
     runta: ["Runta, o robô", "Rodas off-road", "Não fica lento em chão sujo", "Um robô aspirador construído com as plantas do depósito."],
     koroko: ["Koroko do rolo", "Ótima coletora", "Alcance de coleta +40%, caixa +40", "Uma garota que adora arrumar e herdou o lendário rolo tira-pelos."],
     kiyoshi: ["Dr. Kiyoshi", "Imunidade de ferro", "Imune a alergias, +50% de dano contra mofo", "Um doutor dedicado à pesquisa do mofo. Procurava seu caderno perdido."],
+    tsugumi: ["Tsugumi, a aprendiz", "Ainda aprendiz", "Dano −20%, EXP +10%", "Uma aprendiz que acabou de chegar à mansão. Mas com a esponja mágica ninguém a vence."],
+    hayate: ["Hayate, o vendaval", "Espanador vendaval", "Intervalo de ataque −10%", "Um faxineiro veloz que joga espanadores como o vento. Aguenta mal os golpes."],
+    reika: ["Senhorita Reika", "Menina mimada", "Pouco PV, lenta e dano −15%, mas moedas +30%", "Uma senhorita criada numa mansão. Sem o purificador de ar, não dá um passo."],
+    gou: ["Gou, o chefão", "Garra de chefão", "Dano +15%, dano recebido −2", "Um chefão durão que limpou a cidade inteira com um só esfregão. Ninguém na mansão aguenta mais."],
     tome: ["Vovó Tome", "Sabedoria da idade", "Começa com 2 equipamentos, EXP +25%", "A antiga zeladora da mansão. Lenta para andar, mas ninguém supera sua sabedoria e experiência."],
   },
   bonus: {
@@ -365,10 +371,10 @@
     <p>Quando ficar sem forças, você pode se levantar ali mesmo uma vez por partida (com todos os PV, e o lixo próximo é jogado longe). Se não gostar das opções ao subir de nível, você pode ganhar 2 trocas. Ao vencer uma fase, você pode multiplicar por 1,5 as moedas ganhas. Cada recompensa é ganha assistindo a um anúncio e só está disponível jogando no CrazyGames.</p>
 
     <h3>Faxineiros e tesouros</h3>
-    <p>São 6 faxineiros, cada um com equipamento inicial e traço diferentes (dá brilho mais largo ao andar, não fica lento em chão sujo, não tem alergia etc.). Cada fase esconde um tesouro no Normal e outro no Difícil, 20 no total; um tesouro aparece quando você conclui o cômodo com mais ★ naquele modo. Os tesouros são salvos assim que você os pega. Alguns tesouros do Normal fazem um novo faxineiro entrar para a equipe, e dois tesouros do Difícil liberam as habilidades permanentes Trocar opções e Reviver. Na tela "Conquistas" (pelo título) você vê as vitórias de cada faxineiro e os tesouros reunidos, com dicas dos que faltam.</p>
+    <p>São 10 faxineiros, cada um com equipamento inicial e traço diferentes. O equipamento inicial é o equipamento favorito do faxineiro e causa +25% de dano (a build favorita aparece no perfil). A força vai de ★1 a ★5; os faxineiros ★1 têm pouco PV ou pouco dano e servem de desafio. Cada fase esconde um tesouro no Normal e outro no Difícil, 20 no total; um tesouro aparece quando você conclui o cômodo com mais ★ naquele modo. Os tesouros são salvos assim que você os pega. Alguns tesouros do Normal fazem um novo faxineiro entrar para a equipe, e dois tesouros do Difícil liberam as habilidades permanentes Trocar opções e Reviver. Na tela "Conquistas" (pelo título) você vê as vitórias de cada faxineiro e os tesouros reunidos, com dicas dos que faltam.</p>
 
     <h3>Progresso</h3>
-    <p>O progresso conta quantos dos 40 objetivos você alcançou: as vitórias de cada fase em cada modo (10 fases × 2 modos = 20) mais os tesouros (20). Qualquer faxineiro pode conseguir uma vitória. As vitórias de cada faxineiro aparecem na tela "Conquistas" como recordes extras, mas não contam para o progresso.</p>
+    <p>O progresso é a sua pontuação de 300: uma vitória em cada fase e cada modo com cada faxineiro (10 faxineiros × 10 fases × 2 modos = 200 pontos) mais os tesouros (20 × 5 pontos = 100 pontos). Vença todas as fases em todos os modos com todos os faxineiros e reúna todos os tesouros para chegar a 100%.</p>
 
     <h3>Chão sujo</h3>
     <p>O chão está sujo, e quanto mais sujo, mais devagar você anda. Por onde seu equipamento passa, o chão fica limpo. Num chão brilhando você anda mais rápido e recolhe poeira de mais longe. A sujeira se espalha aos poucos, e o lixo suja por onde passa. Enquanto está tudo muito sujo, uma névoa marrom cobre a tela; ela se dissipa conforme você limpa ao seu redor e a casa toda (dá para desligar nas configurações).</p>
