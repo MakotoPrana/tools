@@ -85,7 +85,7 @@
     briefDesc: "<b>Limpe todos os cômodos em até 10 minutos</b> para vencer a fase. Destrua todos os <b>focos</b> (pontos vermelhos) de um cômodo e deixe o chão brilhando para concluí-lo e ganhar um baú e um bônus. <b>Quanto mais ★ um cômodo tem, mais sujo ele está</b>, com mais lixo e mais duro. Se entrar cedo demais, você vai ser sobrepujado, então comece pelos cômodos de menos ★. Os focos são <b>mais duros quanto mais sujo estiver ao redor</b>, então esfregue ao redor primeiro.",
     srcCount: (n) => `Focos ${n}`,
     treasureFoundLine: (name) => `Tesouro "${name}" encontrado!`,
-    treasureHint: (st, room) => `Tesouro: conclua o cômodo ${st} "${room}" para encontrá-lo`,
+    treasureHint: (cond) => `Tesouro: ${cond}`,
     joined: (name) => `${name} entrou para a equipe`,
     willJoin: "Encontrar este tesouro libera um novo faxineiro",
     bossNote: (mid, boss) => `O subchefe "${mid}" aparece aos 5:00, e o chefe "${boss}" aos 9:00.`,
@@ -191,7 +191,19 @@
     perkOn: "Liberada (por um tesouro)",
     perkGot: (name) => `Habilidade permanente "${name}" liberada!`,
     perkTeaser: (name) => `Libera a habilidade permanente "${name}"`,
-    treasureClue: (stage, mode) => `Dica: em ${stage} (${mode}), ele dorme no fundo do cômodo mais sujo`,
+    treasureClue: (stage, mode, cond) => `Dica (${stage}, ${mode}): ${cond}`,
+    condRoom: (room) => `Concluir o cômodo com mais ★, "${room}"`,
+    condKills: (n, enemy) => `Eliminar ${n} × ${enemy} em uma partida`,
+    condRoomTime: (room, time) => `Concluir "${room}" em até ${time}`,
+    condSrcTime: (time) => `Destruir todos os focos da casa em até ${time}`,
+    condClearTime: (time) => `Limpar todos os cômodos em até ${time}`,
+    condBoss: (boss) => `Derrotar "${boss}"`,
+    condDumps: (n) => `Esvaziar a lixeira ${n} vezes em uma partida`,
+    condHpKeep: (pct) => `Vencer a fase sem que seu PV caia abaixo de ${pct}%`,
+    treasureAppeared: "Um tesouro apareceu!",
+    hudTreasure: (s) => `Tesouro ${s}`,
+    hudDumpCount: (a, b) => `Coletas ${a}/${b}`,
+    hudTimeLeft: (s) => `faltam ${s}`,
     treasurePerks: "Habilidades liberadas por tesouros",
     reviveFree: "Reviver com o poder do tesouro",
   },
@@ -371,7 +383,7 @@
     <p>Quando ficar sem forças, você pode se levantar ali mesmo uma vez por partida (com todos os PV, e o lixo próximo é jogado longe). Se não gostar das opções ao subir de nível, você pode ganhar 2 trocas. Ao vencer uma fase, você pode multiplicar por 1,5 as moedas ganhas. Cada recompensa é ganha assistindo a um anúncio e só está disponível jogando no CrazyGames.</p>
 
     <h3>Faxineiros e tesouros</h3>
-    <p>São 10 faxineiros, cada um com equipamento inicial e traço diferentes. O equipamento inicial é o equipamento favorito do faxineiro e causa +25% de dano (a build favorita aparece no perfil). A força vai de ★1 a ★5; os faxineiros ★1 têm pouco PV ou pouco dano e servem de desafio. Cada fase esconde um tesouro no Normal e outro no Difícil, 20 no total; um tesouro aparece quando você conclui o cômodo com mais ★ naquele modo. Os tesouros são salvos assim que você os pega. Alguns tesouros do Normal fazem um novo faxineiro entrar para a equipe, e dois tesouros do Difícil liberam as habilidades permanentes Trocar opções e Reviver. Na tela "Conquistas" (pelo título) você vê as vitórias de cada faxineiro e os tesouros reunidos, com dicas dos que faltam.</p>
+    <p>São 10 faxineiros, cada um com equipamento inicial e traço diferentes. O equipamento inicial é o equipamento favorito do faxineiro e causa +25% de dano (a build favorita aparece no perfil). A força vai de ★1 a ★5; os faxineiros ★1 têm pouco PV ou pouco dano e servem de desafio. Cada fase esconde um tesouro no Normal e outro no Difícil, 20 no total. Cada tesouro tem sua própria condição (concluir o cômodo com mais ★, eliminar uma quantidade de um tipo de lixo, limpar um cômodo dentro de um tempo, derrotar um chefe etc.), mostrada na tela antes de começar e na lista de tesouros. Durante a partida, o progresso aparece no canto superior direito, e o tesouro surge perto de você quando a condição é cumprida (condições cumpridas ao vencer a fase são entregues na vitória). Os tesouros são salvos assim que você os pega. Alguns tesouros do Normal fazem um novo faxineiro entrar para a equipe, e dois tesouros do Difícil liberam as habilidades permanentes Trocar opções e Reviver. Na tela "Conquistas" (pelo título) você vê as vitórias de cada faxineiro e os tesouros reunidos, com dicas dos que faltam.</p>
 
     <h3>Progresso</h3>
     <p>O progresso é a sua pontuação de 300: uma vitória em cada fase e cada modo com cada faxineiro (10 faxineiros × 10 fases × 2 modos = 200 pontos) mais os tesouros (20 × 5 pontos = 100 pontos). Vença todas as fases em todos os modos com todos os faxineiros e reúna todos os tesouros para chegar a 100%.</p>

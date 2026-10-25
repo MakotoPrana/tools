@@ -85,7 +85,7 @@
     briefDesc: "<b>Putze alle Räume in 10 Minuten</b>, um das Level zu schaffen. Zerstöre alle <b>Quellen</b> (rote Punkte) eines Raums und bring seinen Boden zum Glänzen, um ihn abzuschließen und eine Truhe und einen Bonus zu bekommen. <b>Räume mit mehr ★ sind dreckiger</b>, mit mehr und zäherem Müll. Gehst du zu früh hinein, wirst du überrannt, also fang mit den Räumen mit wenigen ★ an. Quellen sind <b>umso härter, je dreckiger ihre Umgebung ist</b>, also schrubb zuerst drumherum.",
     srcCount: (n) => `Quellen ${n}`,
     treasureFoundLine: (name) => `Schatz „${name}“ gefunden!`,
-    treasureHint: (st, room) => `Schatz: Putze den ${st}-Raum „${room}“ fertig, um ihn zu finden`,
+    treasureHint: (cond) => `Schatz: ${cond}`,
     joined: (name) => `${name} ist dabei`,
     willJoin: "Mit diesem Schatz schaltest du eine neue Putzkraft frei",
     bossNote: (mid, boss) => `Der Zwischenboss „${mid}“ erscheint bei 5:00, der Boss „${boss}“ bei 9:00.`,
@@ -191,7 +191,19 @@
     perkOn: "Freigeschaltet (durch einen Schatz)",
     perkGot: (name) => `Dauer-Upgrade „${name}“ freigeschaltet!`,
     perkTeaser: (name) => `Schaltet das Dauer-Upgrade „${name}“ frei`,
-    treasureClue: (stage, mode) => `Tipp: In ${stage} (${mode}) schlummert er tief im dreckigsten Raum`,
+    treasureClue: (stage, mode, cond) => `Tipp (${stage}, ${mode}): ${cond}`,
+    condRoom: (room) => `Den Raum mit den meisten ★, „${room}“, fertig putzen`,
+    condKills: (n, enemy) => `${n} × ${enemy} in einer Runde beseitigen`,
+    condRoomTime: (room, time) => `„${room}“ innerhalb von ${time} fertig putzen`,
+    condSrcTime: (time) => `Alle Quellen im Haus innerhalb von ${time} zerstören`,
+    condClearTime: (time) => `Alle Räume innerhalb von ${time} putzen`,
+    condBoss: (boss) => `„${boss}“ besiegen`,
+    condDumps: (n) => `In einer Runde ${n}-mal Müll entsorgen`,
+    condHpKeep: (pct) => `Das Level schaffen, ohne dass deine LP unter ${pct} % fallen`,
+    treasureAppeared: "Ein Schatz ist aufgetaucht!",
+    hudTreasure: (s) => `Schatz ${s}`,
+    hudDumpCount: (a, b) => `Entsorgt ${a}/${b}`,
+    hudTimeLeft: (s) => `noch ${s}`,
     treasurePerks: "Upgrades, die Schätze freischalten",
     reviveFree: "Mit der Kraft des Schatzes aufstehen",
   },
@@ -371,7 +383,7 @@
     <p>Bist du erschöpft, kannst du einmal pro Runde an Ort und Stelle wieder aufstehen (volle LP, und Müll in der Nähe wird weggefegt). Gefallen dir die Level-up-Auswahlen nicht, kannst du 2 Neuwürfe dazubekommen. Schaffst du ein Level, kannst du die verdienten Münzen mit 1,5 multiplizieren. Jede Belohnung gibt es fürs Ansehen einer Werbung, und nur, wenn du auf CrazyGames spielst.</p>
 
     <h3>Putzkräfte und Schätze</h3>
-    <p>Es gibt 10 Putzkräfte, jede mit eigener Startausrüstung und eigenem Talent. Die Startausrüstung ist die Lieblingsausrüstung der Putzkraft und macht +25 % Schaden (der Lieblings-Build steht im Profil). Die Stärke reicht von ★1 bis ★5; ★1-Putzkräfte haben wenig LP oder Schaden und sind als Herausforderung gedacht. Jedes Level versteckt einen Schatz in Normal und einen in Schwer, insgesamt 20; ein Schatz erscheint, wenn du den Raum mit den meisten ★ in diesem Modus abschließt. Schätze werden beim Aufheben sofort gespeichert. Bestimmte Normal-Schätze bringen eine neue Putzkraft ins Team, und zwei der Schwer-Schätze schalten die Dauer-Upgrades „Neu würfeln“ und „Wiederbeleben“ frei. Im Bildschirm „Erfolge“ (über den Titel) siehst du die Siege jeder Putzkraft und die gesammelten Schätze, mit Tipps zu den noch fehlenden.</p>
+    <p>Es gibt 10 Putzkräfte, jede mit eigener Startausrüstung und eigenem Talent. Die Startausrüstung ist die Lieblingsausrüstung der Putzkraft und macht +25 % Schaden (der Lieblings-Build steht im Profil). Die Stärke reicht von ★1 bis ★5; ★1-Putzkräfte haben wenig LP oder Schaden und sind als Herausforderung gedacht. Jedes Level versteckt einen Schatz in Normal und einen in Schwer, insgesamt 20. Jeder Schatz hat eine eigene Bedingung (den Raum mit den meisten ★ abschließen, eine Anzahl einer bestimmten Müllart beseitigen, einen Raum in einer Zeitgrenze putzen, einen Boss besiegen usw.), die im Vorbereitungsbildschirm und in der Schatzliste steht. Während des Spiels siehst du oben rechts den Fortschritt, und der Schatz erscheint in deiner Nähe, sobald die Bedingung erfüllt ist (Bedingungen, die beim Sieg erfüllt werden, gibt es beim Abschluss des Levels). Schätze werden beim Aufheben sofort gespeichert. Bestimmte Normal-Schätze bringen eine neue Putzkraft ins Team, und zwei der Schwer-Schätze schalten die Dauer-Upgrades „Neu würfeln“ und „Wiederbeleben“ frei. Im Bildschirm „Erfolge“ (über den Titel) siehst du die Siege jeder Putzkraft und die gesammelten Schätze, mit Tipps zu den noch fehlenden.</p>
 
     <h3>Fortschritt</h3>
     <p>Der Fortschritt ist deine Punktzahl von 300: ein Sieg in jedem Level in jedem Modus mit jeder Putzkraft (10 Putzkräfte × 10 Level × 2 Modi = 200 Punkte) plus die Schätze (20 × 5 Punkte = 100 Punkte). Schaffe jedes Level in jedem Modus mit jeder Putzkraft und sammle alle Schätze, um 100 % zu erreichen.</p>
