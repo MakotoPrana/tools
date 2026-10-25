@@ -170,7 +170,7 @@
     shake: "Wackeln & Blitze",
     haze: "Dreckdunst",
     reviveTitle: "Noch ein Versuch?",
-    reviveText: "Steh mit vollen LP genau dort wieder auf, wo du gefallen bist. Wiederbeleben geht nur einmal pro Runde.",
+    reviveText: "Steh mit vollen LP genau dort wieder auf, wo du gefallen bist.",
     reviveBtn: "Wiederbeleben",
     giveUp: "Aufgeben",
     revived: "Wieder da! Weiter geht's!",
@@ -180,6 +180,18 @@
     withAd: (s) => `📺 Werbung ansehen: ${s}`,
     adLoading: "Werbung wird geladen …",
     adFailed: "Werbung konnte nicht geladen werden. Warte kurz und versuch es noch einmal",
+    howToPlay: "Spielanleitung",
+    perkReroll: "Neu würfeln",
+    perkRerollDesc: "Ein Neuwurf beim Level-up in jeder Runde",
+    perkRevive: "Wiederbeleben",
+    perkReviveDesc: "Einmal pro Runde mit vollen LP wieder aufstehen, wenn du erschöpft bist",
+    perkHow: (n, mode) => `Freigeschaltet durch den Schatz von Level ${n} (${mode})`,
+    perkOn: "Freigeschaltet (durch einen Schatz)",
+    perkGot: (name) => `Dauer-Upgrade „${name}“ freigeschaltet!`,
+    perkTeaser: (name) => `Schaltet das Dauer-Upgrade „${name}“ frei`,
+    treasureClue: (stage, mode) => `Tipp: In ${stage} (${mode}) schlummert er tief im dreckigsten Raum`,
+    treasurePerks: "Upgrades, die Schätze freischalten",
+    reviveFree: "Mit der Kraft des Schatzes aufstehen",
   },
   enemies: {
     dust: ["Wollmaus", "Schwach, kommt aber in riesigen Schwärmen. In jedem Raum zu finden."],
@@ -314,6 +326,18 @@
       { shoko: "Bibliothek", bedroom: "Schlafzimmer", closet: "Ankleide", hall: "Großer Saal", master: "Herrenzimmer" },
       ["Schlüssel der Villa", "Ein alter Schlüssel, der jede Tür der Villa öffnet. Er gehörte der früheren Verwalterin."]],
   ],
+  hardTreasures: [
+    ["Winkekatze", "Eine goldene Winkekatze, vergraben auf dem Schuhschrank im Eingang."],
+    ["Silberne Schöpfkelle", "Die schwere silberne Kelle, die der Koch der Villa so liebte."],
+    ["Glückswürfel", "Ein Würfel vom Grund der Badewanne, mit dem man sein Schicksal neu würfeln kann."],
+    ["Aufziehpuppe", "Eine alte Puppe, die mit einem kleinen Besen fegt, wenn man sie aufzieht."],
+    ["Goldene Gießkanne", "Eine glänzende goldene Gießkanne, vergraben im Blumenbeet."],
+    ["Phönix-Staubwedel", "Ein Staubwedel, tief im Dachboden versteckt, der immer wieder auferstehen soll."],
+    ["Messingzahnrad", "Ein großes, glänzendes Zahnrad, das sich aus dem Herzen des Kessels gelöst hat."],
+    ["Retro-Radio", "Ein altes Radio aus dem Gerümpelhaufen. Es spielt noch."],
+    ["Geistereinladung", "Eine alte Einladung mit den Namen der Geister, die zum Fest geladen waren."],
+    ["Goldene Kehrschaufel", "Eine Kehrschaufel aus reinem Gold, die der Herr des Hauses nie hergab."],
+  ],
   tutorial: ["Tutorial", "Ein kleines Haus mit drei Räumen, um das Spiel zu lernen.", { genkan: "Eingang", living: "Wohnzimmer", washitsu: "Tatami-Zimmer" }],
   help: `
     <h2>So wird gespielt</h2>
@@ -341,10 +365,10 @@
     <p>Bist du erschöpft, kannst du einmal pro Runde an Ort und Stelle wieder aufstehen (volle LP, und Müll in der Nähe wird weggefegt). Gefallen dir die Level-up-Auswahlen nicht, kannst du 2 Neuwürfe dazubekommen. Schaffst du ein Level, kannst du die verdienten Münzen mit 1,5 multiplizieren. Jede Belohnung gibt es fürs Ansehen einer Werbung, und nur, wenn du auf CrazyGames spielst.</p>
 
     <h3>Putzkräfte und Schätze</h3>
-    <p>Es gibt 6 Putzkräfte, jede mit eigener Startausrüstung und eigenem Talent (poliert beim Laufen breiter, wird auf dreckigem Boden nicht langsamer, bekommt keine Allergien usw.). Jedes Level versteckt einen Schatz, der erscheint, wenn du den Raum mit den meisten ★ abschließt. Schätze werden beim Aufheben sofort gespeichert, und bestimmte Schätze bringen eine neue Putzkraft ins Team. Im Bildschirm „Erfolge“ (über den Titel) siehst du die Siege jeder Putzkraft pro Level und Modus und die gesammelten Schätze.</p>
+    <p>Es gibt 6 Putzkräfte, jede mit eigener Startausrüstung und eigenem Talent (poliert beim Laufen breiter, wird auf dreckigem Boden nicht langsamer, bekommt keine Allergien usw.). Jedes Level versteckt einen Schatz in Normal und einen in Schwer, insgesamt 20; ein Schatz erscheint, wenn du den Raum mit den meisten ★ in diesem Modus abschließt. Schätze werden beim Aufheben sofort gespeichert. Bestimmte Normal-Schätze bringen eine neue Putzkraft ins Team, und zwei der Schwer-Schätze schalten die Dauer-Upgrades „Neu würfeln“ und „Wiederbeleben“ frei. Im Bildschirm „Erfolge“ (über den Titel) siehst du die Siege jeder Putzkraft und die gesammelten Schätze, mit Tipps zu den noch fehlenden.</p>
 
     <h3>Fortschritt</h3>
-    <p>Der Fortschritt zählt, wie viele von 30 Zielen du erreicht hast: Siege in jedem Level in jedem Modus (10 Level × 2 Modi = 20) plus die Schätze (10). Jede Putzkraft kann einen Sieg holen. Die Siege der einzelnen Putzkräfte werden im Bildschirm „Erfolge“ als Extra-Rekorde gezeigt, zählen aber nicht zum Fortschritt.</p>
+    <p>Der Fortschritt zählt, wie viele von 40 Zielen du erreicht hast: Siege in jedem Level in jedem Modus (10 Level × 2 Modi = 20) plus die Schätze (20). Jede Putzkraft kann einen Sieg holen. Die Siege der einzelnen Putzkräfte werden im Bildschirm „Erfolge“ als Extra-Rekorde gezeigt, zählen aber nicht zum Fortschritt.</p>
 
     <h3>Dreckige Böden</h3>
     <p>Der Boden ist dreckig, und je dreckiger er ist, desto langsamer läufst du. Wo deine Putzausrüstung entlangkommt, wird der Boden sauber. Auf blitzblankem Boden läufst du schneller und sammelst Staub aus größerer Entfernung. Der Dreck breitet sich langsam aus, und Müll hinterlässt Dreck, wo er läuft. Solange alles verdreckt ist, liegt ein brauner Dunst über dem Bild; er lichtet sich, je mehr du deine Umgebung und das ganze Haus putzt (in den Einstellungen abschaltbar).</p>

@@ -495,6 +495,35 @@ body {
 .reward .card:hover img, .reward .card:focus-visible img { transform: scale(1.12) rotate(-6deg); transition: transform 0.15s; }
 .reward .card-lv.new { padding: 0 6px; border-radius: 4px; background: rgba(79, 224, 182, 0.18); box-shadow: 0 0 10px rgba(79, 224, 182, 0.6); animation: new-glow 1s ease-in-out infinite alternate; }
 
+/* レベルアップの画面は、スクロールしないで 1 画面に収まるように詰める */
+.overlay:has(.panel.levelup) { padding: 8px; }
+.panel.levelup { max-width: 640px; padding: 10px 12px 12px; }
+.levelup .lv-head { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.levelup .reward-title { font-size: clamp(1.4rem, 6vw, 1.9rem); }
+.levelup .lv-badge { margin: 0; }
+.levelup .sub { margin: 2px 0 8px; font-size: 0.8rem; }
+.levelup .tut-tip { margin-bottom: 6px; padding: 6px 10px; font-size: 0.78rem; }
+.levelup .cards { gap: 6px; }
+.levelup .card { gap: 8px; padding: 6px 8px; line-height: 1.35; }
+.levelup .card img { width: 38px; height: 38px; }
+.levelup .card-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.76rem; }
+.levelup .card-hint { font-size: 0.7rem; }
+.levelup .recipe { margin-top: 2px; padding: 1px 6px 1px 3px; }
+.levelup .rc-ic, .levelup .card .recipe img.rc-ic { width: 18px; height: 18px; }
+.levelup .rc-evo { display: none; }
+.levelup .inv { margin-top: 8px; gap: 4px; }
+.levelup .inv-slot { height: 26px; }
+.levelup .inv-slot img { width: 18px; height: 18px; }
+.levelup .actions { margin-top: 8px; }
+.levelup .card-body br { display: none; }
+.levelup .card-desc, .levelup .card-hint, .levelup .recipe { display: block; }
+.levelup .card-desc { display: -webkit-box; }
+.levelup .recipe { display: inline-flex; }
+/* 横に広い画面では候補を 2 列に並べる */
+@media (min-width: 620px) {
+  .levelup .cards.many { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* 宝箱: ガタガタ揺れて、光って、中身が飛び出す */
 .chest-stage { position: relative; width: 120px; height: 120px; margin: 4px auto 8px; }
 .chest-box, .chest-reward { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -575,12 +604,17 @@ body {
 .setting input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--mint); }
 
 /* 遊び方 */
-.help { margin-top: 24px; font-size: 0.92rem; }
-.help h2 { font-size: 1.1rem; }
-.help h3 { font-size: 0.98rem; margin: 18px 0 6px; }
-.help table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
-.help th, .help td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
-.help th { background: var(--card); font-weight: 600; width: 45%; }
+/* 遊び方: HTML に言語ごとに書いておき、ページには出さずに「遊び方」の画面 (.help-body) に写して見せる */
+.help { display: none !important; }
+.help-body { font-size: 0.9rem; line-height: 1.7; text-align: left; }
+.help-body h3 { font-size: 0.98rem; margin: 18px 0 6px; color: var(--mint); }
+.help-body h3:first-child { margin-top: 4px; }
+.help-body p { margin: 0 0 8px; color: var(--panel-text); }
+.help-body b { color: var(--gold); }
+.help-wrap { overflow-x: auto; }
+.help-body table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+.help-body th, .help-body td { border: 1px solid rgba(255, 255, 255, 0.14); padding: 6px 10px; text-align: left; vertical-align: top; }
+.help-body th { background: var(--panel-2); font-weight: 600; width: 45%; }
 
 footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 16px 32px; }
 
@@ -618,6 +652,15 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 
 .treasure-line.found { color: var(--gold); }
 .treasure-line.found img { filter: none; }
 .treasure-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.mode-chip { display: inline-block; padding: 0 6px; border-radius: 999px; font-size: 0.62rem; font-weight: 800; vertical-align: 1px; }
+.mode-chip.normal { background: rgba(79, 224, 182, 0.2); color: var(--mint); }
+.mode-chip.hard { background: rgba(255, 107, 107, 0.2); color: #ff8a8a; }
+.treasure-list .clue { color: var(--panel-muted); font-style: italic; }
+.treasure-list .tre-extra { color: var(--gold); font-weight: 700; }
+.treasure-list li.perk:not(.found) { box-shadow: inset 0 0 0 1px rgba(255, 207, 74, 0.35); }
+.shop-item.perk { opacity: 0.75; }
+.shop-item.perk.on { opacity: 1; box-shadow: inset 0 0 0 1px rgba(255, 207, 74, 0.5); }
+.perk-how { color: var(--gold); }
 .treasure-list li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: var(--panel-2); font-size: 0.85rem; color: var(--panel-muted); }
 .treasure-list img { flex: none; width: 30px; height: 30px; filter: grayscale(1) brightness(0.5); }
 .treasure-list li.found { color: var(--panel-text); }

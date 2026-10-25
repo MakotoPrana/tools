@@ -170,7 +170,7 @@
     shake: "Vibrazioni e lampi",
     haze: "Foschia di sporco",
     reviveTitle: "Ci riprovi?",
-    reviveText: "Rialzati sul posto con tutti i PS. Puoi rinascere solo una volta per partita.",
+    reviveText: "Rialzati sul posto con tutti i PS.",
     reviveBtn: "Rinasci",
     giveUp: "Arrenditi",
     revived: "Di nuovo in piedi! Forza!",
@@ -180,6 +180,18 @@
     withAd: (s) => `📺 Guarda una pubblicità: ${s}`,
     adLoading: "Caricamento pubblicità…",
     adFailed: "Impossibile caricare la pubblicità. Aspetta un momento e riprova",
+    howToPlay: "Come si gioca",
+    perkReroll: "Cambia scelte",
+    perkRerollDesc: "Un cambio di scelte al livello su in ogni partita",
+    perkRevive: "Rinascita",
+    perkReviveDesc: "Una volta per partita, rialzati con tutti i PS quando sei esausto",
+    perkHow: (n, mode) => `Si sblocca trovando il tesoro del livello ${n} (${mode})`,
+    perkOn: "Sbloccata (da un tesoro)",
+    perkGot: (name) => `Abilità permanente «${name}» sbloccata!`,
+    perkTeaser: (name) => `Sblocca l'abilità permanente «${name}»`,
+    treasureClue: (stage, mode) => `Indizio: in ${stage} (${mode}), dorme in fondo alla stanza più sporca`,
+    treasurePerks: "Abilità sbloccate dai tesori",
+    reviveFree: "Rinasci con il potere del tesoro",
   },
   enemies: {
     dust: ["Batuffolo di polvere", "Debole, ma arriva in sciami enormi. Si trova in ogni stanza."],
@@ -314,6 +326,18 @@
       { shoko: "Biblioteca", bedroom: "Camera da letto", closet: "Guardaroba", hall: "Salone", master: "Stanza del padrone" },
       ["Chiave della villa", "Una vecchia chiave che apre tutte le porte della villa. Apparteneva all'ex custode."]],
   ],
+  hardTreasures: [
+    ["Gatto portafortuna", "Un maneki-neko dorato sepolto sulla scarpiera dell'ingresso."],
+    ["Mestolo d'argento", "Il pesante mestolo d'argento amato dal cuoco della villa."],
+    ["Dado fortunato", "Un dado trovato sul fondo della vasca, che permetterebbe di ritirare il destino."],
+    ["Bambola a carica", "Una vecchia bambola che spazza il pavimento con una scopetta quando la carichi."],
+    ["Annaffiatoio d'oro", "Uno splendente annaffiatoio dorato sepolto nell'aiuola."],
+    ["Piumino della fenice", "Un piumino nascosto in fondo alla soffitta che, si dice, rinasce sempre."],
+    ["Ingranaggio d'ottone", "Un grosso ingranaggio lucente staccatosi dal cuore della caldaia."],
+    ["Radio rétro", "Una vecchia radio tirata fuori dal mucchio di cianfrusaglie. Funziona ancora."],
+    ["Invito spettrale", "Un vecchio invito con i nomi dei fantasmi invitati al banchetto."],
+    ["Paletta d'oro", "Una paletta in oro massiccio da cui il Signore della casa non si è mai separato."],
+  ],
   tutorial: ["Tutorial", "Una casetta di tre stanze per imparare a giocare.", { genkan: "Ingresso", living: "Soggiorno", washitsu: "Stanza dei tatami" }],
   help: `
     <h2>Come si gioca</h2>
@@ -341,10 +365,10 @@
     <p>Quando sei esausto, puoi rialzarti sul posto una volta per partita (tutti i PS, e i rifiuti vicini vengono spazzati via). Se le scelte al livello su non ti piacciono, puoi ottenere 2 cambi. Quando completi un livello, puoi moltiplicare per 1,5 le monete guadagnate. Ogni ricompensa si ottiene guardando una pubblicità ed è disponibile solo se giochi su CrazyGames.</p>
 
     <h3>Addetti e tesori</h3>
-    <p>Ci sono 6 addetti, ognuno con attrezzi iniziali e talento diversi (lucida più largo camminando, non rallenta sui pavimenti sporchi, non soffre di allergie, ecc.). Ogni livello nasconde un tesoro, che appare quando completi la stanza con più ★. I tesori vengono salvati appena li raccogli, e alcuni fanno unire un nuovo addetto. Nella schermata «Obiettivi» (dal titolo) puoi vedere le vittorie di ogni addetto per livello e modalità e i tesori raccolti.</p>
+    <p>Ci sono 6 addetti, ognuno con attrezzi iniziali e talento diversi (lucida più largo camminando, non rallenta sui pavimenti sporchi, non soffre di allergie, ecc.). Ogni livello nasconde un tesoro in Normale e uno in Difficile, 20 in tutto; un tesoro appare quando completi la stanza con più ★ in quella modalità. I tesori vengono salvati appena li raccogli. Alcuni tesori di Normale fanno unire un nuovo addetto, e due tesori di Difficile sbloccano le abilità permanenti Cambia scelte e Rinascita. Nella schermata «Obiettivi» (dal titolo) puoi vedere le vittorie di ogni addetto e i tesori raccolti, con indizi per quelli che mancano.</p>
 
     <h3>Completamento</h3>
-    <p>Il completamento conta quanti dei 30 obiettivi hai raggiunto: le vittorie di ogni livello in ogni modalità (10 livelli × 2 modalità = 20) più i tesori (10). Qualsiasi addetto può ottenere una vittoria. Le vittorie dei singoli addetti appaiono nella schermata «Obiettivi» come record extra, ma non contano per il completamento.</p>
+    <p>Il completamento conta quanti dei 40 obiettivi hai raggiunto: le vittorie di ogni livello in ogni modalità (10 livelli × 2 modalità = 20) più i tesori (20). Qualsiasi addetto può ottenere una vittoria. Le vittorie dei singoli addetti appaiono nella schermata «Obiettivi» come record extra, ma non contano per il completamento.</p>
 
     <h3>Pavimenti sporchi</h3>
     <p>Il pavimento è sporco, e più è sporco, più cammini lentamente. Dove passano i tuoi attrezzi, il pavimento diventa pulito. Su un pavimento splendente cammini più veloce e raccogli la polvere da più lontano. Lo sporco si espande piano piano, e i rifiuti sporcano dove passano. Finché tutto è molto sporco, una foschia marrone copre lo schermo; si dirada man mano che pulisci intorno a te e tutta la casa (disattivabile nelle impostazioni).</p>

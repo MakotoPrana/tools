@@ -170,7 +170,7 @@
     shake: "Tremor e flashes",
     haze: "Névoa de sujeira",
     reviveTitle: "Quer tentar de novo?",
-    reviveText: "Levante-se ali mesmo com todos os PV. Você só pode reviver uma vez por partida.",
+    reviveText: "Levante-se ali mesmo com todos os PV.",
     reviveBtn: "Reviver",
     giveUp: "Desistir",
     revived: "De volta! Continue!",
@@ -180,6 +180,18 @@
     withAd: (s) => `📺 Ver um anúncio: ${s}`,
     adLoading: "Carregando anúncio…",
     adFailed: "Não foi possível carregar um anúncio. Espere um pouco e tente de novo",
+    howToPlay: "Como jogar",
+    perkReroll: "Trocar opções",
+    perkRerollDesc: "Uma troca de opções ao subir de nível em toda partida",
+    perkRevive: "Reviver",
+    perkReviveDesc: "Uma vez por partida, levante-se com todos os PV quando ficar sem forças",
+    perkHow: (n, mode) => `Liberada ao encontrar o tesouro da fase ${n} (${mode})`,
+    perkOn: "Liberada (por um tesouro)",
+    perkGot: (name) => `Habilidade permanente "${name}" liberada!`,
+    perkTeaser: (name) => `Libera a habilidade permanente "${name}"`,
+    treasureClue: (stage, mode) => `Dica: em ${stage} (${mode}), ele dorme no fundo do cômodo mais sujo`,
+    treasurePerks: "Habilidades liberadas por tesouros",
+    reviveFree: "Reviver com o poder do tesouro",
   },
   enemies: {
     dust: ["Bolinha de poeira", "Fraca, mas vem em enxames enormes. Está em todos os cômodos."],
@@ -314,6 +326,18 @@
       { shoko: "Biblioteca", bedroom: "Quarto", closet: "Closet", hall: "Salão principal", master: "Aposento do senhor" },
       ["Chave da mansão", "Uma chave antiga que abre todas as portas da mansão. Pertencia à antiga zeladora."]],
   ],
+  hardTreasures: [
+    ["Gato da sorte", "Um maneki-neko dourado soterrado em cima da sapateira da entrada."],
+    ["Concha de prata", "A pesada concha de prata que o cozinheiro da mansão adorava."],
+    ["Dado da sorte", "Um dado do fundo da banheira; dizem que permite rolar o destino de novo."],
+    ["Boneca de corda", "Uma boneca antiga que varre o chão com uma vassourinha quando se dá corda."],
+    ["Regador dourado", "Um regador dourado e reluzente enterrado no canteiro."],
+    ["Espanador da fênix", "Um espanador escondido no fundo do sótão que, dizem, renasce sempre."],
+    ["Engrenagem de latão", "Uma grande engrenagem brilhante que se soltou do coração da caldeira."],
+    ["Rádio retrô", "Um rádio antigo tirado do monte de tralha. Ainda toca."],
+    ["Convite fantasma", "Um convite antigo com os nomes dos fantasmas chamados para o banquete."],
+    ["Pá de lixo dourada", "Uma pá de lixo de ouro maciço que o Senhor da casa nunca largou."],
+  ],
   tutorial: ["Tutorial", "Uma casinha de três cômodos para aprender a jogar.", { genkan: "Entrada", living: "Sala de estar", washitsu: "Sala de tatame" }],
   help: `
     <h2>Como jogar</h2>
@@ -341,10 +365,10 @@
     <p>Quando ficar sem forças, você pode se levantar ali mesmo uma vez por partida (com todos os PV, e o lixo próximo é jogado longe). Se não gostar das opções ao subir de nível, você pode ganhar 2 trocas. Ao vencer uma fase, você pode multiplicar por 1,5 as moedas ganhas. Cada recompensa é ganha assistindo a um anúncio e só está disponível jogando no CrazyGames.</p>
 
     <h3>Faxineiros e tesouros</h3>
-    <p>São 6 faxineiros, cada um com equipamento inicial e traço diferentes (dá brilho mais largo ao andar, não fica lento em chão sujo, não tem alergia etc.). Cada fase esconde um tesouro, que aparece quando você conclui o cômodo com mais ★. Os tesouros são salvos assim que você os pega, e alguns fazem um novo faxineiro entrar para a equipe. Na tela "Conquistas" (pelo título) você vê as vitórias de cada faxineiro por fase e modo e os tesouros reunidos.</p>
+    <p>São 6 faxineiros, cada um com equipamento inicial e traço diferentes (dá brilho mais largo ao andar, não fica lento em chão sujo, não tem alergia etc.). Cada fase esconde um tesouro no Normal e outro no Difícil, 20 no total; um tesouro aparece quando você conclui o cômodo com mais ★ naquele modo. Os tesouros são salvos assim que você os pega. Alguns tesouros do Normal fazem um novo faxineiro entrar para a equipe, e dois tesouros do Difícil liberam as habilidades permanentes Trocar opções e Reviver. Na tela "Conquistas" (pelo título) você vê as vitórias de cada faxineiro e os tesouros reunidos, com dicas dos que faltam.</p>
 
     <h3>Progresso</h3>
-    <p>O progresso conta quantos dos 30 objetivos você alcançou: as vitórias de cada fase em cada modo (10 fases × 2 modos = 20) mais os tesouros (10). Qualquer faxineiro pode conseguir uma vitória. As vitórias de cada faxineiro aparecem na tela "Conquistas" como recordes extras, mas não contam para o progresso.</p>
+    <p>O progresso conta quantos dos 40 objetivos você alcançou: as vitórias de cada fase em cada modo (10 fases × 2 modos = 20) mais os tesouros (20). Qualquer faxineiro pode conseguir uma vitória. As vitórias de cada faxineiro aparecem na tela "Conquistas" como recordes extras, mas não contam para o progresso.</p>
 
     <h3>Chão sujo</h3>
     <p>O chão está sujo, e quanto mais sujo, mais devagar você anda. Por onde seu equipamento passa, o chão fica limpo. Num chão brilhando você anda mais rápido e recolhe poeira de mais longe. A sujeira se espalha aos poucos, e o lixo suja por onde passa. Enquanto está tudo muito sujo, uma névoa marrom cobre a tela; ela se dissipa conforme você limpa ao seu redor e a casa toda (dá para desligar nas configurações).</p>

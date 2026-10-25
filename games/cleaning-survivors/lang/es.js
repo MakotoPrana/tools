@@ -170,7 +170,7 @@
     shake: "Temblor y destellos",
     haze: "Neblina de mugre",
     reviveTitle: "¿Lo intentas otra vez?",
-    reviveText: "Levántate ahí mismo con todos los PV. Solo puedes revivir una vez por partida.",
+    reviveText: "Levántate ahí mismo con todos los PV.",
     reviveBtn: "Revivir",
     giveUp: "Rendirse",
     revived: "¡De vuelta! ¡Sigue así!",
@@ -180,6 +180,18 @@
     withAd: (s) => `📺 Ver un anuncio: ${s}`,
     adLoading: "Cargando anuncio…",
     adFailed: "No se pudo cargar un anuncio. Espera un momento y vuelve a intentarlo",
+    howToPlay: "Cómo jugar",
+    perkReroll: "Cambiar opciones",
+    perkRerollDesc: "Un cambio de opciones al subir de nivel en cada partida",
+    perkRevive: "Revivir",
+    perkReviveDesc: "Una vez por partida, levántate con todos los PV cuando estés agotado",
+    perkHow: (n, mode) => `Se desbloquea con el tesoro del nivel ${n} (${mode})`,
+    perkOn: "Desbloqueada (por un tesoro)",
+    perkGot: (name) => `¡Habilidad permanente «${name}» desbloqueada!`,
+    perkTeaser: (name) => `Desbloquea la habilidad permanente «${name}»`,
+    treasureClue: (stage, mode) => `Pista: en ${stage} (${mode}), duerme al fondo de la habitación más sucia`,
+    treasurePerks: "Habilidades que desbloquean los tesoros",
+    reviveFree: "Revivir con el poder del tesoro",
   },
   enemies: {
     dust: ["Pelusa", "Débil, pero llega en enjambres enormes. Está en todas las habitaciones."],
@@ -314,6 +326,18 @@
       { shoko: "Biblioteca", bedroom: "Dormitorio", closet: "Vestidor", hall: "Gran salón", master: "Cámara del señor" },
       ["Llave de la mansión", "Una vieja llave que abre todas las puertas de la mansión. Era de la antigua cuidadora."]],
   ],
+  hardTreasures: [
+    ["Gato de la suerte", "Un maneki-neko dorado enterrado sobre el zapatero de la entrada."],
+    ["Cucharón de plata", "El pesado cucharón de plata que adoraba el cocinero de la mansión."],
+    ["Dado de la suerte", "Un dado del fondo de la bañera; dicen que permite volver a tirar el destino."],
+    ["Muñeca mecánica", "Una muñeca antigua que barre el suelo con una escobita al darle cuerda."],
+    ["Regadera dorada", "Una regadera dorada y reluciente enterrada en el parterre."],
+    ["Plumero del fénix", "Un plumero escondido en lo más hondo del desván que, dicen, renace una y otra vez."],
+    ["Engranaje de latón", "Un gran engranaje reluciente que se soltó del corazón de la caldera."],
+    ["Radio retro", "Una radio antigua sacada del montón de trastos. Todavía suena."],
+    ["Invitación fantasma", "Una vieja invitación con los nombres de los fantasmas invitados al banquete."],
+    ["Recogedor dorado", "Un recogedor de oro puro que el Señor de la casa nunca soltó."],
+  ],
   tutorial: ["Tutorial", "Una casita de tres habitaciones para aprender a jugar.", { genkan: "Entrada", living: "Salón", washitsu: "Sala de tatamis" }],
   help: `
     <h2>Cómo se juega</h2>
@@ -341,10 +365,10 @@
     <p>Cuando estás agotado, puedes levantarte ahí mismo una vez por partida (con todos los PV, y la basura cercana sale volando). Si no te gustan las opciones al subir de nivel, puedes conseguir 2 cambios. Al superar un nivel, puedes multiplicar por 1,5 las monedas ganadas. Cada recompensa se consigue viendo un anuncio y solo está disponible si juegas en CrazyGames.</p>
 
     <h3>Limpiadores y tesoros</h3>
-    <p>Hay 6 limpiadores, cada uno con su equipo inicial y su rasgo (abrillanta más ancho al caminar, no se frena en suelo sucio, no sufre alergias, etc.). Cada nivel esconde un tesoro, que aparece al terminar la habitación con más ★. Los tesoros se guardan en cuanto los recoges, y algunos hacen que se una un nuevo limpiador. En la pantalla «Logros» (desde el título) puedes ver las victorias de cada limpiador por nivel y modo y los tesoros reunidos.</p>
+    <p>Hay 6 limpiadores, cada uno con su equipo inicial y su rasgo (abrillanta más ancho al caminar, no se frena en suelo sucio, no sufre alergias, etc.). Cada nivel esconde un tesoro en Normal y otro en Difícil, 20 en total; un tesoro aparece al terminar la habitación con más ★ en ese modo. Los tesoros se guardan en cuanto los recoges. Algunos tesoros de Normal hacen que se una un nuevo limpiador, y dos tesoros de Difícil desbloquean las habilidades permanentes Cambiar opciones y Revivir. En la pantalla «Logros» (desde el título) puedes ver las victorias de cada limpiador y los tesoros reunidos, con pistas para los que faltan.</p>
 
     <h3>Progreso</h3>
-    <p>El progreso cuenta cuántos de 30 objetivos has logrado: victorias en cada nivel y cada modo (10 niveles × 2 modos = 20) más los tesoros (10). Cualquier limpiador puede conseguir una victoria. Las victorias de cada limpiador aparecen en la pantalla «Logros» como récords extra, pero no cuentan para el progreso.</p>
+    <p>El progreso cuenta cuántos de 40 objetivos has logrado: victorias en cada nivel y cada modo (10 niveles × 2 modos = 20) más los tesoros (20). Cualquier limpiador puede conseguir una victoria. Las victorias de cada limpiador aparecen en la pantalla «Logros» como récords extra, pero no cuentan para el progreso.</p>
 
     <h3>Suelos sucios</h3>
     <p>El suelo está sucio, y cuanto más sucio, más despacio caminas. Por donde pasa tu equipo de limpieza, el suelo queda limpio. Sobre un suelo reluciente caminas más rápido y recoges el polvo desde más lejos. La mugre se extiende poco a poco, y la basura ensucia por donde pasa. Mientras todo está muy sucio, una neblina marrón cubre la pantalla; se despeja a medida que limpias tu alrededor y toda la casa (se puede desactivar en Ajustes).</p>
