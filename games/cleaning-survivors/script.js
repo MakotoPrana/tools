@@ -34,18 +34,27 @@
 
   // 言語: 日本語と英語。保存がなければ、ブラウザの言語が日本語なら日本語、それ以外は英語
   const LANG_KEY = 'cleaning-survivors-lang';
-  const LANGS = ['ja', 'en'];
+  // 日本語・英語・中国語 (簡体字)・韓国語。中国語と韓国語の文言は i18n.js にある
+  const LANGS = [['ja', '日本語'], ['en', 'English'], ['zh', '简体中文'], ['ko', '한국어']];
+  const LANG_CODES = LANGS.map(([code]) => code);
+  const I18N = window.CS_I18N || {};
   const loadLang = () => {
     try {
       const saved = localStorage.getItem(LANG_KEY);
-      if (LANGS.includes(saved)) return saved;
+      if (LANG_CODES.includes(saved) && (saved === 'ja' || saved === 'en' || I18N[saved])) return saved;
     } catch (e) { /* 保存がなければブラウザの言語から決める */ }
-    const browser = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-    return browser.toLowerCase().startsWith('ja') ? 'ja' : 'en';
+    for (const l of navigator.languages || [navigator.language || '']) {
+      const code = String(l).toLowerCase();
+      if (code.startsWith('ja')) return 'ja';
+      if (code.startsWith('zh') && I18N.zh) return 'zh';
+      if (code.startsWith('ko') && I18N.ko) return 'ko';
+      if (code.startsWith('en')) return 'en';
+    }
+    return 'en';
   };
   let lang = loadLang();
-  // データの名前や説明: 英語のときは .en にある方を使う
-  const L = (o, f) => (lang === 'en' && o.en && o.en[f] != null ? o.en[f] : o[f]);
+  // データの名前や説明: 日本語以外のときは、その言語の名前 (.en・.zh・.ko) にある方を使う
+  const L = (o, f) => (lang !== 'ja' && o[lang] && o[lang][f] != null ? o[lang][f] : o[f]);
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const randInt = (a, b) => Math.floor(rand(a, b + 1));
@@ -613,24 +622,6 @@
       ['Mansion Key', 'An old key that opens every door in the mansion. It belonged to the former caretaker.']],
   ];
 
-  // 英語の名前と説明を、それぞれのデータの .en に入れる
-  for (const k in EN_ENEMIES) ENEMIES[k].en = { name: EN_ENEMIES[k][0], desc: EN_ENEMIES[k][1] };
-  for (const k in EN_WEAPONS) WEAPONS[k].en = { name: EN_WEAPONS[k][0], desc: EN_WEAPONS[k][1], lvText: EN_WEAPONS[k][2] };
-  for (const k in EN_EVOS) EVOS[k].en = { name: EN_EVOS[k][0], desc: EN_EVOS[k][1] };
-  for (const k in EN_PASSIVES) PASSIVES[k].en = { name: EN_PASSIVES[k][0], desc: EN_PASSIVES[k][1] };
-  for (const c of CHARS) {
-    const [name, trait, traitDesc, desc] = EN_CHARS[c.id];
-    c.en = { name, trait, traitDesc, desc };
-  }
-  for (const it of SHOP) it.en = { name: EN_SHOP[it.id][0], desc: EN_SHOP[it.id][1] };
-  MODES.normal.en = { name: 'Normal' };
-  MODES.hard.en = { name: 'Hard' };
-  STAGES.forEach((st, i) => {
-    const [name, desc, rooms, [tName, tDesc]] = EN_STAGES[i];
-    st.en = { name, desc };
-    for (const r of st.rooms) r.en = { name: rooms[r.id] };
-    st.treasure.en = { name: tName, desc: tDesc };
-  });
   // チュートリアル: 10 ステージとは別の、3部屋だけの小さな家 (達成率や記録には入らない)。
   // 家のまわりは「外」(通れない、何も描かない) にして、2〜3分で回れる広さにする
   const TUT = -1;
@@ -647,13 +638,44 @@
     treasure: null,
     dumps: [['genkan', 0.78, 0.78]],
   };
-  TUTORIAL.en = { name: 'Tutorial', desc: 'A tiny three-room house for learning how to play.' };
-  for (const r of TUTORIAL.rooms) r.en = { name: { genkan: 'Entrance', living: 'Living Room', washitsu: 'Tatami Room' }[r.id] };
   const stageOf = (i) => (i === TUT ? TUTORIAL : STAGES[i]);
 
-  const bonusText = (key) => (lang === 'en' ? EN_BONUS[key] : ROOM_BONUS[key]);
+  // 日本語以外の名前と説明を、それぞれのデータの .en・.zh・.ko に入れる
+  //   P: { enemies, weapons, evos, passives, chars, bonus, shop, modes, stages, tutorial } (形は EN_* と同じ)
+  const BONUS_TEXT = { ja: ROOM_BONUS };
+  function addLang(code, P) {
+    for (const k in P.enemies) ENEMIES[k][code] = { name: P.enemies[k][0], desc: P.enemies[k][1] };
+    for (const k in P.weapons) WEAPONS[k][code] = { name: P.weapons[k][0], desc: P.weapons[k][1], lvText: P.weapons[k][2] };
+    for (const k in P.evos) EVOS[k][code] = { name: P.evos[k][0], desc: P.evos[k][1] };
+    for (const k in P.passives) PASSIVES[k][code] = { name: P.passives[k][0], desc: P.passives[k][1] };
+    for (const c of CHARS) {
+      const [name, trait, traitDesc, desc] = P.chars[c.id];
+      c[code] = { name, trait, traitDesc, desc };
+    }
+    for (const it of SHOP) it[code] = { name: P.shop[it.id][0], desc: P.shop[it.id][1] };
+    for (const m in MODES) MODES[m][code] = { name: P.modes[m] };
+    STAGES.forEach((st, i) => {
+      const [name, desc, rooms, [tName, tDesc]] = P.stages[i];
+      st[code] = { name, desc };
+      for (const r of st.rooms) r[code] = { name: rooms[r.id] };
+      st.treasure[code] = { name: tName, desc: tDesc };
+    });
+    const [tutName, tutDesc, tutRooms] = P.tutorial;
+    TUTORIAL[code] = { name: tutName, desc: tutDesc };
+    for (const r of TUTORIAL.rooms) r[code] = { name: tutRooms[r.id] };
+    BONUS_TEXT[code] = P.bonus;
+  }
+  addLang('en', {
+    enemies: EN_ENEMIES, weapons: EN_WEAPONS, evos: EN_EVOS, passives: EN_PASSIVES, chars: EN_CHARS, bonus: EN_BONUS, shop: EN_SHOP,
+    modes: { normal: 'Normal', hard: 'Hard' },
+    stages: EN_STAGES,
+    tutorial: ['Tutorial', 'A tiny three-room house for learning how to play.', { genkan: 'Entrance', living: 'Living Room', washitsu: 'Tatami Room' }],
+  });
+  for (const code of ['zh', 'ko']) if (I18N[code]) addLang(code, I18N[code]);
+
+  const bonusText = (key) => (BONUS_TEXT[lang] || ROOM_BONUS)[key];
   // ギアのレベルアップの説明 (レベル lv → lv+1)
-  const lvText = (id, lv) => (lang === 'en' ? WEAPONS[id].en.lvText[lv - 1] : WEAPONS[id].lv[lv - 1][1]);
+  const lvText = (id, lv) => (lang === 'ja' ? WEAPONS[id].lv[lv - 1][1] : L(WEAPONS[id], 'lvText')[lv - 1]);
 
   // ---- 画面の文言 ----
   const TEXT = {
@@ -665,6 +687,7 @@
       pause: '一時停止',
       compress: 'ゴミ圧縮',
       board: 'ゲーム画面',
+      language: '言語',
       // プレイ中
       warn: (name) => `警報! ${name}が近づいている!`,
       rush: '大群ラッシュ!',
@@ -836,6 +859,7 @@
       pause: 'Pause',
       compress: 'Compress',
       board: 'Game screen',
+      language: 'Language',
       warn: (name) => `Warning! ${name} is approaching!`,
       rush: 'Swarm rush!',
       tooTough: 'Too tough! Clean around it',
@@ -999,9 +1023,11 @@
     },
   };
 
-  // 文言を取り出す。関数の文言は引数を渡して組み立てる
+  for (const code of ['zh', 'ko']) if (I18N[code]) TEXT[code] = I18N[code].text;
+
+  // 文言を取り出す。関数の文言は引数を渡して組み立てる (その言語になければ英語、それもなければ日本語)
   const t = (key, ...args) => {
-    const v = TEXT[lang][key] ?? TEXT.ja[key];
+    const v = TEXT[lang][key] ?? TEXT.en[key] ?? TEXT.ja[key];
     return typeof v === 'function' ? v(...args) : v;
   };
 
@@ -4973,6 +4999,9 @@
   ];
   const tutorBox = document.getElementById('tutor');
 
+  // 1秒に読める文字数のめやす (ヒントを出しておく長さに使う)
+  const READ_SPEED = { ja: 10, en: 22, zh: 9, ko: 13 };
+
   function updateTutorial(dt) {
     const tu = G.tutorial;
     const p = G.p;
@@ -4983,7 +5012,7 @@
     const step = TUT_STEPS[tu.step];
     if (!step) return;
     // 条件を満たしたら次の手順へ。読み終わる前に消えないように、文の長さに合わせて 4〜9 秒は出しておく
-    const minT = clamp(t(step.key).replace(/<[^>]+>/g, '').length / (lang === 'en' ? 22 : 10), 4, 9);
+    const minT = clamp(t(step.key).replace(/<[^>]+>/g, '').length / (READ_SPEED[lang] || 10), 4, 9);
     if (tu.stepT > minT && (step.done(G) || (step.max && tu.stepT > step.max))) {
       tu.step++;
       tu.stepT = 0;
@@ -6990,27 +7019,38 @@
   // ---- 言語の切り替え ----
   // HTML に書いた文言 (data-i18n) と、言語ごとの遊び方 (data-lang) を反映する
   function applyLang() {
-    document.documentElement.lang = lang;
+    document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
     document.title = t('pageTitle');
     const desc = document.querySelector('meta[name="description"]');
     if (desc) desc.setAttribute('content', t('pageDesc'));
     document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
     document.querySelectorAll('[data-lang]').forEach((el) => { el.hidden = el.dataset.lang !== lang; });
-    // 日本語 / EN のトグルで、いま選んでいる方を押された状態にする
-    if (langBtn) langBtn.querySelectorAll('[data-set-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.setLang === lang)));
+    if (langBtn) {
+      langBtn.value = lang;
+      langBtn.setAttribute('aria-label', t('language'));
+    }
   }
 
+  // 言語の選択 (ヘッダーのセレクトボックス)。プレイ中は隠している
   if (langBtn) {
-    langBtn.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-set-lang]');
-      if (!b || b.dataset.setLang === lang || G) return;
-      lang = b.dataset.setLang;
+    for (const [code, label] of LANGS) {
+      if (code !== 'ja' && code !== 'en' && !I18N[code]) continue;
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.lang = code === 'zh' ? 'zh-Hans' : code;
+      opt.textContent = label;
+      langBtn.append(opt);
+    }
+    langBtn.addEventListener('change', () => {
+      if (G) return;
+      lang = langBtn.value;
       try { localStorage.setItem(LANG_KEY, lang); } catch (err) { /* 保存できなくても切り替え自体は有効 */ }
       Sound.init();
       Sound.play('click');
       applyLang();
       if (rerender) rerender();
+      langBtn.blur();
     });
   }
 
