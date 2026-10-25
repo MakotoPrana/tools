@@ -85,7 +85,7 @@
     briefDesc: "<b>Pulisci tutte le stanze entro 10 minuti</b> per completare il livello. Distruggi tutte le <b>sorgenti</b> (punti rossi) di una stanza e fai brillare il pavimento per completarla e ottenere un forziere e un bonus. <b>Più ★ ha una stanza, più è sporca</b>, con rifiuti più numerosi e duri. Se entri troppo presto verrai sopraffatto, quindi comincia dalle stanze con meno ★. Le sorgenti sono <b>tanto più dure quanto più è sporco intorno</b>, quindi strofina intorno prima.",
     srcCount: (n) => `Sorgenti ${n}`,
     treasureFoundLine: (name) => `Tesoro «${name}» trovato!`,
-    treasureHint: (st, room) => `Tesoro: completa la stanza ${st} «${room}» per trovarlo`,
+    treasureHint: (cond) => `Tesoro: ${cond}`,
     joined: (name) => `${name} si è unito`,
     willJoin: "Trovare questo tesoro sblocca un nuovo addetto",
     bossNote: (mid, boss) => `Il mini-boss «${mid}» appare a 5:00, e il boss «${boss}» a 9:00.`,
@@ -191,7 +191,19 @@
     perkOn: "Sbloccata (da un tesoro)",
     perkGot: (name) => `Abilità permanente «${name}» sbloccata!`,
     perkTeaser: (name) => `Sblocca l'abilità permanente «${name}»`,
-    treasureClue: (stage, mode) => `Indizio: in ${stage} (${mode}), dorme in fondo alla stanza più sporca`,
+    treasureClue: (stage, mode, cond) => `Indizio (${stage}, ${mode}): ${cond}`,
+    condRoom: (room) => `Completare la stanza con più ★, «${room}»`,
+    condKills: (n, enemy) => `Eliminare ${n} × ${enemy} in una partita`,
+    condRoomTime: (room, time) => `Completare «${room}» entro ${time}`,
+    condSrcTime: (time) => `Distruggere tutte le sorgenti della casa entro ${time}`,
+    condClearTime: (time) => `Pulire tutte le stanze entro ${time}`,
+    condBoss: (boss) => `Sconfiggere «${boss}»`,
+    condDumps: (n) => `Svuotare il bidone ${n} volte in una partita`,
+    condHpKeep: (pct) => `Completare il livello senza che i PS scendano sotto il ${pct}%`,
+    treasureAppeared: "È apparso un tesoro!",
+    hudTreasure: (s) => `Tesoro ${s}`,
+    hudDumpCount: (a, b) => `Svuotati ${a}/${b}`,
+    hudTimeLeft: (s) => `restano ${s}`,
     treasurePerks: "Abilità sbloccate dai tesori",
     reviveFree: "Rinasci con il potere del tesoro",
   },
@@ -371,7 +383,7 @@
     <p>Quando sei esausto, puoi rialzarti sul posto una volta per partita (tutti i PS, e i rifiuti vicini vengono spazzati via). Se le scelte al livello su non ti piacciono, puoi ottenere 2 cambi. Quando completi un livello, puoi moltiplicare per 1,5 le monete guadagnate. Ogni ricompensa si ottiene guardando una pubblicità ed è disponibile solo se giochi su CrazyGames.</p>
 
     <h3>Addetti e tesori</h3>
-    <p>Ci sono 10 addetti, ognuno con attrezzi iniziali e talento diversi. L'attrezzo iniziale è l'attrezzo preferito dell'addetto e fa +25% di danno (la build preferita è indicata nella sua scheda). La forza va da ★1 a ★5; gli addetti ★1 hanno pochi PS o poco danno e sono pensati come sfida. Ogni livello nasconde un tesoro in Normale e uno in Difficile, 20 in tutto; un tesoro appare quando completi la stanza con più ★ in quella modalità. I tesori vengono salvati appena li raccogli. Alcuni tesori di Normale fanno unire un nuovo addetto, e due tesori di Difficile sbloccano le abilità permanenti Cambia scelte e Rinascita. Nella schermata «Obiettivi» (dal titolo) puoi vedere le vittorie di ogni addetto e i tesori raccolti, con indizi per quelli che mancano.</p>
+    <p>Ci sono 10 addetti, ognuno con attrezzi iniziali e talento diversi. L'attrezzo iniziale è l'attrezzo preferito dell'addetto e fa +25% di danno (la build preferita è indicata nella sua scheda). La forza va da ★1 a ★5; gli addetti ★1 hanno pochi PS o poco danno e sono pensati come sfida. Ogni livello nasconde un tesoro in Normale e uno in Difficile, 20 in tutto. Ogni tesoro ha la sua condizione (completare la stanza con più ★, eliminare un certo numero di un rifiuto preciso, pulire una stanza entro un tempo limite, sconfiggere un boss, ecc.), indicata nella schermata di preparazione e nell'elenco dei tesori. Durante la partita, i tuoi progressi appaiono in alto a destra e il tesoro compare vicino a te quando soddisfi la condizione (le condizioni legate alla vittoria vengono premiate al termine del livello). I tesori vengono salvati appena li raccogli. Alcuni tesori di Normale fanno unire un nuovo addetto, e due tesori di Difficile sbloccano le abilità permanenti Cambia scelte e Rinascita. Nella schermata «Obiettivi» (dal titolo) puoi vedere le vittorie di ogni addetto e i tesori raccolti, con indizi per quelli che mancano.</p>
 
     <h3>Completamento</h3>
     <p>Il completamento è il tuo punteggio su 300: una vittoria in ogni livello e modalità con ogni addetto (10 addetti × 10 livelli × 2 modalità = 200 punti) più i tesori (20 × 5 punti = 100 punti). Completa ogni livello in ogni modalità con ogni addetto e trova tutti i tesori per arrivare al 100%.</p>

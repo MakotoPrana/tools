@@ -85,7 +85,7 @@
     briefDesc: "<b>Limpia todas las habitaciones en menos de 10 minutos</b> para superar el nivel. Destruye todos los <b>focos</b> (puntos rojos) de una habitación y deja su suelo reluciente para terminarla y ganar un cofre y una bonificación. <b>Cuantas más ★ tiene una habitación, más sucia está</b>, con más basura y más dura. Si entras demasiado pronto, te arrollarán, así que empieza por las de menos ★. Los focos son <b>más duros cuanto más sucio está su alrededor</b>, así que friega alrededor primero.",
     srcCount: (n) => `Focos ${n}`,
     treasureFoundLine: (name) => `¡Tesoro «${name}» encontrado!`,
-    treasureHint: (st, room) => `Tesoro: termina la habitación ${st} «${room}» para encontrarlo`,
+    treasureHint: (cond) => `Tesoro: ${cond}`,
     joined: (name) => `${name} se ha unido`,
     willJoin: "Encontrar este tesoro desbloquea un nuevo limpiador",
     bossNote: (mid, boss) => `El subjefe «${mid}» aparece a las 5:00, y el jefe «${boss}» a las 9:00.`,
@@ -191,7 +191,19 @@
     perkOn: "Desbloqueada (por un tesoro)",
     perkGot: (name) => `¡Habilidad permanente «${name}» desbloqueada!`,
     perkTeaser: (name) => `Desbloquea la habilidad permanente «${name}»`,
-    treasureClue: (stage, mode) => `Pista: en ${stage} (${mode}), duerme al fondo de la habitación más sucia`,
+    treasureClue: (stage, mode, cond) => `Pista (${stage}, ${mode}): ${cond}`,
+    condRoom: (room) => `Terminar la habitación con más ★, «${room}»`,
+    condKills: (n, enemy) => `Eliminar ${n} × ${enemy} en una partida`,
+    condRoomTime: (room, time) => `Terminar «${room}» en menos de ${time}`,
+    condSrcTime: (time) => `Destruir todos los focos de la casa en menos de ${time}`,
+    condClearTime: (time) => `Limpiar todas las habitaciones en menos de ${time}`,
+    condBoss: (boss) => `Derrotar a «${boss}»`,
+    condDumps: (n) => `Vaciar el cubo ${n} veces en una partida`,
+    condHpKeep: (pct) => `Superar el nivel sin que tus PV bajen del ${pct} %`,
+    treasureAppeared: "¡Ha aparecido un tesoro!",
+    hudTreasure: (s) => `Tesoro ${s}`,
+    hudDumpCount: (a, b) => `Vaciados ${a}/${b}`,
+    hudTimeLeft: (s) => `quedan ${s}`,
     treasurePerks: "Habilidades que desbloquean los tesoros",
     reviveFree: "Revivir con el poder del tesoro",
   },
@@ -371,7 +383,7 @@
     <p>Cuando estás agotado, puedes levantarte ahí mismo una vez por partida (con todos los PV, y la basura cercana sale volando). Si no te gustan las opciones al subir de nivel, puedes conseguir 2 cambios. Al superar un nivel, puedes multiplicar por 1,5 las monedas ganadas. Cada recompensa se consigue viendo un anuncio y solo está disponible si juegas en CrazyGames.</p>
 
     <h3>Limpiadores y tesoros</h3>
-    <p>Hay 10 limpiadores, cada uno con su equipo inicial y su rasgo. El equipo inicial es el equipo favorito del limpiador y hace +25 % de daño (su build favorita aparece en su ficha). La fuerza va de ★1 a ★5; los limpiadores ★1 tienen pocos PV o poco daño y son un reto. Cada nivel esconde un tesoro en Normal y otro en Difícil, 20 en total; un tesoro aparece al terminar la habitación con más ★ en ese modo. Los tesoros se guardan en cuanto los recoges. Algunos tesoros de Normal hacen que se una un nuevo limpiador, y dos tesoros de Difícil desbloquean las habilidades permanentes Cambiar opciones y Revivir. En la pantalla «Logros» (desde el título) puedes ver las victorias de cada limpiador y los tesoros reunidos, con pistas para los que faltan.</p>
+    <p>Hay 10 limpiadores, cada uno con su equipo inicial y su rasgo. El equipo inicial es el equipo favorito del limpiador y hace +25 % de daño (su build favorita aparece en su ficha). La fuerza va de ★1 a ★5; los limpiadores ★1 tienen pocos PV o poco daño y son un reto. Cada nivel esconde un tesoro en Normal y otro en Difícil, 20 en total. Cada tesoro tiene su propia condición (terminar la habitación con más ★, eliminar cierta cantidad de un tipo de basura, limpiar una habitación en un tiempo límite, derrotar a un jefe, etc.), que aparece en la pantalla previa y en la lista de tesoros. Durante la partida, tu progreso se ve arriba a la derecha y el tesoro aparece cerca de ti al cumplir la condición (las condiciones que se cumplen al superar el nivel se recompensan al terminarlo). Los tesoros se guardan en cuanto los recoges. Algunos tesoros de Normal hacen que se una un nuevo limpiador, y dos tesoros de Difícil desbloquean las habilidades permanentes Cambiar opciones y Revivir. En la pantalla «Logros» (desde el título) puedes ver las victorias de cada limpiador y los tesoros reunidos, con pistas para los que faltan.</p>
 
     <h3>Progreso</h3>
     <p>El progreso es tu puntuación sobre 300: una victoria en cada nivel y cada modo con cada limpiador (10 limpiadores × 10 niveles × 2 modos = 200 puntos) más los tesoros (20 × 5 puntos = 100 puntos). Supera todos los niveles en todos los modos con todos los limpiadores y reúne todos los tesoros para llegar al 100 %.</p>

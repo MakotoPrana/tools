@@ -341,7 +341,7 @@
       start: 'genkan',
       treasure: { room: 'living', name: '家族のアルバム', desc: 'ゴミの下から出てきた、屋敷の家族の古いアルバム。' },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
-      treasureH: { name: '招き猫の置物', desc: '玄関の靴箱の上に埋もれていた、金色の招き猫。' },
+      treasureH: { name: '招き猫の置物', desc: '玄関の靴箱の上に埋もれていた、金色の招き猫。', cond: { type: 'kills', enemy: 'dust', n: 1500 } },
       dumps: [['rouka', 0.5, 0.5], ['living', 0.3, 0.3]],
     },
     {
@@ -356,9 +356,9 @@
       ],
       doors: [['rouka', 'dining'], ['rouka', 'kitchen'], ['dining', 'kitchen'], ['rouka', 'pantry'], ['rouka', 'laundry'], ['rouka', 'katte']],
       start: 'katte',
-      treasure: { room: 'kitchen', name: '金の蛇口', desc: 'ピカピカに光る純金の蛇口。水の使い手が欲しがっていた。' },
+      treasure: { room: 'kitchen', name: '金の蛇口', desc: 'ピカピカに光る純金の蛇口。水の使い手が欲しがっていた。', cond: { type: 'kills', enemy: 'grease', n: 120 } },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
-      treasureH: { name: '銀のお玉', desc: '屋敷の料理番が愛用していた、ずっしり重い銀のお玉。' },
+      treasureH: { name: '銀のお玉', desc: '屋敷の料理番が愛用していた、ずっしり重い銀のお玉。', cond: { type: 'roomTime', room: 'pantry', t: 240 } },
       dumps: [['rouka', 0.2, 0.5], ['rouka', 0.8, 0.5]],
     },
     {
@@ -372,7 +372,7 @@
       ],
       doors: [['rouka', 'bath'], ['rouka', 'datsui'], ['rouka', 'toilet'], ['rouka', 'senmen'], ['bath', 'datsui']],
       start: 'rouka',
-      treasure: { room: 'bath', name: '真珠の石けん', desc: '泡が真珠のように光る、不思議な石けん。' },
+      treasure: { room: 'bath', name: '真珠の石けん', desc: '泡が真珠のように光る、不思議な石けん。', cond: { type: 'kills', enemy: 'spore', n: 180 } },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
       treasureH: { name: '幸運のサイコロ', desc: '湯船の底に沈んでいた、運命を選び直せるというサイコロ。', perk: 'reroll' },
       dumps: [['rouka', 0.5, 0.25], ['datsui', 0.5, 0.6]],
@@ -388,9 +388,9 @@
       ],
       doors: [['hall', 'kids'], ['hall', 'study'], ['hall', 'storage'], ['study', 'nando'], ['storage', 'nando']],
       start: 'hall',
-      treasure: { room: 'storage', name: 'ロボットの設計図', desc: '物置の奥にしまわれていた、お掃除ロボの設計図。' },
+      treasure: { room: 'storage', name: 'ロボットの設計図', desc: '物置の奥にしまわれていた、お掃除ロボの設計図。', cond: { type: 'roomTime', room: 'study', t: 180 } },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
-      treasureH: { name: 'からくり人形', desc: 'ねじを巻くと、ほうきで床を掃くしぐさをする古い人形。' },
+      treasureH: { name: 'からくり人形', desc: 'ねじを巻くと、ほうきで床を掃くしぐさをする古い人形。', cond: { type: 'srcTime', t: 390 } },
       dumps: [['hall', 0.5, 0.5], ['study', 0.5, 0.75]],
     },
     {
@@ -406,9 +406,9 @@
       ],
       doors: [['gate', 'path'], ['gate', 'front'], ['path', 'front'], ['path', 'flower'], ['path', 'shed'], ['path', 'pond'], ['path', 'yard'], ['yard', 'pond'], ['flower', 'shed']],
       start: 'gate',
-      treasure: { room: 'pond', name: '四つ葉のクローバー', desc: '池のほとりに一本だけ生えていた、幸運の四つ葉。' },
+      treasure: { room: 'pond', name: '四つ葉のクローバー', desc: '池のほとりに一本だけ生えていた、幸運の四つ葉。', cond: { type: 'roomTime', room: 'flower', t: 120 } },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
-      treasureH: { name: '金のじょうろ', desc: '花壇の土に埋まっていた、金色に輝くじょうろ。' },
+      treasureH: { name: '金のじょうろ', desc: '花壇の土に埋まっていた、金色に輝くじょうろ。', cond: { type: 'kills', enemy: 'spore', n: 100 } },
       dumps: [['path', 0.5, 0.4], ['front', 0.5, 0.5]],
     },
     {
@@ -424,7 +424,7 @@
       ],
       doors: [['stairs', 'passage'], ['nook', 'passage'], ['secret', 'passage'], ['passage', 'oldclothes'], ['passage', 'chests'], ['passage', 'skylight']],
       start: 'stairs',
-      treasure: { room: 'secret', name: '伝説のコロコロ', desc: 'どんなゴミでも巻き取るという、伝説の粘着ローラー。' },
+      treasure: { room: 'secret', name: '伝説のコロコロ', desc: 'どんなゴミでも巻き取るという、伝説の粘着ローラー。', cond: { type: 'kills', enemy: 'paper', n: 200 } },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
       treasureH: { name: '不死鳥の羽根ぼうき', desc: '屋根裏の奥に隠されていた、何度でもよみがえるという羽根ぼうき。', perk: 'revive' },
       dumps: [['passage', 0.2, 0.5], ['passage', 0.8, 0.5]],
@@ -441,9 +441,9 @@
       ],
       doors: [['under', 'corridor'], ['store', 'corridor'], ['corridor', 'cellar'], ['corridor', 'washroom'], ['corridor', 'boiler'], ['under', 'store']],
       start: 'under',
-      treasure: { room: 'boiler', name: '古い懐中時計', desc: 'ボイラーの裏で見つかった、まだ動いている懐中時計。' },
+      treasure: { room: 'boiler', name: '古い懐中時計', desc: 'ボイラーの裏で見つかった、まだ動いている懐中時計。', cond: { type: 'boss', boss: 'yokai' } },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
-      treasureH: { name: '真鍮の歯車', desc: 'ボイラーの心臓部から外れた、ピカピカの大きな歯車。' },
+      treasureH: { name: '真鍮の歯車', desc: 'ボイラーの心臓部から外れた、ピカピカの大きな歯車。', cond: { type: 'clearTime', t: 450 } },
       dumps: [['corridor', 0.25, 0.5], ['corridor', 0.75, 0.5]],
     },
     {
@@ -458,9 +458,9 @@
       ],
       doors: [['side', 'bench'], ['side', 'garage'], ['bench', 'garage'], ['bench', 'tools'], ['garage', 'tires'], ['tools', 'tires'], ['tires', 'back'], ['garage', 'back']],
       start: 'side',
-      treasure: { room: 'back', name: '除菌博士の研究ノート', desc: 'カビと戦い続けた博士の研究ノート。持ち主が探している。' },
+      treasure: { room: 'back', name: '除菌博士の研究ノート', desc: 'カビと戦い続けた博士の研究ノート。持ち主が探している。', cond: { type: 'kills', enemy: 'bottle', n: 35 } },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
-      treasureH: { name: 'レトロなラジオ', desc: 'ガラクタの山から出てきた、まだ音が鳴る古いラジオ。' },
+      treasureH: { name: 'レトロなラジオ', desc: 'ガラクタの山から出てきた、まだ音が鳴る古いラジオ。', cond: { type: 'dumps', n: 10 } },
       dumps: [['garage', 0.3, 0.3], ['garage', 0.5, 0.85]],
     },
     {
@@ -475,9 +475,9 @@
       ],
       doors: [['lobby', 'cloak'], ['lobby', 'pantry'], ['lobby', 'hall'], ['cloak', 'hall'], ['hall', 'stage'], ['hall', 'green'], ['green', 'stage'], ['green', 'pantry']],
       start: 'lobby',
-      treasure: { room: 'stage', name: '銀の燭台', desc: '舞台の上に残されていた、幽霊のお気に入りの燭台。' },
+      treasure: { room: 'stage', name: '銀の燭台', desc: '舞台の上に残されていた、幽霊のお気に入りの燭台。', cond: { type: 'kills', enemy: 'bag', n: 80 } },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
-      treasureH: { name: '幽霊の招待状', desc: '宴に招かれた幽霊たちの名前が並ぶ、古い招待状。' },
+      treasureH: { name: '幽霊の招待状', desc: '宴に招かれた幽霊たちの名前が並ぶ、古い招待状。', cond: { type: 'hpKeep', pct: 30 } },
       dumps: [['hall', 0.3, 0.85], ['lobby', 0.5, 0.5]],
     },
     {
@@ -493,7 +493,7 @@
       start: 'hall',
       treasure: { room: 'master', name: '屋敷の鍵', desc: '屋敷じゅうの扉を開けられる古い鍵。昔の管理人が持っていた。' },
       // ハードの宝物 (見つかる部屋はノーマルと同じ)
-      treasureH: { name: '黄金のちりとり', desc: '屋敷の主が最後まで手放さなかった、純金のちりとり。' },
+      treasureH: { name: '黄金のちりとり', desc: '屋敷の主が最後まで手放さなかった、純金のちりとり。', cond: { type: 'boss', boss: 'master' } },
       dumps: [['hall', 0.3, 0.3], ['master', 0.5, 0.85]],
     },
   ];
@@ -814,7 +814,7 @@
       briefDesc: '<b>10分以内に全部屋の清掃を完了</b>すればクリア。部屋の<b>発生源</b>（赤い点）を全部潰して床をピカピカにすると、その部屋の清掃が完了し、宝箱と特典がもらえる。<b>★が多い部屋ほど汚れがキツく</b>、ゴミが多くて強い。弱いうちに入るとすぐやられるので、★の少ない部屋から片付けよう。発生源は<b>まわりが汚れているほど硬い</b>ので、まずまわりを磨こう。',
       srcCount: (n) => `発生源 ${n}`,
       treasureFoundLine: (name) => `宝物「${name}」 見つけた!`,
-      treasureHint: (st, room) => `宝物: ${st}の部屋「${room}」の清掃を完了すると見つかる`,
+      treasureHint: (cond) => `宝物の条件: ${cond}`,
       joined: (name) => `${name}が仲間になった`,
       willJoin: 'この宝物を見つけると、新しい清掃員が仲間になる',
       bossNote: (mid, boss) => `5分で中ボス「${mid}」、9分でボス「${boss}」が現れる。`,
@@ -920,7 +920,19 @@
       perkOn: '開放済み (宝物で開放)',
       perkGot: (name) => `恒久スキル「${name}」を開放した!`,
       perkTeaser: (name) => `見つけると恒久スキル「${name}」を開放`,
-      treasureClue: (stage, mode) => `ヒント: ${stage}の${mode}で、いちばん汚れた部屋の奥に眠っている`,
+      treasureClue: (stage, mode, cond) => `ヒント (${stage}・${mode}): ${cond}`,
+      condRoom: (room) => `★の一番多い部屋「${room}」の清掃を完了する`,
+      condKills: (n, enemy) => `1回のプレイで${enemy}を${n}体片付ける`,
+      condRoomTime: (room, time) => `部屋「${room}」の清掃を${time}以内に完了する`,
+      condSrcTime: (time) => `家じゅうの発生源を${time}以内に全部潰す`,
+      condClearTime: (time) => `${time}以内に全部屋の清掃を完了する`,
+      condBoss: (boss) => `「${boss}」を倒す`,
+      condDumps: (n) => `1回のプレイでゴミ捨てを${n}回する`,
+      condHpKeep: (pct) => `体力を${pct}%より下げずにクリアする`,
+      treasureAppeared: '宝物が現れた!',
+      hudTreasure: (s) => `宝物 ${s}`,
+      hudDumpCount: (a, b) => `ゴミ捨て ${a}/${b}`,
+      hudTimeLeft: (s) => `あと ${s}`,
       treasurePerks: '宝物で開放する恒久スキル',
       reviveFree: '宝物の力で復活する',
     },
@@ -1009,7 +1021,7 @@
       briefDesc: '<b>Clean every room within 10 minutes</b> to clear the stage. Destroy all the <b>sources</b> (red dots) in a room and polish its floor to finish that room and earn a chest and a bonus. <b>Rooms with more ★ are filthier</b>, with more and tougher trash. Enter them too early and you\'ll be overwhelmed, so start with the rooms with fewer ★. Sources <b>get tougher the dirtier their surroundings are</b>, so scrub around them first.',
       srcCount: (n) => `Sources ${n}`,
       treasureFoundLine: (name) => `Treasure "${name}" found!`,
-      treasureHint: (st, room) => `Treasure: finish cleaning the ${st} room "${room}" to find it`,
+      treasureHint: (cond) => `Treasure: ${cond}`,
       joined: (name) => `${name} has joined`,
       willJoin: 'Finding this treasure unlocks a new cleaner',
       bossNote: (mid, boss) => `The mid-boss "${mid}" appears at 5:00, and the boss "${boss}" at 9:00.`,
@@ -1115,7 +1127,19 @@
       perkOn: 'Unlocked (by a treasure)',
       perkGot: (name) => `Unlocked the permanent skill "${name}"!`,
       perkTeaser: (name) => `Unlocks the permanent skill "${name}" when found`,
-      treasureClue: (stage, mode) => `Hint: in ${stage} (${mode}), it sleeps deep in the filthiest room`,
+      treasureClue: (stage, mode, cond) => `Hint (${stage}, ${mode}): ${cond}`,
+      condRoom: (room) => `Finish cleaning the room with the most ★, "${room}"`,
+      condKills: (n, enemy) => `Clear ${n} × ${enemy} in one run`,
+      condRoomTime: (room, time) => `Finish cleaning "${room}" within ${time}`,
+      condSrcTime: (time) => `Destroy every source in the house within ${time}`,
+      condClearTime: (time) => `Clean every room within ${time}`,
+      condBoss: (boss) => `Defeat "${boss}"`,
+      condDumps: (n) => `Use trash dumps ${n} times in one run`,
+      condHpKeep: (pct) => `Clear the stage without your HP dropping below ${pct}%`,
+      treasureAppeared: 'A treasure appeared!',
+      hudTreasure: (s) => `Treasure ${s}`,
+      hudDumpCount: (a, b) => `Dumps ${a}/${b}`,
+      hudTimeLeft: (s) => `${s} left`,
       treasurePerks: 'Permanent skills unlocked by treasures',
       reviveFree: 'Revive with the treasure\'s power',
     },
@@ -1220,6 +1244,27 @@
   const treasureList = (mode) => (mode === 'hard' ? save.treasuresH : save.treasures);
   const hasTreasure = (i, mode) => !!treasureList(mode)[i];
   const treasureCount = () => save.treasures.filter(Boolean).length + save.treasuresH.filter(Boolean).length;
+  // 宝物の取得条件 (書いていなければ、★の一番多い部屋の清掃を完了する)
+  //   room: 宝物の部屋の清掃を完了 / kills: そのゴミを n 体片付ける / roomTime: 部屋 room の清掃を t 秒以内に完了
+  //   srcTime: 家じゅうの発生源を t 秒以内に全部潰す / clearTime: t 秒以内にクリア / boss: そのボスを倒す
+  //   dumps: ゴミ捨てを n 回 / hpKeep: 体力を pct% より下げずにクリア
+  const treasureCond = (i, mode) => treasureOf(i, mode).cond || { type: 'room' };
+  // 取得条件の文 (宝物の一覧のヒントと、出撃前の確認画面に出す)
+  function condText(i, mode) {
+    const st = STAGES[i];
+    const c = treasureCond(i, mode);
+    const roomName = (id) => L(st.rooms.find((r) => r.id === id), 'name');
+    switch (c.type) {
+      case 'kills': return t('condKills', c.n, L(ENEMIES[c.enemy], 'name'));
+      case 'roomTime': return t('condRoomTime', roomName(c.room), fmtTime(c.t));
+      case 'srcTime': return t('condSrcTime', fmtTime(c.t));
+      case 'clearTime': return t('condClearTime', fmtTime(c.t));
+      case 'boss': return t('condBoss', L(ENEMIES[c.boss], 'name'));
+      case 'dumps': return t('condDumps', c.n);
+      case 'hpKeep': return t('condHpKeep', c.pct);
+      default: return t('condRoom', roomName(st.treasure.room));
+    }
+  }
   // 宝物で開放する恒久スキル (リロール・復活。どちらも 1 段階だけ)
   const PERKS = ['reroll', 'revive'];
   const perkSource = (id) => {
@@ -3096,6 +3141,9 @@
       pendingLv: 0,
       rerolls: 0, // レベルアップの選び直し (宝物の恒久スキル「リロール」で 1 回。広告を見ると 2 回ぶん増える)
       freeRevive: false, // 宝物の恒久スキル「復活」で、まだ使える復活
+      trCond: null, // 宝物の取得条件 (startGame で決める)
+      trSpawned: true,
+      minHp: 1, // このプレイでいちばん減ったときの体力の割合
       adRevived: false, // 広告で復活したか (1 回のプレイで 1 回だけ)
       box: 0,
       dumpCoins: 0,
@@ -5016,6 +5064,7 @@
       G.shake = Math.max(G.shake, 4);
     }
     p.hp -= amount;
+    G.minHp = Math.min(G.minHp, Math.max(0, p.hp) / G.stats.maxHp); // 宝物の条件「体力を保ってクリア」用
     if (p.hp <= 0) {
       p.hp = 0;
       G.state = 'dead';
@@ -5453,6 +5502,7 @@
       for (const r of G.rooms) {
         if (!r.done && r.src === 0 && r.clean >= r.total * ROOM_DONE) completeRoom(r);
       }
+      checkTreasureCond();
       if (G.rooms.every((r) => r.done)) winGame();
       else if (G.time >= GAME_TIME) timeUp();
       else if (G.pendingLv > 0 && overlay.hidden) showLevelUp();
@@ -5496,18 +5546,38 @@
     if (r.bonus === 'heal') G.p.hp = G.stats.maxHp;
     G.roomCoins += 15 * r.danger;
     G.items.push({ kind: 'chest', x: G.p.x + 26, y: G.p.y, t: 0 });
-    // 宝物の部屋なら、部屋のまん中に宝物が現れる
-    const isTreasureRoom = !!G.stage.treasure && r.id === G.stage.treasure.room;
-    if (isTreasureRoom) {
-      const [tx, ty] = roomPoint(r.rect, 0.5, 0.5);
-      const spot = { x: tx, y: ty };
-      pushOut(spot, 16);
-      G.items.push({ kind: 'treasure', x: spot.x, y: spot.y, t: 0 });
-      for (let k = 0; k < 30; k++) addPart(spot.x, spot.y, rand(-120, 120), rand(-160, -20), rand(0.6, 1.2), rand(3, 6), pick(['#ffd34a', '#fff3b0', '#ffffff']), 'twinkle');
-    }
+    // 宝物の条件が「この部屋の清掃を完了」(時間つきもある) なら、部屋のまん中に宝物が現れる
+    const c = G.trCond;
+    const isTreasureRoom = !G.trSpawned && c && ((c.type === 'room' && r.id === G.stage.treasure.room) || (c.type === 'roomTime' && r.id === c.room && G.time <= c.t));
+    if (isTreasureRoom) spawnTreasure(...roomPoint(r.rect, 0.5, 0.5), false);
     showBanner(isTreasureRoom ? t('roomTreasure', L(r, 'name')) : t('roomDone', L(r, 'name'), bonusText(r.bonus)), '#4fe0b6', 3);
     Sound.play('room-clear');
     G.shake = Math.max(G.shake, 6);
+  }
+
+  // 宝物を床に出す (条件を満たしたとき)
+  function spawnTreasure(x, y, banner = true) {
+    G.trSpawned = true;
+    const spot = { x, y };
+    pushOut(spot, 16);
+    G.items.push({ kind: 'treasure', x: spot.x, y: spot.y, t: 0 });
+    for (let k = 0; k < 30; k++) addPart(spot.x, spot.y, rand(-120, 120), rand(-160, -20), rand(0.6, 1.2), rand(3, 6), pick(['#ffd34a', '#fff3b0', '#ffffff']), 'twinkle');
+    if (banner) {
+      showBanner(t('treasureAppeared'), '#ffcf4a', 2.6);
+      Sound.play('chest-evo');
+    }
+  }
+
+  // プレイ中に満たす宝物の条件 (ゴミの数・ゴミ捨ての回数・発生源・ボス)。満たしたら主人公のそばに宝物が現れる
+  function checkTreasureCond() {
+    const c = G.trCond;
+    if (G.trSpawned || !c) return;
+    let ok = false;
+    if (c.type === 'kills') ok = (G.killsByType[c.enemy] || 0) >= c.n;
+    else if (c.type === 'dumps') ok = G.dumpCount >= c.n;
+    else if (c.type === 'srcTime') ok = G.time <= c.t && G.rooms.every((r) => r.src === 0);
+    else if (c.type === 'boss') ok = (G.killsByType[c.boss] || 0) > 0;
+    if (ok) spawnTreasure(G.p.x + 40, G.p.y - 20);
   }
 
   function timeUp() {
@@ -5532,6 +5602,16 @@
     showBanner(t('allClean'), '#4fe0b6', 2.6);
     Sound.bgm(null);
     Sound.play('win');
+    // クリアで満たす宝物の条件 (時間内にクリア・体力を保ってクリア) と、床に出たまま拾っていない宝物は、ここで渡す
+    const c = G.trCond;
+    G.pendingLv = 0; // クリアしたあとはレベルアップの画面を出さない
+    const winCond = !G.trSpawned && c && ((c.type === 'clearTime' && G.time <= c.t) || (c.type === 'hpKeep' && G.minHp * 100 >= c.pct));
+    const left = G.items.some((it) => it.kind === 'treasure');
+    if (winCond || left) {
+      G.trSpawned = true;
+      G.items = G.items.filter((it) => it.kind !== 'treasure');
+      foundTreasure();
+    }
   }
 
   // ===================================================================
@@ -6470,6 +6550,29 @@
     dot(G.p.x, G.p.y, 3, '#ffffff');
   }
 
+  // 宝物の条件の進み具合 (HUD に出す短い文。出すものがなければ空)
+  function treasureHud() {
+    const c = G.trCond;
+    if (!c || G.trSpawned || G.tutorial) return '';
+    const left = (lim) => (G.time <= lim ? t('hudTimeLeft', fmtTime(Math.ceil(lim - G.time))) : '');
+    switch (c.type) {
+      case 'kills': return `${L(ENEMIES[c.enemy], 'name')} ${Math.min(c.n, G.killsByType[c.enemy] || 0)}/${c.n}`;
+      case 'dumps': return t('hudDumpCount', Math.min(c.n, G.dumpCount), c.n);
+      case 'roomTime': {
+        const s = left(c.t);
+        return s && `${L(G.stage.rooms.find((r) => r.id === c.room), 'name')} ${s}`;
+      }
+      case 'srcTime': {
+        const s = left(c.t);
+        return s && `${t('srcCount', G.rooms.reduce((n, r) => n + r.src, 0))} ${s}`;
+      }
+      case 'clearTime': return left(c.t);
+      case 'hpKeep': return G.minHp * 100 >= c.pct ? `HP ≥ ${c.pct}%` : '';
+      case 'boss': return L(ENEMIES[c.boss], 'name');
+      default: return '';
+    }
+  }
+
   function drawHud(tm) {
     const w = view.w;
     const h = view.h;
@@ -6498,6 +6601,9 @@
       hudText(here.done ? t('hudRooms', doneN, G.rooms.length) : t('hudSrc', here.src, doneN, G.rooms.length), w - 10, 46, 12, 'right', here.src > 0 ? '#ffb3b3' : '#d9e2ec');
     }
     hudText(t('hudKills', G.kills), w - 10, 62, 11, 'right', '#c5d0dc');
+    // 宝物の条件の進み具合 (まだ満たしていないとき)
+    const trHud = treasureHud();
+    if (trHud) hudText(t('hudTreasure', trHud), w - 10, 77, 11, 'right', '#ffcf4a');
     drawMinimap(tm);
 
     // ボスの体力
@@ -6507,8 +6613,9 @@
       const left = 10 + clamp(Math.min(view.w, view.h) * 0.22, 84, 140) + 14;
       const bw = Math.min(360, w - left - 12);
       const cx = (left + w - 12) / 2;
-      hudText(L(boss.def, 'name'), cx, 80, 12, 'center', '#ffb3b3');
-      bar(cx - bw / 2, 86, bw, 8, boss.hp / boss.maxHp, '#ff6b6b');
+      const by = trHud ? 96 : 80; // 宝物の条件を出しているときは、その下に
+      hudText(L(boss.def, 'name'), cx, by, 12, 'center', '#ffb3b3');
+      bar(cx - bw / 2, by + 6, bw, 8, boss.hp / boss.maxHp, '#ff6b6b');
     }
 
     // 体力はキャラの足もとのゲージ、ダストボックスは左下のゴミ箱 (DOM) で見せる
@@ -6838,7 +6945,6 @@
     const rec = peekRec(ch.id, briefRoom, save.mode);
     const chars = CHARS.map((c) => charCard(c, 'char', c.id === ch.id)).join('');
     const roomList = [...r.rooms].sort((a, c) => a.danger - c.danger).map((rm) => `<li><b>${esc(L(rm, 'name'))}</b><span class="danger d${rm.danger}">${stars(rm.danger)}</span><span>${t('srcCount', rm.src.length)}</span><span class="bonus">${esc(bonusText(rm.bonus))}</span></li>`).join('');
-    const tRoom = r.rooms.find((q) => q.id === r.treasure.room);
     const found = hasTreasure(briefRoom, save.mode);
     const tr = treasureOf(briefRoom, save.mode);
     const unlocks = save.mode === 'normal' ? CHARS.find((c) => c.unlock === briefRoom) : null;
@@ -6857,7 +6963,7 @@
         </div>
         <div class="treasure-line${found ? ' found' : ''}">
           <img src="${iconURL('treasure')}" alt="">
-          <span>${found ? esc(t('treasureFoundLine', L(tr, 'name'))) : esc(t('treasureHint', '★'.repeat(tRoom.danger), L(tRoom, 'name')))}${unlocks ? `<br><small>${found ? esc(t('joined', L(unlocks, 'name'))) : t('willJoin')}</small>` : ''}${tr.perk ? `<br><small>${esc(found ? t('perkGot', perkName(tr.perk)) : t('perkTeaser', perkName(tr.perk)))}</small>` : ''}</span>
+          <span>${found ? esc(t('treasureFoundLine', L(tr, 'name'))) : esc(t('treasureHint', condText(briefRoom, save.mode)))}${unlocks ? `<br><small>${found ? esc(t('joined', L(unlocks, 'name'))) : t('willJoin')}</small>` : ''}${tr.perk ? `<br><small>${esc(found ? t('perkGot', perkName(tr.perk)) : t('perkTeaser', perkName(tr.perk)))}</small>` : ''}</span>
         </div>
         <p class="brief-note">${esc(t('slotNote', MAX_GEARS, MAX_PASSIVES))}</p>
         <p class="brief-note">${esc(t('bossNote', L(ENEMIES.yokai, 'name'), L(ENEMIES[r.boss], 'name')))}</p>
@@ -6886,7 +6992,7 @@
       const extra = [];
       if (tr.perk) extra.push(got ? t('perkGot', perkName(tr.perk)) : t('perkTeaser', perkName(tr.perk)));
       if (joins) extra.push(got ? t('joined', L(joins, 'name')) : t('willJoin'));
-      return `<li class="${got ? 'found' : ''}${tr.perk ? ' perk' : ''}"><img src="${iconURL('treasure')}" alt=""><span><b>${got ? esc(L(tr, 'name')) : '？？？'}</b> <span class="mode-chip ${mode}">${esc(modeName)}</span><br>${got ? `<small>${esc(stageName)}</small><br><small>${esc(L(tr, 'desc'))}</small>` : `<small class="clue">${esc(t('treasureClue', stageName, modeName))}</small>`}${extra.map((x) => `<br><small class="tre-extra">${esc(x)}</small>`).join('')}</span></li>`;
+      return `<li class="${got ? 'found' : ''}${tr.perk ? ' perk' : ''}"><img src="${iconURL('treasure')}" alt=""><span><b>${got ? esc(L(tr, 'name')) : '？？？'}</b> <span class="mode-chip ${mode}">${esc(modeName)}</span><br>${got ? `<small>${esc(stageName)}</small><br><small>${esc(L(tr, 'desc'))}</small>` : `<small class="clue">${esc(t('treasureClue', stageName, modeName, condText(i, mode)))}</small>`}${extra.map((x) => `<br><small class="tre-extra">${esc(x)}</small>`).join('')}</span></li>`;
     })).join('');
     show('chars', `
       <div class="panel wide">
@@ -6988,6 +7094,10 @@
     Sound.init();
     newGame(stageIdx);
     if (hasPerk('reroll')) G.rerolls = 1;
+    // 宝物の取得条件 (もう持っている宝物は出さない)
+    G.trCond = stageIdx === TUT ? null : treasureCond(stageIdx, G.mode);
+    G.trSpawned = !G.trCond || hasTreasure(stageIdx, G.mode);
+    G.minHp = 1;
     G.freeRevive = hasPerk('revive');
     rerender = null;
     hide();

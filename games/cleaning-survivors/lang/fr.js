@@ -85,7 +85,7 @@
     briefDesc: "<b>Nettoyez toutes les pièces en moins de 10 minutes</b> pour terminer le niveau. Détruisez toutes les <b>sources</b> (points rouges) d'une pièce et faites briller son sol pour la finir et gagner un coffre et un bonus. <b>Plus une pièce a de ★, plus elle est sale</b>, avec des déchets plus nombreux et plus coriaces. Si vous y entrez trop tôt, vous serez vite débordé : commencez par les pièces qui ont peu de ★. Les sources sont <b>d'autant plus solides que leurs alentours sont sales</b>, alors frottez autour d'abord.",
     srcCount: (n) => `Sources ${n}`,
     treasureFoundLine: (name) => `Trésor « ${name} » trouvé !`,
-    treasureHint: (st, room) => `Trésor : finissez la pièce ${st} « ${room} » pour le trouver`,
+    treasureHint: (cond) => `Trésor : ${cond}`,
     joined: (name) => `${name} a rejoint l'équipe`,
     willJoin: "Trouver ce trésor débloque un nouvel agent",
     bossNote: (mid, boss) => `Le mini-boss « ${mid} » apparaît à 5:00, et le boss « ${boss} » à 9:00.`,
@@ -191,7 +191,19 @@
     perkOn: "Débloqué (par un trésor)",
     perkGot: (name) => `Compétence permanente « ${name} » débloquée !`,
     perkTeaser: (name) => `Débloque la compétence permanente « ${name} »`,
-    treasureClue: (stage, mode) => `Indice : dans ${stage} (${mode}), il dort au fond de la pièce la plus sale`,
+    treasureClue: (stage, mode, cond) => `Indice (${stage}, ${mode}) : ${cond}`,
+    condRoom: (room) => `Finir la pièce qui a le plus de ★, « ${room} »`,
+    condKills: (n, enemy) => `Nettoyer ${n} × ${enemy} en une partie`,
+    condRoomTime: (room, time) => `Finir « ${room} » en moins de ${time}`,
+    condSrcTime: (time) => `Détruire toutes les sources de la maison en moins de ${time}`,
+    condClearTime: (time) => `Nettoyer toutes les pièces en moins de ${time}`,
+    condBoss: (boss) => `Vaincre « ${boss} »`,
+    condDumps: (n) => `Vider la poubelle ${n} fois en une partie`,
+    condHpKeep: (pct) => `Terminer le niveau sans que vos PV descendent sous ${pct} %`,
+    treasureAppeared: "Un trésor est apparu !",
+    hudTreasure: (s) => `Trésor ${s}`,
+    hudDumpCount: (a, b) => `Bennes ${a}/${b}`,
+    hudTimeLeft: (s) => `reste ${s}`,
     treasurePerks: "Compétences débloquées par des trésors",
     reviveFree: "Revivre grâce au trésor",
   },
@@ -371,7 +383,7 @@
     <p>Quand vous êtes à bout de forces, vous pouvez vous relever sur place une fois par partie (tous vos PV, et les déchets proches sont balayés). Si les choix au niveau supérieur ne vous plaisent pas, vous pouvez obtenir 2 relances. Quand vous terminez un niveau, vous pouvez multiplier par 1,5 les pièces gagnées. Chaque récompense s'obtient en regardant une publicité et n'est disponible que sur CrazyGames.</p>
 
     <h3>Agents et trésors</h3>
-    <p>Il y a 10 agents, chacun avec un équipement de départ et un talent différents. L'équipement de départ est l'équipement favori de l'agent et inflige +25 % de dégâts (son build favori est indiqué dans sa fiche). La force va de ★1 à ★5 ; les agents ★1 ont peu de PV ou de dégâts et servent de défi. Chaque niveau cache un trésor en Normal et un en Difficile, 20 en tout ; un trésor apparaît quand vous finissez la pièce qui a le plus de ★ dans ce mode. Les trésors sont enregistrés dès que vous les ramassez. Certains trésors du mode Normal font rejoindre un nouvel agent, et deux trésors du mode Difficile débloquent les compétences permanentes Relance et Renaissance. L'écran « Succès » (depuis le titre) montre les victoires de chaque agent et les trésors récoltés, avec des indices pour ceux qui manquent.</p>
+    <p>Il y a 10 agents, chacun avec un équipement de départ et un talent différents. L'équipement de départ est l'équipement favori de l'agent et inflige +25 % de dégâts (son build favori est indiqué dans sa fiche). La force va de ★1 à ★5 ; les agents ★1 ont peu de PV ou de dégâts et servent de défi. Chaque niveau cache un trésor en Normal et un en Difficile, 20 en tout. Chaque trésor a sa propre condition (finir la pièce qui a le plus de ★, nettoyer un certain nombre d'un déchet précis, finir une pièce dans un temps limité, vaincre un boss, etc.), indiquée sur l'écran de préparation et dans la liste des trésors. Pendant la partie, votre progression s'affiche en haut à droite, et le trésor apparaît près de vous quand la condition est remplie (les conditions liées à la victoire sont récompensées à la fin du niveau). Les trésors sont enregistrés dès que vous les ramassez. Certains trésors du mode Normal font rejoindre un nouvel agent, et deux trésors du mode Difficile débloquent les compétences permanentes Relance et Renaissance. L'écran « Succès » (depuis le titre) montre les victoires de chaque agent et les trésors récoltés, avec des indices pour ceux qui manquent.</p>
 
     <h3>Progression</h3>
     <p>La progression est votre score sur 300 points : une victoire dans chaque niveau et chaque mode avec chaque agent (10 agents × 10 niveaux × 2 modes = 200 points) plus les trésors (20 × 5 points = 100 points). Terminez tous les niveaux dans tous les modes avec tous les agents et trouvez tous les trésors pour atteindre 100 %.</p>
