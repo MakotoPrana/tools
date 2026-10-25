@@ -166,7 +166,8 @@
     total: "Total",
     nextStage: "Siguiente nivel",
     again: "Otra vez",
-    shopSub: "Vale para todos los limpiadores, desde la próxima partida",
+    shopSub: "Solo vale para este limpiador, desde la próxima partida. Las monedas son comunes",
+    skillsOf: (name) => `Habilidades de ${name}`,
     max: "MÁX",
     cost: (c) => `${c} monedas`,
     killed: (n) => `Eliminados ${n}`,
@@ -380,7 +381,7 @@
     <p>Cada nivel tiene modo Normal y modo Difícil. Superar un nivel en Normal desbloquea el siguiente nivel y el modo Difícil de ese nivel. Los niveles se desbloquean por separado para cada limpiador, así que otro limpiador empieza desde el nivel 1. En Difícil hay más basura y mucho más dura, y es casi imposible ganar hasta tener las habilidades permanentes a la mitad más o menos (el último nivel en Difícil es 50/50 incluso al 80 %). Gasta monedas en «habilidades permanentes» antes de intentarlo (Difícil da 1,6 veces más monedas).</p>
 
     <h3>Habilidades permanentes</h3>
-    <p>Gasta las monedas que ganes para subir salud, fuerza, poder de limpieza (lo ancho que abrillantas el suelo), velocidad, defensa, regeneración, alcance de recogida, experiencia, tamaño del depósito de polvo, monedas y número de opciones al subir de nivel. Valen para todos los limpiadores desde la siguiente partida. Ábrelas con el botón «⬆ Habilidades» de la pantalla de título o de la selección de nivel. Cuando puedes pagar una mejora, el botón brilla en dorado y muestra cuántas.</p>
+    <p>Gasta las monedas que ganes para subir salud, fuerza, poder de limpieza (lo ancho que abrillantas el suelo), velocidad, defensa, regeneración, alcance de recogida, experiencia, tamaño del depósito de polvo, monedas y número de opciones al subir de nivel. Son de cada limpiador y solo valen para el que las mejoró, desde la siguiente partida (las monedas son comunes; cambia de limpiador con los iconos de arriba). Ábrelas con el botón «⬆ Habilidades» de la pantalla de título o de la selección de nivel. Cuando puedes pagar una mejora, el botón brilla en dorado y muestra cuántas.</p>
 
     <h3>Botones de recompensa (revivir, cambios, monedas ×1,5)</h3>
     <p>Cuando estás agotado, puedes levantarte ahí mismo una vez por partida (con todos los PV, y la basura cercana sale volando). Si no te gustan las opciones al subir de nivel, puedes conseguir 2 cambios. Al superar un nivel, puedes multiplicar por 1,5 las monedas ganadas. Cada recompensa se consigue viendo un anuncio y solo está disponible si juegas en CrazyGames.</p>

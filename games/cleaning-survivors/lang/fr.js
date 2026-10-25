@@ -166,7 +166,8 @@
     total: "Total",
     nextStage: "Niveau suivant",
     again: "Réessayer",
-    shopSub: "Valable pour tous les agents, dès la prochaine partie",
+    shopSub: "Valable seulement pour cet agent, dès la prochaine partie. Les pièces sont communes à tous",
+    skillsOf: (name) => `Compétences de ${name}`,
     max: "MAX",
     cost: (c) => `${c} pièces`,
     killed: (n) => `Nettoyés ${n}`,
@@ -380,7 +381,7 @@
     <p>Chaque niveau a un mode Normal et un mode Difficile. Terminer un niveau en Normal débloque le niveau suivant et le mode Difficile de ce niveau. Les niveaux se débloquent séparément pour chaque agent : un autre agent recommence au niveau 1. En Difficile, les déchets sont beaucoup plus nombreux et coriaces, et il est presque impossible de gagner tant que vos compétences permanentes ne sont pas à environ la moitié (le dernier niveau en Difficile reste du 50/50 même à 80 %). Dépensez vos pièces en « compétences permanentes » avant de vous y attaquer (le mode Difficile rapporte 1,6 fois plus de pièces).</p>
 
     <h3>Compétences permanentes</h3>
-    <p>Dépensez les pièces gagnées pour augmenter santé, puissance, pouvoir nettoyant (largeur de nettoyage du sol), vitesse, défense, régénération, portée de ramassage, expérience, taille du bac à poussière, pièces et nombre de choix au niveau supérieur. Elles valent pour tous les agents dès la partie suivante. Ouvrez-les avec le bouton « ⬆ Compétences » sur l'écran titre ou le choix du niveau. Quand vous pouvez payer une amélioration, le bouton brille en doré et indique combien.</p>
+    <p>Dépensez les pièces gagnées pour augmenter santé, puissance, pouvoir nettoyant (largeur de nettoyage du sol), vitesse, défense, régénération, portée de ramassage, expérience, taille du bac à poussière, pièces et nombre de choix au niveau supérieur. Elles sont propres à chaque agent et ne valent que pour celui que vous avez amélioré, dès la partie suivante (les pièces sont communes ; changez d'agent avec les icônes en haut de l'écran). Ouvrez-les avec le bouton « ⬆ Compétences » sur l'écran titre ou le choix du niveau. Quand vous pouvez payer une amélioration, le bouton brille en doré et indique combien.</p>
 
     <h3>Boutons de récompense (revivre, relances, pièces ×1,5)</h3>
     <p>Quand vous êtes à bout de forces, vous pouvez vous relever sur place une fois par partie (tous vos PV, et les déchets proches sont balayés). Si les choix au niveau supérieur ne vous plaisent pas, vous pouvez obtenir 2 relances. Quand vous terminez un niveau, vous pouvez multiplier par 1,5 les pièces gagnées. Chaque récompense s'obtient en regardant une publicité et n'est disponible que sur CrazyGames.</p>
