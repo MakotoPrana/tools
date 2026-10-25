@@ -6823,6 +6823,14 @@
   // 画面 (タイトル・メニュー・レベルアップなど)
   // ===================================================================
   const actions = {};
+  // 画面を描き直しても、スクロールの位置をそのままにする (focusSel のボタンにフォーカスを戻す)
+  function keepScroll(render, focusSel) {
+    const top = overlay.scrollTop;
+    render();
+    overlay.scrollTop = top;
+    const b = focusSel && overlay.querySelector(focusSel);
+    if (b && !b.disabled) b.focus({ preventScroll: true });
+  }
   // 広告を待つあいだは、画面のボタンを押せなくして「準備中」と出す
   function adBusy() {
     overlay.querySelectorAll('button').forEach((b) => { b.disabled = true; });
@@ -7962,11 +7970,12 @@
       sh[id]++;
       persist();
       Sound.play('level');
-      showShop();
+      // 続けて上げられるように、スクロールの位置と押したボタンはそのまま
+      keepScroll(() => showShop(), `[data-act="buy"][data-arg="${id}"]`);
     },
     shopChar: (id) => {
       shopCharId = id;
-      showShop();
+      keepScroll(() => showShop(), `[data-act="shopChar"][data-arg="${id}"]`);
     },
     zukan: showZukan,
     settings: (from) => showSettings(from),
