@@ -8068,8 +8068,11 @@
     pauseBack: () => { if (G && G.paused) renderPause(); },
   });
 
-  // ゲーム一覧へのリンクは、このサイト (tools.e-seventh.com) で遊んでいるときだけ出す
-  if (location.hostname === 'tools.e-seventh.com') document.querySelector('.back').style.visibility = '';
+  // ゲーム一覧へのリンクとコピーライトは、このサイト (tools.e-seventh.com) で遊んでいるときだけ出す (CrazyGames などでは出さない)
+  if (location.hostname === 'tools.e-seventh.com') {
+    document.querySelector('.back').style.visibility = '';
+    document.querySelector('footer').hidden = false;
+  }
 
   applyLang();
   showTitle();
