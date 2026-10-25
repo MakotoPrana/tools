@@ -1205,10 +1205,11 @@
     tutorialSeen: false, // チュートリアルを始めたか、案内でスキップを選んだ (もう案内を出さない)
   });
 
-  function loadSave() {
+  // raw: 保存の文字列 (省略するとこの端末の localStorage から読む)
+  function loadSave(raw) {
     const s = defaultSave();
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
+      if (raw === undefined) raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return s;
       const d = JSON.parse(raw);
       if (typeof d.coins === 'number') s.coins = d.coins;
@@ -1321,8 +1322,12 @@
   const TREASURE_PTS = 5;
 
 
+  let persisted = false; // この起動のあいだに一度でも保存したか
   function persist() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* 保存できなくても遊べる */ }
+    const json = JSON.stringify(save);
+    persisted = true;
+    try { localStorage.setItem(SAVE_KEY, json); } catch (e) { /* 保存できなくても遊べる */ }
+    Ads.setData(SAVE_KEY, json); // CrazyGames ではデータモジュールにも保存する
   }
 
   const save = loadSave();
@@ -1556,9 +1561,22 @@
         }
       });
     }
+    // CrazyGames のデータモジュール (ログインしている人はアカウントに、ゲストはその端末に保存される)
+    const store = () => (live() && sdk.data ? sdk.data : null);
     return {
+      ready,
       rewarded,
       live,
+      getData: (k) => {
+        const d = store();
+        if (!d) return null;
+        try { return d.getItem(k); } catch (e) { return null; }
+      },
+      setData: (k, v) => {
+        const d = store();
+        if (d) try { d.setItem(k, v); } catch (e) { /* 保存できなくても遊べる */ }
+      },
+      hasData: () => !!store(),
       // 遊んでいるあいだ (一時停止・メニュー・結果画面以外) を CrazyGames に知らせる
       gameplay: (on) => { if (live()) safe(() => (on ? sdk.game.gameplayStart() : sdk.game.gameplayStop())); },
       muted: () => !!(live() && sdk.game && sdk.game.settings && sdk.game.settings.muteAudio),
@@ -7838,6 +7856,28 @@
     lastResult = null;
   }
 
+  // CrazyGames では、データモジュールの保存を正とする (ログインしていれば別の端末でも続きから遊べる)。
+  // データモジュールにまだ保存がなければ (初めて・このしくみの前から遊んでいた人)、この端末の保存を移す
+  async function syncCloudSave() {
+    await Ads.ready;
+    if (!Ads.hasData()) return;
+    const raw = Ads.getData(SAVE_KEY);
+    // SDK の準備ができる前にもう遊んで保存していたら、そちらを残す
+    if (!raw || persisted) {
+      persist();
+      return;
+    }
+    if (raw === JSON.stringify(save)) return;
+    const loaded = loadSave(raw);
+    for (const k of Object.keys(save)) delete save[k];
+    Object.assign(save, loaded);
+    try { localStorage.setItem(SAVE_KEY, raw); } catch (e) { /* 保存できなくても遊べる */ }
+    selCharId = null;
+    shopCharId = null;
+    Sound.setVolume();
+    if (rerender && !G) rerender();
+  }
+
   // ---- 言語の切り替え ----
   // lang/<言語>.js の遊び方を、英語の遊び方のあとに並べる
   {
@@ -8028,8 +8068,12 @@
     pauseBack: () => { if (G && G.paused) renderPause(); },
   });
 
+  // ゲーム一覧へのリンクは、このサイト (tools.e-seventh.com) で遊んでいるときだけ出す
+  if (location.hostname === 'tools.e-seventh.com') document.querySelector('.back').style.visibility = '';
+
   applyLang();
   showTitle();
+  syncCloudSave();
 
   // テスト用 (ブラウザのコンソールから状態を見る)
   window.__cs = {
