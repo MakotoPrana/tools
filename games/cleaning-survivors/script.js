@@ -1520,10 +1520,13 @@
   const Ads = (() => {
     let sdk = null;
     let busy = false;
+    // 遊んでいるあいだか。SDK の準備ができる前に遊び始めても、準備ができたところで知らせる
+    let playing = false;
     const live = () => !!sdk && sdk.environment !== 'disabled';
     const safe = (fn) => {
       try { Promise.resolve(fn()).catch(() => {}); } catch (e) { /* SDK が使えなくても遊べる */ }
     };
+    const sendGameplay = () => { if (live()) safe(() => (playing ? sdk.game.gameplayStart() : sdk.game.gameplayStop())); };
     const ready = (async () => {
       const cg = window.CrazyGames && window.CrazyGames.SDK;
       if (!cg) return;
@@ -1536,6 +1539,7 @@
       }
       if (live() && sdk.game && sdk.game.addSettingsChangeListener) safe(() => sdk.game.addSettingsChangeListener(() => Sound.setVolume()));
       Sound.setVolume();
+      if (playing) sendGameplay();
       if (rerender) rerender(); // 広告が使えるとわかったら、報酬のボタンを出すために描き直す
     })();
     // 報酬つきの広告を流す。最後まで見たら true。広告が使えない場所では false
@@ -1578,7 +1582,10 @@
       },
       hasData: () => !!store(),
       // 遊んでいるあいだ (一時停止・メニュー・結果画面以外) を CrazyGames に知らせる
-      gameplay: (on) => { if (live()) safe(() => (on ? sdk.game.gameplayStart() : sdk.game.gameplayStop())); },
+      gameplay: (on) => {
+        playing = on;
+        sendGameplay();
+      },
       muted: () => !!(live() && sdk.game && sdk.game.settings && sdk.game.settings.muteAudio),
     };
   })();
