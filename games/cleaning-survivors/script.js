@@ -483,7 +483,6 @@
     { id: 'xp', name: '経験値', desc: 'もらえる経験値 +8%', max: 10, cost: 80 },
     { id: 'box', name: 'ダストボックス容量', desc: '容量 +20', max: 6, cost: 50 },
     { id: 'coin', name: 'コイン', desc: 'もらえるコイン +10%', max: 10, cost: 100 },
-    { id: 'reroll', name: 'リロール', desc: 'レベルアップの選び直し +1回', max: 6, cost: 100 },
     { id: 'choices', name: '選択肢の数', desc: 'レベルアップの候補 3 → 4', max: 1, cost: 500 },
   ];
   const shopCost = (item, lv) => item.cost * (lv + 1);
@@ -588,7 +587,6 @@
     xp: ['Experience', 'XP gained +8%'],
     box: ['Dust Box', 'Capacity +20'],
     coin: ['Coins', 'Coins earned +10%'],
-    reroll: ['Reroll', 'Level-up rerolls +1'],
     choices: ['Choices', 'Level-up choices 3 → 4'],
   };
   // ステージごとに [名前, 説明, { 部屋: 名前 }, [宝物の名前, 説明]]
@@ -853,6 +851,17 @@
       bgm: 'BGM',
       shake: '画面の揺れ・フラッシュ',
       haze: '汚れの靄',
+      reviveTitle: 'もう一度がんばる?',
+      reviveText: '体力が全回復して、その場で復活できる。復活できるのは1回のプレイで1回だけ。',
+      reviveBtn: '復活する',
+      giveUp: 'あきらめる',
+      revived: '復活! もうひとふんばり!',
+      rerollPlus: 'リロール +2',
+      coinsX: (n) => `コイン 1.5倍 (+${n})`,
+      coinAd: 'コイン (1.5倍ボーナス)',
+      withAd: (s) => `📺 広告を見て${s}`,
+      adLoading: '広告を準備中…',
+      adFailed: '広告を読み込めなかった。少し待ってからもう一度試してね',
     },
     en: {
       pageTitle: 'Cleaning Survivors',
@@ -1023,6 +1032,17 @@
       bgm: 'Music',
       shake: 'Screen shake & flash',
       haze: 'Grime haze',
+      reviveTitle: 'Give it another go?',
+      reviveText: 'Get back up right where you fell with full HP. You can revive only once per run.',
+      reviveBtn: 'Revive',
+      giveUp: 'Give up',
+      revived: 'Revived! Keep going!',
+      rerollPlus: '+2 rerolls',
+      coinsX: (n) => `Coins ×1.5 (+${n})`,
+      coinAd: 'Coins (×1.5 bonus)',
+      withAd: (s) => `📺 Watch an ad: ${s}`,
+      adLoading: 'Loading ad…',
+      adFailed: 'Couldn\'t load an ad. Wait a moment and try again',
     },
   };
 
@@ -1073,6 +1093,9 @@
       const d = JSON.parse(raw);
       if (typeof d.coins === 'number') s.coins = d.coins;
       for (const it of SHOP) if (d.shop && typeof d.shop[it.id] === 'number') s.shop[it.id] = Math.min(it.max, d.shop[it.id]);
+      // 恒久スキル「リロール」はなくした (選び直しは広告で増やす)。上げていたぶんのコインは返す
+      const oldReroll = d.shop && typeof d.shop.reroll === 'number' ? Math.min(6, Math.max(0, Math.floor(d.shop.reroll))) : 0;
+      if (oldReroll) s.coins += (100 * oldReroll * (oldReroll + 1)) / 2;
       Object.assign(s.kills, d.kills || {});
       Object.assign(s.settings, d.settings || {});
       if (CHARS.some((c) => c.id === d.char)) s.char = d.char;
@@ -1163,10 +1186,17 @@
       setVolume();
     }
 
+    // 広告のあいだと、CrazyGames の設定で消音にしているときは音を出さない
+    let adMute = false;
     function setVolume() {
       if (!ac) return;
-      seGain.gain.value = (save.settings.se / 100) * 0.6;
-      bgmGain.gain.value = (save.settings.bgm / 100) * 0.35;
+      const on = adMute || Ads.muted() ? 0 : 1;
+      seGain.gain.value = (save.settings.se / 100) * 0.6 * on;
+      bgmGain.gain.value = (save.settings.bgm / 100) * 0.35 * on;
+    }
+    function setAdMute(v) {
+      adMute = v;
+      setVolume();
     }
 
     function tone(freq, freq2, dur, type, vol, when = 0, dest = seGain) {
@@ -1305,8 +1335,66 @@
       timer = setInterval(schedule, 25);
     }
 
-    return { init, play, bgm, setVolume };
+    return { init, play, bgm, setVolume, setAdMute };
   })();
+
+  // ---- CrazyGames の広告 (リワード広告) ----
+  // CrazyGames の上で遊ぶときは、報酬の前に広告を流す。SDK がない場所や使えない場所 (このサイトなど) では、
+  // 広告なしでそのまま報酬を渡す (ボタンの文言からも「広告を見て」を外す)
+  const Ads = (() => {
+    let sdk = null;
+    let busy = false;
+    const live = () => !!sdk && sdk.environment !== 'disabled';
+    const safe = (fn) => {
+      try { Promise.resolve(fn()).catch(() => {}); } catch (e) { /* SDK が使えなくても遊べる */ }
+    };
+    const ready = (async () => {
+      const cg = window.CrazyGames && window.CrazyGames.SDK;
+      if (!cg) return;
+      try {
+        await cg.init();
+        sdk = cg;
+      } catch (e) {
+        sdk = null;
+        return;
+      }
+      if (live() && sdk.game && sdk.game.addSettingsChangeListener) safe(() => sdk.game.addSettingsChangeListener(() => Sound.setVolume()));
+      Sound.setVolume();
+      if (rerender) rerender(); // 広告が使えるとわかったら、ボタンの文言を描き直す
+    })();
+    // 報酬つきの広告を流す。最後まで見たら true。広告が使えない場所では、すぐ true
+    async function rewarded() {
+      await ready;
+      if (!live()) return true;
+      if (busy) return false;
+      busy = true;
+      return new Promise((resolve) => {
+        const done = (ok) => {
+          busy = false;
+          Sound.setAdMute(false);
+          resolve(ok);
+        };
+        try {
+          sdk.ad.requestAd('rewarded', {
+            adStarted: () => Sound.setAdMute(true),
+            adFinished: () => done(true),
+            adError: () => done(false),
+          });
+        } catch (e) {
+          done(false);
+        }
+      });
+    }
+    return {
+      rewarded,
+      live,
+      // 遊んでいるあいだ (一時停止・メニュー・結果画面以外) を CrazyGames に知らせる
+      gameplay: (on) => { if (live()) safe(() => (on ? sdk.game.gameplayStart() : sdk.game.gameplayStop())); },
+      muted: () => !!(live() && sdk.game && sdk.game.settings && sdk.game.settings.muteAudio),
+    };
+  })();
+  // 広告で報酬をもらうボタンの文言 (広告が使えない場所では「広告を見て」を付けない)
+  const adLabel = (s) => (Ads.live() ? t('withAd', s) : s);
 
   // ===================================================================
   // 絵 (ゴミ・主人公・アイコン)
@@ -2723,7 +2811,7 @@
       xp: 0,
       xpNext: xpFor(1),
       pendingLv: 0,
-      rerolls: save.shop.reroll,
+      rerolls: 0, // レベルアップの選び直し。広告を見ると 2 回ぶん増える
       box: 0,
       dumpCoins: 0,
       bossCoins: 0,
@@ -5123,7 +5211,9 @@
     } else if (G.state === 'win' && G.endT > 2.6) {
       showResult(true);
     } else if (G.state === 'dead' && G.endT > 1.6) {
-      showResult(false);
+      // 力尽きたら、1回のプレイで1回だけ復活をすすめる (時間切れは復活できない)
+      if (!G.timeUp && !G.reviveOffered) showRevive();
+      else showResult(false);
     }
   }
 
@@ -6284,6 +6374,12 @@
   // 画面 (タイトル・メニュー・レベルアップなど)
   // ===================================================================
   const actions = {};
+  // 広告を待つあいだは、画面のボタンを押せなくして「準備中」と出す
+  function adBusy() {
+    overlay.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    const b = overlay.querySelector('.ad-btn, [data-act="reviveAd"]');
+    if (b) b.textContent = t('adLoading');
+  }
   overlay.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled || overlay.classList.contains('locked')) return;
@@ -6624,12 +6720,14 @@
     Sound.bgm('main');
     showBanner(L(stageOf(stageIdx), 'name'), '#ffffff', 2);
     renderTutor();
+    Ads.gameplay(true);
   }
 
   function pauseGame() {
     if (!G || G.state !== 'play' || !overlay.hidden) return;
     G.paused = true;
     Sound.bgm(null);
+    Ads.gameplay(false);
     show('pause', `
       <div class="panel">
         <h2>${t('paused')}</h2>
@@ -6651,6 +6749,65 @@
     G.paused = false;
     hide();
     Sound.bgm(G.bosses.some((b) => b.boss && b.alive) ? 'boss' : 'main');
+    Ads.gameplay(true);
+  }
+
+  // ---- 復活 (広告の報酬) ----
+  function showRevive() {
+    G.reviveOffered = true;
+    Ads.gameplay(false);
+    rerender = renderRevive;
+    renderRevive();
+  }
+
+  function renderRevive(msg = '') {
+    show('revive', `
+      <div class="panel reward">
+        <h2 class="result-title lose">${t('wornOut')}</h2>
+        <p class="treasure-name">${t('reviveTitle')}</p>
+        <p class="sub">${t('reviveText')}</p>
+        ${msg ? `<p class="result-note">${esc(msg)}</p>` : ''}
+        <div class="actions">
+          <button type="button" class="btn primary" data-act="reviveAd" data-focus>${esc(adLabel(t('reviveBtn')))}</button>
+          <button type="button" class="btn" data-act="giveUp" data-back>${t('giveUp')}</button>
+        </div>
+      </div>`, false);
+  }
+
+  // 体力を全回復して、その場で立ち上がる。まわりのゴミは吹き飛ばし、少しのあいだ無敵にする
+  function revive() {
+    const p = G.p;
+    G.state = 'play';
+    G.endT = 0;
+    p.hp = G.stats.maxHp;
+    p.inv = 3;
+    p.allergyT = 0;
+    p.slowAmt = 0;
+    G.bullets.length = 0;
+    G.clouds.length = 0;
+    for (const e of G.enemies) {
+      if (!e.alive || e.def.source) continue;
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d > 260) continue;
+      if (e.boss || e.elite) {
+        e.x = p.x + (dx / d) * 260;
+        e.y = p.y + (dy / d) * 260;
+        pushOut(e, e.r);
+      } else {
+        e.alive = false;
+        puff(e.x, e.y, '#ffffff', 3);
+      }
+    }
+    puff(p.x, p.y, '#bff7e6', 30);
+    G.shake = Math.max(G.shake, 8);
+    showBanner(t('revived'), '#4fe0b6', 2.4);
+    Sound.play('level');
+    rerender = null;
+    hide();
+    Sound.bgm(G.bosses.some((b) => b.boss && b.alive) ? 'boss' : 'main');
+    Ads.gameplay(true);
   }
 
   // ---- レベルアップ ----
@@ -6715,7 +6872,9 @@
     </div>`;
   }
 
+  let levelMsg = ''; // レベルアップ画面に出すお知らせ (広告を読み込めなかったときなど)
   function showLevelUp() {
+    levelMsg = '';
     G.pendingLv--;
     Sound.play('level');
     choices = makeChoices();
@@ -6741,7 +6900,10 @@
         <div class="cards">${cards}</div>
         <p class="inv-title">${t('inventory')}</p>
         ${invHtml()}
-        ${G.rerolls > 0 ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button></div>` : ''}
+        <div class="actions">${G.rerolls > 0
+    ? `<button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button>`
+    : `<button type="button" class="btn small ad-btn" data-act="adReroll">${esc(adLabel(t('rerollPlus')))}</button>`}</div>
+        ${levelMsg ? `<p class="result-note">${esc(levelMsg)}</p>` : ''}
       </div>`, false, { kind: 'level', lock: 450 });
   }
 
@@ -6865,6 +7027,7 @@
         killCoins, cleanCoins, dumpCoins: g.dumpCoins, roomCoins: g.roomCoins, bossCoins: g.bossCoins, mul, total, notes: [[win ? 'noteTutorial' : 'noteTutorialRetry']],
       };
       G = null;
+      Ads.gameplay(false);
       renderResult(res);
       return;
     }
@@ -6896,6 +7059,7 @@
     };
     G = null;
     briefRoom = i;
+    Ads.gameplay(false);
     renderResult(res);
   }
 
@@ -6909,8 +7073,13 @@
     }
   }
 
+  let lastResult = null;
   function renderResult(r) {
+    lastResult = r;
     rerender = () => renderResult(r);
+    // ステージをクリアしたら、広告を見てもらえるコインを 1.5 倍にできる (1回だけ)
+    const adExtra = Math.round(r.total * 0.5);
+    const canBoost = r.win && !r.tut && !r.adExtra && adExtra > 0;
     const next = r.win && r.i + 1 < STAGES.length;
     const stageName = r.tut ? L(TUTORIAL, 'name') : t('stageTitle', r.i + 1, L(STAGES[r.i], 'name'));
     show('result', `
@@ -6930,8 +7099,11 @@
           <dt>${t('coinBoss')}</dt><dd>+${r.bossCoins}</dd>
           ${r.win ? `<dt>${t('coinClear')}</dt><dd>+50</dd>` : ''}
           ${r.mul !== 1 ? `<dt>${t('coinMul', r.mode === 'hard')}</dt><dd>×${r.mul.toFixed(2)}</dd>` : ''}
-          <dt class="total">${t('total')}</dt><dd class="total">+${r.total}</dd>
+          ${r.adExtra ? `<dt>${t('coinAd')}</dt><dd>+${r.adExtra}</dd>` : ''}
+          <dt class="total">${t('total')}</dt><dd class="total">+${r.total + (r.adExtra || 0)}</dd>
         </dl>
+        ${canBoost ? `<div class="actions"><button type="button" class="btn primary ad-btn" data-act="adCoins">${esc(adLabel(t('coinsX', adExtra)))}</button></div>` : ''}
+        ${r.adMsg ? `<p class="result-note">${esc(r.adMsg)}</p>` : ''}
         ${r.notes.map((n) => `<p class="result-note">${esc(noteText(n))}</p>`).join('')}
         ${affordable() ? `<div class="shop-cta"><span>${t('shopCta', save.coins, affordable())}</span>${shopBtn('rooms')}</div>` : ''}
         <div class="actions">
@@ -6976,7 +7148,7 @@
   }
 
   function shopIcon(id) {
-    return { hp: 'heal', might: 'boiler', clean: 'roller', speed: 'boots', armor: 'gloves', regen: 'heal', magnet: 'dustpack', xp: 'battery', box: 'dustpack', coin: 'coin', reroll: 'tape', choices: 'chest' }[id];
+    return { hp: 'heal', might: 'boiler', clean: 'roller', speed: 'boots', armor: 'gloves', regen: 'heal', magnet: 'dustpack', xp: 'battery', box: 'dustpack', coin: 'coin', choices: 'chest' }[id];
   }
 
   // ---- 図鑑 ----
@@ -7126,6 +7298,43 @@
       renderLevelUp();
     },
     chestOk: afterMenu,
+    // ---- 広告の報酬 ----
+    reviveAd: async () => {
+      if (!G || screen !== 'revive') return;
+      adBusy();
+      const ok = await Ads.rewarded();
+      if (!G || screen !== 'revive') return;
+      if (ok) revive();
+      else renderRevive(t('adFailed'));
+    },
+    giveUp: () => {
+      if (G && screen === 'revive') showResult(false);
+    },
+    adReroll: async () => {
+      if (!G || screen !== 'levelup') return;
+      adBusy();
+      const ok = await Ads.rewarded();
+      if (!G || screen !== 'levelup') return;
+      if (ok) {
+        G.rerolls += 2;
+        levelMsg = '';
+      } else levelMsg = t('adFailed');
+      renderLevelUp();
+    },
+    adCoins: async () => {
+      const r = lastResult;
+      if (!r || screen !== 'result' || r.adExtra) return;
+      adBusy();
+      const ok = await Ads.rewarded();
+      if (lastResult !== r || screen !== 'result') return;
+      if (ok) {
+        r.adExtra = Math.round(r.total * 0.5);
+        r.adMsg = '';
+        save.coins += r.adExtra;
+        persist();
+      } else r.adMsg = t('adFailed');
+      renderResult(r);
+    },
     shop: (from) => showShop(from),
     buy: (id) => {
       const it = SHOP.find((s) => s.id === id);

@@ -169,6 +169,17 @@
     bgm: "Musica",
     shake: "Vibrazioni e lampi",
     haze: "Foschia di sporco",
+    reviveTitle: "Ci riprovi?",
+    reviveText: "Rialzati sul posto con tutti i PS. Puoi rinascere solo una volta per partita.",
+    reviveBtn: "Rinasci",
+    giveUp: "Arrenditi",
+    revived: "Di nuovo in piedi! Forza!",
+    rerollPlus: "+2 cambi",
+    coinsX: (n) => `Monete ×1,5 (+${n})`,
+    coinAd: "Monete (bonus ×1,5)",
+    withAd: (s) => `📺 Guarda una pubblicità: ${s}`,
+    adLoading: "Caricamento pubblicità…",
+    adFailed: "Impossibile caricare la pubblicità. Aspetta un momento e riprova",
   },
   enemies: {
     dust: ["Batuffolo di polvere", "Debole, ma arriva in sciami enormi. Si trova in ogni stanza."],
@@ -268,7 +279,6 @@
     xp: ["Esperienza", "ESP ottenuta +8%"],
     box: ["Contenitore polvere", "Capacità +20"],
     coin: ["Monete", "Monete ottenute +10%"],
-    reroll: ["Cambia scelte", "Cambi al livello su +1"],
     choices: ["Scelte", "Scelte al livello su 3 → 4"],
   },
   modes: { normal: "Normale", hard: "Difficile" },
@@ -325,7 +335,10 @@
     <p>Ogni livello ha una modalità Normale e una Difficile. Completare un livello in Normale sblocca il livello successivo e la modalità Difficile di quel livello. In Difficile i rifiuti sono più numerosi e molto più duri, ed è quasi impossibile vincere finché le abilità permanenti non sono a circa metà (l'ultimo livello in Difficile resta 50/50 anche all'80%). Spendi le monete nelle «abilità permanenti» prima di provarci (Difficile dà 1,6 volte le monete).</p>
 
     <h3>Abilità permanenti</h3>
-    <p>Spendi le monete guadagnate per aumentare salute, potenza, potere pulente (quanto largo lucidi il pavimento), velocità, difesa, rigenerazione, raggio di raccolta, esperienza, capienza del contenitore polvere, monete, cambi di scelte e numero di scelte al livello su. Valgono per tutti gli addetti dalla partita successiva. Aprile con il pulsante «⬆ Abilità» nella schermata del titolo o nella scelta del livello. Quando puoi permetterti un potenziamento, il pulsante brilla d'oro e mostra quanti.</p>
+    <p>Spendi le monete guadagnate per aumentare salute, potenza, potere pulente (quanto largo lucidi il pavimento), velocità, difesa, rigenerazione, raggio di raccolta, esperienza, capienza del contenitore polvere, monete e numero di scelte al livello su. Valgono per tutti gli addetti dalla partita successiva. Aprile con il pulsante «⬆ Abilità» nella schermata del titolo o nella scelta del livello. Quando puoi permetterti un potenziamento, il pulsante brilla d'oro e mostra quanti.</p>
+
+    <h3>Pulsanti ricompensa (rinascita, cambi, monete ×1,5)</h3>
+    <p>Quando sei esausto, puoi rialzarti sul posto una volta per partita (tutti i PS, e i rifiuti vicini vengono spazzati via). Se le scelte al livello su non ti piacciono, puoi ottenere 2 cambi. Quando completi un livello, puoi moltiplicare per 1,5 le monete guadagnate. Se giochi su CrazyGames, prima di ogni ricompensa viene mostrata una pubblicità.</p>
 
     <h3>Addetti e tesori</h3>
     <p>Ci sono 6 addetti, ognuno con attrezzi iniziali e talento diversi (lucida più largo camminando, non rallenta sui pavimenti sporchi, non soffre di allergie, ecc.). Ogni livello nasconde un tesoro, che appare quando completi la stanza con più ★. I tesori vengono salvati appena li raccogli, e alcuni fanno unire un nuovo addetto. Nella schermata «Obiettivi» (dal titolo) puoi vedere le vittorie di ogni addetto per livello e modalità e i tesori raccolti.</p>

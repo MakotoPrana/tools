@@ -169,6 +169,17 @@
     bgm: "Música",
     shake: "Tremor e flashes",
     haze: "Névoa de sujeira",
+    reviveTitle: "Quer tentar de novo?",
+    reviveText: "Levante-se ali mesmo com todos os PV. Você só pode reviver uma vez por partida.",
+    reviveBtn: "Reviver",
+    giveUp: "Desistir",
+    revived: "De volta! Continue!",
+    rerollPlus: "+2 trocas",
+    coinsX: (n) => `Moedas ×1,5 (+${n})`,
+    coinAd: "Moedas (bônus ×1,5)",
+    withAd: (s) => `📺 Ver um anúncio: ${s}`,
+    adLoading: "Carregando anúncio…",
+    adFailed: "Não foi possível carregar um anúncio. Espere um pouco e tente de novo",
   },
   enemies: {
     dust: ["Bolinha de poeira", "Fraca, mas vem em enxames enormes. Está em todos os cômodos."],
@@ -268,7 +279,6 @@
     xp: ["Experiência", "EXP recebida +8%"],
     box: ["Caixa de poeira", "Capacidade +20"],
     coin: ["Moedas", "Moedas recebidas +10%"],
-    reroll: ["Trocar opções", "Trocas ao subir de nível +1"],
     choices: ["Opções", "Opções ao subir de nível 3 → 4"],
   },
   modes: { normal: "Normal", hard: "Difícil" },
@@ -325,7 +335,10 @@
     <p>Cada fase tem o modo Normal e o modo Difícil. Vencer uma fase no Normal libera a próxima fase e o Difícil daquela fase. No Difícil há mais lixo e muito mais duro, e é quase impossível vencer antes de as habilidades permanentes estarem mais ou menos na metade (a última fase no Difícil é 50/50 mesmo com 80%). Gaste moedas em "habilidades permanentes" antes de tentar (o Difícil dá 1,6 vez mais moedas).</p>
 
     <h3>Habilidades permanentes</h3>
-    <p>Gaste as moedas que ganhar para aumentar saúde, força, poder de limpeza (a largura com que você dá brilho ao chão), velocidade, defesa, regeneração, alcance de coleta, experiência, tamanho da caixa de poeira, moedas, trocas de opções e número de opções ao subir de nível. Elas valem para todos os faxineiros a partir da próxima partida. Abra pelo botão "⬆ Habilidades" na tela de título ou na seleção de fase. Quando você pode pagar uma melhoria, o botão brilha em dourado e mostra quantas.</p>
+    <p>Gaste as moedas que ganhar para aumentar saúde, força, poder de limpeza (a largura com que você dá brilho ao chão), velocidade, defesa, regeneração, alcance de coleta, experiência, tamanho da caixa de poeira, moedas e número de opções ao subir de nível. Elas valem para todos os faxineiros a partir da próxima partida. Abra pelo botão "⬆ Habilidades" na tela de título ou na seleção de fase. Quando você pode pagar uma melhoria, o botão brilha em dourado e mostra quantas.</p>
+
+    <h3>Botões de recompensa (reviver, trocas, moedas ×1,5)</h3>
+    <p>Quando ficar sem forças, você pode se levantar ali mesmo uma vez por partida (com todos os PV, e o lixo próximo é jogado longe). Se não gostar das opções ao subir de nível, você pode ganhar 2 trocas. Ao vencer uma fase, você pode multiplicar por 1,5 as moedas ganhas. Jogando no CrazyGames, um anúncio passa antes de cada uma dessas recompensas.</p>
 
     <h3>Faxineiros e tesouros</h3>
     <p>São 6 faxineiros, cada um com equipamento inicial e traço diferentes (dá brilho mais largo ao andar, não fica lento em chão sujo, não tem alergia etc.). Cada fase esconde um tesouro, que aparece quando você conclui o cômodo com mais ★. Os tesouros são salvos assim que você os pega, e alguns fazem um novo faxineiro entrar para a equipe. Na tela "Conquistas" (pelo título) você vê as vitórias de cada faxineiro por fase e modo e os tesouros reunidos.</p>

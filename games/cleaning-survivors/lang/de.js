@@ -169,6 +169,17 @@
     bgm: "Musik",
     shake: "Wackeln & Blitze",
     haze: "Dreckdunst",
+    reviveTitle: "Noch ein Versuch?",
+    reviveText: "Steh mit vollen LP genau dort wieder auf, wo du gefallen bist. Wiederbeleben geht nur einmal pro Runde.",
+    reviveBtn: "Wiederbeleben",
+    giveUp: "Aufgeben",
+    revived: "Wieder da! Weiter geht's!",
+    rerollPlus: "+2 Neuwürfe",
+    coinsX: (n) => `Münzen ×1,5 (+${n})`,
+    coinAd: "Münzen (×1,5-Bonus)",
+    withAd: (s) => `📺 Werbung ansehen: ${s}`,
+    adLoading: "Werbung wird geladen …",
+    adFailed: "Werbung konnte nicht geladen werden. Warte kurz und versuch es noch einmal",
   },
   enemies: {
     dust: ["Wollmaus", "Schwach, kommt aber in riesigen Schwärmen. In jedem Raum zu finden."],
@@ -268,7 +279,6 @@
     xp: ["Erfahrung", "Erhaltene EP +8 %"],
     box: ["Staubbox", "Kapazität +20"],
     coin: ["Münzen", "Erhaltene Münzen +10 %"],
-    reroll: ["Neu würfeln", "Neu würfeln beim Level-up +1"],
     choices: ["Auswahl", "Auswahl beim Level-up 3 → 4"],
   },
   modes: { normal: "Normal", hard: "Schwer" },
@@ -325,7 +335,10 @@
     <p>Jedes Level hat einen Normal- und einen Schwer-Modus. Schaffst du ein Level in Normal, werden das nächste Level und der Schwer-Modus dieses Levels freigeschaltet. In Schwer gibt es mehr und viel zäheren Müll, und es ist kaum zu schaffen, bevor deine Dauer-Upgrades etwa zur Hälfte ausgebaut sind (das letzte Level in Schwer ist selbst bei 80 % ein Münzwurf). Gib deine Münzen für „Dauer-Upgrades“ aus, bevor du es versuchst (Schwer bringt 1,6-mal so viele Münzen).</p>
 
     <h3>Dauer-Upgrades</h3>
-    <p>Gib verdiente Münzen aus, um Gesundheit, Kraft, Putzkraft (wie breit du den Boden polierst), Tempo, Abwehr, Regeneration, Sammelreichweite, Erfahrung, Staubbox-Größe, Münzen, Neuwürfe und die Anzahl der Level-up-Auswahlen zu erhöhen. Sie gelten ab der nächsten Runde für alle Putzkräfte. Öffne sie über die Schaltfläche „⬆ Upgrades“ auf dem Titelbildschirm oder in der Levelauswahl. Kannst du dir ein Upgrade leisten, leuchtet die Schaltfläche golden und zeigt die Anzahl.</p>
+    <p>Gib verdiente Münzen aus, um Gesundheit, Kraft, Putzkraft (wie breit du den Boden polierst), Tempo, Abwehr, Regeneration, Sammelreichweite, Erfahrung, Staubbox-Größe, Münzen und die Anzahl der Level-up-Auswahlen zu erhöhen. Sie gelten ab der nächsten Runde für alle Putzkräfte. Öffne sie über die Schaltfläche „⬆ Upgrades“ auf dem Titelbildschirm oder in der Levelauswahl. Kannst du dir ein Upgrade leisten, leuchtet die Schaltfläche golden und zeigt die Anzahl.</p>
+
+    <h3>Belohnungs-Schaltflächen (Wiederbeleben, Neuwürfe, Münzen ×1,5)</h3>
+    <p>Bist du erschöpft, kannst du einmal pro Runde an Ort und Stelle wieder aufstehen (volle LP, und Müll in der Nähe wird weggefegt). Gefallen dir die Level-up-Auswahlen nicht, kannst du 2 Neuwürfe dazubekommen. Schaffst du ein Level, kannst du die verdienten Münzen mit 1,5 multiplizieren. Auf CrazyGames läuft vor jeder dieser Belohnungen eine Werbung.</p>
 
     <h3>Putzkräfte und Schätze</h3>
     <p>Es gibt 6 Putzkräfte, jede mit eigener Startausrüstung und eigenem Talent (poliert beim Laufen breiter, wird auf dreckigem Boden nicht langsamer, bekommt keine Allergien usw.). Jedes Level versteckt einen Schatz, der erscheint, wenn du den Raum mit den meisten ★ abschließt. Schätze werden beim Aufheben sofort gespeichert, und bestimmte Schätze bringen eine neue Putzkraft ins Team. Im Bildschirm „Erfolge“ (über den Titel) siehst du die Siege jeder Putzkraft pro Level und Modus und die gesammelten Schätze.</p>

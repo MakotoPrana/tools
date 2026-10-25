@@ -169,6 +169,17 @@
     bgm: "Música",
     shake: "Temblor y destellos",
     haze: "Neblina de mugre",
+    reviveTitle: "¿Lo intentas otra vez?",
+    reviveText: "Levántate ahí mismo con todos los PV. Solo puedes revivir una vez por partida.",
+    reviveBtn: "Revivir",
+    giveUp: "Rendirse",
+    revived: "¡De vuelta! ¡Sigue así!",
+    rerollPlus: "+2 cambios",
+    coinsX: (n) => `Monedas ×1,5 (+${n})`,
+    coinAd: "Monedas (bonificación ×1,5)",
+    withAd: (s) => `📺 Ver un anuncio: ${s}`,
+    adLoading: "Cargando anuncio…",
+    adFailed: "No se pudo cargar un anuncio. Espera un momento y vuelve a intentarlo",
   },
   enemies: {
     dust: ["Pelusa", "Débil, pero llega en enjambres enormes. Está en todas las habitaciones."],
@@ -268,7 +279,6 @@
     xp: ["Experiencia", "EXP obtenida +8 %"],
     box: ["Depósito de polvo", "Capacidad +20"],
     coin: ["Monedas", "Monedas obtenidas +10 %"],
-    reroll: ["Cambiar opciones", "Cambios al subir de nivel +1"],
     choices: ["Opciones", "Opciones al subir de nivel 3 → 4"],
   },
   modes: { normal: "Normal", hard: "Difícil" },
@@ -325,7 +335,10 @@
     <p>Cada nivel tiene modo Normal y modo Difícil. Superar un nivel en Normal desbloquea el siguiente nivel y el modo Difícil de ese nivel. En Difícil hay más basura y mucho más dura, y es casi imposible ganar hasta tener las habilidades permanentes a la mitad más o menos (el último nivel en Difícil es 50/50 incluso al 80 %). Gasta monedas en «habilidades permanentes» antes de intentarlo (Difícil da 1,6 veces más monedas).</p>
 
     <h3>Habilidades permanentes</h3>
-    <p>Gasta las monedas que ganes para subir salud, fuerza, poder de limpieza (lo ancho que abrillantas el suelo), velocidad, defensa, regeneración, alcance de recogida, experiencia, tamaño del depósito de polvo, monedas, cambios de opciones y número de opciones al subir de nivel. Valen para todos los limpiadores desde la siguiente partida. Ábrelas con el botón «⬆ Habilidades» de la pantalla de título o de la selección de nivel. Cuando puedes pagar una mejora, el botón brilla en dorado y muestra cuántas.</p>
+    <p>Gasta las monedas que ganes para subir salud, fuerza, poder de limpieza (lo ancho que abrillantas el suelo), velocidad, defensa, regeneración, alcance de recogida, experiencia, tamaño del depósito de polvo, monedas y número de opciones al subir de nivel. Valen para todos los limpiadores desde la siguiente partida. Ábrelas con el botón «⬆ Habilidades» de la pantalla de título o de la selección de nivel. Cuando puedes pagar una mejora, el botón brilla en dorado y muestra cuántas.</p>
+
+    <h3>Botones de recompensa (revivir, cambios, monedas ×1,5)</h3>
+    <p>Cuando estás agotado, puedes levantarte ahí mismo una vez por partida (con todos los PV, y la basura cercana sale volando). Si no te gustan las opciones al subir de nivel, puedes conseguir 2 cambios. Al superar un nivel, puedes multiplicar por 1,5 las monedas ganadas. Si juegas en CrazyGames, antes de cada recompensa se muestra un anuncio.</p>
 
     <h3>Limpiadores y tesoros</h3>
     <p>Hay 6 limpiadores, cada uno con su equipo inicial y su rasgo (abrillanta más ancho al caminar, no se frena en suelo sucio, no sufre alergias, etc.). Cada nivel esconde un tesoro, que aparece al terminar la habitación con más ★. Los tesoros se guardan en cuanto los recoges, y algunos hacen que se una un nuevo limpiador. En la pantalla «Logros» (desde el título) puedes ver las victorias de cada limpiador por nivel y modo y los tesoros reunidos.</p>

@@ -169,6 +169,17 @@
     bgm: "Musique",
     shake: "Secousses et flashs",
     haze: "Brume de crasse",
+    reviveTitle: "On remet ça ?",
+    reviveText: "Relevez-vous sur place avec tous vos PV. Vous ne pouvez revivre qu'une fois par partie.",
+    reviveBtn: "Revivre",
+    giveUp: "Abandonner",
+    revived: "De retour ! On continue !",
+    rerollPlus: "+2 relances",
+    coinsX: (n) => `Pièces ×1,5 (+${n})`,
+    coinAd: "Pièces (bonus ×1,5)",
+    withAd: (s) => `📺 Regarder une pub : ${s}`,
+    adLoading: "Chargement de la pub…",
+    adFailed: "Impossible de charger une pub. Patientez un instant et réessayez",
   },
   enemies: {
     dust: ["Mouton de poussière", "Faible, mais arrive en énormes nuées. Présent dans toutes les pièces."],
@@ -268,7 +279,6 @@
     xp: ["Expérience", "EXP gagnée +8 %"],
     box: ["Bac à poussière", "Capacité +20"],
     coin: ["Pièces", "Pièces gagnées +10 %"],
-    reroll: ["Relance", "Relances au niveau supérieur +1"],
     choices: ["Choix", "Choix au niveau supérieur 3 → 4"],
   },
   modes: { normal: "Normal", hard: "Difficile" },
@@ -325,7 +335,10 @@
     <p>Chaque niveau a un mode Normal et un mode Difficile. Terminer un niveau en Normal débloque le niveau suivant et le mode Difficile de ce niveau. En Difficile, les déchets sont beaucoup plus nombreux et coriaces, et il est presque impossible de gagner tant que vos compétences permanentes ne sont pas à environ la moitié (le dernier niveau en Difficile reste du 50/50 même à 80 %). Dépensez vos pièces en « compétences permanentes » avant de vous y attaquer (le mode Difficile rapporte 1,6 fois plus de pièces).</p>
 
     <h3>Compétences permanentes</h3>
-    <p>Dépensez les pièces gagnées pour augmenter santé, puissance, pouvoir nettoyant (largeur de nettoyage du sol), vitesse, défense, régénération, portée de ramassage, expérience, taille du bac à poussière, pièces, relances et nombre de choix au niveau supérieur. Elles valent pour tous les agents dès la partie suivante. Ouvrez-les avec le bouton « ⬆ Compétences » sur l'écran titre ou le choix du niveau. Quand vous pouvez payer une amélioration, le bouton brille en doré et indique combien.</p>
+    <p>Dépensez les pièces gagnées pour augmenter santé, puissance, pouvoir nettoyant (largeur de nettoyage du sol), vitesse, défense, régénération, portée de ramassage, expérience, taille du bac à poussière, pièces et nombre de choix au niveau supérieur. Elles valent pour tous les agents dès la partie suivante. Ouvrez-les avec le bouton « ⬆ Compétences » sur l'écran titre ou le choix du niveau. Quand vous pouvez payer une amélioration, le bouton brille en doré et indique combien.</p>
+
+    <h3>Boutons de récompense (revivre, relances, pièces ×1,5)</h3>
+    <p>Quand vous êtes à bout de forces, vous pouvez vous relever sur place une fois par partie (tous vos PV, et les déchets proches sont balayés). Si les choix au niveau supérieur ne vous plaisent pas, vous pouvez obtenir 2 relances. Quand vous terminez un niveau, vous pouvez multiplier par 1,5 les pièces gagnées. Sur CrazyGames, une publicité passe avant chacune de ces récompenses.</p>
 
     <h3>Agents et trésors</h3>
     <p>Il y a 6 agents, chacun avec un équipement de départ et un talent différents (nettoie plus large en marchant, n'est pas ralenti par les sols sales, ne fait pas d'allergie, etc.). Chaque niveau cache un trésor, qui apparaît quand vous finissez la pièce qui a le plus de ★. Les trésors sont enregistrés dès que vous les ramassez, et certains font rejoindre un nouvel agent. L'écran « Succès » (depuis le titre) montre les victoires de chaque agent par niveau et par mode, ainsi que les trésors récoltés.</p>
