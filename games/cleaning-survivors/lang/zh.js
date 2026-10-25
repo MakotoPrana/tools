@@ -186,6 +186,7 @@
     giveUp: '放弃',
     revived: '复活! 再加把劲!',
     rerollPlus: '重新选择 +2',
+    rerollWait: (n) => `再升级 ${n} 次后可看广告重新选择`,
     coinsX: (n) => `金币 1.5倍 (+${n})`,
     coinAd: '金币（1.5倍奖励）',
     withAd: (s) => `📺 看广告: ${s}`,

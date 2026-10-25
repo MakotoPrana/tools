@@ -915,6 +915,7 @@
       giveUp: 'あきらめる',
       revived: '復活! もうひとふんばり!',
       rerollPlus: 'リロール +2',
+      rerollWait: (n) => `広告リロールはあと ${n} 回のレベルアップ後`,
       coinsX: (n) => `コイン 1.5倍 (+${n})`,
       coinAd: 'コイン (1.5倍ボーナス)',
       withAd: (s) => `📺 広告を見て${s}`,
@@ -1131,6 +1132,7 @@
       giveUp: 'Give up',
       revived: 'Revived! Keep going!',
       rerollPlus: '+2 rerolls',
+      rerollWait: (n) => `Ad reroll available in ${n} level-up${n === 1 ? '' : 's'}`,
       coinsX: (n) => `Coins ×1.5 (+${n})`,
       coinAd: 'Coins (×1.5 bonus)',
       withAd: (s) => `📺 Watch an ad: ${s}`,
@@ -3206,6 +3208,8 @@
       xpNext: xpFor(1),
       pendingLv: 0,
       rerolls: 0, // レベルアップの選び直し (宝物の恒久スキル「リロール」で 1 回。広告を見ると 2 回ぶん増える)
+      lvShown: 0, // 出したレベルアップ画面の数
+      adRerollAt: -99, // 広告でリロールを増やした画面の番号 (そのあと AD_REROLL_WAIT 回は広告を出さない)
       freeRevive: false, // 宝物の恒久スキル「復活」で、まだ使える復活
       trCond: null, // 宝物の取得条件 (startGame で決める)
       trSpawned: true,
@@ -7419,9 +7423,13 @@
   }
 
   let levelMsg = ''; // レベルアップ画面に出すお知らせ (広告を読み込めなかったときなど)
+  // 広告のリロールは、使ったあと次の 5 回のレベルアップでは出さない (いくらでも選び直せないように)
+  const AD_REROLL_WAIT = 5;
+  const adRerollWait = () => Math.max(0, AD_REROLL_WAIT + 1 - (G.lvShown - G.adRerollAt));
   function showLevelUp() {
     levelMsg = '';
     G.pendingLv--;
+    G.lvShown++;
     Sound.play('level');
     choices = makeChoices();
     renderLevelUp();
@@ -7446,7 +7454,9 @@
         ${invHtml()}
         ${G.rerolls > 0
     ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button></div>`
-    : Ads.live() ? `<div class="actions"><button type="button" class="btn small ad-btn" data-act="adReroll">${esc(adLabel(t('rerollPlus')))}</button></div>` : ''}
+    : !Ads.live() ? ''
+      : adRerollWait() > 0 ? `<div class="actions"><button type="button" class="btn small ad-btn" disabled>${esc(t('rerollWait', adRerollWait()))}</button></div>`
+        : `<div class="actions"><button type="button" class="btn small ad-btn" data-act="adReroll">${esc(adLabel(t('rerollPlus')))}</button></div>`}
         ${levelMsg ? `<p class="result-note">${esc(levelMsg)}</p>` : ''}
       </div>`, false, { kind: 'level', lock: 450 });
     fitPanel();
@@ -7966,12 +7976,13 @@
       if (G && screen === 'revive') showResult(false);
     },
     adReroll: async () => {
-      if (!G || screen !== 'levelup') return;
+      if (!G || screen !== 'levelup' || adRerollWait() > 0) return;
       adBusy();
       const ok = await Ads.rewarded();
       if (!G || screen !== 'levelup') return;
       if (ok) {
         G.rerolls += 2;
+        G.adRerollAt = G.lvShown;
         levelMsg = '';
       } else levelMsg = t('adFailed');
       renderLevelUp();

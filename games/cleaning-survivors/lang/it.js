@@ -186,6 +186,7 @@
     giveUp: "Arrenditi",
     revived: "Di nuovo in piedi! Forza!",
     rerollPlus: "+2 cambi",
+    rerollWait: (n) => `Cambio con pubblicità tra ${n} livell${n === 1 ? 'o' : 'i'}`,
     coinsX: (n) => `Monete ×1,5 (+${n})`,
     coinAd: "Monete (bonus ×1,5)",
     withAd: (s) => `📺 Guarda una pubblicità: ${s}`,
