@@ -64,8 +64,11 @@
     recordOf: (name) => `Recordes de ${name}`,
     coins: "Moedas",
     hardNote: "Difícil: PV e dano do lixo e dos focos de cerca de 3 a 7 vezes os do Normal (varia por fase), quantidade ×1,2. Moedas ×1,6. Suba antes suas habilidades permanentes até mais ou menos a metade. A última fase é 50/50 mesmo com 80%.",
-    lockedPrev: "Vença a fase anterior no Normal para entrar",
-    lockedHard: "Vença esta fase no Normal para liberar o Difícil",
+    lockedPrev: "Vença a fase anterior no Normal com este faxineiro para entrar",
+    lockedHard: "Vença esta fase no Normal com este faxineiro para liberar o Difícil",
+    charSelect: "Escolha um faxineiro",
+    charGo: "Escolher fase com este faxineiro",
+    changeChar: "Trocar de faxineiro",
     bestRooms: (r, n) => `Melhor: ${r}/${n} cômodos`,
     bestClear: (time) => `Melhor tempo ${time}`,
     roomCount: (n) => `${n} cômodos`,
@@ -374,7 +377,7 @@
     <p>Destrua todos os focos de um cômodo e limpe pelo menos 90% do chão para concluí-lo (o resto ganha brilho sozinho). Você ganha um baú e um bônus próprio do cômodo (movimento mais rápido, mais PV máximos etc.), e o cômodo nunca mais fica sujo.</p>
 
     <h3>Normal e Difícil</h3>
-    <p>Cada fase tem o modo Normal e o modo Difícil. Vencer uma fase no Normal libera a próxima fase e o Difícil daquela fase. No Difícil há mais lixo e muito mais duro, e é quase impossível vencer antes de as habilidades permanentes estarem mais ou menos na metade (a última fase no Difícil é 50/50 mesmo com 80%). Gaste moedas em "habilidades permanentes" antes de tentar (o Difícil dá 1,6 vez mais moedas).</p>
+    <p>Cada fase tem o modo Normal e o modo Difícil. Vencer uma fase no Normal libera a próxima fase e o Difícil daquela fase. As fases são liberadas separadamente para cada faxineiro, então outro faxineiro começa da fase 1. No Difícil há mais lixo e muito mais duro, e é quase impossível vencer antes de as habilidades permanentes estarem mais ou menos na metade (a última fase no Difícil é 50/50 mesmo com 80%). Gaste moedas em "habilidades permanentes" antes de tentar (o Difícil dá 1,6 vez mais moedas).</p>
 
     <h3>Habilidades permanentes</h3>
     <p>Gaste as moedas que ganhar para aumentar saúde, força, poder de limpeza (a largura com que você dá brilho ao chão), velocidade, defesa, regeneração, alcance de coleta, experiência, tamanho da caixa de poeira, moedas e número de opções ao subir de nível. Elas valem para todos os faxineiros a partir da próxima partida. Abra pelo botão "⬆ Habilidades" na tela de título ou na seleção de fase. Quando você pode pagar uma melhoria, o botão brilha em dourado e mostra quantas.</p>

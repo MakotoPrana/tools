@@ -793,8 +793,11 @@
       recordOf: (name) => `${name} の記録`,
       coins: 'コイン',
       hardNote: 'ハード: ゴミと発生源の HP・ダメージがノーマルの約3〜7倍 (ステージで違う)、数 ×1.2。コイン ×1.6。恒久スキルを半分ほど上げてから挑もう。最終ステージは8割ほど上げても五分五分',
-      lockedPrev: '前のステージをノーマルでクリアすると入れる',
-      lockedHard: 'このステージをノーマルでクリアすると挑戦できる',
+      lockedPrev: 'この清掃員で前のステージをノーマルでクリアすると入れる',
+      lockedHard: 'この清掃員でこのステージをノーマルでクリアすると挑戦できる',
+      charSelect: '清掃員を選ぶ',
+      charGo: 'この清掃員でステージを選ぶ',
+      changeChar: '清掃員を変える',
       bestRooms: (r, n) => `清掃した部屋 最高 ${r}/${n}`,
       bestClear: (time) => `最速クリア ${time}`,
       roomCount: (n) => `${n}部屋`,
@@ -1000,8 +1003,11 @@
       recordOf: (name) => `${name}'s records`,
       coins: 'Coins',
       hardNote: 'Hard: trash and source HP and damage are about 3–7× Normal (varies by stage), count ×1.2. Coins ×1.6. Raise your permanent skills to about half first. The final stage is a coin flip even at 80%.',
-      lockedPrev: 'Clear the previous stage on Normal to enter',
-      lockedHard: 'Clear this stage on Normal to unlock Hard',
+      lockedPrev: 'Clear the previous stage on Normal with this cleaner to enter',
+      lockedHard: 'Clear this stage on Normal with this cleaner to unlock Hard',
+      charSelect: 'Choose a Cleaner',
+      charGo: 'Choose a stage with this cleaner',
+      changeChar: 'Change cleaner',
       bestRooms: (r, n) => `Best rooms cleaned ${r}/${n}`,
       bestClear: (time) => `Best clear ${time}`,
       roomCount: (n) => `${n} rooms`,
@@ -1235,9 +1241,12 @@
   }
 
   // だれかがそのステージ・モードをクリアしたか
+  // だれかがクリアしたか (宝物の一覧などで、ステージの名前を見せるかどうかに使う)
   const stageCleared = (i, mode) => CHARS.some((c) => peekRec(c.id, i, mode).c);
-  const stageUnlocked = (i) => TEST_UNLOCK || i === 0 || stageCleared(i - 1, 'normal');
-  const hardUnlocked = (i) => TEST_UNLOCK || stageCleared(i, 'normal');
+  const stageSeen = (i) => TEST_UNLOCK || i === 0 || stageCleared(i - 1, 'normal');
+  // ステージとハードの開放は清掃員ごと。その清掃員で前のステージ (ハードは同じステージ) をノーマルでクリアすると開く
+  const stageUnlocked = (i, ch = curChar()) => TEST_UNLOCK || i === 0 || !!peekRec(ch.id, i - 1, 'normal').c;
+  const hardUnlocked = (i, ch = curChar()) => TEST_UNLOCK || !!peekRec(ch.id, i, 'normal').c;
   const charUnlocked = (c) => TEST_UNLOCK || c.unlock < 0 || save.treasures[c.unlock];
   // 宝物はステージごと・モードごとに 1 つ (ハードの宝物はノーマルと同じ部屋で見つかる)
   const treasureOf = (i, mode) => (mode === 'hard' ? STAGES[i].treasureH : STAGES[i].treasure);
@@ -6878,7 +6887,7 @@
     }).join('');
     show('rooms', `
       <div class="panel">
-        ${panelHead(t('stageSelect'), 'title')}
+        ${panelHead(t('stageSelect'), 'charSelect')}
         <p class="sub">${esc(t('recordOf', L(ch, 'name')))}${t('sep')}${t('coins')} <span class="coins">${save.coins}</span></p>
         ${modeTabs('mode')}
         ${hard ? `<p class="mode-note">${t('hardNote')}</p>` : ''}
@@ -6943,7 +6952,6 @@
     const r = STAGES[briefRoom];
     const ch = curChar();
     const rec = peekRec(ch.id, briefRoom, save.mode);
-    const chars = CHARS.map((c) => charCard(c, 'char', c.id === ch.id)).join('');
     const roomList = [...r.rooms].sort((a, c) => a.danger - c.danger).map((rm) => `<li><b>${esc(L(rm, 'name'))}</b><span class="danger d${rm.danger}">${stars(rm.danger)}</span><span>${t('srcCount', rm.src.length)}</span><span class="bonus">${esc(bonusText(rm.bonus))}</span></li>`).join('');
     const found = hasTreasure(briefRoom, save.mode);
     const tr = treasureOf(briefRoom, save.mode);
@@ -6968,10 +6976,46 @@
         <p class="brief-note">${esc(t('slotNote', MAX_GEARS, MAX_PASSIVES))}</p>
         <p class="brief-note">${esc(t('bossNote', L(ENEMIES.yokai, 'name'), L(ENEMIES[r.boss], 'name')))}</p>
         <div class="records"><span>${esc(L(ch, 'name'))}${t('sep')}${modeName}</span><span>${t('bestRooms', `<b>${rec.r}`, `${r.rooms.length}</b>`)}</span>${rec.t ? `<span>${t('bestClear', `<b>${fmtTime(rec.t)}</b>`)}</span>` : ''}${rec.c ? `<span><b>${t('cleared')}</b></span>` : ''}</div>
-        <h3>${t('pickCleaner')}</h3>
-        <div class="chars">${chars}</div>
         <div class="actions">
           <button type="button" class="btn primary" data-act="start" data-focus>${t('deploy', modeName)}</button>
+          <button type="button" class="btn" data-act="charSelect">${t('changeChar')}</button>
+        </div>
+      </div>`);
+  }
+
+  // ---- キャラ選択 (はじめる → キャラ選択 → ステージ選択) ----
+  let selCharId = null;
+  function showCharSelect() {
+    G = null;
+    rerender = showCharSelect;
+    Sound.bgm(null);
+    if (!selCharId) selCharId = curChar().id;
+    const c = CHARS.find((q) => q.id === selCharId) || CHARS[0];
+    const ok = charUnlocked(c);
+    const icons = CHARS.map((q) => {
+      const has = charUnlocked(q);
+      return `<button type="button" class="pick${q.id === c.id ? ' on' : ''}${has ? '' : ' locked'}" data-act="selChar" data-arg="${q.id}" aria-pressed="${q.id === c.id}" aria-label="${esc(has ? L(q, 'name') : '？？？')}"${q.id === c.id ? ' data-focus' : ''}>
+        <img src="${charThumb(q.id, !has)}" alt=""><span class="pick-stars p${q.power}">${'★'.repeat(q.power)}</span>
+      </button>`;
+    }).join('');
+    const total = STAGES.length * Object.keys(MODES).length;
+    const detail = ok
+      ? `<div class="pick-head"><img src="${charThumb(c.id)}" alt=""><div><h3>${esc(L(c, 'name'))}</h3>
+          <span class="char-power p${c.power}">${esc(t('charPower', '★'.repeat(c.power) + '☆'.repeat(5 - c.power)))}</span> <span class="char-clears">${esc(t('clears', charClears(c), total))}</span></div></div>
+        <p class="char-trait">${esc(traitText(c))}</p>
+        <p class="char-fav">${esc(t('charFav', favBuild(c), Math.round(((c.fav || FAV_MUL) - 1) * 100)))}</p>
+        <p class="char-desc">${esc(L(c, 'desc'))}</p>
+        <p class="char-desc">${esc(t('charStats', c.hp, c.weapons.map((w) => L(WEAPONS[w], 'name')).join(t('sep'))))}</p>`
+      : `<div class="pick-head"><img src="${charThumb(c.id, true)}" alt=""><div><h3>？？？</h3>
+          <span class="char-power p${c.power}">${esc(t('charPower', '★'.repeat(c.power) + '☆'.repeat(5 - c.power)))}</span></div></div>
+        <p class="char-desc">${esc(unlockText(c))}</p>`;
+    show('charselect', `
+      <div class="panel">
+        ${panelHead(t('charSelect'), 'title')}
+        <div class="picks">${icons}</div>
+        <div class="pick-detail${ok ? '' : ' locked'}">${detail}</div>
+        <div class="actions">
+          <button type="button" class="btn primary" data-act="charGo" ${ok ? '' : 'disabled'}>${t('charGo')}</button>
         </div>
       </div>`);
   }
@@ -6986,7 +7030,7 @@
     const tre = STAGES.flatMap((st, i) => Object.keys(MODES).map((mode) => {
       const tr = treasureOf(i, mode);
       const got = hasTreasure(i, mode);
-      const stageName = t('stageTitle', i + 1, stageUnlocked(i) ? L(st, 'name') : '？？？');
+      const stageName = t('stageTitle', i + 1, stageSeen(i) ? L(st, 'name') : '？？？');
       const modeName = L(MODES[mode], 'name');
       const joins = mode === 'normal' ? CHARS.find((c) => c.unlock === i) : null;
       const extra = [];
@@ -7016,7 +7060,7 @@
       if (r.r) return `<td class="part">${t('roomsCell', r.r, STAGES[i].rooms.length)}</td>`;
       return '<td class="none">—</td>';
     };
-    const rows = STAGES.map((st, i) => `<tr><th>${i + 1}. ${stageUnlocked(i) ? esc(L(st, 'name')) : '？？？'}</th>${cell(i, 'normal')}${cell(i, 'hard')}</tr>`).join('');
+    const rows = STAGES.map((st, i) => `<tr><th>${i + 1}. ${stageSeen(i) ? esc(L(st, 'name')) : '？？？'}</th>${cell(i, 'normal')}${cell(i, 'hard')}</tr>`).join('');
     let n = 0;
     for (let i = 0; i < STAGES.length; i++) for (const m of Object.keys(MODES)) if (peekRec(c.id, i, m).c) n++;
     show('charRec', `
@@ -7442,7 +7486,7 @@
       return;
     }
     // 記録 (清掃員ごと・モードごと)
-    const wasStageCleared = stageCleared(i, 'normal');
+    const wasStageCleared = !!peekRec(g.ch.id, i, 'normal').c; // 次のステージの開放は清掃員ごと
     const rec = recOf(save, g.ch.id, i, g.mode);
     const firstForChar = win && !rec.c;
     rec.r = Math.max(rec.r, doneN);
@@ -7692,9 +7736,22 @@
 
   Object.assign(actions, {
     title: showTitle,
-    play: () => (save.tutorialSeen ? showRooms() : showTutorialAsk()),
+    play: () => (save.tutorialSeen ? showCharSelect() : showTutorialAsk()),
     skipTutorial: () => {
       save.tutorialSeen = true;
+      persist();
+      showCharSelect();
+    },
+    charSelect: () => showCharSelect(),
+    // キャラ選択: アイコンを押すと下に説明を出す。仲間になっていない清掃員は、なり方だけ見られる
+    selChar: (id) => {
+      selCharId = id;
+      showCharSelect();
+    },
+    charGo: () => {
+      const c = CHARS.find((q) => q.id === selCharId);
+      if (!c || !charUnlocked(c)) return;
+      save.char = c.id;
       persist();
       showRooms();
     },

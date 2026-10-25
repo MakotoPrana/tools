@@ -64,8 +64,11 @@
     recordOf: (name) => `Rekorde von ${name}`,
     coins: "Münzen",
     hardNote: "Schwer: LP und Schaden von Müll und Quellen etwa 3- bis 7-mal so hoch wie in Normal (je nach Level), Anzahl ×1,2. Münzen ×1,6. Bring deine Dauer-Upgrades zuerst auf etwa die Hälfte. Das letzte Level ist selbst mit 80 % ein Münzwurf.",
-    lockedPrev: "Schließe das vorige Level in Normal ab, um hineinzukommen",
-    lockedHard: "Schließe dieses Level in Normal ab, um Schwer freizuschalten",
+    lockedPrev: "Schließe mit dieser Putzkraft das vorige Level in Normal ab, um hineinzukommen",
+    lockedHard: "Schließe mit dieser Putzkraft dieses Level in Normal ab, um Schwer freizuschalten",
+    charSelect: "Putzkraft wählen",
+    charGo: "Mit dieser Putzkraft ein Level wählen",
+    changeChar: "Putzkraft wechseln",
     bestRooms: (r, n) => `Beste: ${r}/${n} Räume geputzt`,
     bestClear: (time) => `Bestzeit ${time}`,
     roomCount: (n) => `${n} Räume`,
@@ -374,7 +377,7 @@
     <p>Zerstöre alle Quellen eines Raums und putze mindestens 90 % seines Bodens, um ihn abzuschließen (der Rest wird automatisch poliert). Du bekommst eine Truhe und einen raumspezifischen Bonus (schnellere Bewegung, mehr max. LP usw.), und der Raum wird nie wieder dreckig.</p>
 
     <h3>Normal und Schwer</h3>
-    <p>Jedes Level hat einen Normal- und einen Schwer-Modus. Schaffst du ein Level in Normal, werden das nächste Level und der Schwer-Modus dieses Levels freigeschaltet. In Schwer gibt es mehr und viel zäheren Müll, und es ist kaum zu schaffen, bevor deine Dauer-Upgrades etwa zur Hälfte ausgebaut sind (das letzte Level in Schwer ist selbst bei 80 % ein Münzwurf). Gib deine Münzen für „Dauer-Upgrades“ aus, bevor du es versuchst (Schwer bringt 1,6-mal so viele Münzen).</p>
+    <p>Jedes Level hat einen Normal- und einen Schwer-Modus. Schaffst du ein Level in Normal, werden das nächste Level und der Schwer-Modus dieses Levels freigeschaltet. Level werden für jede Putzkraft einzeln freigeschaltet, eine andere Putzkraft beginnt also bei Level 1. In Schwer gibt es mehr und viel zäheren Müll, und es ist kaum zu schaffen, bevor deine Dauer-Upgrades etwa zur Hälfte ausgebaut sind (das letzte Level in Schwer ist selbst bei 80 % ein Münzwurf). Gib deine Münzen für „Dauer-Upgrades“ aus, bevor du es versuchst (Schwer bringt 1,6-mal so viele Münzen).</p>
 
     <h3>Dauer-Upgrades</h3>
     <p>Gib verdiente Münzen aus, um Gesundheit, Kraft, Putzkraft (wie breit du den Boden polierst), Tempo, Abwehr, Regeneration, Sammelreichweite, Erfahrung, Staubbox-Größe, Münzen und die Anzahl der Level-up-Auswahlen zu erhöhen. Sie gelten ab der nächsten Runde für alle Putzkräfte. Öffne sie über die Schaltfläche „⬆ Upgrades“ auf dem Titelbildschirm oder in der Levelauswahl. Kannst du dir ein Upgrade leisten, leuchtet die Schaltfläche golden und zeigt die Anzahl.</p>

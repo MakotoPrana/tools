@@ -64,8 +64,11 @@
     recordOf: (name) => `Records de ${name}`,
     coins: "Pièces",
     hardNote: "Difficile : PV et dégâts des déchets et des sources environ 3 à 7 fois ceux du mode Normal (selon le niveau), nombre ×1,2. Pièces ×1,6. Montez vos compétences permanentes à environ la moitié d'abord. Le dernier niveau reste du 50/50 même à 80 %.",
-    lockedPrev: "Terminez le niveau précédent en Normal pour entrer",
-    lockedHard: "Terminez ce niveau en Normal pour débloquer le mode Difficile",
+    lockedPrev: "Terminez le niveau précédent en Normal avec cet agent pour entrer",
+    lockedHard: "Terminez ce niveau en Normal avec cet agent pour débloquer le mode Difficile",
+    charSelect: "Choisir un agent",
+    charGo: "Choisir un niveau avec cet agent",
+    changeChar: "Changer d'agent",
     bestRooms: (r, n) => `Meilleur : ${r}/${n} pièces`,
     bestClear: (time) => `Meilleur temps ${time}`,
     roomCount: (n) => `${n} pièces`,
@@ -374,7 +377,7 @@
     <p>Détruisez toutes les sources d'une pièce et nettoyez au moins 90 % de son sol pour la finir (le reste se lustre tout seul). Vous gagnez un coffre et un bonus propre à la pièce (déplacement plus rapide, PV max en plus, etc.), et la pièce ne se salit plus jamais.</p>
 
     <h3>Normal et Difficile</h3>
-    <p>Chaque niveau a un mode Normal et un mode Difficile. Terminer un niveau en Normal débloque le niveau suivant et le mode Difficile de ce niveau. En Difficile, les déchets sont beaucoup plus nombreux et coriaces, et il est presque impossible de gagner tant que vos compétences permanentes ne sont pas à environ la moitié (le dernier niveau en Difficile reste du 50/50 même à 80 %). Dépensez vos pièces en « compétences permanentes » avant de vous y attaquer (le mode Difficile rapporte 1,6 fois plus de pièces).</p>
+    <p>Chaque niveau a un mode Normal et un mode Difficile. Terminer un niveau en Normal débloque le niveau suivant et le mode Difficile de ce niveau. Les niveaux se débloquent séparément pour chaque agent : un autre agent recommence au niveau 1. En Difficile, les déchets sont beaucoup plus nombreux et coriaces, et il est presque impossible de gagner tant que vos compétences permanentes ne sont pas à environ la moitié (le dernier niveau en Difficile reste du 50/50 même à 80 %). Dépensez vos pièces en « compétences permanentes » avant de vous y attaquer (le mode Difficile rapporte 1,6 fois plus de pièces).</p>
 
     <h3>Compétences permanentes</h3>
     <p>Dépensez les pièces gagnées pour augmenter santé, puissance, pouvoir nettoyant (largeur de nettoyage du sol), vitesse, défense, régénération, portée de ramassage, expérience, taille du bac à poussière, pièces et nombre de choix au niveau supérieur. Elles valent pour tous les agents dès la partie suivante. Ouvrez-les avec le bouton « ⬆ Compétences » sur l'écran titre ou le choix du niveau. Quand vous pouvez payer une amélioration, le bouton brille en doré et indique combien.</p>

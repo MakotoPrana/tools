@@ -64,8 +64,11 @@
     recordOf: (name) => `Record di ${name}`,
     coins: "Monete",
     hardNote: "Difficile: PS e danno di rifiuti e sorgenti circa 3–7 volte quelli di Normale (dipende dal livello), quantità ×1,2. Monete ×1,6. Porta prima le abilità permanenti a circa metà. L'ultimo livello resta 50/50 anche all'80%.",
-    lockedPrev: "Completa il livello precedente in Normale per entrare",
-    lockedHard: "Completa questo livello in Normale per sbloccare Difficile",
+    lockedPrev: "Completa il livello precedente in Normale con questo addetto per entrare",
+    lockedHard: "Completa questo livello in Normale con questo addetto per sbloccare Difficile",
+    charSelect: "Scegli un addetto",
+    charGo: "Scegli un livello con questo addetto",
+    changeChar: "Cambia addetto",
     bestRooms: (r, n) => `Migliore: ${r}/${n} stanze`,
     bestClear: (time) => `Tempo migliore ${time}`,
     roomCount: (n) => `${n} stanze`,
@@ -374,7 +377,7 @@
     <p>Distruggi tutte le sorgenti di una stanza e pulisci almeno il 90% del pavimento per completarla (il resto si lucida da solo). Ottieni un forziere e un bonus specifico della stanza (movimento più rapido, più PS max, ecc.), e la stanza non si sporca più.</p>
 
     <h3>Normale e Difficile</h3>
-    <p>Ogni livello ha una modalità Normale e una Difficile. Completare un livello in Normale sblocca il livello successivo e la modalità Difficile di quel livello. In Difficile i rifiuti sono più numerosi e molto più duri, ed è quasi impossibile vincere finché le abilità permanenti non sono a circa metà (l'ultimo livello in Difficile resta 50/50 anche all'80%). Spendi le monete nelle «abilità permanenti» prima di provarci (Difficile dà 1,6 volte le monete).</p>
+    <p>Ogni livello ha una modalità Normale e una Difficile. Completare un livello in Normale sblocca il livello successivo e la modalità Difficile di quel livello. I livelli si sbloccano separatamente per ogni addetto, quindi un altro addetto riparte dal livello 1. In Difficile i rifiuti sono più numerosi e molto più duri, ed è quasi impossibile vincere finché le abilità permanenti non sono a circa metà (l'ultimo livello in Difficile resta 50/50 anche all'80%). Spendi le monete nelle «abilità permanenti» prima di provarci (Difficile dà 1,6 volte le monete).</p>
 
     <h3>Abilità permanenti</h3>
     <p>Spendi le monete guadagnate per aumentare salute, potenza, potere pulente (quanto largo lucidi il pavimento), velocità, difesa, rigenerazione, raggio di raccolta, esperienza, capienza del contenitore polvere, monete e numero di scelte al livello su. Valgono per tutti gli addetti dalla partita successiva. Aprile con il pulsante «⬆ Abilità» nella schermata del titolo o nella scelta del livello. Quando puoi permetterti un potenziamento, il pulsante brilla d'oro e mostra quanti.</p>
