@@ -268,6 +268,8 @@ body {
 .btn:disabled { opacity: 0.4; cursor: default; }
 .btn.primary { background: linear-gradient(180deg, #3fd3a8, #20a884); border-color: transparent; color: #08261d; }
 .btn.small { min-width: 0; padding: 6px 12px; font-size: 0.85rem; }
+/* 並んだボタンは文言より狭くならない (長い言語では折り返して次の行へ) */
+.actions > .btn { flex-shrink: 0; width: max-content; }
 
 /* タイトル */
 .logo {

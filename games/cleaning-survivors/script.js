@@ -34,21 +34,24 @@
 
   // 言語: 日本語と英語。保存がなければ、ブラウザの言語が日本語なら日本語、それ以外は英語
   const LANG_KEY = 'cleaning-survivors-lang';
-  // 日本語・英語・中国語 (簡体字)・韓国語。中国語と韓国語の文言は i18n.js にある
-  const LANGS = [['ja', '日本語'], ['en', 'English'], ['zh', '简体中文'], ['ko', '한국어']];
-  const LANG_CODES = LANGS.map(([code]) => code);
+  // 日本語・英語はこのファイルに、ほかの言語の文言は lang/<言語>.js にある (読みこめた言語だけ選べる)
   const I18N = window.CS_I18N || {};
+  const LANGS = [
+    ['ja', '日本語'], ['en', 'English'], ['zh', '简体中文'], ['ko', '한국어'],
+    ['fr', 'Français'], ['de', 'Deutsch'], ['es', 'Español'], ['it', 'Italiano'], ['pt', 'Português'],
+  ].filter(([code]) => code === 'ja' || code === 'en' || I18N[code]);
+  const LANG_CODES = LANGS.map(([code]) => code);
+  const PACK_CODES = LANG_CODES.filter((code) => I18N[code]);
+  // ラテン文字の言語 (ロゴを英字用の大きさにする)
+  const LATIN = ['en', 'fr', 'de', 'es', 'it', 'pt'];
   const loadLang = () => {
     try {
       const saved = localStorage.getItem(LANG_KEY);
-      if (LANG_CODES.includes(saved) && (saved === 'ja' || saved === 'en' || I18N[saved])) return saved;
+      if (LANG_CODES.includes(saved)) return saved;
     } catch (e) { /* 保存がなければブラウザの言語から決める */ }
     for (const l of navigator.languages || [navigator.language || '']) {
-      const code = String(l).toLowerCase();
-      if (code.startsWith('ja')) return 'ja';
-      if (code.startsWith('zh') && I18N.zh) return 'zh';
-      if (code.startsWith('ko') && I18N.ko) return 'ko';
-      if (code.startsWith('en')) return 'en';
+      const code = String(l).toLowerCase().slice(0, 2);
+      if (LANG_CODES.includes(code)) return code;
     }
     return 'en';
   };
@@ -671,7 +674,7 @@
     stages: EN_STAGES,
     tutorial: ['Tutorial', 'A tiny three-room house for learning how to play.', { genkan: 'Entrance', living: 'Living Room', washitsu: 'Tatami Room' }],
   });
-  for (const code of ['zh', 'ko']) if (I18N[code]) addLang(code, I18N[code]);
+  for (const code of PACK_CODES) addLang(code, I18N[code]);
 
   const bonusText = (key) => (BONUS_TEXT[lang] || ROOM_BONUS)[key];
   // ギアのレベルアップの説明 (レベル lv → lv+1)
@@ -1023,7 +1026,7 @@
     },
   };
 
-  for (const code of ['zh', 'ko']) if (I18N[code]) TEXT[code] = I18N[code].text;
+  for (const code of PACK_CODES) TEXT[code] = I18N[code].text;
 
   // 文言を取り出す。関数の文言は引数を渡して組み立てる (その言語になければ英語、それもなければ日本語)
   const t = (key, ...args) => {
@@ -2601,6 +2604,9 @@
   resize();
 
   const keys = new Set();
+  // 移動のキーはキーボードの配列によらず、WASD の位置のキーで動く (フランス語の AZERTY なら ZQSD)
+  const MOVE_CODES = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd' };
+  const keyName = (e) => MOVE_CODES[e.code] || (e.key.length === 1 ? e.key.toLowerCase() : e.key);
   const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 
   window.addEventListener('keydown', (e) => {
@@ -2608,7 +2614,7 @@
     const k = e.key;
     if (G && G.state === 'play' && !G.paused && overlay.hidden) {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(k)) e.preventDefault();
-      keys.add(k.length === 1 ? k.toLowerCase() : k);
+      keys.add(keyName(e));
       if (k === 'Escape' || k === 'p' || k === 'P') pauseGame();
       return;
     }
@@ -2623,8 +2629,7 @@
     }
   });
   window.addEventListener('keyup', (e) => {
-    const k = e.key;
-    keys.delete(k.length === 1 ? k.toLowerCase() : k);
+    keys.delete(keyName(e));
   });
   window.addEventListener('blur', () => keys.clear());
 
@@ -5000,7 +5005,7 @@
   const tutorBox = document.getElementById('tutor');
 
   // 1秒に読める文字数のめやす (ヒントを出しておく長さに使う)
-  const READ_SPEED = { ja: 10, en: 22, zh: 9, ko: 13 };
+  const READ_SPEED = { ja: 10, en: 22, zh: 9, ko: 13, fr: 20, de: 19, es: 20, it: 20, pt: 20 };
 
   function updateTutorial(dt) {
     const tu = G.tutorial;
@@ -6371,7 +6376,7 @@
     Sound.bgm(null);
     show('title', `
       <div class="panel bare">
-        <p class="logo${lang === 'en' ? ' en' : ''}"><small>${t('logoSmall')}</small>${t('logo')}</p>
+        <p class="logo${LATIN.includes(lang) ? ' en' : ''}"><small>${t('logoSmall')}</small>${t('logo')}</p>
         <p class="tagline">${t('tagline')}</p>
         <div class="title-cast"><img src="${charThumb('cleaner')}" alt="">${['dust', 'paper', 'can', 'grease', 'spore', 'bag'].map((k) => `<img src="${enemyThumb(k)}" alt="">`).join('')}</div>
         ${completionHtml()}
@@ -7017,6 +7022,23 @@
   }
 
   // ---- 言語の切り替え ----
+  // lang/<言語>.js の遊び方を、英語の遊び方のあとに並べる
+  {
+    const helps = document.querySelectorAll('.help');
+    let last = helps[helps.length - 1];
+    for (const code of PACK_CODES) {
+      if (!I18N[code].help || !last) continue;
+      const sec = document.createElement('section');
+      sec.className = 'help';
+      sec.dataset.lang = code;
+      sec.lang = code === 'zh' ? 'zh-Hans' : code;
+      sec.hidden = true;
+      sec.innerHTML = I18N[code].help;
+      last.after(sec);
+      last = sec;
+    }
+  }
+
   // HTML に書いた文言 (data-i18n) と、言語ごとの遊び方 (data-lang) を反映する
   function applyLang() {
     document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
@@ -7035,7 +7057,6 @@
   // 言語の選択 (ヘッダーのセレクトボックス)。プレイ中は隠している
   if (langBtn) {
     for (const [code, label] of LANGS) {
-      if (code !== 'ja' && code !== 'en' && !I18N[code]) continue;
       const opt = document.createElement('option');
       opt.value = code;
       opt.lang = code === 'zh' ? 'zh-Hans' : code;
