@@ -12,6 +12,9 @@
 
     gtag('config', 'G-4VLZW1VMVC');
   </script>
+  <!-- CrazyGames の SDK (CrazyGames の上ではリワード広告に使う。ほかの場所では何もしない)。
+       CrazyGames の決まりに合わせて、ゲームのコードより先に <head> で読みこむ -->
+  <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
   <title>おそうじサバイバー</title>
   <meta name="description" content="押し寄せるゴミと汚れを、清掃ギアで一気に片付けるヴァンサバ風アクション。全10ステージ・ノーマルとハード。汚れレベルの違う部屋を、10分以内に全部ピカピカにしよう。" />
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
@@ -200,8 +203,6 @@
   <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
-  <!-- CrazyGames の SDK (CrazyGames の上ではリワード広告に使う。ほかの場所では何もしない) -->
-  <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
   <script src="lang/zh.js?v=10"></script>
   <script src="lang/ko.js?v=10"></script>
   <script src="lang/fr.js?v=10"></script>
