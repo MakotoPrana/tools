@@ -602,6 +602,13 @@ body {
 .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
 .setting input[type="range"] { width: 55%; accent-color: var(--mint); }
 .setting input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--mint); }
+.btn.danger { background: #8a2f3a; border-color: #c4505e; color: #fff; }
+.btn.danger:hover, .btn.danger:focus-visible { background: #a33a47; }
+.reset-btn { display: block; margin: 18px auto 0; }
+.reset-box { margin-top: 16px; padding: 12px; border: 1px solid #c4505e; border-radius: 10px; background: rgba(138, 47, 58, 0.18); }
+.reset-box p { margin: 0 0 10px; font-size: 0.85rem; line-height: 1.5; }
+.reset-row { display: flex; gap: 10px; justify-content: center; }
+.reset-done { margin: 16px 0 0; text-align: center; color: var(--mint); }
 
 /* 遊び方 */
 /* 遊び方: HTML に言語ごとに書いておき、ページには出さずに「遊び方」の画面 (.help-body) に写して見せる */
