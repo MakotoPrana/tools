@@ -904,6 +904,11 @@
       bgm: 'BGM',
       shake: '画面の揺れ・フラッシュ',
       haze: '汚れの靄',
+      resetSave: 'セーブデータを消去',
+      resetWarn: 'コイン・恒久スキル・クリア記録・宝物・図鑑・清掃員の開放がすべて消えて、最初からになります。元には戻せません(音量などの設定は残ります)。',
+      resetYes: '消去する',
+      resetNo: 'やめる',
+      resetDone: 'セーブデータを消去しました',
       reviveTitle: 'もう一度がんばる?',
       reviveText: '体力が全回復して、その場で復活できる。',
       reviveBtn: '復活する',
@@ -1115,6 +1120,11 @@
       bgm: 'Music',
       shake: 'Screen shake & flash',
       haze: 'Grime haze',
+      resetSave: 'Delete save data',
+      resetWarn: "All coins, skills, clear records, treasures, the enemy guide and unlocked cleaners will be erased and you'll start over. This can't be undone (sound and display settings are kept).",
+      resetYes: 'Delete',
+      resetNo: 'Cancel',
+      resetDone: 'Save data deleted',
       reviveTitle: 'Give it another go?',
       reviveText: 'Get back up right where you fell with full HP.',
       reviveBtn: 'Revive',
@@ -7787,14 +7797,35 @@
       </div>`, helpBack !== 'pause');
   }
 
+  // セーブデータの消去は2段階 (押すと確認が出る)。消したあとはタイトルへ戻す
+  let resetStep = '';
   function showSettings(from) {
-    settingsBack = from || settingsBack;
+    if (from) { settingsBack = from; resetStep = ''; }
     rerender = () => showSettings();
+    const reset = resetStep === 'ask'
+      ? `<div class="reset-box"><p>${t('resetWarn')}</p>
+          <div class="reset-row"><button type="button" class="btn small danger" data-act="resetYes">${t('resetYes')}</button>
+          <button type="button" class="btn small" data-act="resetNo">${t('resetNo')}</button></div></div>`
+      : resetStep === 'done'
+        ? `<p class="reset-done">${t('resetDone')}</p>`
+        : `<button type="button" class="btn small danger reset-btn" data-act="resetAsk">${t('resetSave')}</button>`;
     show('settings', `
       <div class="panel">
         ${panelHead(t('settings'), settingsBack, '', true)}
         ${settingsHtml()}
+        ${reset}
       </div>`);
+  }
+
+  // 音量などの設定は残して、それ以外を最初の状態に戻す
+  function resetSave() {
+    const settings = { ...save.settings };
+    for (const k of Object.keys(save)) delete save[k];
+    Object.assign(save, defaultSave(), { settings });
+    persist();
+    selCharId = null;
+    shopCharId = null;
+    lastResult = null;
   }
 
   // ---- 言語の切り替え ----
@@ -7979,6 +8010,9 @@
     },
     zukan: showZukan,
     settings: (from) => showSettings(from),
+    resetAsk: () => { resetStep = 'ask'; showSettings(); },
+    resetNo: () => { resetStep = ''; showSettings(); },
+    resetYes: () => { resetSave(); resetStep = 'done'; settingsBack = 'title'; showSettings(); },
     help: (from) => showHelp(from),
     pauseBack: () => { if (G && G.paused) renderPause(); },
   });
