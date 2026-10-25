@@ -576,7 +576,7 @@
 - CrazyGames の HTML5 SDK v3 (`https://sdk.crazygames.com/crazygames-sdk-v3.js`) を読みこみ、`CrazyGames.SDK.init()` してから使う。報酬は `SDK.ad.requestAd('rewarded', { adStarted, adFinished, adError })` のリワード広告で、`adFinished` まで見たら渡す。`adError` (広告がない・前の広告から間がない など) のときは渡さず、「広告を読み込めなかった」と出して、もう一度押せるようにする
 - 広告のあいだは効果音と BGM を消す。CrazyGames の設定 (`SDK.game.settings.muteAudio`) で消音のときも消す
 - 遊んでいるあいだを `SDK.game.gameplayStart()`、一時停止・復活の確認・結果画面に入ったら `SDK.game.gameplayStop()` で知らせる
-- SDK がない場所や、`SDK.environment` が `disabled` の場所 (このサイトなど) では、広告なしでそのまま報酬を渡し、ボタンの文言から「広告を見て」を外す
+- SDK がない場所や、`SDK.environment` が `disabled` の場所 (このサイトなど) では、報酬は渡さない (復活の画面・リロール +2・コイン 1.5 倍のボタンを出さない)。`local` (開発中) は SDK のテスト広告で試せる
 - 報酬は 3 つ
   - 復活: 力尽きたら (時間切れは除く)「もう一度がんばる?」の画面を出す。広告を見ると、体力が全回復してその場で復活する (3 秒無敵。まわり 260px のゴミは消え、中ボス・ボス・金色のふちのゴミは押し戻す)。1 回のプレイで 1 回だけ。「あきらめる」で結果画面へ
   - リロール +2: レベルアップの画面で、リロールが残っていないときに出す。広告を見るとリロールが 2 回ぶん増える。何度でも使える

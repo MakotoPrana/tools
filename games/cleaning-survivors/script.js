@@ -1339,8 +1339,7 @@
   })();
 
   // ---- CrazyGames の広告 (リワード広告) ----
-  // CrazyGames の上で遊ぶときは、報酬の前に広告を流す。SDK がない場所や使えない場所 (このサイトなど) では、
-  // 広告なしでそのまま報酬を渡す (ボタンの文言からも「広告を見て」を外す)
+  // 報酬は広告を見たときだけ渡す。SDK がない場所や使えない場所 (このサイトなど) では、報酬のボタンを出さない
   const Ads = (() => {
     let sdk = null;
     let busy = false;
@@ -1360,12 +1359,12 @@
       }
       if (live() && sdk.game && sdk.game.addSettingsChangeListener) safe(() => sdk.game.addSettingsChangeListener(() => Sound.setVolume()));
       Sound.setVolume();
-      if (rerender) rerender(); // 広告が使えるとわかったら、ボタンの文言を描き直す
+      if (rerender) rerender(); // 広告が使えるとわかったら、報酬のボタンを出すために描き直す
     })();
-    // 報酬つきの広告を流す。最後まで見たら true。広告が使えない場所では、すぐ true
+    // 報酬つきの広告を流す。最後まで見たら true。広告が使えない場所では false
     async function rewarded() {
       await ready;
-      if (!live()) return true;
+      if (!live()) return false;
       if (busy) return false;
       busy = true;
       return new Promise((resolve) => {
@@ -1393,8 +1392,8 @@
       muted: () => !!(live() && sdk.game && sdk.game.settings && sdk.game.settings.muteAudio),
     };
   })();
-  // 広告で報酬をもらうボタンの文言 (広告が使えない場所では「広告を見て」を付けない)
-  const adLabel = (s) => (Ads.live() ? t('withAd', s) : s);
+  // 広告で報酬をもらうボタンの文言
+  const adLabel = (s) => t('withAd', s);
 
   // ===================================================================
   // 絵 (ゴミ・主人公・アイコン)
@@ -5211,8 +5210,8 @@
     } else if (G.state === 'win' && G.endT > 2.6) {
       showResult(true);
     } else if (G.state === 'dead' && G.endT > 1.6) {
-      // 力尽きたら、1回のプレイで1回だけ復活をすすめる (時間切れは復活できない)
-      if (!G.timeUp && !G.reviveOffered) showRevive();
+      // 力尽きたら、1回のプレイで1回だけ復活をすすめる (時間切れは復活できない。広告が使えない場所では出さない)
+      if (!G.timeUp && !G.reviveOffered && Ads.live()) showRevive();
       else showResult(false);
     }
   }
@@ -6900,9 +6899,9 @@
         <div class="cards">${cards}</div>
         <p class="inv-title">${t('inventory')}</p>
         ${invHtml()}
-        <div class="actions">${G.rerolls > 0
-    ? `<button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button>`
-    : `<button type="button" class="btn small ad-btn" data-act="adReroll">${esc(adLabel(t('rerollPlus')))}</button>`}</div>
+        ${G.rerolls > 0
+    ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button></div>`
+    : Ads.live() ? `<div class="actions"><button type="button" class="btn small ad-btn" data-act="adReroll">${esc(adLabel(t('rerollPlus')))}</button></div>` : ''}
         ${levelMsg ? `<p class="result-note">${esc(levelMsg)}</p>` : ''}
       </div>`, false, { kind: 'level', lock: 450 });
   }
@@ -7079,7 +7078,7 @@
     rerender = () => renderResult(r);
     // ステージをクリアしたら、広告を見てもらえるコインを 1.5 倍にできる (1回だけ)
     const adExtra = Math.round(r.total * 0.5);
-    const canBoost = r.win && !r.tut && !r.adExtra && adExtra > 0;
+    const canBoost = r.win && !r.tut && !r.adExtra && adExtra > 0 && Ads.live();
     const next = r.win && r.i + 1 < STAGES.length;
     const stageName = r.tut ? L(TUTORIAL, 'name') : t('stageTitle', r.i + 1, L(STAGES[r.i], 'name'));
     show('result', `
