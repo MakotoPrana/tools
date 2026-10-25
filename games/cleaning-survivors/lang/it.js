@@ -166,7 +166,8 @@
     total: "Totale",
     nextStage: "Livello successivo",
     again: "Riprova",
-    shopSub: "Valgono per tutti gli addetti, dalla prossima partita",
+    shopSub: "Vale solo per questo addetto, dalla prossima partita. Le monete sono in comune",
+    skillsOf: (name) => `Abilità di ${name}`,
     max: "MAX",
     cost: (c) => `${c} monete`,
     killed: (n) => `Eliminati ${n}`,
@@ -380,7 +381,7 @@
     <p>Ogni livello ha una modalità Normale e una Difficile. Completare un livello in Normale sblocca il livello successivo e la modalità Difficile di quel livello. I livelli si sbloccano separatamente per ogni addetto, quindi un altro addetto riparte dal livello 1. In Difficile i rifiuti sono più numerosi e molto più duri, ed è quasi impossibile vincere finché le abilità permanenti non sono a circa metà (l'ultimo livello in Difficile resta 50/50 anche all'80%). Spendi le monete nelle «abilità permanenti» prima di provarci (Difficile dà 1,6 volte le monete).</p>
 
     <h3>Abilità permanenti</h3>
-    <p>Spendi le monete guadagnate per aumentare salute, potenza, potere pulente (quanto largo lucidi il pavimento), velocità, difesa, rigenerazione, raggio di raccolta, esperienza, capienza del contenitore polvere, monete e numero di scelte al livello su. Valgono per tutti gli addetti dalla partita successiva. Aprile con il pulsante «⬆ Abilità» nella schermata del titolo o nella scelta del livello. Quando puoi permetterti un potenziamento, il pulsante brilla d'oro e mostra quanti.</p>
+    <p>Spendi le monete guadagnate per aumentare salute, potenza, potere pulente (quanto largo lucidi il pavimento), velocità, difesa, rigenerazione, raggio di raccolta, esperienza, capienza del contenitore polvere, monete e numero di scelte al livello su. Sono di ogni addetto e valgono solo per quello che hai potenziato, dalla partita successiva (le monete sono in comune; cambia addetto con le icone in alto). Aprile con il pulsante «⬆ Abilità» nella schermata del titolo o nella scelta del livello. Quando puoi permetterti un potenziamento, il pulsante brilla d'oro e mostra quanti.</p>
 
     <h3>Pulsanti ricompensa (rinascita, cambi, monete ×1,5)</h3>
     <p>Quando sei esausto, puoi rialzarti sul posto una volta per partita (tutti i PS, e i rifiuti vicini vengono spazzati via). Se le scelte al livello su non ti piacciono, puoi ottenere 2 cambi. Quando completi un livello, puoi moltiplicare per 1,5 le monete guadagnate. Ogni ricompensa si ottiene guardando una pubblicità ed è disponibile solo se giochi su CrazyGames.</p>

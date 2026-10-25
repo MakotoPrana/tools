@@ -166,7 +166,8 @@
     total: "Gesamt",
     nextStage: "Nächstes Level",
     again: "Nochmal",
-    shopSub: "Gilt für alle Putzkräfte, ab der nächsten Runde",
+    shopSub: "Gilt nur für diese Putzkraft, ab der nächsten Runde. Münzen teilen sich alle",
+    skillsOf: (name) => `Upgrades von ${name}`,
     max: "MAX",
     cost: (c) => `${c} Münzen`,
     killed: (n) => `Beseitigt ${n}`,
@@ -380,7 +381,7 @@
     <p>Jedes Level hat einen Normal- und einen Schwer-Modus. Schaffst du ein Level in Normal, werden das nächste Level und der Schwer-Modus dieses Levels freigeschaltet. Level werden für jede Putzkraft einzeln freigeschaltet, eine andere Putzkraft beginnt also bei Level 1. In Schwer gibt es mehr und viel zäheren Müll, und es ist kaum zu schaffen, bevor deine Dauer-Upgrades etwa zur Hälfte ausgebaut sind (das letzte Level in Schwer ist selbst bei 80 % ein Münzwurf). Gib deine Münzen für „Dauer-Upgrades“ aus, bevor du es versuchst (Schwer bringt 1,6-mal so viele Münzen).</p>
 
     <h3>Dauer-Upgrades</h3>
-    <p>Gib verdiente Münzen aus, um Gesundheit, Kraft, Putzkraft (wie breit du den Boden polierst), Tempo, Abwehr, Regeneration, Sammelreichweite, Erfahrung, Staubbox-Größe, Münzen und die Anzahl der Level-up-Auswahlen zu erhöhen. Sie gelten ab der nächsten Runde für alle Putzkräfte. Öffne sie über die Schaltfläche „⬆ Upgrades“ auf dem Titelbildschirm oder in der Levelauswahl. Kannst du dir ein Upgrade leisten, leuchtet die Schaltfläche golden und zeigt die Anzahl.</p>
+    <p>Gib verdiente Münzen aus, um Gesundheit, Kraft, Putzkraft (wie breit du den Boden polierst), Tempo, Abwehr, Regeneration, Sammelreichweite, Erfahrung, Staubbox-Größe, Münzen und die Anzahl der Level-up-Auswahlen zu erhöhen. Sie gelten pro Putzkraft und nur für die, die du verbessert hast, ab der nächsten Runde (Münzen teilen sich alle; wechsle die Putzkraft mit den Symbolen oben). Öffne sie über die Schaltfläche „⬆ Upgrades“ auf dem Titelbildschirm oder in der Levelauswahl. Kannst du dir ein Upgrade leisten, leuchtet die Schaltfläche golden und zeigt die Anzahl.</p>
 
     <h3>Belohnungs-Schaltflächen (Wiederbeleben, Neuwürfe, Münzen ×1,5)</h3>
     <p>Bist du erschöpft, kannst du einmal pro Runde an Ort und Stelle wieder aufstehen (volle LP, und Müll in der Nähe wird weggefegt). Gefallen dir die Level-up-Auswahlen nicht, kannst du 2 Neuwürfe dazubekommen. Schaffst du ein Level, kannst du die verdienten Münzen mit 1,5 multiplizieren. Jede Belohnung gibt es fürs Ansehen einer Werbung, und nur, wenn du auf CrazyGames spielst.</p>

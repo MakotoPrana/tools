@@ -895,7 +895,8 @@
       total: '合計',
       nextStage: '次のステージへ',
       again: 'もう一度',
-      shopSub: 'どの清掃員にも、次のプレイからずっと効く',
+      shopSub: 'その清掃員だけに、次のプレイからずっと効く。コインは全員共通',
+      skillsOf: (name) => `${name}の恒久スキル`,
       max: '最大',
       cost: (c) => `${c} コイン`,
       killed: (n) => `片付けた数 ${n}`,
@@ -1105,7 +1106,8 @@
       total: 'Total',
       nextStage: 'Next stage',
       again: 'Try again',
-      shopSub: 'Applies to every cleaner, from your next run on',
+      shopSub: 'Applies only to this cleaner, from your next run on. Coins are shared by everyone',
+      skillsOf: (name) => `${name}'s skills`,
       max: 'MAX',
       cost: (c) => `${c} coins`,
       killed: (n) => `Cleared ${n}`,
@@ -1179,7 +1181,7 @@
   const defaultSave = () => ({
     v: 2,
     coins: 0,
-    shop: Object.fromEntries(SHOP.map((it) => [it.id, 0])),
+    shopBy: {}, // 恒久スキルの段階は清掃員ごと (shopOf で取り出す)。コインは全清掃員共通
     rec: {},
     treasures: STAGES.map(() => false), // ノーマルの宝物
     treasuresH: STAGES.map(() => false), // ハードの宝物
@@ -1198,7 +1200,10 @@
       if (!raw) return s;
       const d = JSON.parse(raw);
       if (typeof d.coins === 'number') s.coins = d.coins;
-      for (const it of SHOP) if (d.shop && typeof d.shop[it.id] === 'number') s.shop[it.id] = Math.min(it.max, d.shop[it.id]);
+      // 恒久スキル: 清掃員ごとの段階。清掃員ごとになる前の保存 (shop) は、ハジメの段階として引き継ぐ
+      const readShop = (src) => Object.fromEntries(SHOP.map((it) => [it.id, src && typeof src[it.id] === 'number' ? Math.max(0, Math.min(it.max, Math.floor(src[it.id]))) : 0]));
+      if (d.shopBy && typeof d.shopBy === 'object') for (const c of CHARS) { if (d.shopBy[c.id]) s.shopBy[c.id] = readShop(d.shopBy[c.id]); }
+      else if (d.shop) s.shopBy.cleaner = readShop(d.shop);
       // 恒久スキル「リロール」はなくした (選び直しは広告で増やす)。上げていたぶんのコインは返す
       const oldReroll = d.shop && typeof d.shop.reroll === 'number' ? Math.min(6, Math.max(0, Math.floor(d.shop.reroll))) : 0;
       if (oldReroll) s.coins += (100 * oldReroll * (oldReroll + 1)) / 2;
@@ -1247,6 +1252,8 @@
   // ステージとハードの開放は清掃員ごと。その清掃員で前のステージ (ハードは同じステージ) をノーマルでクリアすると開く
   const stageUnlocked = (i, ch = curChar()) => TEST_UNLOCK || i === 0 || !!peekRec(ch.id, i - 1, 'normal').c;
   const hardUnlocked = (i, ch = curChar()) => TEST_UNLOCK || !!peekRec(ch.id, i, 'normal').c;
+  // 清掃員の恒久スキルの段階 (まだなければ 0 で作る)
+  const shopOf = (id) => save.shopBy[id] || (save.shopBy[id] = Object.fromEntries(SHOP.map((it) => [it.id, 0])));
   const charUnlocked = (c) => TEST_UNLOCK || c.unlock < 0 || save.treasures[c.unlock];
   // 宝物はステージごと・モードごとに 1 つ (ハードの宝物はノーマルと同じ部屋で見つかる)
   const treasureOf = (i, mode) => (mode === 'hard' ? STAGES[i].treasureH : STAGES[i].treasure);
@@ -2752,24 +2759,10 @@
   }
   const iconURL = (id) => iconCanvas(id).toDataURL();
 
-  // ステージのアイコン (64×64)。ステージ選択で、どんな場所かがひと目でわかるように
-  const stageIconCache = {};
-  function stageIconURL(i) {
-    if (stageIconCache[i]) return stageIconCache[i];
-    const cv = document.createElement('canvas');
-    cv.width = cv.height = 64;
-    const c = cv.getContext('2d');
+  // ステージのモチーフ (64×64 を基準に描く): 家・フライパン・浴槽・段ボール・木・屋根裏の窓・ボイラー・タイヤ・おばけ・王冠
+  function drawStageMotif(c, i) {
     c.lineCap = 'round';
     c.lineJoin = 'round';
-    // 下地: ステージの汚れの色を明るくした角丸の四角
-    const [r, g, b] = STAGES[i].dirt;
-    const grad = c.createLinearGradient(0, 0, 0, 64);
-    grad.addColorStop(0, `rgb(${Math.min(255, r + 90)},${Math.min(255, g + 90)},${Math.min(255, b + 90)})`);
-    grad.addColorStop(1, `rgb(${r + 20},${g + 20},${b + 20})`);
-    c.fillStyle = grad;
-    c.beginPath();
-    c.roundRect(2, 2, 60, 60, 14);
-    c.fill();
     const fill = (col, f) => { c.fillStyle = col; c.beginPath(); f(); c.fill(); };
     const line = (col, w, f) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); f(); c.stroke(); };
     switch (i) {
@@ -2847,8 +2840,62 @@
         fill('#ff5a6a', () => c.arc(32, 36, 4, 0, TAU));
         fill('#7fc8ff', () => { c.arc(20, 38, 3, 0, TAU); c.arc(44, 38, 3, 0, TAU); });
     }
-    stageIconCache[i] = cv.toDataURL();
-    return stageIconCache[i];
+  }
+
+  // ステージ選択のパネルの背景にするイラスト (400×150)。床の模様・汚れ・そのステージのゴミ・大きなモチーフ
+  const stageArtCache = {};
+  function stageArtURL(i) {
+    if (stageArtCache[i]) return stageArtCache[i];
+    const W = 400;
+    const H = 150;
+    const cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    const c = cv.getContext('2d');
+    const st = STAGES[i];
+    const rnd = mulberry32(500 + i * 31);
+    // 床: スタートの部屋の床の模様
+    const floor = st.rooms.find((r) => r.id === st.start).floor;
+    c.fillStyle = c.createPattern(makeFloorPattern(floor), 'repeat');
+    c.fillRect(0, 0, W, H);
+    // 汚れ: ステージの汚れの色のしみ
+    const [r, g, b] = st.dirt;
+    for (let k = 0; k < 14; k++) {
+      const x = rnd() * W;
+      const y = rnd() * H;
+      const rr = 18 + rnd() * 46;
+      const grad = c.createRadialGradient(x, y, 0, x, y, rr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},0.75)`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      c.fillStyle = grad;
+      c.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+    }
+    c.fillStyle = `rgba(${r},${g},${b},0.25)`;
+    c.fillRect(0, 0, W, H);
+    // モチーフ: 右側に大きく、後ろをほんのり明るく
+    const glow = c.createRadialGradient(W - 86, H / 2, 10, W - 86, H / 2, 95);
+    glow.addColorStop(0, 'rgba(255,248,220,0.55)');
+    glow.addColorStop(1, 'rgba(255,248,220,0)');
+    c.fillStyle = glow;
+    c.fillRect(W - 200, 0, 200, H);
+    c.save();
+    c.translate(W - 150, H / 2 - 62);
+    c.scale(1.95, 1.95);
+    drawStageMotif(c, i);
+    c.restore();
+    // ゴミ: そのステージによく出るゴミを、まん中あたりに散らす
+    const kinds = ['dust', 'paper', 'hair', ...Object.keys(st.weights).filter((k) => ENEMIES[k] && !ENEMIES[k].source)];
+    for (let k = 0; k < 6; k++) {
+      const type = kinds[Math.floor(rnd() * kinds.length)];
+      const x = W * 0.56 + rnd() * W * 0.16;
+      const y = 26 + rnd() * (H - 52);
+      c.save();
+      c.translate(x, y);
+      drawEnemyBody(c, type, 9 + rnd() * 5, rnd() * 10, 0, rnd() * TAU);
+      c.restore();
+    }
+    stageArtCache[i] = cv.toDataURL();
+    return stageArtCache[i];
   }
 
   const thumbCache = {};
@@ -3713,7 +3760,7 @@
   // ---- 強さの計算 ----
   function recalcStats() {
     const s = G.stats;
-    const sh = save.shop;
+    const sh = shopOf(G.ch.id); // その清掃員の恒久スキル
     const lv = (id) => G.passives[id] || 0;
     const oldMax = s.maxHp || 0;
     const bn = G.bonus; // 清掃が完了した部屋の特典
@@ -6878,11 +6925,18 @@
       else if (hard && !hardUnlocked(i)) meta = t('lockedHard');
       else if (rec.r) meta = t('bestRooms', rec.r, r.rooms.length) + (rec.t ? `${t('sep')}${t('bestClear', fmtTime(rec.t))}` : '');
       else meta = `${t('roomCount', r.rooms.length)}${t('sep')}${L(r, 'desc')}`;
-      const badges = stageUnlocked(i) ? `<span class="badges"><span class="badge n${nOk ? ' on' : ''}">N</span><span class="badge h${hOk ? ' on' : ''}">H</span><span class="badge t${hasTreasure(i, save.mode) ? ' on' : ''}" title="${t('treasure')}">${t('badgeTreasure')}</span></span>` : '';
-      return `<button type="button" class="room${rec.c ? ' cleared' : ''}" data-act="brief" data-arg="${i}" ${ok ? '' : 'disabled'}>
-        <span class="room-no">${stageUnlocked(i) ? i + 1 : '🔒'}</span>
-        <img class="room-icon${stageUnlocked(i) ? '' : ' locked'}" src="${stageIconURL(i)}" alt="">
-        <span class="room-body"><span class="room-name">${stageUnlocked(i) ? esc(L(r, 'name')) : '？？？'}</span>${badges}<br><span class="room-meta">${esc(meta)}</span></span>
+      const open = stageUnlocked(i);
+      // クリア (ノーマル・ハード) と、宝箱 (ノーマル・ハードの宝物を見つけたか) を並べて見せる
+      const modeName = (m) => L(MODES[m], 'name');
+      const clearChip = (m, on) => `<span class="st-chip ${m}${on ? ' on' : ''}" title="${esc(modeName(m))}">${m === 'normal' ? 'N' : 'H'}${on ? ' ✓' : ''}</span>`;
+      const chest = (m) => {
+        const got = hasTreasure(i, m);
+        return `<span class="st-chest ${m}${got ? ' got' : ''}" title="${esc(`${t('treasure')} (${modeName(m)})`)}"><img src="${iconURL('chest')}" alt=""><b>${m === 'normal' ? 'N' : 'H'}</b></span>`;
+      };
+      const status = open ? `<span class="st-row">${clearChip('normal', nOk)}${clearChip('hard', hOk)}<span class="st-gap"></span>${chest('normal')}${chest('hard')}</span>` : '';
+      return `<button type="button" class="room stage-card${rec.c ? ' cleared' : ''}${open ? '' : ' locked'}" data-act="brief" data-arg="${i}" ${ok ? '' : 'disabled'} style="--art: url(${stageArtURL(i)})">
+        <span class="room-no">${open ? i + 1 : '🔒'}</span>
+        <span class="room-body"><span class="room-name">${open ? esc(L(r, 'name')) : '？？？'}</span><br><span class="room-meta">${esc(meta)}</span>${status}</span>
       </button>`;
     }).join('');
     show('rooms', `
@@ -7255,7 +7309,7 @@
     for (const id of Object.keys(G.passives)) if (G.passives[id] < PASSIVES[id].max) opts.push({ kind: 'p', id });
     if (G.weapons.length < MAX_GEARS) for (const id of WEAPON_IDS) if (!G.weapons.some((w) => w.id === id)) opts.push({ kind: 'w', id, isNew: true });
     if (Object.keys(G.passives).length < MAX_PASSIVES) for (const id of PASSIVE_IDS) if (!G.passives[id]) opts.push({ kind: 'p', id, isNew: true });
-    const n = 3 + save.shop.choices;
+    const n = 3 + shopOf(G.ch.id).choices;
     if (!opts.length) return [{ kind: 'heal' }, { kind: 'coin' }];
     return shuffle(opts).slice(0, n);
   }
@@ -7468,7 +7522,7 @@
     const killCoins = Math.floor(g.kills / 20);
     const cleanCoins = Math.floor(pct);
     const base = killCoins + cleanCoins + (win ? 50 : 0) + g.dumpCoins + g.bossCoins + g.roomCoins;
-    const mul = g.md.coin * (1 + save.shop.coin * 0.1) * (1 + (g.ch.mods.coin || 0));
+    const mul = g.md.coin * (1 + shopOf(g.ch.id).coin * 0.1) * (1 + (g.ch.mods.coin || 0));
     const total = Math.round(base * mul);
     save.coins += total;
     if (i === TUT) {
@@ -7571,7 +7625,11 @@
 
   // ---- 恒久スキル ----
   // いまのコインで上げられる恒久スキルの数
-  const affordable = () => SHOP.filter((it) => save.shop[it.id] < it.max && save.coins >= shopCost(it, save.shop[it.id])).length;
+  // (ステージ選択やタイトルからは、選んでいる清掃員の恒久スキルを数える)
+  const affordable = (id = curChar().id) => {
+    const sh = shopOf(id);
+    return SHOP.filter((it) => sh[it.id] < it.max && save.coins >= shopCost(it, sh[it.id])).length;
+  };
   // 恒久スキルへのボタン。上げられるものがあれば目立たせて数を出す
   const shopBtn = (from, small) => {
     const n = affordable();
@@ -7579,11 +7637,23 @@
   };
 
   let shopBack = 'rooms';
+  // 恒久スキルの画面。上のアイコンで、どの清掃員の恒久スキルを見るか (上げるか) を切り替える
+  let shopCharId = null;
   function showShop(from) {
-    if (from) shopBack = from;
+    if (from) {
+      shopBack = from;
+      shopCharId = curChar().id;
+    }
+    if (!shopCharId || !charUnlocked(CHARS.find((c) => c.id === shopCharId))) shopCharId = curChar().id;
     rerender = showShop;
+    const sh = shopOf(shopCharId);
+    const who = CHARS.find((c) => c.id === shopCharId);
+    const tabs = CHARS.filter(charUnlocked).map((c) => {
+      const n = affordable(c.id);
+      return `<button type="button" class="shop-char${c.id === shopCharId ? ' on' : ''}" data-act="shopChar" data-arg="${c.id}" aria-pressed="${c.id === shopCharId}" aria-label="${esc(L(c, 'name'))}"><img src="${charThumb(c.id)}" alt="">${n ? `<span class="cta-badge">${n}</span>` : ''}</button>`;
+    }).join('');
     const items = SHOP.map((it) => {
-      const lv = save.shop[it.id];
+      const lv = sh[it.id];
       const maxed = lv >= it.max;
       const cost = shopCost(it, lv);
       const pips = Array.from({ length: it.max }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('');
@@ -7596,6 +7666,8 @@
     show('shop', `
       <div class="panel">
         ${panelHead(t('skills'), shopBack, '', true)}
+        <div class="shop-chars">${tabs}</div>
+        <p class="shop-who">${esc(t('skillsOf', L(who, 'name')))}</p>
         <p class="sub">${t('coins')} <span class="coins">${save.coins}</span>${t('sep')}${t('shopSub')}</p>
         <div class="shop">${items}</div>
         <h3>${t('treasurePerks')}</h3>
@@ -7845,13 +7917,18 @@
     shop: (from) => showShop(from),
     buy: (id) => {
       const it = SHOP.find((s) => s.id === id);
-      const lv = save.shop[id];
+      const sh = shopOf(shopCharId || curChar().id);
+      const lv = sh[id];
       const cost = shopCost(it, lv);
       if (lv >= it.max || save.coins < cost) return;
       save.coins -= cost;
-      save.shop[id]++;
+      sh[id]++;
       persist();
       Sound.play('level');
+      showShop();
+    },
+    shopChar: (id) => {
+      shopCharId = id;
       showShop();
     },
     zukan: showZukan,

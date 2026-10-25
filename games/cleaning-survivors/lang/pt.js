@@ -166,7 +166,8 @@
     total: "Total",
     nextStage: "Próxima fase",
     again: "De novo",
-    shopSub: "Vale para todos os faxineiros, a partir da próxima partida",
+    shopSub: "Vale só para este faxineiro, a partir da próxima partida. As moedas são de todos",
+    skillsOf: (name) => `Habilidades de ${name}`,
     max: "MÁX",
     cost: (c) => `${c} moedas`,
     killed: (n) => `Eliminados ${n}`,
@@ -380,7 +381,7 @@
     <p>Cada fase tem o modo Normal e o modo Difícil. Vencer uma fase no Normal libera a próxima fase e o Difícil daquela fase. As fases são liberadas separadamente para cada faxineiro, então outro faxineiro começa da fase 1. No Difícil há mais lixo e muito mais duro, e é quase impossível vencer antes de as habilidades permanentes estarem mais ou menos na metade (a última fase no Difícil é 50/50 mesmo com 80%). Gaste moedas em "habilidades permanentes" antes de tentar (o Difícil dá 1,6 vez mais moedas).</p>
 
     <h3>Habilidades permanentes</h3>
-    <p>Gaste as moedas que ganhar para aumentar saúde, força, poder de limpeza (a largura com que você dá brilho ao chão), velocidade, defesa, regeneração, alcance de coleta, experiência, tamanho da caixa de poeira, moedas e número de opções ao subir de nível. Elas valem para todos os faxineiros a partir da próxima partida. Abra pelo botão "⬆ Habilidades" na tela de título ou na seleção de fase. Quando você pode pagar uma melhoria, o botão brilha em dourado e mostra quantas.</p>
+    <p>Gaste as moedas que ganhar para aumentar saúde, força, poder de limpeza (a largura com que você dá brilho ao chão), velocidade, defesa, regeneração, alcance de coleta, experiência, tamanho da caixa de poeira, moedas e número de opções ao subir de nível. Elas são de cada faxineiro e valem só para quem você melhorou, a partir da próxima partida (as moedas são de todos; troque de faxineiro com os ícones no alto da tela). Abra pelo botão "⬆ Habilidades" na tela de título ou na seleção de fase. Quando você pode pagar uma melhoria, o botão brilha em dourado e mostra quantas.</p>
 
     <h3>Botões de recompensa (reviver, trocas, moedas ×1,5)</h3>
     <p>Quando ficar sem forças, você pode se levantar ali mesmo uma vez por partida (com todos os PV, e o lixo próximo é jogado longe). Se não gostar das opções ao subir de nível, você pode ganhar 2 trocas. Ao vencer uma fase, você pode multiplicar por 1,5 as moedas ganhas. Cada recompensa é ganha assistindo a um anúncio e só está disponível jogando no CrazyGames.</p>
