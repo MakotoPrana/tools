@@ -38,7 +38,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", "PingFang SC", "Microsoft YaHei", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   line-height: 1.6;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
@@ -68,35 +68,26 @@ body {
   .top { gap: 6px; }
   .top h1 { font-size: 0.95rem; }
   .top-btns { gap: 4px; }
-  .lang-toggle button { padding: 0 5px; }
+  .top-btns .lang-select { max-width: 6.5em; padding: 0 3px; }
 }
 
-/* 言語のトグル (日本語 / EN)。選んでいる方を色付きにする */
-.lang-toggle {
-  display: flex;
+/* 言語の選択 (日本語・English・简体中文・한국어) */
+.lang-select {
   height: 34px;
-  padding: 2px;
+  max-width: 7.5em;
+  padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card);
-}
-
-.lang-toggle[hidden] { display: none; }
-
-.lang-toggle button {
-  padding: 0 8px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--muted);
+  color: var(--text);
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
 }
 
-.lang-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; cursor: default; }
-.lang-toggle button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.lang-select[hidden] { display: none; }
+.lang-select:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 
 .icon-btn {
   flex: none;
@@ -277,6 +268,8 @@ body {
 .btn:disabled { opacity: 0.4; cursor: default; }
 .btn.primary { background: linear-gradient(180deg, #3fd3a8, #20a884); border-color: transparent; color: #08261d; }
 .btn.small { min-width: 0; padding: 6px 12px; font-size: 0.85rem; }
+/* 並んだボタンは文言より狭くならない (長い言語では折り返して次の行へ) */
+.actions > .btn { flex-shrink: 0; width: max-content; }
 
 /* タイトル */
 .logo {

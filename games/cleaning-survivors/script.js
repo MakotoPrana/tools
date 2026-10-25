@@ -34,18 +34,30 @@
 
   // 言語: 日本語と英語。保存がなければ、ブラウザの言語が日本語なら日本語、それ以外は英語
   const LANG_KEY = 'cleaning-survivors-lang';
-  const LANGS = ['ja', 'en'];
+  // 日本語・英語はこのファイルに、ほかの言語の文言は lang/<言語>.js にある (読みこめた言語だけ選べる)
+  const I18N = window.CS_I18N || {};
+  const LANGS = [
+    ['ja', '日本語'], ['en', 'English'], ['zh', '简体中文'], ['ko', '한국어'],
+    ['fr', 'Français'], ['de', 'Deutsch'], ['es', 'Español'], ['it', 'Italiano'], ['pt', 'Português'],
+  ].filter(([code]) => code === 'ja' || code === 'en' || I18N[code]);
+  const LANG_CODES = LANGS.map(([code]) => code);
+  const PACK_CODES = LANG_CODES.filter((code) => I18N[code]);
+  // ラテン文字の言語 (ロゴを英字用の大きさにする)
+  const LATIN = ['en', 'fr', 'de', 'es', 'it', 'pt'];
   const loadLang = () => {
     try {
       const saved = localStorage.getItem(LANG_KEY);
-      if (LANGS.includes(saved)) return saved;
+      if (LANG_CODES.includes(saved)) return saved;
     } catch (e) { /* 保存がなければブラウザの言語から決める */ }
-    const browser = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-    return browser.toLowerCase().startsWith('ja') ? 'ja' : 'en';
+    for (const l of navigator.languages || [navigator.language || '']) {
+      const code = String(l).toLowerCase().slice(0, 2);
+      if (LANG_CODES.includes(code)) return code;
+    }
+    return 'en';
   };
   let lang = loadLang();
-  // データの名前や説明: 英語のときは .en にある方を使う
-  const L = (o, f) => (lang === 'en' && o.en && o.en[f] != null ? o.en[f] : o[f]);
+  // データの名前や説明: 日本語以外のときは、その言語の名前 (.en・.zh・.ko) にある方を使う
+  const L = (o, f) => (lang !== 'ja' && o[lang] && o[lang][f] != null ? o[lang][f] : o[f]);
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const randInt = (a, b) => Math.floor(rand(a, b + 1));
@@ -471,7 +483,6 @@
     { id: 'xp', name: '経験値', desc: 'もらえる経験値 +8%', max: 10, cost: 80 },
     { id: 'box', name: 'ダストボックス容量', desc: '容量 +20', max: 6, cost: 50 },
     { id: 'coin', name: 'コイン', desc: 'もらえるコイン +10%', max: 10, cost: 100 },
-    { id: 'reroll', name: 'リロール', desc: 'レベルアップの選び直し +1回', max: 6, cost: 100 },
     { id: 'choices', name: '選択肢の数', desc: 'レベルアップの候補 3 → 4', max: 1, cost: 500 },
   ];
   const shopCost = (item, lv) => item.cost * (lv + 1);
@@ -576,7 +587,6 @@
     xp: ['Experience', 'XP gained +8%'],
     box: ['Dust Box', 'Capacity +20'],
     coin: ['Coins', 'Coins earned +10%'],
-    reroll: ['Reroll', 'Level-up rerolls +1'],
     choices: ['Choices', 'Level-up choices 3 → 4'],
   };
   // ステージごとに [名前, 説明, { 部屋: 名前 }, [宝物の名前, 説明]]
@@ -613,24 +623,6 @@
       ['Mansion Key', 'An old key that opens every door in the mansion. It belonged to the former caretaker.']],
   ];
 
-  // 英語の名前と説明を、それぞれのデータの .en に入れる
-  for (const k in EN_ENEMIES) ENEMIES[k].en = { name: EN_ENEMIES[k][0], desc: EN_ENEMIES[k][1] };
-  for (const k in EN_WEAPONS) WEAPONS[k].en = { name: EN_WEAPONS[k][0], desc: EN_WEAPONS[k][1], lvText: EN_WEAPONS[k][2] };
-  for (const k in EN_EVOS) EVOS[k].en = { name: EN_EVOS[k][0], desc: EN_EVOS[k][1] };
-  for (const k in EN_PASSIVES) PASSIVES[k].en = { name: EN_PASSIVES[k][0], desc: EN_PASSIVES[k][1] };
-  for (const c of CHARS) {
-    const [name, trait, traitDesc, desc] = EN_CHARS[c.id];
-    c.en = { name, trait, traitDesc, desc };
-  }
-  for (const it of SHOP) it.en = { name: EN_SHOP[it.id][0], desc: EN_SHOP[it.id][1] };
-  MODES.normal.en = { name: 'Normal' };
-  MODES.hard.en = { name: 'Hard' };
-  STAGES.forEach((st, i) => {
-    const [name, desc, rooms, [tName, tDesc]] = EN_STAGES[i];
-    st.en = { name, desc };
-    for (const r of st.rooms) r.en = { name: rooms[r.id] };
-    st.treasure.en = { name: tName, desc: tDesc };
-  });
   // チュートリアル: 10 ステージとは別の、3部屋だけの小さな家 (達成率や記録には入らない)。
   // 家のまわりは「外」(通れない、何も描かない) にして、2〜3分で回れる広さにする
   const TUT = -1;
@@ -647,13 +639,44 @@
     treasure: null,
     dumps: [['genkan', 0.78, 0.78]],
   };
-  TUTORIAL.en = { name: 'Tutorial', desc: 'A tiny three-room house for learning how to play.' };
-  for (const r of TUTORIAL.rooms) r.en = { name: { genkan: 'Entrance', living: 'Living Room', washitsu: 'Tatami Room' }[r.id] };
   const stageOf = (i) => (i === TUT ? TUTORIAL : STAGES[i]);
 
-  const bonusText = (key) => (lang === 'en' ? EN_BONUS[key] : ROOM_BONUS[key]);
+  // 日本語以外の名前と説明を、それぞれのデータの .en・.zh・.ko に入れる
+  //   P: { enemies, weapons, evos, passives, chars, bonus, shop, modes, stages, tutorial } (形は EN_* と同じ)
+  const BONUS_TEXT = { ja: ROOM_BONUS };
+  function addLang(code, P) {
+    for (const k in P.enemies) ENEMIES[k][code] = { name: P.enemies[k][0], desc: P.enemies[k][1] };
+    for (const k in P.weapons) WEAPONS[k][code] = { name: P.weapons[k][0], desc: P.weapons[k][1], lvText: P.weapons[k][2] };
+    for (const k in P.evos) EVOS[k][code] = { name: P.evos[k][0], desc: P.evos[k][1] };
+    for (const k in P.passives) PASSIVES[k][code] = { name: P.passives[k][0], desc: P.passives[k][1] };
+    for (const c of CHARS) {
+      const [name, trait, traitDesc, desc] = P.chars[c.id];
+      c[code] = { name, trait, traitDesc, desc };
+    }
+    for (const it of SHOP) it[code] = { name: P.shop[it.id][0], desc: P.shop[it.id][1] };
+    for (const m in MODES) MODES[m][code] = { name: P.modes[m] };
+    STAGES.forEach((st, i) => {
+      const [name, desc, rooms, [tName, tDesc]] = P.stages[i];
+      st[code] = { name, desc };
+      for (const r of st.rooms) r[code] = { name: rooms[r.id] };
+      st.treasure[code] = { name: tName, desc: tDesc };
+    });
+    const [tutName, tutDesc, tutRooms] = P.tutorial;
+    TUTORIAL[code] = { name: tutName, desc: tutDesc };
+    for (const r of TUTORIAL.rooms) r[code] = { name: tutRooms[r.id] };
+    BONUS_TEXT[code] = P.bonus;
+  }
+  addLang('en', {
+    enemies: EN_ENEMIES, weapons: EN_WEAPONS, evos: EN_EVOS, passives: EN_PASSIVES, chars: EN_CHARS, bonus: EN_BONUS, shop: EN_SHOP,
+    modes: { normal: 'Normal', hard: 'Hard' },
+    stages: EN_STAGES,
+    tutorial: ['Tutorial', 'A tiny three-room house for learning how to play.', { genkan: 'Entrance', living: 'Living Room', washitsu: 'Tatami Room' }],
+  });
+  for (const code of PACK_CODES) addLang(code, I18N[code]);
+
+  const bonusText = (key) => (BONUS_TEXT[lang] || ROOM_BONUS)[key];
   // ギアのレベルアップの説明 (レベル lv → lv+1)
-  const lvText = (id, lv) => (lang === 'en' ? WEAPONS[id].en.lvText[lv - 1] : WEAPONS[id].lv[lv - 1][1]);
+  const lvText = (id, lv) => (lang === 'ja' ? WEAPONS[id].lv[lv - 1][1] : L(WEAPONS[id], 'lvText')[lv - 1]);
 
   // ---- 画面の文言 ----
   const TEXT = {
@@ -665,6 +688,7 @@
       pause: '一時停止',
       compress: 'ゴミ圧縮',
       board: 'ゲーム画面',
+      language: '言語',
       // プレイ中
       warn: (name) => `警報! ${name}が近づいている!`,
       rush: '大群ラッシュ!',
@@ -827,6 +851,17 @@
       bgm: 'BGM',
       shake: '画面の揺れ・フラッシュ',
       haze: '汚れの靄',
+      reviveTitle: 'もう一度がんばる?',
+      reviveText: '体力が全回復して、その場で復活できる。復活できるのは1回のプレイで1回だけ。',
+      reviveBtn: '復活する',
+      giveUp: 'あきらめる',
+      revived: '復活! もうひとふんばり!',
+      rerollPlus: 'リロール +2',
+      coinsX: (n) => `コイン 1.5倍 (+${n})`,
+      coinAd: 'コイン (1.5倍ボーナス)',
+      withAd: (s) => `📺 広告を見て${s}`,
+      adLoading: '広告を準備中…',
+      adFailed: '広告を読み込めなかった。少し待ってからもう一度試してね',
     },
     en: {
       pageTitle: 'Cleaning Survivors',
@@ -836,6 +871,7 @@
       pause: 'Pause',
       compress: 'Compress',
       board: 'Game screen',
+      language: 'Language',
       warn: (name) => `Warning! ${name} is approaching!`,
       rush: 'Swarm rush!',
       tooTough: 'Too tough! Clean around it',
@@ -996,12 +1032,25 @@
       bgm: 'Music',
       shake: 'Screen shake & flash',
       haze: 'Grime haze',
+      reviveTitle: 'Give it another go?',
+      reviveText: 'Get back up right where you fell with full HP. You can revive only once per run.',
+      reviveBtn: 'Revive',
+      giveUp: 'Give up',
+      revived: 'Revived! Keep going!',
+      rerollPlus: '+2 rerolls',
+      coinsX: (n) => `Coins ×1.5 (+${n})`,
+      coinAd: 'Coins (×1.5 bonus)',
+      withAd: (s) => `📺 Watch an ad: ${s}`,
+      adLoading: 'Loading ad…',
+      adFailed: 'Couldn\'t load an ad. Wait a moment and try again',
     },
   };
 
-  // 文言を取り出す。関数の文言は引数を渡して組み立てる
+  for (const code of PACK_CODES) TEXT[code] = I18N[code].text;
+
+  // 文言を取り出す。関数の文言は引数を渡して組み立てる (その言語になければ英語、それもなければ日本語)
   const t = (key, ...args) => {
-    const v = TEXT[lang][key] ?? TEXT.ja[key];
+    const v = TEXT[lang][key] ?? TEXT.en[key] ?? TEXT.ja[key];
     return typeof v === 'function' ? v(...args) : v;
   };
 
@@ -1044,6 +1093,9 @@
       const d = JSON.parse(raw);
       if (typeof d.coins === 'number') s.coins = d.coins;
       for (const it of SHOP) if (d.shop && typeof d.shop[it.id] === 'number') s.shop[it.id] = Math.min(it.max, d.shop[it.id]);
+      // 恒久スキル「リロール」はなくした (選び直しは広告で増やす)。上げていたぶんのコインは返す
+      const oldReroll = d.shop && typeof d.shop.reroll === 'number' ? Math.min(6, Math.max(0, Math.floor(d.shop.reroll))) : 0;
+      if (oldReroll) s.coins += (100 * oldReroll * (oldReroll + 1)) / 2;
       Object.assign(s.kills, d.kills || {});
       Object.assign(s.settings, d.settings || {});
       if (CHARS.some((c) => c.id === d.char)) s.char = d.char;
@@ -1134,10 +1186,17 @@
       setVolume();
     }
 
+    // 広告のあいだと、CrazyGames の設定で消音にしているときは音を出さない
+    let adMute = false;
     function setVolume() {
       if (!ac) return;
-      seGain.gain.value = (save.settings.se / 100) * 0.6;
-      bgmGain.gain.value = (save.settings.bgm / 100) * 0.35;
+      const on = adMute || Ads.muted() ? 0 : 1;
+      seGain.gain.value = (save.settings.se / 100) * 0.6 * on;
+      bgmGain.gain.value = (save.settings.bgm / 100) * 0.35 * on;
+    }
+    function setAdMute(v) {
+      adMute = v;
+      setVolume();
     }
 
     function tone(freq, freq2, dur, type, vol, when = 0, dest = seGain) {
@@ -1276,8 +1335,65 @@
       timer = setInterval(schedule, 25);
     }
 
-    return { init, play, bgm, setVolume };
+    return { init, play, bgm, setVolume, setAdMute };
   })();
+
+  // ---- CrazyGames の広告 (リワード広告) ----
+  // 報酬は広告を見たときだけ渡す。SDK がない場所や使えない場所 (このサイトなど) では、報酬のボタンを出さない
+  const Ads = (() => {
+    let sdk = null;
+    let busy = false;
+    const live = () => !!sdk && sdk.environment !== 'disabled';
+    const safe = (fn) => {
+      try { Promise.resolve(fn()).catch(() => {}); } catch (e) { /* SDK が使えなくても遊べる */ }
+    };
+    const ready = (async () => {
+      const cg = window.CrazyGames && window.CrazyGames.SDK;
+      if (!cg) return;
+      try {
+        await cg.init();
+        sdk = cg;
+      } catch (e) {
+        sdk = null;
+        return;
+      }
+      if (live() && sdk.game && sdk.game.addSettingsChangeListener) safe(() => sdk.game.addSettingsChangeListener(() => Sound.setVolume()));
+      Sound.setVolume();
+      if (rerender) rerender(); // 広告が使えるとわかったら、報酬のボタンを出すために描き直す
+    })();
+    // 報酬つきの広告を流す。最後まで見たら true。広告が使えない場所では false
+    async function rewarded() {
+      await ready;
+      if (!live()) return false;
+      if (busy) return false;
+      busy = true;
+      return new Promise((resolve) => {
+        const done = (ok) => {
+          busy = false;
+          Sound.setAdMute(false);
+          resolve(ok);
+        };
+        try {
+          sdk.ad.requestAd('rewarded', {
+            adStarted: () => Sound.setAdMute(true),
+            adFinished: () => done(true),
+            adError: () => done(false),
+          });
+        } catch (e) {
+          done(false);
+        }
+      });
+    }
+    return {
+      rewarded,
+      live,
+      // 遊んでいるあいだ (一時停止・メニュー・結果画面以外) を CrazyGames に知らせる
+      gameplay: (on) => { if (live()) safe(() => (on ? sdk.game.gameplayStart() : sdk.game.gameplayStop())); },
+      muted: () => !!(live() && sdk.game && sdk.game.settings && sdk.game.settings.muteAudio),
+    };
+  })();
+  // 広告で報酬をもらうボタンの文言
+  const adLabel = (s) => t('withAd', s);
 
   // ===================================================================
   // 絵 (ゴミ・主人公・アイコン)
@@ -2575,6 +2691,9 @@
   resize();
 
   const keys = new Set();
+  // 移動のキーはキーボードの配列によらず、WASD の位置のキーで動く (フランス語の AZERTY なら ZQSD)
+  const MOVE_CODES = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd' };
+  const keyName = (e) => MOVE_CODES[e.code] || (e.key.length === 1 ? e.key.toLowerCase() : e.key);
   const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 
   window.addEventListener('keydown', (e) => {
@@ -2582,7 +2701,7 @@
     const k = e.key;
     if (G && G.state === 'play' && !G.paused && overlay.hidden) {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(k)) e.preventDefault();
-      keys.add(k.length === 1 ? k.toLowerCase() : k);
+      keys.add(keyName(e));
       if (k === 'Escape' || k === 'p' || k === 'P') pauseGame();
       return;
     }
@@ -2597,8 +2716,7 @@
     }
   });
   window.addEventListener('keyup', (e) => {
-    const k = e.key;
-    keys.delete(k.length === 1 ? k.toLowerCase() : k);
+    keys.delete(keyName(e));
   });
   window.addEventListener('blur', () => keys.clear());
 
@@ -2692,7 +2810,7 @@
       xp: 0,
       xpNext: xpFor(1),
       pendingLv: 0,
-      rerolls: save.shop.reroll,
+      rerolls: 0, // レベルアップの選び直し。広告を見ると 2 回ぶん増える
       box: 0,
       dumpCoins: 0,
       bossCoins: 0,
@@ -4973,6 +5091,9 @@
   ];
   const tutorBox = document.getElementById('tutor');
 
+  // 1秒に読める文字数のめやす (ヒントを出しておく長さに使う)
+  const READ_SPEED = { ja: 10, en: 22, zh: 9, ko: 13, fr: 20, de: 19, es: 20, it: 20, pt: 20 };
+
   function updateTutorial(dt) {
     const tu = G.tutorial;
     const p = G.p;
@@ -4983,7 +5104,7 @@
     const step = TUT_STEPS[tu.step];
     if (!step) return;
     // 条件を満たしたら次の手順へ。読み終わる前に消えないように、文の長さに合わせて 4〜9 秒は出しておく
-    const minT = clamp(t(step.key).replace(/<[^>]+>/g, '').length / (lang === 'en' ? 22 : 10), 4, 9);
+    const minT = clamp(t(step.key).replace(/<[^>]+>/g, '').length / (READ_SPEED[lang] || 10), 4, 9);
     if (tu.stepT > minT && (step.done(G) || (step.max && tu.stepT > step.max))) {
       tu.step++;
       tu.stepT = 0;
@@ -5089,7 +5210,9 @@
     } else if (G.state === 'win' && G.endT > 2.6) {
       showResult(true);
     } else if (G.state === 'dead' && G.endT > 1.6) {
-      showResult(false);
+      // 力尽きたら、1回のプレイで1回だけ復活をすすめる (時間切れは復活できない。広告が使えない場所では出さない)
+      if (!G.timeUp && !G.reviveOffered && Ads.live()) showRevive();
+      else showResult(false);
     }
   }
 
@@ -6250,6 +6373,12 @@
   // 画面 (タイトル・メニュー・レベルアップなど)
   // ===================================================================
   const actions = {};
+  // 広告を待つあいだは、画面のボタンを押せなくして「準備中」と出す
+  function adBusy() {
+    overlay.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    const b = overlay.querySelector('.ad-btn, [data-act="reviveAd"]');
+    if (b) b.textContent = t('adLoading');
+  }
   overlay.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled || overlay.classList.contains('locked')) return;
@@ -6342,7 +6471,7 @@
     Sound.bgm(null);
     show('title', `
       <div class="panel bare">
-        <p class="logo${lang === 'en' ? ' en' : ''}"><small>${t('logoSmall')}</small>${t('logo')}</p>
+        <p class="logo${LATIN.includes(lang) ? ' en' : ''}"><small>${t('logoSmall')}</small>${t('logo')}</p>
         <p class="tagline">${t('tagline')}</p>
         <div class="title-cast"><img src="${charThumb('cleaner')}" alt="">${['dust', 'paper', 'can', 'grease', 'spore', 'bag'].map((k) => `<img src="${enemyThumb(k)}" alt="">`).join('')}</div>
         ${completionHtml()}
@@ -6590,12 +6719,14 @@
     Sound.bgm('main');
     showBanner(L(stageOf(stageIdx), 'name'), '#ffffff', 2);
     renderTutor();
+    Ads.gameplay(true);
   }
 
   function pauseGame() {
     if (!G || G.state !== 'play' || !overlay.hidden) return;
     G.paused = true;
     Sound.bgm(null);
+    Ads.gameplay(false);
     show('pause', `
       <div class="panel">
         <h2>${t('paused')}</h2>
@@ -6617,6 +6748,65 @@
     G.paused = false;
     hide();
     Sound.bgm(G.bosses.some((b) => b.boss && b.alive) ? 'boss' : 'main');
+    Ads.gameplay(true);
+  }
+
+  // ---- 復活 (広告の報酬) ----
+  function showRevive() {
+    G.reviveOffered = true;
+    Ads.gameplay(false);
+    rerender = renderRevive;
+    renderRevive();
+  }
+
+  function renderRevive(msg = '') {
+    show('revive', `
+      <div class="panel reward">
+        <h2 class="result-title lose">${t('wornOut')}</h2>
+        <p class="treasure-name">${t('reviveTitle')}</p>
+        <p class="sub">${t('reviveText')}</p>
+        ${msg ? `<p class="result-note">${esc(msg)}</p>` : ''}
+        <div class="actions">
+          <button type="button" class="btn primary" data-act="reviveAd" data-focus>${esc(adLabel(t('reviveBtn')))}</button>
+          <button type="button" class="btn" data-act="giveUp" data-back>${t('giveUp')}</button>
+        </div>
+      </div>`, false);
+  }
+
+  // 体力を全回復して、その場で立ち上がる。まわりのゴミは吹き飛ばし、少しのあいだ無敵にする
+  function revive() {
+    const p = G.p;
+    G.state = 'play';
+    G.endT = 0;
+    p.hp = G.stats.maxHp;
+    p.inv = 3;
+    p.allergyT = 0;
+    p.slowAmt = 0;
+    G.bullets.length = 0;
+    G.clouds.length = 0;
+    for (const e of G.enemies) {
+      if (!e.alive || e.def.source) continue;
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d > 260) continue;
+      if (e.boss || e.elite) {
+        e.x = p.x + (dx / d) * 260;
+        e.y = p.y + (dy / d) * 260;
+        pushOut(e, e.r);
+      } else {
+        e.alive = false;
+        puff(e.x, e.y, '#ffffff', 3);
+      }
+    }
+    puff(p.x, p.y, '#bff7e6', 30);
+    G.shake = Math.max(G.shake, 8);
+    showBanner(t('revived'), '#4fe0b6', 2.4);
+    Sound.play('level');
+    rerender = null;
+    hide();
+    Sound.bgm(G.bosses.some((b) => b.boss && b.alive) ? 'boss' : 'main');
+    Ads.gameplay(true);
   }
 
   // ---- レベルアップ ----
@@ -6681,7 +6871,9 @@
     </div>`;
   }
 
+  let levelMsg = ''; // レベルアップ画面に出すお知らせ (広告を読み込めなかったときなど)
   function showLevelUp() {
+    levelMsg = '';
     G.pendingLv--;
     Sound.play('level');
     choices = makeChoices();
@@ -6707,7 +6899,10 @@
         <div class="cards">${cards}</div>
         <p class="inv-title">${t('inventory')}</p>
         ${invHtml()}
-        ${G.rerolls > 0 ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button></div>` : ''}
+        ${G.rerolls > 0
+    ? `<div class="actions"><button type="button" class="btn small" data-act="reroll">${t('reroll', G.rerolls)}</button></div>`
+    : Ads.live() ? `<div class="actions"><button type="button" class="btn small ad-btn" data-act="adReroll">${esc(adLabel(t('rerollPlus')))}</button></div>` : ''}
+        ${levelMsg ? `<p class="result-note">${esc(levelMsg)}</p>` : ''}
       </div>`, false, { kind: 'level', lock: 450 });
   }
 
@@ -6831,6 +7026,7 @@
         killCoins, cleanCoins, dumpCoins: g.dumpCoins, roomCoins: g.roomCoins, bossCoins: g.bossCoins, mul, total, notes: [[win ? 'noteTutorial' : 'noteTutorialRetry']],
       };
       G = null;
+      Ads.gameplay(false);
       renderResult(res);
       return;
     }
@@ -6862,6 +7058,7 @@
     };
     G = null;
     briefRoom = i;
+    Ads.gameplay(false);
     renderResult(res);
   }
 
@@ -6875,8 +7072,13 @@
     }
   }
 
+  let lastResult = null;
   function renderResult(r) {
+    lastResult = r;
     rerender = () => renderResult(r);
+    // ステージをクリアしたら、広告を見てもらえるコインを 1.5 倍にできる (1回だけ)
+    const adExtra = Math.round(r.total * 0.5);
+    const canBoost = r.win && !r.tut && !r.adExtra && adExtra > 0 && Ads.live();
     const next = r.win && r.i + 1 < STAGES.length;
     const stageName = r.tut ? L(TUTORIAL, 'name') : t('stageTitle', r.i + 1, L(STAGES[r.i], 'name'));
     show('result', `
@@ -6896,8 +7098,11 @@
           <dt>${t('coinBoss')}</dt><dd>+${r.bossCoins}</dd>
           ${r.win ? `<dt>${t('coinClear')}</dt><dd>+50</dd>` : ''}
           ${r.mul !== 1 ? `<dt>${t('coinMul', r.mode === 'hard')}</dt><dd>×${r.mul.toFixed(2)}</dd>` : ''}
-          <dt class="total">${t('total')}</dt><dd class="total">+${r.total}</dd>
+          ${r.adExtra ? `<dt>${t('coinAd')}</dt><dd>+${r.adExtra}</dd>` : ''}
+          <dt class="total">${t('total')}</dt><dd class="total">+${r.total + (r.adExtra || 0)}</dd>
         </dl>
+        ${canBoost ? `<div class="actions"><button type="button" class="btn primary ad-btn" data-act="adCoins">${esc(adLabel(t('coinsX', adExtra)))}</button></div>` : ''}
+        ${r.adMsg ? `<p class="result-note">${esc(r.adMsg)}</p>` : ''}
         ${r.notes.map((n) => `<p class="result-note">${esc(noteText(n))}</p>`).join('')}
         ${affordable() ? `<div class="shop-cta"><span>${t('shopCta', save.coins, affordable())}</span>${shopBtn('rooms')}</div>` : ''}
         <div class="actions">
@@ -6942,7 +7147,7 @@
   }
 
   function shopIcon(id) {
-    return { hp: 'heal', might: 'boiler', clean: 'roller', speed: 'boots', armor: 'gloves', regen: 'heal', magnet: 'dustpack', xp: 'battery', box: 'dustpack', coin: 'coin', reroll: 'tape', choices: 'chest' }[id];
+    return { hp: 'heal', might: 'boiler', clean: 'roller', speed: 'boots', armor: 'gloves', regen: 'heal', magnet: 'dustpack', xp: 'battery', box: 'dustpack', coin: 'coin', choices: 'chest' }[id];
   }
 
   // ---- 図鑑 ----
@@ -6988,29 +7193,56 @@
   }
 
   // ---- 言語の切り替え ----
+  // lang/<言語>.js の遊び方を、英語の遊び方のあとに並べる
+  {
+    const helps = document.querySelectorAll('.help');
+    let last = helps[helps.length - 1];
+    for (const code of PACK_CODES) {
+      if (!I18N[code].help || !last) continue;
+      const sec = document.createElement('section');
+      sec.className = 'help';
+      sec.dataset.lang = code;
+      sec.lang = code === 'zh' ? 'zh-Hans' : code;
+      sec.hidden = true;
+      sec.innerHTML = I18N[code].help;
+      last.after(sec);
+      last = sec;
+    }
+  }
+
   // HTML に書いた文言 (data-i18n) と、言語ごとの遊び方 (data-lang) を反映する
   function applyLang() {
-    document.documentElement.lang = lang;
+    document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
     document.title = t('pageTitle');
     const desc = document.querySelector('meta[name="description"]');
     if (desc) desc.setAttribute('content', t('pageDesc'));
     document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
     document.querySelectorAll('[data-lang]').forEach((el) => { el.hidden = el.dataset.lang !== lang; });
-    // 日本語 / EN のトグルで、いま選んでいる方を押された状態にする
-    if (langBtn) langBtn.querySelectorAll('[data-set-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.setLang === lang)));
+    if (langBtn) {
+      langBtn.value = lang;
+      langBtn.setAttribute('aria-label', t('language'));
+    }
   }
 
+  // 言語の選択 (ヘッダーのセレクトボックス)。プレイ中は隠している
   if (langBtn) {
-    langBtn.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-set-lang]');
-      if (!b || b.dataset.setLang === lang || G) return;
-      lang = b.dataset.setLang;
+    for (const [code, label] of LANGS) {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.lang = code === 'zh' ? 'zh-Hans' : code;
+      opt.textContent = label;
+      langBtn.append(opt);
+    }
+    langBtn.addEventListener('change', () => {
+      if (G) return;
+      lang = langBtn.value;
       try { localStorage.setItem(LANG_KEY, lang); } catch (err) { /* 保存できなくても切り替え自体は有効 */ }
       Sound.init();
       Sound.play('click');
       applyLang();
       if (rerender) rerender();
+      langBtn.blur();
     });
   }
 
@@ -7065,6 +7297,43 @@
       renderLevelUp();
     },
     chestOk: afterMenu,
+    // ---- 広告の報酬 ----
+    reviveAd: async () => {
+      if (!G || screen !== 'revive') return;
+      adBusy();
+      const ok = await Ads.rewarded();
+      if (!G || screen !== 'revive') return;
+      if (ok) revive();
+      else renderRevive(t('adFailed'));
+    },
+    giveUp: () => {
+      if (G && screen === 'revive') showResult(false);
+    },
+    adReroll: async () => {
+      if (!G || screen !== 'levelup') return;
+      adBusy();
+      const ok = await Ads.rewarded();
+      if (!G || screen !== 'levelup') return;
+      if (ok) {
+        G.rerolls += 2;
+        levelMsg = '';
+      } else levelMsg = t('adFailed');
+      renderLevelUp();
+    },
+    adCoins: async () => {
+      const r = lastResult;
+      if (!r || screen !== 'result' || r.adExtra) return;
+      adBusy();
+      const ok = await Ads.rewarded();
+      if (lastResult !== r || screen !== 'result') return;
+      if (ok) {
+        r.adExtra = Math.round(r.total * 0.5);
+        r.adMsg = '';
+        save.coins += r.adExtra;
+        persist();
+      } else r.adMsg = t('adFailed');
+      renderResult(r);
+    },
     shop: (from) => showShop(from),
     buy: (id) => {
       const it = SHOP.find((s) => s.id === id);
