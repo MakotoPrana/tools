@@ -31,6 +31,10 @@
   const SAVE_KEY = 'cleaning-survivors-save';
   // テスト版は <meta name="cs-test-unlock"> で全部屋・全主人公を開放する
   const TEST_UNLOCK = !!document.querySelector('meta[name="cs-test-unlock"]');
+  // このサイト (tools.e-seventh.com) 以外 (CrazyGames などに埋めこまれたとき) は、ゲームの画面だけを全面に出す。
+  // CrazyGames 用の zip は <html class="embed"> にしてあるので、読みこみの途中からサイトの見た目が出ない
+  const EMBED = document.documentElement.classList.contains('embed') || location.hostname !== 'tools.e-seventh.com';
+  document.documentElement.classList.toggle('embed', EMBED);
 
   // 言語: 日本語と英語。保存がなければ、ブラウザの言語が日本語なら日本語、それ以外は英語
   const LANG_KEY = 'cleaning-survivors-lang';
@@ -1541,6 +1545,11 @@
       Sound.setVolume();
       if (playing) sendGameplay();
       if (rerender) rerender(); // 広告が使えるとわかったら、報酬のボタンを出すために描き直す
+      // 読みこみ中 (ロゴのアニメーションが終わるまで) を CrazyGames に知らせる
+      if (live() && sdk.game.loadingStart) {
+        safe(() => sdk.game.loadingStart());
+        Promise.resolve(window.introDone).then(() => safe(() => sdk.game.loadingStop()));
+      }
     })();
     // 報酬つきの広告を流す。最後まで見たら true。広告が使えない場所では false
     async function rewarded() {
@@ -1582,6 +1591,8 @@
       },
       hasData: () => !!store(),
       // 遊んでいるあいだ (一時停止・メニュー・結果画面以外) を CrazyGames に知らせる
+      // うれしい場面 (ステージクリアなど) を CrazyGames に知らせる
+      happy: () => { if (live() && sdk.game.happytime) safe(() => sdk.game.happytime()); },
       gameplay: (on) => {
         playing = on;
         sendGameplay();
@@ -5389,7 +5400,7 @@
     d.t += dt;
     if (d.t >= DUMP_TIME) {
       d.t = 0;
-      const coins = Math.floor(G.box / 4);
+      const coins = Math.max(1, Math.floor(G.box / 4)); // 少しだけ捨てても「+0 コイン」にはしない
       G.dumpCoins += coins;
       G.box = 0;
       G.dumpCount++;
@@ -5734,6 +5745,7 @@
     showBanner(t('allClean'), '#4fe0b6', 2.6);
     Sound.bgm(null);
     Sound.play('win');
+    Ads.happy();
     // クリアで満たす宝物の条件 (時間内にクリア・体力を保ってクリア) と、床に出たまま拾っていない宝物は、ここで渡す
     const c = G.trCond;
     G.pendingLv = 0; // クリアしたあとはレベルアップの画面を出さない
@@ -6515,16 +6527,16 @@
       c.restore();
     }
     c.globalCompositeOperation = 'destination-out';
-    const rr = Math.min(w, h) * 0.42;
+    const rr = Math.min(w, h) * 0.55;
     const g = c.createRadialGradient(px / k, py / k, 0, px / k, py / k, rr);
-    g.addColorStop(0, 'rgba(0,0,0,0.75)');
-    g.addColorStop(0.55, 'rgba(0,0,0,0.4)');
+    g.addColorStop(0, 'rgba(0,0,0,0.9)');
+    g.addColorStop(0.55, 'rgba(0,0,0,0.5)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = g;
     c.fillRect(0, 0, w, h);
     c.globalCompositeOperation = 'source-over';
     ctx.save();
-    ctx.globalAlpha = Math.min(1, G.haze) * 0.72;
+    ctx.globalAlpha = Math.min(1, G.haze) * 0.5;
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(hazeCv, 0, 0, view.w, view.h);
     ctx.restore();
@@ -6913,8 +6925,9 @@
     pauseBtn.style.visibility = 'hidden';
     bombBtn.hidden = true;
     if (tutorBox && !(G && G.tutorial)) tutorBox.hidden = true;
-    // 言語はメニューでだけ切り替えられる (プレイ中の一時停止やレベルアップでは隠す)
-    if (langBtn) langBtn.hidden = !!G;
+    // 言語はメニューでだけ切り替えられる (プレイ中の一時停止やレベルアップでは隠す)。
+    // 埋めこみではゲームの画面に重ねて出すので、ほかの画面の見出しと重ならないようにタイトルだけで出す
+    if (langBtn) langBtn.hidden = !!G || (EMBED && name !== 'title');
     joy.id = null;
     keys.clear();
   }
@@ -7114,7 +7127,7 @@
         <p class="brief-note">${esc(t('slotNote', MAX_GEARS, MAX_PASSIVES))}</p>
         <p class="brief-note">${esc(t('bossNote', L(ENEMIES.yokai, 'name'), L(ENEMIES[r.boss], 'name')))}</p>
         <div class="records"><span>${esc(L(ch, 'name'))}${t('sep')}${modeName}</span><span>${t('bestRooms', `<b>${rec.r}`, `${r.rooms.length}</b>`)}</span>${rec.t ? `<span>${t('bestClear', `<b>${fmtTime(rec.t)}</b>`)}</span>` : ''}${rec.c ? `<span><b>${t('cleared')}</b></span>` : ''}</div>
-        <div class="actions">
+        <div class="actions sticky">
           <button type="button" class="btn primary" data-act="start" data-focus>${t('deploy', modeName)}</button>
           <button type="button" class="btn" data-act="charSelect">${t('changeChar')}</button>
         </div>
@@ -7148,11 +7161,11 @@
           <span class="char-power p${c.power}">${esc(t('charPower', '★'.repeat(c.power) + '☆'.repeat(5 - c.power)))}</span></div></div>
         <p class="char-desc">${esc(unlockText(c))}</p>`;
     show('charselect', `
-      <div class="panel">
+      <div class="panel charsel">
         ${panelHead(t('charSelect'), 'title')}
-        <div class="picks">${icons}</div>
-        <div class="pick-detail${ok ? '' : ' locked'}">${detail}</div>
-        <div class="actions">
+        <div class="charsel-body"><div class="picks">${icons}</div>
+        <div class="pick-detail${ok ? '' : ' locked'}">${detail}</div></div>
+        <div class="actions sticky">
           <button type="button" class="btn primary" data-act="charGo" ${ok ? '' : 'disabled'}>${t('charGo')}</button>
         </div>
       </div>`);
@@ -8076,7 +8089,7 @@
   });
 
   // ゲーム一覧へのリンクとコピーライトは、このサイト (tools.e-seventh.com) で遊んでいるときだけ出す (CrazyGames などでは出さない)
-  if (location.hostname === 'tools.e-seventh.com') {
+  if (!EMBED) {
     document.querySelector('.back').style.visibility = '';
     document.querySelector('footer').hidden = false;
   }
@@ -8096,6 +8109,21 @@
       w.lv = lv;
       w.evo = evo;
       recalcStats();
+    },
+    // 宣伝用の画像を作るときに、清掃員 (char) やゴミ (enemy) を大きく描く
+    art: (kind, id, size = 256) => {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = size;
+      const c = cv.getContext('2d');
+      c.translate(size / 2, size * 0.54);
+      if (kind === 'char') {
+        c.scale((size / 64) * 1.7, (size / 64) * 1.7);
+        drawPlayerBody(c, id, 0.5, 0, false, false);
+      } else {
+        c.scale(size / 96, size / 96);
+        drawEnemyBody(c, id, ENEMIES[id].boss ? 30 : 26, 0.3, 0, id === 'can' || id === 'bottle' ? 0.4 : 0);
+      }
+      return cv.toDataURL();
     },
   };
 })();
