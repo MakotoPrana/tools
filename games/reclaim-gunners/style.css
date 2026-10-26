@@ -308,10 +308,33 @@ body.rotated .app {
 .diff b { font-size: 1.1em; min-width: 7em; }
 
 /* 全体図 */
-.world { position: relative; }
-.world svg { display: block; width: 100%; height: auto; border-radius: 10px; }
-.world .region { cursor: pointer; }
-.world .region:hover path.land { filter: brightness(1.25); }
+/* 全体図: 絵 (1024 × 572) の上に、押せる島と名前の札の SVG をぴったり重ねる。画面の高さに収まる大きさにする */
+.world-panel { display: flex; flex-direction: column; }
+.world {
+  position: relative;
+  width: min(100%, calc((100cqh - 9.5em) * 1024 / 572));
+  max-width: 100%;
+  aspect-ratio: 1024 / 572;
+  margin: 0 auto;
+  flex: none;
+}
+.world img { display: block; width: 100%; height: 100%; border-radius: 10px; }
+.world svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.world .region, .world .plate { cursor: pointer; }
+.world .region ellipse { transition: fill 0.15s; }
+.world .region:hover ellipse { fill: rgba(255, 240, 180, 0.14); }
+.world .region ellipse.sel { animation: world-sel 1.6s linear infinite; }
+.world .plate:hover rect { stroke: #fff3b0; }
+@keyframes world-sel { to { stroke-dashoffset: -44; } }
+/* スマホでは、見出しと下の説明を小さくして、絵を大きく出す */
+body.compact .world-panel { padding: 4px 8px 6px; }
+body.compact .world-panel .panel-head { margin-bottom: 2px; }
+body.compact .world-panel .panel-head h2 { display: none; }
+body.compact .world-panel .panel-head .stat { margin-left: auto; }
+body.compact .world { width: min(100%, calc((100cqh - 7.6em) * 1024 / 572)); }
+body.compact .world-panel .region-info { margin-top: 4px; padding: 4px 8px; gap: 6px; }
+body.compact .world-panel .region-info .desc { display: none; }
+@media (prefers-reduced-motion: reduce) { .world .region ellipse.sel { animation: none; } }
 .region-info { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .region-info .grow { flex: 1; min-width: 12em; }
 

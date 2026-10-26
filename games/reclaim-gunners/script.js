@@ -5293,13 +5293,18 @@
   };
 
   // ---------- 全体図 ----------
+  // 全体図の絵 (assets/worldmap.jpg。1024 × 572)。絵の上に、押せる場所と名前の札を重ねる
+  //   spots: そのステージの島 (押せる楕円)。label: 名前の札の中心 (絵に描いてある名前の上にかぶせる)
+  //   黒森シュヴァルツは、絵の中に島が 2 つある (どちらを押しても黒森)
+  const WORLD_W = 1024;
+  const WORLD_H = 572;
   const WORLD = {
-    1: { x: 130, y: 268, r: 70, color: '#8fb85a', icon: 'mill' },
-    2: { x: 318, y: 300, r: 62, color: '#4a9a9a', icon: 'lake' },
-    3: { x: 220, y: 120, r: 64, color: '#9a8a70', icon: 'mount' },
-    4: { x: 392, y: 190, r: 62, color: '#2f6a3a', icon: 'tree' },
-    5: { x: 430, y: 66, r: 56, color: '#b04a2a', icon: 'volcano' },
-    6: { x: 562, y: 176, r: 64, color: '#5a2a6a', icon: 'castle' },
+    1: { spots: [[230, 200, 200, 125]], label: [375, 264] },
+    2: { spots: [[230, 418, 140, 72]], label: [232, 470] },
+    3: { spots: [[630, 118, 140, 78]], label: [672, 182] },
+    4: { spots: [[600, 282, 92, 68], [495, 446, 100, 72]], label: [610, 342], label2: [505, 505] },
+    5: { spots: [[702, 430, 92, 80]], label: [710, 505] },
+    6: { spots: [[872, 240, 112, 128]], label: [865, 342] },
   };
   let selStage = 1;
 
@@ -5313,36 +5318,19 @@
     return { n, total: def.areas.length, pct: Math.round((n / def.areas.length) * 100) };
   }
 
-  function blobPath(cx, cy, r, seed) {
-    const rng = mulberry32(seed);
-    const pts = [];
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU;
-      const rr = r * (0.78 + rng() * 0.3);
-      pts.push([cx + Math.cos(a) * rr * 1.25, cy + Math.sin(a) * rr * 0.8]);
-    }
-    let d = '';
-    for (let i = 0; i < pts.length; i++) {
-      const p0 = pts[i];
-      const p1 = pts[(i + 1) % pts.length];
-      const mx = (p0[0] + p1[0]) / 2;
-      const my = (p0[1] + p1[1]) / 2;
-      if (i === 0) d += `M${((pts[pts.length - 1][0] + p0[0]) / 2).toFixed(1)},${((pts[pts.length - 1][1] + p0[1]) / 2).toFixed(1)}`;
-      d += ` Q${p0[0].toFixed(1)},${p0[1].toFixed(1)} ${mx.toFixed(1)},${my.toFixed(1)}`;
-    }
-    return d + 'Z';
-  }
-
-  function worldIcon(type, x, y) {
-    switch (type) {
-      case 'mill': return `<g transform="translate(${x},${y})"><path d="M-6,14 L-3,-4 L3,-4 L6,14Z" fill="#e8dcc0"/><g stroke="#6a4a2a" stroke-width="2"><line x1="0" y1="-4" x2="-12" y2="-16"/><line x1="0" y1="-4" x2="12" y2="-16"/><line x1="0" y1="-4" x2="-12" y2="8"/><line x1="0" y1="-4" x2="12" y2="8"/></g></g>`;
-      case 'lake': return `<ellipse cx="${x}" cy="${y}" rx="24" ry="10" fill="#7ac8e8" opacity="0.8"/>`;
-      case 'mount': return `<g transform="translate(${x},${y})"><path d="M-26,12 L-8,-16 L4,4 L12,-8 L28,12Z" fill="#6a5a4a"/><path d="M-8,-16 L-3,-8 L-13,-8Z" fill="#fff"/></g>`;
-      case 'tree': return `<g transform="translate(${x},${y})" fill="#1a3a20">${[-16, 0, 16].map((dx, i) => `<path d="M${dx - 9},${10 - i % 2 * 4} L${dx},${-14 - i % 2 * 4} L${dx + 9},${10 - i % 2 * 4}Z"/>`).join('')}</g>`;
-      case 'volcano': return `<g transform="translate(${x},${y})"><path d="M-24,12 L-7,-12 L7,-12 L24,12Z" fill="#4a2a20"/><path d="M-7,-12 L7,-12 L3,-4 L-3,-4Z" fill="#ff6a2a"/><circle cx="2" cy="-20" r="5" fill="#666" opacity="0.6"/></g>`;
-      case 'castle': return `<g transform="translate(${x},${y})" fill="#1a0a20"><rect x="-18" y="-6" width="36" height="18"/><rect x="-22" y="-18" width="8" height="30"/><rect x="14" y="-18" width="8" height="30"/><rect x="-5" y="-24" width="10" height="36"/><path d="M-5,-24 L0,-32 L5,-24Z" fill="#ff3a5a"/></g>`;
-      default: return '';
-    }
+  // 全体図の名前の札 (絵に描いてある名前と状態の上にかぶせて、いまの状態を出す)
+  function worldPlate(st, [x, y], sel) {
+    const p = stageProgress(st);
+    const reach = stageReachable(st.id);
+    const status = !st.ready ? '準備中' : !reach ? '🔒 守護者を倒すと開く' : `解放 ${p.pct}%`;
+    const col = !st.ready ? '#b8a890' : !reach ? '#ff9a8a' : p.pct >= 100 ? '#7dffb0' : '#ffe9a8';
+    const w = 176;
+    const h = 48;
+    return `<g class="plate" data-act="pickStage" data-id="${st.id}">
+      <rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="9" fill="url(#plate)" stroke="${sel ? '#fff3b0' : '#c8a45a'}" stroke-width="${sel ? 3 : 1.6}"/>
+      <text x="${x}" y="${y - 3}" text-anchor="middle" font-size="18" font-weight="800" fill="#fff" stroke="#1a0e06" stroke-width="3" paint-order="stroke">${st.id}.${st.name}</text>
+      <text x="${x}" y="${y + 16}" text-anchor="middle" font-size="13" font-weight="700" fill="${col}" stroke="#1a0e06" stroke-width="2.5" paint-order="stroke">${status}</text>
+    </g>`;
   }
 
   function showWorld() {
@@ -5353,43 +5341,49 @@
       const s = stageDef(selStage);
       const sp = stageProgress(s);
       const reach = stageReachable(s.id);
-      const lines = LINKS.map((l) => {
-        const a = WORLD[l.a];
-        const b = WORLD[l.b];
-        const open = prog.bosses.includes(l.boss);
-        return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${open ? '#ffe9a8' : '#5a4a6a'}" stroke-width="${open ? 3 : 2}" stroke-dasharray="${open ? '' : '6 6'}"/>`;
-      }).join('');
-      const regions = STAGES.map((st) => {
+      const spots = STAGES.map((st) => {
         const w = WORLD[st.id];
-        const r = stageReachable(st.id) && st.ready;
-        const p = stageProgress(st);
-        return `<g class="region" data-act="pickStage" data-id="${st.id}">
-          <path class="land" d="${blobPath(w.x, w.y, w.r, st.id * 13)}" fill="${w.color}" opacity="${r ? 1 : 0.45}" stroke="${st.id === selStage ? '#fff' : 'rgba(0,0,0,0.4)'}" stroke-width="${st.id === selStage ? 3 : 2}"/>
-          ${p && p.n < p.total ? `<path d="${blobPath(w.x, w.y, w.r, st.id * 13)}" fill="#5a1a7a" opacity="${0.5 * (1 - p.n / p.total)}" pointer-events="none"/>` : ''}
-          ${!p ? `<path d="${blobPath(w.x, w.y, w.r, st.id * 13)}" fill="#3a0a4a" opacity="0.5" pointer-events="none"/>` : ''}
-          ${worldIcon(w.icon, w.x, w.y - 8)}
-          <text x="${w.x}" y="${w.y + 26}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke">${st.id}. ${st.name}</text>
-          <text x="${w.x}" y="${w.y + 41}" text-anchor="middle" font-size="10" fill="#ffe9a8" stroke="#000" stroke-width="2.5" paint-order="stroke">${!st.ready ? '準備中' : p ? `解放 ${p.pct}%` : ''}</text>
-        </g>`;
+        const sel = st.id === selStage;
+        const open = st.ready && stageReachable(st.id);
+        return w.spots.map(([x, y, rx, ry]) => `<g class="region" data-act="pickStage" data-id="${st.id}">
+          <ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${open ? 'rgba(255,240,180,0.001)' : 'rgba(20,8,30,0.38)'}" class="${sel ? 'sel' : ''}" stroke="${sel ? '#fff3b0' : 'transparent'}" stroke-width="${sel ? 4 : 0}" stroke-dasharray="${sel ? '14 8' : ''}"/>
+        </g>`).join('');
+      }).join('');
+      const plates = STAGES.map((st) => {
+        const w = WORLD[st.id];
+        const sel = st.id === selStage;
+        return worldPlate(st, w.label, sel) + (w.label2 ? worldPlate(st, w.label2, sel) : '');
       }).join('');
       return `
-      <div class="overlay"><div class="panel full">
+      <div class="overlay"><div class="panel full world-panel">
         <div class="panel-head">
           <button class="btn small back-btn" data-act="toTitle">‹ タイトル</button>
           <h2>ヴェルデ地方</h2>
           <span class="stat">${heroDef.name} ・ <span style="color:${D.color}">${D.name}</span> ・ <span class="gold">${fmt(hero.gold)} G</span> ・ EXP ${fmt(hero.exp)}</span>
         </div>
         <div class="world">
-          <svg viewBox="0 0 640 360" role="img" aria-label="全体図">
-            <defs><radialGradient id="sea" cx="0.5" cy="0.5" r="0.8"><stop offset="0" stop-color="#2a2a4a"/><stop offset="1" stop-color="#120c1e"/></radialGradient></defs>
-            <rect width="640" height="360" fill="url(#sea)"/>
-            ${lines}
-            ${regions}
+          <img src="assets/worldmap.jpg" width="${WORLD_W}" height="${WORLD_H}" alt="">
+          <svg viewBox="0 0 ${WORLD_W} ${WORLD_H}" role="img" aria-label="全体図">
+            <defs>
+              <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a3018"/><stop offset="1" stop-color="#24160a"/></linearGradient>
+            </defs>
+            ${spots}
+            <!-- 左上の題字と、右下の目標 (絵の文字の上にかぶせる) -->
+            <g pointer-events="none">
+              <rect x="24" y="20" width="324" height="92" rx="10" fill="url(#plate)" stroke="#c8a45a" stroke-width="1.6"/>
+              <text x="186" y="62" text-anchor="middle" font-size="30" font-weight="900" fill="#fff3d0" stroke="#1a0e06" stroke-width="3" paint-order="stroke">ヴェルデ地方</text>
+              <text x="186" y="94" text-anchor="middle" font-size="16" font-weight="700" fill="#d8c090">魔境奪還ガンナーズ</text>
+              <rect x="800" y="468" width="196" height="80" rx="9" fill="url(#plate)" stroke="#c8a45a" stroke-width="1.6"/>
+              <text x="898" y="494" text-anchor="middle" font-size="15" font-weight="800" fill="#ffd84a">目標</text>
+              <text x="898" y="516" text-anchor="middle" font-size="13" font-weight="700" fill="#f0e6d0">魔王ベリアルを倒し</text>
+              <text x="898" y="535" text-anchor="middle" font-size="13" font-weight="700" fill="#f0e6d0">ヴェルデ地方を取り戻す</text>
+            </g>
+            ${plates}
           </svg>
         </div>
         <div class="region-info">
-          <div class="grow"><b>${s.id}. ${s.name}</b> <span class="muted">${s.desc} ・ 推奨 Lv${s.lv[0] + D.lv}〜${Math.min(99, s.lv[1] + D.lv)}</span>
-            ${sp ? `<br><span class="muted">解放 ${sp.n}/${sp.total} エリア</span>` : ''}</div>
+          <div class="grow"><b>${s.id}. ${s.name}</b> <span class="muted"><span class="desc">${s.desc} ・ </span>推奨 Lv${s.lv[0] + D.lv}〜${Math.min(99, s.lv[1] + D.lv)}</span>
+            ${sp ? `<span class="muted"> ・ 解放 ${sp.n}/${sp.total} エリア</span>` : ''}</div>
           <button class="btn small" data-act="openBoard">能力ボード</button>
           <button class="btn small" data-act="openEquip">装備</button>
           <button class="btn primary" data-act="goStage" ${s.ready && reach ? '' : 'disabled'}>${!s.ready ? '準備中' : reach ? 'このステージへ' : '守護者を倒すと開く'}</button>
