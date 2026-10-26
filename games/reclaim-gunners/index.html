@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>魔境奪還ガンナーズ</title>
+  <meta name="description" content="悪魔に侵略された地方を、エリアごとに取り戻していく見下ろし型ガンシューティングRPG。魔巣を潰してエリアを解放し、武器を集めて強くなろう。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../">‹ ゲーム一覧</a>
+      <h1>魔境奪還ガンナーズ</h1>
+      <div class="top-btns">
+        <button type="button" id="pause-btn" class="icon-btn" aria-label="メニュー" tabindex="-1" hidden>Ⅱ</button>
+      </div>
+    </header>
+
+    <div class="board-wrap" id="board-wrap">
+      <div class="board" id="board-box">
+        <canvas id="board" aria-label="ゲーム画面"></canvas>
+
+        <!-- スマホの操作ボタン (プレイ中だけ出す) -->
+        <div class="touch" id="touch" hidden>
+          <button type="button" class="tbtn t-interact" id="t-interact" hidden>調べる</button>
+          <button type="button" class="tbtn t-potion" id="t-potion">回復<small id="t-potion-n">3</small></button>
+          <button type="button" class="tbtn t-reload" id="t-reload">R</button>
+          <button type="button" class="tbtn t-dodge" id="t-dodge">回避</button>
+        </div>
+
+        <div class="toast" id="toast" hidden></div>
+        <div class="saving" id="saving" hidden><img src="../../assets/favicon.svg" alt="" width="20" height="20" />セーブしました</div>
+        <div id="ui"></div>
+      </div>
+    </div>
+
+    <p class="howto">
+      パソコン: WASD で移動、マウスでねらって左クリックで撃つ。R リロード / Space 回避 / 1〜6・ホイール 持ち替え / E 調べる / F 回復薬 / M マップ / Esc メニュー。
+      スマホ: 横持ちで、画面の左半分で移動、右半分でねらって撃つ。
+    </p>
+  </main>
+
+  <script src="../origami-intro.js"></script>
+  <script>OrigamiIntro.play();</script>
+  <script src="data/heroes.js?v=1"></script>
+  <script src="data/weapons.js?v=1"></script>
+  <script src="data/enemies.js?v=1"></script>
+  <script src="data/stages.js?v=1"></script>
+  <script src="script.js?v=1"></script>
+</body>
+</html>
