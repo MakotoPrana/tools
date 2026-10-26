@@ -31,9 +31,12 @@
   const DIFF_IDS = ['normal', 'hard', 'extreme'];
 
   // タイル
-  const T = { FLOOR: 0, WALL: 1, FENCE: 2, WATER: 3, SEAL: 4, TREE: 5, ROCK: 6, BONE: 7, FEATURE: 8 };
-  const MOVE_BLOCK = [0, 1, 1, 1, 1, 1, 1, 1, 1]; // 歩く者が通れない
-  const SHOT_BLOCK = [0, 1, 0, 0, 1, 1, 0, 0, 1]; // 弾が通れない (柵・水・岩・骨は弾が越える)
+  // SWAMP: 沼 (通れるが、足が遅くなる)。REED: 葦 (通れないが、弾は越える)
+  const T = { FLOOR: 0, WALL: 1, FENCE: 2, WATER: 3, SEAL: 4, TREE: 5, ROCK: 6, BONE: 7, FEATURE: 8, SWAMP: 9, REED: 10 };
+  const MOVE_BLOCK = [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1]; // 歩く者が通れない
+  const SHOT_BLOCK = [0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0]; // 弾が通れない (柵・水・岩・骨・葦は弾が越える)
+  const GHOST_BLOCK = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]; // 壁をすり抜ける敵 (門の結界だけは通れない)
+  const isFloor = (t) => t === T.FLOOR || t === T.SWAMP;
   const FLY_BLOCK = SHOT_BLOCK; // 飛ぶ敵は弾と同じ所を通れる
 
   // 敵のレベル補正 (SPEC.md の「敵のレベル」)
@@ -359,14 +362,27 @@
     orchard: { floor: ['#5e8e46', '#66964d'], dot: '#c8524a', fog: [70, 20, 90] },
     river: { floor: ['#7a9a5a', '#82a262'], dot: '#5f7f46', fog: [60, 20, 90] },
     fort: { floor: ['#8a7f6c', '#928774'], dot: '#6f6656', fog: [80, 20, 80] },
+    // ステージ2 ミスト湖沼
+    cove: { floor: ['#8a9a6a', '#92a272'], dot: '#6f7f50', fog: [50, 30, 90] },
+    lakeTown: { floor: ['#9a8a70', '#a2927a'], dot: '#7a6a50', fog: [50, 30, 90] },
+    reed: { floor: ['#8c9a50', '#94a258'], dot: '#6f7d36', fog: [50, 30, 90] },
+    firefly: { floor: ['#2f4a3a', '#345040'], dot: '#c8ff6a', fog: [40, 30, 90] },
+    cathedral: { floor: ['#7a7a84', '#82828c'], dot: '#62626c', fog: [60, 30, 100] },
+    fishing: { floor: ['#b8a67a', '#c0ae82'], dot: '#9a8a5a', fog: [50, 30, 90] },
+    mist: { floor: ['#6a7a76', '#72827e'], dot: '#56645f', fog: [60, 40, 100] },
+    toad: { floor: ['#4a4a32', '#525238'], dot: '#3a3a22', fog: [60, 30, 60] },
   };
 
   // エリアの境目の壁の見た目 (テーマごと)
-  const WALL_STYLE = { village: 'stone', wheat: 'hedge', hill: 'hedge', orchard: 'hedge', river: 'hedge', forest: 'trees', bone: 'rocks', fort: 'rocks' };
+  const WALL_STYLE = {
+    village: 'stone', wheat: 'hedge', hill: 'hedge', orchard: 'hedge', river: 'hedge', forest: 'trees', bone: 'rocks', fort: 'rocks',
+    cove: 'reeds', lakeTown: 'stone', reed: 'reeds', firefly: 'trees', cathedral: 'stone', fishing: 'rocks', mist: 'trees', toad: 'rocks',
+  };
   const WALL_COLORS = {
     hedge: ['#24421f', '#2f5a29', '#3f7436'],
     trees: ['#142a13', '#1f3d1c', '#2c5428'],
     rocks: ['#2e2a28', '#4a4440', '#6a625a'],
+    reeds: ['#3a4a22', '#5a6a2a', '#8a9a3a'],
   };
 
   const mapCache = {};
@@ -414,6 +430,7 @@
     };
     // エリアの形: layout の文字 1 つが scale × scale タイル。境目はノイズでうねらせる
     const L = def.layout;
+    const lake = new Uint8Array(w * h);
     const aIndex = Object.fromEntries(def.areas.map((a, i) => [a.id, i]));
     const nx = valueNoise(def.seed);
     const ny = valueNoise(def.seed + 101);
@@ -425,7 +442,26 @@
         const r = clamp(Math.floor(sy / L.scale), 0, L.rows.length - 1);
         const row = L.rows[r];
         const ch = row[clamp(Math.floor(sx / L.scale), 0, row.length - 1)];
-        areaOf[idx(x, y)] = aIndex[L.key[ch]];
+        if (ch === '~') lake[idx(x, y)] = 1;
+        else areaOf[idx(x, y)] = aIndex[L.key[ch]];
+      }
+    }
+    // 湖 (~): 通れない水。どのエリアに入るかは、いちばん近いエリアにする
+    {
+      const qq = [];
+      for (let i = 0; i < w * h; i++) {
+        if (lake[i]) tiles[i] = T.WATER;
+        else qq.push(i);
+      }
+      for (let head = 0; head < qq.length; head++) {
+        const i = qq[head];
+        const x = i % w;
+        for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) {
+          if (n >= 0 && n < w * h && areaOf[n] < 0) {
+            areaOf[n] = areaOf[i];
+            qq.push(n);
+          }
+        }
       }
     }
     // 外周と、エリアの境目の壁 (右か下のとなりが別のエリアなら壁にする)
@@ -434,7 +470,8 @@
       for (let x = 0; x < w; x++) {
         const i = idx(x, y);
         const edge = x === 0 || y === 0 || x === w - 1 || y === h - 1;
-        const diff = (x < w - 1 && areaOf[i + 1] !== areaOf[i]) || (y < h - 1 && areaOf[i + w] !== areaOf[i]);
+        // 湖のふちには壁を立てない (水が境目になる)
+        const diff = !lake[i] && ((x < w - 1 && !lake[i + 1] && areaOf[i + 1] !== areaOf[i]) || (y < h - 1 && !lake[i + w] && areaOf[i + w] !== areaOf[i]));
         if (edge || diff) {
           tiles[i] = T.WALL;
           if (!edge) border[i] = 1;
@@ -538,6 +575,7 @@
       a.mimics = (a.mimics || []).map((m) => snap(m[0], m[1], ai, 2, 3));
     });
     for (const l of def.lairs) [l.x, l.y] = snap(l.x, l.y, aIndex[l.area], Math.max(3, l.r - 1.5));
+    for (const en of def.entries || []) [en.x, en.y] = snap(en.x, en.y, aIndex[en.area], 2, 3);
 
     // 物を置かない所
     for (const a of def.areas) {
@@ -546,6 +584,7 @@
       for (const m of a.mimics) mark(m[0], m[1], 1.5);
     }
     for (const l of def.lairs) mark(l.x, l.y, l.r + 0.5);
+    for (const en of def.entries || []) mark(en.x, en.y, 2.5);
     for (const g of def.gates) mark(g.rect[0] + g.rect[2] / 2, g.rect[1] + g.rect[3] / 2, 4);
     for (const f of def.features) {
       if (f.door) mark(f.door[0], f.door[1], 2);
@@ -594,11 +633,27 @@
       for (let j = y0 - 1; j <= y1 + 1; j++) for (let i = x0 - 1; i <= x1 + 1; i++) if (!free(i, j)) return false;
       return true;
     };
-    const tileOf = { tree: T.TREE, rock: T.ROCK, bone: T.BONE, fence: T.FENCE };
+    const tileOf = { tree: T.TREE, rock: T.ROCK, bone: T.BONE, fence: T.FENCE, reed: T.REED };
     for (const s of def.scatter) {
       const ai = aIndex[s.area];
       const list = areaTiles[ai];
       let placed = 0;
+      // 沼: 通れるので、まるい水たまりを広げる (道はふさがらない)
+      if (s.tile === 'swamp') {
+        for (let n = 0; n < s.n; n++) {
+          const k = list[Math.floor(rng() * list.length)];
+          const cx = k % w;
+          const cy = (k / w) | 0;
+          const r = 2 + rng() * 2.5;
+          for (let j = Math.floor(cy - r); j <= cy + r; j++) {
+            for (let i = Math.floor(cx - r); i <= cx + r; i++) {
+              const d = Math.hypot(i - cx, (j - cy) * 1.3);
+              if (inside(i, j) && d <= r && areaOf[idx(i, j)] === ai && tiles[idx(i, j)] === T.FLOOR) tiles[idx(i, j)] = T.SWAMP;
+            }
+          }
+        }
+        continue;
+      }
       for (let tries = 0; tries < s.n * 60 && placed < s.n; tries++) {
         const k = list[Math.floor(rng() * list.length)];
         const x = k % w;
@@ -612,7 +667,7 @@
         placed++;
       }
     }
-    const map = { def, w, h, tiles, areaOf, idx, areaTiles, centers, ruin, maskCache: {} };
+    const map = { def, w, h, tiles, areaOf, idx, areaTiles, centers, ruin, lake, maskCache: {} };
     map.bg = renderBg(map);
     map.mini = renderMini(map);
     // 霧のかたまり (解放前のエリアに漂う)
@@ -659,6 +714,7 @@
     c.height = h * TILE;
     const g = c.getContext('2d');
     const rng = mulberry32(def.seed * 7 + 3);
+    const inb = (x, y) => x >= 0 && y >= 0 && x < w && y < h;
     // 床
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
@@ -669,6 +725,10 @@
         if (rng() < 0.5) {
           g.fillStyle = th.dot;
           g.fillRect(x * TILE + rng() * 16, y * TILE + rng() * 16, 2 + rng() * 2, 2);
+        }
+        if (th === THEMES.firefly && rng() < 0.05) {
+          g.fillStyle = 'rgba(200,255,120,0.6)';
+          g.fillRect(x * TILE + rng() * 18, y * TILE + rng() * 18, 1.5, 1.5);
         }
         if (th === THEMES.wheat && y % 2 === 0) {
           g.fillStyle = 'rgba(150,110,30,0.25)';
@@ -754,6 +814,45 @@
             g.arc(px + bx, py + by, 3, 0, TAU);
             g.fill();
           }
+        } else if (t === T.WATER && map.lake[idx(x, y)]) {
+          // 湖
+          g.fillStyle = '#2a5a8a';
+          g.fillRect(px, py, TILE, TILE);
+          const shore = (dx, dy) => inb(x + dx, y + dy) && !map.lake[idx(x + dx, y + dy)];
+          g.fillStyle = '#4a8ac0';
+          if (shore(0, -1)) g.fillRect(px, py, TILE, 3);
+          if (shore(0, 1)) g.fillRect(px, py + TILE - 3, TILE, 3);
+          if (shore(-1, 0)) g.fillRect(px, py, 3, TILE);
+          if (shore(1, 0)) g.fillRect(px + TILE - 3, py, 3, TILE);
+          if (rng() < 0.15) {
+            g.fillStyle = 'rgba(255,255,255,0.18)';
+            g.fillRect(px + rng() * 12, py + rng() * 16, 6, 1.5);
+          }
+        } else if (t === T.SWAMP) {
+          g.fillStyle = '#3a4a2e';
+          g.fillRect(px, py, TILE, TILE);
+          g.fillStyle = 'rgba(90,110,60,0.6)';
+          g.fillRect(px + rng() * 10, py + rng() * 14, 8, 3);
+          if (rng() < 0.3) {
+            g.strokeStyle = 'rgba(160,190,120,0.5)';
+            g.lineWidth = 1;
+            g.beginPath();
+            g.arc(px + 4 + rng() * 12, py + 4 + rng() * 12, 1.5 + rng() * 1.5, 0, TAU);
+            g.stroke();
+          }
+        } else if (t === T.REED) {
+          g.strokeStyle = '#5a6a24';
+          g.lineWidth = 1.6;
+          g.lineCap = 'round';
+          for (let k = 0; k < 6; k++) {
+            const bx = px + 3 + rng() * 14;
+            g.beginPath();
+            g.moveTo(bx, py + 18);
+            g.quadraticCurveTo(bx + rng() * 6 - 3, py + 8, bx + rng() * 8 - 4, py + 1 + rng() * 4);
+            g.stroke();
+          }
+          g.fillStyle = '#7a5a2a';
+          g.fillRect(px + 8, py + 3, 3, 6);
         } else if (t === T.FENCE) {
           g.fillStyle = '#7a4f26';
           g.fillRect(px, py + 7, TILE, 3);
@@ -837,6 +936,8 @@
         if (t === T.WALL || t === T.FEATURE) col = '#2a2433';
         else if (t === T.TREE) col = '#1f3a1d';
         else if (t === T.WATER) col = '#2f6a9e';
+        else if (t === T.SWAMP) col = '#3a4a2e';
+        else if (t === T.REED) col = '#5a6a24';
         else if (t !== T.FLOOR) col = '#666';
         g.fillStyle = col;
         g.fillRect(x, y, 1, 1);
@@ -865,7 +966,8 @@
     return STAGES.find((s) => s.id === id);
   }
 
-  function startStage(stageId, pointId) {
+  // opt.hp: 門を通ってきたときは、体力をそのまま持ち越す
+  function startStage(stageId, pointId, opt = {}) {
     const def = stageDef(stageId);
     const map = getMap(def);
     const tiles = map.tiles.slice();
@@ -883,6 +985,7 @@
       parts: [],
       texts: [],
       teles: [],
+      hazards: [],
       bosses: [],
       stones: [],
       beam: null,
@@ -923,6 +1026,11 @@
       for (const m of a.mimics || []) spawnEnemy('mimic', tc(m[0]), tc(m[1]), area, null, { dormant: true });
       G.stones.push({ id: a.id, kind: 'area', area, x: tc(a.stone[0]), y: tc(a.stone[1]), name: a.name });
     });
+    // 隣のステージから来たときの場所 (門の守護者を倒していれば転移碑)
+    for (const en of def.entries || []) {
+      if (prog.bosses.includes(en.boss) && !prog.travel.includes(en.id)) prog.travel.push(en.id);
+      G.stones.push({ id: en.id, kind: 'gate', x: tc(en.x), y: tc(en.y), name: en.name });
+    }
     // ボス
     for (const l of def.lairs) {
       const bd = BOSSES[l.boss];
@@ -937,7 +1045,10 @@
       ws: {}, firing: false, wasFiring: false, kaiInstant: false, twinSide: 1, twinBoost: 0, moving: false, walk: 0, hurtT: 0,
     };
     for (const id of Object.keys(hero.weapons)) ensureWs(id);
-    hero.potions = maxPotions();
+    if (opt.hp != null) {
+      P.hp = clamp(opt.hp, 1, hp);
+      P.shownHp = P.hp;
+    } else hero.potions = maxPotions();
     const pt = pointPos(pointId);
     P.x = pt.x;
     P.y = pt.y;
@@ -956,7 +1067,7 @@
 
   // 転移碑の位置 (pointId がなければ、ステージの始まりの場所)
   function pointPos(pointId) {
-    const st = G.stones.find((s) => s.id === pointId) || G.stones.find((s) => s.kind === 'area' && s.area.def.start) || G.stones[0];
+    const st = G.stones.find((s) => s.id === pointId) || G.stones.find((s) => s.kind === 'area' && s.area.def.start) || G.stones.find((s) => s.kind === 'gate' && stoneActive(s)) || G.stones[0];
     return { x: st.x, y: st.y + 24 };
   }
 
@@ -1347,7 +1458,7 @@
     };
     for (const e of G.enemies) add(e);
     for (const n of G.nests) add(n);
-    for (const b of G.bosses) if (b.state === 'fight') for (const p of b.parts) if (!(p.h > 6)) add(p);
+    for (const b of G.bosses) if (b.state === 'fight') for (const p of b.parts) if (!(p.h > 6) && !p.hidden) add(p);
     list.sort((a, b) => a.d - b.d);
     P.targets = list;
   }
@@ -1370,7 +1481,16 @@
     P.heavyT = Math.max(0, (P.heavyT || 0) - dt);
     let sp = moveSpeed();
     if (P.heavyT > 0) sp *= 0.75; // 重火器を撃っている間は遅くなる
-    if (P.rollT > 0) {
+    P.slowT = Math.max(0, (P.slowT || 0) - dt);
+    if (P.slowT > 0) sp *= 0.6; // 泥・氷の弾に当たると遅くなる
+    if (tileAt(P.x, P.y) === T.SWAMP && P.rollT <= 0 && P.tackleT <= 0) sp *= 0.7; // 沼
+    if (P.pull) {
+      // 大蝦蟇の舌で引き寄せられている
+      P.pull.t -= dt;
+      const a = Math.atan2(P.pull.y - P.y, P.pull.x - P.x);
+      moveCircle(P, Math.cos(a) * 380 * dt, Math.sin(a) * 380 * dt, P.r, MOVE_BLOCK, lockArea());
+      if (P.pull.t <= 0 || dist(P.x, P.y, P.pull.x, P.pull.y) < 40) P.pull = null;
+    } else if (P.rollT > 0) {
       P.rollT -= dt;
       moveCircle(P, Math.cos(P.dodgeDir) * 290 * dt, Math.sin(P.dodgeDir) * 290 * dt, P.r, MOVE_BLOCK, lockArea());
     } else if (P.tackleT > 0) {
@@ -1609,14 +1729,14 @@
     for (const n of G.nests) if (!n.dead && dist2(x, y, n.x, n.y) < (rad + n.r) ** 2) fn(n);
     for (const b of G.bosses) {
       if (b.state !== 'fight') continue;
-      for (const p of b.parts) if (!p.dead && dist2(x, y, p.x, p.y) < (rad + p.r) ** 2) fn(p);
+      for (const p of b.parts) if (!p.dead && !p.hidden && dist2(x, y, p.x, p.y) < (rad + p.r) ** 2) fn(p);
     }
   }
 
   function forAllTargets(fn) {
     for (const e of G.enemies) if (!e.dead) fn(e);
     for (const n of G.nests) if (!n.dead) fn(n);
-    for (const b of G.bosses) if (b.state === 'fight') for (const p of b.parts) if (!p.dead) fn(p);
+    for (const b of G.bosses) if (b.state === 'fight') for (const p of b.parts) if (!p.dead && !p.hidden) fn(p);
   }
 
   function damageTarget(t, base, o) {
@@ -1810,6 +1930,7 @@
       b.life -= dt;
       if (b.life <= 0 || SHOT_BLOCK[tileAt(b.x, b.y)]) continue;
       if (!G.dead && dist2(b.x, b.y, P.x, P.y) < (b.r + P.r - 1) ** 2) {
+        if (b.slow && P.inv <= 0) P.slowT = 2;
         hurtPlayer(b.dmg, b.lv);
         if (P.inv < 0.59) eout.push(b); // 無敵中は弾がすり抜ける
         continue;
@@ -1819,8 +1940,32 @@
     G.ebullets = eout;
   }
 
-  function enemyShot(x, y, a, speed, dmg, lv, color = '#ff5a8a', r = 4, life = 3) {
-    G.ebullets.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg, lv, color, r, life });
+  function enemyShot(x, y, a, speed, dmg, lv, color = '#ff5a8a', r = 4, life = 3, slow = false) {
+    G.ebullets.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg, lv, color, r, life, slow });
+  }
+
+  // 毒の沼: 上にいる間、0.5 秒ごとに体力が減る (被弾のあとの無敵は効かない。力尽きたあとの無敵の間は減らない)
+  function addPoison(x, y, r, dps, lv, life = 4) {
+    if (G.hazards.length > 40) G.hazards.shift();
+    G.hazards.push({ x, y, r, dps, lv, t: life, max: life });
+  }
+  function updateHazards(dt) {
+    G.poisonTick = (G.poisonTick || 0) - dt;
+    const tick = G.poisonTick <= 0;
+    if (tick) G.poisonTick = 0.5;
+    for (const z of G.hazards) {
+      z.t -= dt;
+      if (tick && !G.dead && P.rollT <= 0 && P.inv <= 0.7 && dist2(z.x, z.y, P.x, P.y) < (z.r + P.r * 0.5) ** 2) {
+        const d = Math.max(1, Math.round(z.dps * 0.5 * recvMul(z.lv - powerLv()) * (1 - Math.min(0.45, 0.015 * rank('def')))));
+        P.hp -= d;
+        addText(P.x + rnd(-4, 4), P.y - 12, `-${d}`, '#b8ff5a', 8);
+        if (P.hp <= 0) {
+          P.hp = 0;
+          G.dead = 2.2;
+        }
+      }
+    }
+    G.hazards = G.hazards.filter((z) => z.t > 0);
   }
 
   function ring(x, y, n, speed, dmg, lv, off = 0, color) {
@@ -1854,10 +1999,15 @@
   function spawnFromNest(n) {
     const a = n.area.def;
     let pool = a.enemies;
-    if (n.type === 'small') pool = pool.slice(0, 2);
+    if (n.type === 'small' || n.nd.weak) pool = pool.slice(0, 2);
+    // 魔巣の種類ごとの湧きやすい敵 (そのエリアに出る敵の中から。いなければエリアの敵から)
+    if (n.nd.pool) {
+      const own = n.nd.pool.filter((id) => a.enemies.includes(id));
+      if (own.length && Math.random() < 0.7) pool = own;
+    }
     let id = pick(pool);
     if (n.type === 'big' && Math.random() < 0.6) id = pick(pool.slice(-2));
-    const elite = Math.random() < D.elite * (n.type === 'big' ? 2 : 1);
+    const elite = !n.nd.weak && Math.random() < D.elite * (n.nd.elite || 1);
     const ang = rnd(0, TAU);
     const x = n.x + Math.cos(ang) * (n.r + 10);
     const y = n.y + Math.sin(ang) * (n.r + 10);
@@ -1905,6 +2055,13 @@
         e.los = lineClear(e.x, e.y, P.x, P.y);
       }
       updateEnemyAI(e, dt, dp);
+      if (e.def.poisonTrail && e.state === 'chase') {
+        e.trailT = (e.trailT || 0) - dt;
+        if (e.trailT <= 0) {
+          e.trailT = 1.1;
+          addPoison(e.x, e.y + 3, 13, e.atk * 1.5, e.lv, 3.5);
+        }
+      }
       if (!G.dead && !e.dormant && dp < e.r + P.r) hurtPlayer(e.atk, e.lv);
     }
     G.enemies = G.enemies.filter((e) => !e.dead);
@@ -1936,14 +2093,16 @@
   }
 
   function moveEnemy(e, ang, speed, dt) {
-    const s = speed * (e.slowT > 0 ? 0.6 : 1) * dt;
-    const hit = moveCircle(e, Math.cos(ang) * s, Math.sin(ang) * s, Math.min(e.r, 8), e.def.fly ? FLY_BLOCK : MOVE_BLOCK);
+    let s = speed * (e.slowT > 0 ? 0.6 : 1) * dt;
+    if (!e.def.fly && tileAt(e.x, e.y) === T.SWAMP) s *= 0.7;
+    const hit = moveCircle(e, Math.cos(ang) * s, Math.sin(ang) * s, Math.min(e.r, 8), e.def.ghost ? GHOST_BLOCK : e.def.fly ? FLY_BLOCK : MOVE_BLOCK);
     if (Math.abs(Math.cos(ang)) > 0.1) e.faceX = Math.cos(ang) > 0 ? 1 : -1;
     e.ph += dt * speed * 0.15;
     return hit;
   }
 
   function chaseAngle(e, dp) {
+    if (e.def.ghost) return Math.atan2(P.y - e.y, P.x - e.x); // 壁をすり抜けて、まっすぐ来る
     if (e.los && (dp < 80 || e.def.fly)) return Math.atan2(P.y - e.y, P.x - e.x);
     const fa = flowAngle(e);
     if (fa != null) return fa;
@@ -2029,8 +2188,35 @@
         if (e.cd <= 0 && e.los && dp < 330) {
           e.cd = def.shot.cd * rnd(0.85, 1.15);
           const n = def.shot.n;
+          const col = def.slowShot ? '#8fd8ff' : def.id === 'skel' ? '#f0e6c8' : '#ff5a8a';
           if (n >= 8) ring(e.x, e.y, n, def.shot.speed, e.atk, e.lv, e.t);
-          else for (let i = 0; i < n; i++) enemyShot(e.x, e.y, toP + (n > 1 ? (i / (n - 1) - 0.5) * 0.5 : 0), def.shot.speed, e.atk, e.lv, def.id === 'skel' ? '#f0e6c8' : '#ff5a8a', 3.5);
+          else for (let i = 0; i < n; i++) enemyShot(e.x, e.y, toP + (n > 1 ? (i / (n - 1) - 0.5) * 0.5 : 0), def.shot.speed, e.atk, e.lv, col, 3.5, 3, !!def.slowShot);
+        }
+        // 呪術師: まわりの敵を回復し、ときどきインプを呼ぶ
+        if (def.healer) {
+          e.healT = (e.healT == null ? rnd(1, 3) : e.healT) - dt;
+          if (e.healT <= 0) {
+            e.healT = 3;
+            for (const o of G.enemies) {
+              if (o === e || o.dead || o.hp >= o.maxHp || dist2(o.x, o.y, e.x, e.y) > 130 * 130) continue;
+              o.hp = Math.min(o.maxHp, o.hp + o.maxHp * 0.15);
+              for (let k = 0; k < 4; k++) addPart({ x: o.x + rnd(-6, 6), y: o.y, vx: 0, vy: -40, life: 0.5, color: '#7dff9a', size: 2 });
+            }
+          }
+        }
+        if (def.summon) {
+          e.sumT = (e.sumT == null ? rnd(3, 6) : e.sumT) - dt;
+          if (e.sumT <= 0) {
+            e.sumT = 6;
+            e.summons = (e.summons || []).filter((o) => !o.dead);
+            if (e.summons.length < 3) {
+              const o = spawnEnemy(def.summon, e.x + rnd(-14, 14), e.y + rnd(-14, 14), e.area, null, { lv: e.lv - 2, chase: true });
+              if (o) {
+                e.summons.push(o);
+                for (let k = 0; k < 6; k++) addPart({ x: o.x, y: o.y, vx: rnd(-40, 40), vy: rnd(-40, 40), life: 0.4, color: '#c05aff', size: 2.5 });
+              }
+            }
+          }
         }
         break;
       }
@@ -2086,13 +2272,24 @@
     if (e.dead) return;
     e.dead = true;
     if (e.home) e.home.children--;
-    const mul = D.reward * (e.elite ? 3 : 1);
+    const mul = D.reward * (e.elite ? 3 : 1) * (e.mini ? 0.3 : 1);
     const exp = Math.round(e.def.exp * lvMul.exp(e.lv) * mul);
     gainExp(exp);
     hero.kills++;
     for (let i = 0; i < 8; i++) addPart({ x: e.x, y: e.y, vx: rnd(-80, 80), vy: rnd(-80, 80), life: rnd(0.2, 0.45), color: crumbled ? '#4a2a5a' : e.def.color, size: rnd(2, 3.5) });
     if (crumbled) return;
     sfx('kill');
+    if (e.def.split && !e.mini) {
+      for (const s of [-1, 1]) {
+        const o = spawnEnemy(e.def.id, e.x + s * 6, e.y, e.area, null, { lv: e.lv, chase: true });
+        if (o) {
+          o.mini = true;
+          o.r *= 0.65;
+          o.hp = o.maxHp = o.maxHp * 0.4;
+          o.kx = s * 120;
+        }
+      }
+    }
     const gold = Math.max(1, Math.round(e.def.gold * lvMul.gold(e.lv) * mul * (1 + 0.03 * rank('gold'))));
     dropGold(e.x, e.y, gold);
     const matRate = 0.15 * (1 + 0.03 * rank('mat')) * (heroDef.id === 'mira' ? 1.2 : 1) * D.mat;
@@ -2128,6 +2325,7 @@
       const dp = dist(n.x, n.y, P.x, P.y);
       if (dp > 700 || G.dead) continue;
       n.spawnT -= dt;
+      if (n.nd.attack && dp < 340) nestAttack(n, dt, dp);
       const cap = Math.round(n.nd.cap * D.cap);
       if (n.spawnT <= 0 && n.children < cap) {
         spawnFromNest(n);
@@ -2141,6 +2339,39 @@
         moveCircle(P, Math.cos(a) * 2, Math.sin(a) * 2, P.r, MOVE_BLOCK, lockArea());
       }
     }
+  }
+
+  // 魔巣の種類ごとの攻撃 (主人公が近くにいるときだけ)
+  function nestAttack(n, dt, dp) {
+    const at = n.nd.attack;
+    n.atkT = (n.atkT == null ? rnd(1, at.cd) : n.atkT) - dt;
+    if (n.atkT > 0) return;
+    const dmg = 6 * lvMul.atk(n.lv);
+    const toP = Math.atan2(P.y - n.y, P.x - n.x);
+    if (at.type === 'ring') {
+      n.atkT = at.cd;
+      ring(n.x, n.y, at.n, at.speed, dmg, n.lv, Math.random(), '#f0e6c8');
+    } else if (at.type === 'aim') {
+      if (!lineClear(n.x, n.y, P.x, P.y)) {
+        n.atkT = 0.5;
+        return;
+      }
+      n.atkT = at.cd;
+      for (let i = 0; i < at.n; i++) setTimeLater(i * 0.18, () => !n.dead && enemyShot(n.x, n.y, Math.atan2(P.y - n.y, P.x - n.x), at.speed, dmg, n.lv, '#ffd84a', 3.5));
+    } else if (at.type === 'poison') {
+      n.atkT = at.cd;
+      // 主人公のまわりと、魔巣と主人公の間に毒の沼をまく
+      for (let i = 0; i < at.n; i++) {
+        const t = i === 0 ? 1 : rnd(0.3, 0.9);
+        const px = lerp(n.x, P.x, t) + rnd(-30, 30);
+        const py = lerp(n.y, P.y, t) + rnd(-30, 30);
+        G.teles.push({ type: 'circle', x: px, y: py, r: 18, t: 0, dur: 0.8, onDone: () => addPoison(px, py, 18, dmg * 1.2, n.lv, 4.5) });
+      }
+    } else if (at.type === 'slow') {
+      n.atkT = at.cd;
+      for (let i = 0; i < at.n; i++) enemyShot(n.x, n.y, toP + (i / at.n) * TAU, at.speed, dmg * 0.8, n.lv, '#5ad8c8', 4, 3, true);
+    }
+    if (dp < 340) sfx('hit');
   }
 
   function hitNest(n) {
@@ -2167,7 +2398,7 @@
       addPart({ x: n.x, y: n.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(0.4, 0.9), color: pick(['#7a1f4a', '#b04bff', '#2a0f2a', '#ff5a8a']), size: rnd(2, 5) });
     }
     addPart({ x: n.x, y: n.y, vx: 0, vy: 0, life: 0.4, color: '#d07aff', size: n.r * 3, ring: true });
-    const typeMul = { small: 1, normal: 2, big: 4 }[n.type];
+    const typeMul = { small: 1, big: 4 }[n.type] || 2;
     dropGold(n.x, n.y, Math.round(20 * lvMul.gold(n.lv) * typeMul * D.reward * (1 + 0.03 * rank('gold'))));
     const mats = n.area.def.enemies;
     for (let i = 0; i < typeMul; i++) G.pickups.push({ type: 'mat', id: ENEMY[pick(mats)].mat, x: n.x, y: n.y, vx: rnd(-50, 50), vy: rnd(-50, 50), life: 9999 });
@@ -2281,9 +2512,14 @@
     if (b.id === 'G1') b.parts = [bossPart(b, b.cx, b.cy, 34, b.total * 0.4, { size: 2, mode: 'rest', h: 0 })];
     else if (b.id === 'G2') b.parts = [bossPart(b, b.cx, b.cy - 10, 24, b.total, { facing: Math.PI / 2, mode: 'walk' })];
     else if (b.id === 'N1') b.parts = [bossPart(b, b.cx, b.cy, 28, b.total, { mode: 'idle' })];
+    else if (b.id === 'G3') {
+      b.mode = null;
+      b.mt = 1;
+      b.parts = [bossPart(b, b.cx, b.cy, 18, b.total, { fade: 1 })];
+    } else if (b.id === 'N2') b.parts = [bossPart(b, b.cx, b.cy, 30, b.total, { mode: 'idle', t: 1.2 })];
   }
 
-  const bossHp = (b) => b.parts.reduce((s, p) => s + Math.max(0, p.hp), 0) + (b.id === 'G1' ? b.parts.reduce((s, p) => s + (p.dead ? 0 : p.size === 2 ? b.total * 0.6 : p.size === 1 ? b.total * 0.15 : 0), 0) : 0);
+  const bossHp = (b) => b.parts.reduce((s, p) => s + (p.clone ? 0 : Math.max(0, p.hp)), 0) + (b.id === 'G1' ? b.parts.reduce((s, p) => s + (p.dead ? 0 : p.size === 2 ? b.total * 0.6 : p.size === 1 ? b.total * 0.15 : 0), 0) : 0);
 
   function updateBosses(dt) {
     for (const b of G.bosses) {
@@ -2312,6 +2548,8 @@
       if (b.id === 'G1') updateBlob(b, dt);
       else if (b.id === 'G2') updateGolem(b, dt);
       else if (b.id === 'N1') updateDragon(b, dt);
+      else if (b.id === 'G3') updateSiren(b, dt);
+      else if (b.id === 'N2') updateToad(b, dt);
       for (const p of b.parts) {
         if (p.dead) continue;
         // ボスもエリアの外へは出ない (外に出たら、最後にいたエリアの中の場所へ戻す)
@@ -2326,7 +2564,7 @@
           p.y = p.ly;
           if (p.mode === 'jump') p.tx = p.x, p.ty = p.y;
         }
-        if (!G.dead && !(p.h > 6) && dist(p.x, p.y, P.x, P.y) < p.r + P.r - 2) hurtPlayer(b.atk, b.lv);
+        if (!G.dead && !(p.h > 6) && !p.hidden && !p.clone && dist(p.x, p.y, P.x, P.y) < p.r + P.r - 2) hurtPlayer(b.atk, b.lv);
       }
       b.parts = b.parts.filter((p) => !p.dead);
       if (!b.parts.length) bossDefeated(b);
@@ -2482,6 +2720,166 @@
     }
   }
 
+  // ボスがエリアの中で動ける場所 (決闘場のまわり) を、でたらめに選ぶ
+  function bossSpot(b, rmin, rmax) {
+    for (let k = 0; k < 30; k++) {
+      const a = rnd(0, TAU);
+      const d = rnd(rmin, rmax);
+      const x = b.cx + Math.cos(a) * d;
+      const y = b.cy + Math.sin(a) * d;
+      const tx = Math.floor(x / TILE);
+      const ty = Math.floor(y / TILE);
+      if (tx <= 0 || ty <= 0 || tx >= G.map.w - 1 || ty >= G.map.h - 1) continue;
+      const i = ty * G.map.w + tx;
+      if (G.map.areaOf[i] !== b.area || MOVE_BLOCK[G.tiles[i]]) continue;
+      if (dist(x, y, P.x, P.y) < 90) continue;
+      return { x, y };
+    }
+    return { x: b.cx, y: b.cy };
+  }
+
+  // G3 霧の女王 ローレライ: 霧で姿を消し、分身の中に本物が 1 体。歌 (全方位の弾) と氷の槍 (当たると遅くなる)
+  function updateSiren(b, dt) {
+    const real = b.parts.find((p) => !p.clone);
+    if (!real) return;
+    b.mt = (b.mt == null ? 1 : b.mt) - dt;
+    const show = b.phase2 ? 3 : 4;
+    if (b.mode === 'show') {
+      b.atkT = (b.atkT == null ? 0.6 : b.atkT) - dt;
+      if (b.atkT <= 0) {
+        b.atkT = b.phase2 ? 1.1 : 1.5;
+        b.song = (b.song || 0) + 1;
+        for (const p of b.parts) {
+          if (p.dead) continue;
+          if (b.song % 2) ring(p.x, p.y, p.clone ? 7 : 10, 95, b.atk * 0.7, b.lv, b.t + (p.clone ? 0.3 : 0), '#bfe8ff');
+          else if (!p.clone) {
+            const toP = Math.atan2(P.y - p.y, P.x - p.x);
+            for (let i = 0; i < 5; i++) enemyShot(p.x, p.y, toP + (i - 2) * 0.16, 230, b.atk * 0.9, b.lv, '#8fd8ff', 4, 2.5, true);
+          }
+        }
+      }
+      if (b.mt <= 0) {
+        b.mode = 'vanish';
+        b.mt = 0.6;
+      }
+    } else if (b.mode === 'vanish') {
+      for (const p of b.parts) p.fade = clamp(b.mt / 0.6, 0, 1);
+      if (b.mt <= 0) {
+        // 姿を消している間に、本物と分身の場所を入れかえる
+        const n = b.phase2 ? 4 : 3;
+        b.parts = b.parts.filter((p) => !p.clone);
+        const sp = bossSpot(b, 30, b.R * 1.4);
+        real.x = sp.x;
+        real.y = sp.y;
+        for (let i = 0; i < n; i++) {
+          const c = bossSpot(b, 30, b.R * 1.4);
+          b.parts.push(bossPart(b, c.x, c.y, real.r, 1, { clone: true, fade: 0, hidden: true }));
+        }
+        for (const p of b.parts) p.hidden = true;
+        b.mode = 'appear';
+        b.mt = 0.5;
+      }
+    } else if (b.mode === 'appear') {
+      for (const p of b.parts) p.fade = clamp(1 - b.mt / 0.5, 0, 1);
+      if (b.mt <= 0) {
+        for (const p of b.parts) {
+          p.hidden = false;
+          p.fade = 1;
+        }
+        b.mode = 'show';
+        b.mt = show;
+      }
+    } else {
+      b.mode = 'show';
+      b.mt = show;
+    }
+    for (const p of b.parts) p.bob = Math.sin(G.t * 2 + p.x) * 3;
+  }
+
+  // N2 大蝦蟇 ゲロイア: 長い舌で引き寄せ、水に潜ってから飛び出して押しつぶす。毒の泡を吐く
+  function updateToad(b, dt) {
+    const p = b.parts[0];
+    if (!p) return;
+    const toP = Math.atan2(P.y - p.y, P.x - p.x);
+    p.t -= dt;
+    if (p.mode === 'idle') {
+      p.face = toP;
+      p.x += Math.cos(toP) * 22 * dt;
+      p.y += Math.sin(toP) * 22 * dt;
+      if (p.t > 0) return;
+      b.step = (b.step || 0) + 1;
+      const act = b.step % 3;
+      if (act === 1) {
+        p.mode = 'tongueWind';
+        p.t = 0.7;
+        p.ta = toP;
+        G.teles.push({ type: 'line', x: p.x, y: p.y, a: toP, len: 230, w: 20, t: 0, dur: 0.7 });
+      } else if (act === 2) {
+        p.mode = 'dive';
+        p.t = b.phase2 ? 1 : 1.4;
+        p.hidden = true;
+        for (let i = 0; i < 12; i++) addPart({ x: p.x + rnd(-p.r, p.r), y: p.y, vx: rnd(-60, 60), vy: rnd(-80, -20), life: 0.5, color: '#7ab8d8', size: 3 });
+      } else {
+        p.mode = 'spit';
+        p.t = 0.6;
+        const n = b.phase2 ? 5 : 3;
+        for (let i = 0; i < n; i++) {
+          const tx = P.x + rnd(-50, 50);
+          const ty = P.y + rnd(-50, 50);
+          G.teles.push({ type: 'circle', x: tx, y: ty, r: 22, t: 0, dur: 0.9 + i * 0.12, rock: { sx: p.x, sy: p.y - 16 }, onDone: () => addPoison(tx, ty, 22, b.atk * 0.8, b.lv, 5) });
+        }
+      }
+    } else if (p.mode === 'tongueWind') {
+      if (p.t <= 0) {
+        p.mode = 'tongue';
+        p.t = 0.35;
+        p.tl = 0;
+      }
+    } else if (p.mode === 'tongue') {
+      p.tl = Math.min(230, (p.tl || 0) + 900 * dt);
+      const ex = p.x + Math.cos(p.ta) * p.tl;
+      const ey = p.y + Math.sin(p.ta) * p.tl;
+      if (!P.pull && P.inv <= 0 && segDist(P.x, P.y, p.x, p.y, ex, ey) < 12 + P.r) {
+        hurtPlayer(b.atk, b.lv);
+        P.pull = { x: p.x, y: p.y, t: 0.45 };
+      }
+      if (p.t <= 0) {
+        p.mode = 'idle';
+        p.t = b.phase2 ? 1 : 1.6;
+        p.tl = 0;
+      }
+    } else if (p.mode === 'dive') {
+      // 水の中を主人公の下へ泳いでくる (影だけ見える)
+      p.x += Math.cos(toP) * 160 * dt;
+      p.y += Math.sin(toP) * 160 * dt;
+      if (p.t <= 0) {
+        p.mode = 'emerge';
+        p.t = 0.75;
+        p.ex = P.x;
+        p.ey = P.y;
+        G.teles.push({ type: 'circle', x: P.x, y: P.y, r: 60, t: 0, dur: 0.75 });
+      }
+    } else if (p.mode === 'emerge') {
+      if (p.t <= 0) {
+        p.x = p.ex;
+        p.y = p.ey;
+        p.hidden = false;
+        if (dist(p.x, p.y, P.x, P.y) < 60 + P.r) hurtPlayer(b.atk * 1.5, b.lv);
+        ring(p.x, p.y, b.phase2 ? 18 : 14, 110, b.atk * 0.7, b.lv, Math.random(), '#7ab8d8');
+        G.shake = 8;
+        sfx('explode');
+        for (let i = 0; i < 20; i++) addPart({ x: p.x + rnd(-p.r, p.r), y: p.y + rnd(-10, 10), vx: rnd(-90, 90), vy: rnd(-90, 0), life: 0.6, color: '#9ad0f0', size: 3 });
+        p.mode = 'idle';
+        p.t = b.phase2 ? 1 : 1.8;
+      }
+    } else if (p.mode === 'spit') {
+      if (p.t <= 0) {
+        p.mode = 'idle';
+        p.t = b.phase2 ? 1 : 1.5;
+      }
+    }
+  }
+
   // 少しあとに何かをする (ゲームの時間で数える)
   const later = [];
   function setTimeLater(sec, fn) {
@@ -2501,6 +2899,12 @@
   function bossPartDown(p) {
     const b = p.boss;
     p.dead = true;
+    if (p.clone) {
+      for (let i = 0; i < 14; i++) addPart({ x: p.x, y: p.y, vx: rnd(-60, 60), vy: rnd(-60, 60), life: 0.5, color: '#dff4ff', size: 3 });
+      addText(p.x, p.y - 20, '分身', '#bfe8ff', 9);
+      return;
+    }
+    if (b.id === 'G3') for (const c of b.parts) c.dead = true;
     for (let i = 0; i < 24; i++) addPart({ x: p.x, y: p.y, vx: rnd(-120, 120), vy: rnd(-120, 120), life: rnd(0.3, 0.7), color: b.id === 'G1' ? '#7ad06a' : '#c8b8a0', size: rnd(2, 4) });
     sfx('nest');
     G.shake = 6;
@@ -2538,6 +2942,8 @@
       sub += `\n${stageDef(gt.to).name}への門が開いた`;
     }
     if (b.lair.travel && !prog.travel.includes(b.lair.travel)) prog.travel.push(b.lair.travel);
+    // 門の向こう側 (隣のステージ) の転移碑も起動する
+    for (const st of STAGES) for (const en of st.entries || []) if (en.boss === b.id && !prog.travel.includes(en.id)) prog.travel.push(en.id);
     showBanner(`${b.def.name} 撃破!`, sub, '', 4.5, '#ffd84a');
     sfx('liberate');
     for (let i = 0; i < 60; i++) addPart({ x: b.cx + rnd(-b.R, b.R), y: b.cy + rnd(-b.R, b.R), vx: 0, vy: rnd(-50, -10), life: rnd(0.8, 1.8), color: pick(['#ffd84a', '#fff3b0']), size: rnd(1.5, 3), glow: true });
@@ -2650,6 +3056,19 @@
   // ===================================================================
   // 調べる (転移碑・お店・門)
   // ===================================================================
+  // 開いた門を通って、隣のステージへ行く (体力はそのまま。セーブはしない)
+  function goThroughGate(gt) {
+    collectAllMats();
+    const hp = P.hp;
+    const to = stageDef(gt.to);
+    startStage(to.id, gt.entry, { hp });
+    hero.lastTravel = { difficulty: diffId, stage: to.id, point: gt.entry };
+    selStage = to.id;
+    G.gateMsgT = 3;
+    showBanner(`ステージ${to.id} ${to.name}`, to.desc, '', 3);
+    sfx('pick');
+  }
+
   function updateInteract() {
     G.interact = null;
     let best = 38 * 38;
@@ -2678,8 +3097,12 @@
       const cx = (x + rw / 2) * TILE;
       const cy = (y + rh / 2) * TILE;
       if (dist(P.x, P.y, cx, cy) < 46 && G.gateMsgT <= 0) {
-        G.gateMsgT = 3;
         const to = stageDef(gt.to);
+        if (to.ready && gt.entry && !G.lock) {
+          goThroughGate(gt);
+          return;
+        }
+        G.gateMsgT = 3;
         toast(`この先は ステージ${to.id} ${to.name}\n（このバージョンでは準備中です）`, 2.6);
       }
     }
@@ -2781,6 +3204,9 @@
     G.bullets = [];
     G.ebullets = [];
     G.teles = [];
+    G.hazards = [];
+    P.slowT = 0;
+    P.pull = null;
     G.pickups = G.pickups.filter((p) => p.type === 'mat');
     collectAllMats();
     later.length = 0;
@@ -2843,6 +3269,7 @@
     updateLater(dt);
     updateStrays(dt);
     updatePickups(dt);
+    updateHazards(dt);
     updateFx(dt);
     // カメラ: 主人公を中心に、ねらっている方向へ少し先を見せる
     const look = touchMode ? 30 : 60;
@@ -2925,6 +3352,7 @@
     drawShops(inView);
     drawSeals();
     drawLairs();
+    for (const z of G.hazards) if (inView(z.x, z.y, z.r)) drawHazard(z);
     for (const t of G.teles) drawTele(t);
     for (const s of G.stones) if (inView(s.x, s.y, 20)) drawStone(s);
     for (const p of G.pickups) if (inView(p.x, p.y)) drawPickup(p);
@@ -2959,6 +3387,7 @@
     }
     ctx.restore();
     ctx.imageSmoothingEnabled = false;
+    drawMist();
     drawHud();
     if (G.fade > 0) {
       ctx.fillStyle = `rgba(0,0,0,${G.fade})`;
@@ -3279,25 +3708,84 @@
   function drawNest(n) {
     const pulse = Math.sin(n.ph * 3) * 0.08 + 1;
     const r = n.r * pulse;
+    const [c0, c1, c2] = n.nd.colors;
     ctx.save();
     ctx.translate(n.x, n.y);
-    ctx.strokeStyle = '#4a1030';
+    // 根 (種類ごとに形を変える)
+    ctx.strokeStyle = c0;
     ctx.lineWidth = 2.5;
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * TAU + Math.sin(n.ph + i) * 0.2;
+    const roots = n.type === 'brood' ? 9 : 7;
+    for (let i = 0; i < roots; i++) {
+      const a = (i / roots) * TAU + Math.sin(n.ph + i) * 0.2;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(Math.cos(a + 0.4) * r * 1.4, Math.sin(a + 0.4) * r * 1.4, Math.cos(a) * r * 2, Math.sin(a) * r * 2);
       ctx.stroke();
     }
+    if (n.type === 'bone') {
+      // 骨の杭が突き出ている
+      ctx.strokeStyle = '#e8dcc0';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU + 0.3;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7);
+        ctx.lineTo(Math.cos(a) * r * 1.45, Math.sin(a) * r * 1.45 - 4);
+        ctx.stroke();
+      }
+    } else if (n.type === 'brood') {
+      // まわりに小さな卵
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * TAU + n.ph * 0.3;
+        ctx.fillStyle = c1;
+        circle(ctx, Math.cos(a) * r * 1.35, Math.sin(a) * r * 1.35, 4 + Math.sin(n.ph * 4 + i) * 0.8);
+        ctx.fillStyle = c2;
+        circle(ctx, Math.cos(a) * r * 1.35 - 1, Math.sin(a) * r * 1.35 - 1, 1.5);
+      }
+    } else if (n.type === 'spore') {
+      // 胞子が立ちのぼる
+      for (let i = 0; i < 5; i++) {
+        const k = (n.ph * 0.6 + i / 5) % 1;
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = c2;
+        circle(ctx, Math.sin(i * 2.1 + n.ph) * r * 0.8, -r * 0.4 - k * r * 2, 2.2);
+      }
+      ctx.globalAlpha = 1;
+    } else if (n.type === 'mire') {
+      // 泥の波紋
+      ctx.strokeStyle = c2;
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 2; i++) {
+        const k = (n.ph * 0.5 + i / 2) % 1;
+        ctx.globalAlpha = 1 - k;
+        ctx.beginPath();
+        ctx.ellipse(0, r * 0.3, r * (1 + k * 1.2), r * (0.5 + k * 0.6), 0, 0, TAU);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
     const g = ctx.createRadialGradient(0, 0, 2, 0, 0, r);
-    g.addColorStop(0, n.hitFlash > 0 ? '#ffffff' : '#ff4a8a');
-    g.addColorStop(0.5, '#8a1f5a');
-    g.addColorStop(1, '#3a0a2a');
+    g.addColorStop(0, n.hitFlash > 0 ? '#ffffff' : c2);
+    g.addColorStop(0.5, c1);
+    g.addColorStop(1, c0);
     ctx.fillStyle = g;
     circle(ctx, 0, 0, r);
-    ctx.fillStyle = 'rgba(255,200,230,0.7)';
-    circle(ctx, -r * 0.3, -r * 0.3, r * 0.18);
+    if (n.type === 'eye') {
+      // 主人公を見つめる大きな目
+      const a = Math.atan2(P.y - n.y, P.x - n.x);
+      ctx.fillStyle = '#fff6e0';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.62, r * 0.45, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = c2;
+      circle(ctx, Math.cos(a) * r * 0.22, Math.sin(a) * r * 0.15, r * 0.28);
+      ctx.fillStyle = '#1a0a10';
+      circle(ctx, Math.cos(a) * r * 0.26, Math.sin(a) * r * 0.18, r * 0.12);
+    } else {
+      ctx.fillStyle = 'rgba(255,230,240,0.6)';
+      circle(ctx, -r * 0.3, -r * 0.3, r * 0.18);
+    }
     ctx.restore();
     const w = n.r * 2.2;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -3306,6 +3794,7 @@
     ctx.fillRect(n.x - w / 2, n.y - n.r - 9, w * (n.hp / n.maxHp), 4);
     if (dist(n.x, n.y, P.x, P.y) < 260) txt(`${n.nd.name} Lv${n.lv}`, n.x, n.y - n.r - 15, 7, lvColor(n.lv - powerLv()), 'center');
   }
+
 
   function drawEnemy(e) {
     const def = e.def;
@@ -3432,12 +3921,124 @@
         if (e.mode === 'stun') txt('★', 0, -r - 10 + Math.sin(G.t * 8) * 2, 8, '#ffe45c', 'center');
         break;
       }
+      case 'slime': {
+        const sq = Math.sin(G.t * 6 + e.hx) * 0.12;
+        ctx.scale(1 + sq, 1 - sq);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.ellipse(0, 1, r, r * 0.8, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        circle(ctx, -r * 0.35, -r * 0.25, r * 0.22);
+        eyes(fx, -1, r * 0.14, '#1a3a1a');
+        break;
+      }
+      case 'moth': {
+        const wf = Math.abs(Math.sin(G.t * 16)) * 0.6 + 0.4;
+        ctx.fillStyle = flash ? '#fff' : '#d8c25a';
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.ellipse(s * r * 0.9, -1, r * wf, r * 0.75, s * 0.4, 0, TAU);
+          ctx.fill();
+        }
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 0.35, r * 0.8, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = '#5a3a1a';
+        circle(ctx, -r * 0.9, -1, 2);
+        circle(ctx, r * 0.9, -1, 2);
+        break;
+      }
+      case 'wraith': {
+        ctx.globalAlpha *= 0.85;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(0, -2, r, Math.PI, TAU);
+        ctx.lineTo(r, r * 0.8);
+        for (let i = 0; i < 4; i++) ctx.lineTo(r - (i + 0.5) * (r / 2), r * 0.8 - (i % 2 ? 0 : 4 + Math.sin(G.t * 8 + i) * 2));
+        ctx.lineTo(-r, r * 0.8);
+        ctx.closePath();
+        ctx.fill();
+        eyes(fx, -3, 1.6, '#1a3a5a');
+        break;
+      }
+      case 'knight': {
+        ctx.fillStyle = flash ? '#fff' : '#4a5468';
+        ctx.fillRect(-r * 0.8, -r * 0.2, r * 1.6, r * 1.1);
+        ctx.fillStyle = col;
+        circle(ctx, 0, -r * 0.35, r * 0.7);
+        ctx.fillStyle = '#1a1a22';
+        ctx.fillRect(-r * 0.45, -r * 0.45, r * 0.9, r * 0.18);
+        ctx.fillStyle = '#7fd8ff';
+        circle(ctx, -r * 0.2, -r * 0.36, 1.2);
+        circle(ctx, r * 0.2, -r * 0.36, 1.2);
+        ctx.strokeStyle = '#c8d0e0';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(fx * r, r * 0.6);
+        ctx.lineTo(fx * (r + 6), -r * 0.8);
+        ctx.stroke();
+        break;
+      }
+      case 'shaman': {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(-r, r);
+        ctx.lineTo(0, -r * 1.2);
+        ctx.lineTo(r, r);
+        ctx.closePath();
+        ctx.fill();
+        eyes(fx, -2, 1.4, '#ff9aff');
+        ctx.strokeStyle = '#8a5a2a';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(fx * (r + 2), r);
+        ctx.lineTo(fx * (r + 2), -r - 3);
+        ctx.stroke();
+        ctx.fillStyle = '#7dff9a';
+        circle(ctx, fx * (r + 2), -r - 4, 2.2 + Math.sin(G.t * 5) * 0.6);
+        break;
+      }
       default:
         ctx.fillStyle = col;
         circle(ctx, 0, 0, r);
         eyes(fx, -2, 1.5, '#fff');
     }
     ctx.restore();
+  }
+
+  // 毒の沼
+  function drawHazard(z) {
+    const k = Math.min(1, z.t / 0.6, (z.max - z.t) / 0.3);
+    ctx.globalAlpha = 0.55 * k;
+    const g = ctx.createRadialGradient(z.x, z.y, 0, z.x, z.y, z.r);
+    g.addColorStop(0, '#b8ff5a');
+    g.addColorStop(1, 'rgba(90,140,30,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(z.x, z.y, z.r, z.r * 0.7, 0, 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha = k;
+    ctx.fillStyle = '#e0ff9a';
+    const b = (G.t * 1.5 + z.x * 0.1) % 1;
+    circle(ctx, z.x + Math.sin(z.x) * z.r * 0.4, z.y - b * 6, 1.5);
+    ctx.globalAlpha = 1;
+  }
+
+  // 霧のエリア (解放するまでは、主人公のまわりしか見えない)
+  function drawMist() {
+    const a = G.areas[G.curArea];
+    if (!a || !a.def.mist) return;
+    const k = a.fog;
+    if (k <= 0.02) return;
+    const sx = P.x - (G.cam.x - VW / 2);
+    const sy = P.y - (G.cam.y - VH / 2);
+    const g = ctx.createRadialGradient(sx, sy, 70, sx, sy, 210);
+    g.addColorStop(0, 'rgba(200,210,215,0)');
+    g.addColorStop(1, `rgba(190,200,205,${0.92 * k})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, VW, VH);
   }
 
   function eyes(fx, y, r, color) {
@@ -3547,6 +4148,91 @@
         circle(ctx, p.r * 0.9, -4, 2.2);
         circle(ctx, p.r * 0.9, 4, 2.2);
         if (sleeping) txt('Zz', 0, -p.r - 6, 9, '#ffffff', 'center');
+      } else if (b.id === 'G3') {
+        // 霧の女王 (本物も分身も同じ見た目)
+        ctx.globalAlpha = p.fade == null ? 1 : p.fade;
+        ctx.translate(0, p.bob || 0);
+        const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 40);
+        g.addColorStop(0, 'rgba(200,235,255,0.5)');
+        g.addColorStop(1, 'rgba(200,235,255,0)');
+        ctx.fillStyle = g;
+        circle(ctx, 0, 0, 40);
+        ctx.fillStyle = flash ? '#fff' : '#9fd0f0';
+        ctx.beginPath();
+        ctx.moveTo(-16, 18);
+        ctx.quadraticCurveTo(-8, -2, 0, -6);
+        ctx.quadraticCurveTo(8, -2, 16, 18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = flash ? '#fff' : '#f4e8f4';
+        circle(ctx, 0, -12, 7);
+        ctx.fillStyle = '#5a7ac8';
+        ctx.beginPath();
+        ctx.moveTo(-8, -14);
+        ctx.quadraticCurveTo(-14, 4, -10, 12);
+        ctx.lineTo(-5, -8);
+        ctx.moveTo(8, -14);
+        ctx.quadraticCurveTo(14, 4, 10, 12);
+        ctx.lineTo(5, -8);
+        ctx.fill();
+        ctx.fillStyle = sleeping ? '#333' : '#2a4a8a';
+        circle(ctx, -2.5, -12, 1.2);
+        circle(ctx, 2.5, -12, 1.2);
+        ctx.fillStyle = '#fff3b0';
+        ctx.fillRect(-6, -21, 12, 3);
+        if (sleeping) txt('Zz', 14, -24, 9, '#ffffff', 'center');
+      } else if (b.id === 'N2') {
+        if (p.hidden) {
+          // 潜っている間は、水面の影と波紋だけ
+          ctx.fillStyle = 'rgba(20,40,60,0.35)';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, p.r * 1.1, p.r * 0.6, 0, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(160,210,240,0.6)';
+          ctx.lineWidth = 1.5;
+          const k = (G.t * 1.5) % 1;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, p.r * (0.8 + k), p.r * (0.45 + k * 0.5), 0, 0, TAU);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
+          ctx.beginPath();
+          ctx.ellipse(0, p.r * 0.6, p.r * 1.2, p.r * 0.45, 0, 0, TAU);
+          ctx.fill();
+          // 舌
+          if (p.mode === 'tongue' && p.tl > 0) {
+            ctx.strokeStyle = '#e86a8a';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(p.ta) * p.tl, Math.sin(p.ta) * p.tl);
+            ctx.stroke();
+            ctx.fillStyle = '#ff8aa8';
+            circle(ctx, Math.cos(p.ta) * p.tl, Math.sin(p.ta) * p.tl, 6);
+          }
+          const sq = p.mode === 'tongueWind' ? 0.1 : Math.sin(G.t * 3) * 0.04;
+          ctx.scale(1 + sq, 1 - sq);
+          ctx.fillStyle = flash ? '#fff' : '#6a7a3a';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, p.r * 1.15, p.r * 0.85, 0, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = flash ? '#fff' : '#8a9a4a';
+          for (const [x, y] of [[-12, -6], [10, 4], [-4, 10], [14, -10]]) circle(ctx, x, y, 4);
+          ctx.fillStyle = flash ? '#fff' : '#c8c070';
+          ctx.beginPath();
+          ctx.ellipse(0, p.r * 0.35, p.r * 0.8, p.r * 0.4, 0, 0, Math.PI);
+          ctx.fill();
+          for (const sx of [-1, 1]) {
+            ctx.fillStyle = flash ? '#fff' : '#6a7a3a';
+            circle(ctx, sx * p.r * 0.5, -p.r * 0.7, 8);
+            ctx.fillStyle = sleeping ? '#333' : '#ffd84a';
+            circle(ctx, sx * p.r * 0.5, -p.r * 0.72, 5);
+            ctx.fillStyle = '#1a1a0a';
+            ctx.fillRect(sx * p.r * 0.5 - 1, -p.r * 0.72 - 4, 2, 8);
+          }
+          if (sleeping) txt('Zz', p.r, -p.r - 4, 9, '#ffffff', 'center');
+        }
       }
       ctx.restore();
     }
@@ -4285,6 +4971,7 @@
       const points = [];
       for (const ar of def.areas) if (prog.travel.includes(ar.id)) points.push({ id: ar.id, name: ar.name });
       for (const l of def.lairs) if (l.travel && prog.travel.includes(l.travel)) points.push({ id: l.travel, name: `${l.name}（守護者の決闘場）` });
+      for (const en of def.entries || []) if (prog.travel.includes(en.id)) points.push({ id: en.id, name: `${en.name}（${stageDef(def.gates.find((g) => g.boss === en.boss).to).name}から）` });
       const canStart = (ar) => prog.travel.includes(ar.id) || (ar.start && prog.travel.length === 0);
       let info = '<span class="muted">エリアを押すと、くわしく出ます</span>';
       if (a) {
@@ -4379,6 +5066,18 @@
       g.arc(l.x * 8 + 4, l.y * 8 + 4, l.r * 8, 0, TAU);
       g.stroke();
       g.setLineDash([]);
+    }
+    // 門のそばの転移碑 (守護者の決闘場・隣のステージから来た所)
+    const gateStones = [...def.lairs.filter((l) => l.travel).map((l) => ({ id: l.travel, x: l.x, y: l.y })), ...(def.entries || [])];
+    for (const st of gateStones) {
+      if (!prog.travel.includes(st.id)) continue;
+      g.fillStyle = '#6ad0ff';
+      g.beginPath();
+      g.arc(st.x * 8 + 4, st.y * 8 + 4, 6, 0, TAU);
+      g.fill();
+      g.strokeStyle = '#000';
+      g.lineWidth = 2;
+      g.stroke();
     }
     for (const f of def.features) {
       if (!f.shop) continue;
