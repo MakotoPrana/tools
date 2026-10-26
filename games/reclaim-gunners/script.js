@@ -5295,15 +5295,14 @@
   // ---------- 全体図 ----------
   // 全体図の絵 (assets/worldmap.jpg。1024 × 572)。絵の上に、押せる場所と名前の札を重ねる
   //   spots: そのステージの島 (押せる楕円)。label: 名前の札の中心 (絵に描いてある名前の上にかぶせる)
-  //   黒森シュヴァルツは、絵の中に島が 2 つある (どちらを押しても黒森)
   const WORLD_W = 1024;
   const WORLD_H = 572;
   const WORLD = {
     1: { spots: [[230, 200, 200, 125]], label: [375, 264] },
     2: { spots: [[230, 418, 140, 72]], label: [232, 470] },
     3: { spots: [[630, 118, 140, 78]], label: [672, 182] },
-    4: { spots: [[600, 282, 92, 68], [495, 446, 100, 72]], label: [610, 342], label2: [505, 505] },
-    5: { spots: [[702, 430, 92, 80]], label: [710, 505] },
+    4: { spots: [[600, 282, 92, 68]], label: [610, 342] },
+    5: { spots: [[690, 440, 130, 95]], label: [710, 505] },
     6: { spots: [[872, 240, 112, 128]], label: [865, 342] },
   };
   let selStage = 1;
@@ -5352,7 +5351,7 @@
       const plates = STAGES.map((st) => {
         const w = WORLD[st.id];
         const sel = st.id === selStage;
-        return worldPlate(st, w.label, sel) + (w.label2 ? worldPlate(st, w.label2, sel) : '');
+        return worldPlate(st, w.label, sel);
       }).join('');
       return `
       <div class="overlay"><div class="panel full world-panel">
