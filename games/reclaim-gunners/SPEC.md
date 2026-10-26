@@ -103,25 +103,43 @@
 - 1 ステージの広さは、横 4.5 画面 × 縦 3 画面ほど = 2880×1080px（144 × 54 タイル）。テストプレイで「狭い」となり、最初の 3 × 2 画面から縦横 1.5 倍にした。ステージによって縦長の形にしてもよい
 - マップは 20px のタイルで作る（1 画面 = 32×18 タイル、1 ステージ = 約 96×36 タイル）
 - タイルの種類: 床・壁（通れない、弾も通らない）・低い障害物（通れないが弾は越える）・水（通れない、弾は越える）・沼（移動速度 −30%）・溶岩（踏むとダメージ）・壊せる木箱
-- ステージの中は 8 エリア前後に分かれる。エリアの境目は細い通路・橋・門などで、見てわかるようにする
+- ステージの中は 8 エリア前後に分かれる。エリアの境目は生け垣・木立ち・岩場などの壁で、通り道（すき間）でつながる
 - 各エリアに、魔巣が 2〜5 個と、転移碑が 1 つある
+
+#### エリアの形
+
+- エリアは格子ではなく、いろいろな形にする。ステージのデータに、文字の地図（文字 1 つ = 3 × 3 タイル）でエリアの形を描く
+- マップを作るときに、境目をなめらかなノイズで 2〜3 タイルほどうねらせる。境目は 1 タイルの壁になり、景色に合わせて見た目を変える（村は石垣、麦畑・丘・果樹園・川辺は生け垣、森は木立ち、竜骨の窪地・砦跡は岩場）
+- つながっているエリアの組み合わせ（links）を書いておくと、その 2 つのエリアの境目のまん中あたりに、幅 5 タイルの通り道があく
+- 魔巣・転移碑・ミミック・決闘場の位置はだいたいでよい。マップを作るときに、自分のエリアの十分内側（魔巣は端から 3〜4 タイル、決闘場は円がほぼ収まる所）へ自動で寄せ、魔巣どうしも離す
+- どこからも歩いて行けない小さなすき間ができたら、壁でうめる
+- ステージ図の名前は、エリアのいちばん奥まった所に出す。霧・ミニマップ・ステージ図の色は、エリアの形どおりに塗る
 
 #### 例: ステージ1 ハルト平原（横 4.5 × 縦 3 画面・8 エリア）
 
+文字の地図（V 始まりの村・W 麦畑・O 果樹園・H 風車の丘・R 川辺の水車小屋・F 古井戸の森・T 古戦場の砦跡・B 竜骨の窪地★）
+
 ```
-       ↑ 北の門（ステージ3へ / 鉄喰いゴーレム）
-┌────────────────────────────┬────────────────────────────┐
-│ 古井戸の森  Lv10〜14  魔巣5 │ 竜骨の窪地★  Lv30〜35        │
-│                            │ 大魔巣3 + 魔巣3・ヌシ骨竜    │
-├─────────┬──────────────────┼─────────────────────────────┤
-│ 果樹園   │ 風車の丘          │ 古戦場の砦跡  Lv16〜20       │
-│ Lv3〜6   │ Lv4〜8   魔巣3    │ 大魔巣1 + 魔巣3（崩れた城壁）│
-│ 魔巣3    │                  │                             │
-├─────────┼──────────────────┼─────────────────────────────┤
-│ 始まりの村│ 麦畑              │ 川辺の水車小屋  Lv6〜9  魔巣3 │ → 東の門（ステージ2へ / ブロブキング）
-│（町）Lv1〜3│ Lv2〜5   魔巣3    │（川と橋）                    │
-│ 小魔巣2  │                  │                             │
-└─────────┴──────────────────┴─────────────────────────────┘
+       ↓ 北の門（ステージ3へ / 鉄喰いゴーレム）
+FFFFFFFFFFFFFFFFFFFFFFFFBBBBBBBBBBBBBBBBBBBBBBBB
+FFFFFFFFFFFFFFFFFFFFFFFFFBBBBBBBBBBBBBBBBBBBBBBB
+FFFFFFFFFFFFFFFFFFFFFFFFFFBBBBBBBBBBBBBBBBBBBBBB
+FFFFFFFFFFFFFFFFFFFFFFFFFFFBBBBBBBBBBBBBBBBBBBBB
+FFFFFFFFFFFFFFHHHHHHFFFFFFFBBBBBBBBBBBBBBBBBBBBB
+FFFFFFFFFFHHHHHHHHHHHHFFFFBBBBBBBBBBBBBBBBBBBBBB
+FFFFFFFFHHHHHHHHHHHHHHHHHHBBBBBBTTTTTTTTTTTTTTTT
+OOOOOOOOFHHHHHHHHHHHHHHHHHHHBBBTTTTTTTTTTTTTTTTT
+OOOOOOOOOOOOHHHHHHHHHHHHHHHHHHTTTTTTTTTTTTTTTTTT
+OOOOOOOOOOOOOHHHHHHHHHHHHHHHHHTTTTTTTTTTTTTTTTTT
+OOOOOOOOOOOOOHHHHHHHHHHHHHHHHTTTTTTTTTTTTTTTTTTT
+OOOOOOOOOOOOWWWHHHHHHHHHHHHHTTTTTTTTTTTTTTRRRRRR
+VVVVVVVVVOOOWWWWWWWWWWWWWWWWWTTTTTTTTRRRRRRRRRRR
+VVVVVVVVVVVVWWWWWWWWWWWWWWWWWWTTTTRRRRRRRRRRRRRR
+VVVVVVVVVVVVWWWWWWWWWWWWWWWWWWWRRRRRRRRRRRRRRRRR
+VVVVVVVVVVVVVWWWWWWWWWWWWWWWWWRRRRRRRRRRRRRRRRRR
+VVVVVVVVVVVVVWWWWWWWWWWWWWWWWRRRRRRRRRRRRRRRRRRR
+VVVVVVVVVVVVWWWWWWWWWWWWWWWWRRRRRRRRRRRRRRRRRRRR
+                                                → 東の門（ステージ2へ / ブロブキング）は右下
 ```
 
 - エリアの間は壁で区切り、すき間（通り道）でつなぐ: 村↔果樹園・村↔麦畑・果樹園↔風車の丘・果樹園↔森・麦畑↔風車の丘・麦畑↔水車小屋・風車の丘↔森・風車の丘↔砦跡・水車小屋↔砦跡・砦跡↔竜骨の窪地

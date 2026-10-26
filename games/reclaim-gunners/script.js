@@ -361,10 +361,37 @@
     fort: { floor: ['#8a7f6c', '#928774'], dot: '#6f6656', fog: [80, 20, 80] },
   };
 
+  // エリアの境目の壁の見た目 (テーマごと)
+  const WALL_STYLE = { village: 'stone', wheat: 'hedge', hill: 'hedge', orchard: 'hedge', river: 'hedge', forest: 'trees', bone: 'rocks', fort: 'rocks' };
+  const WALL_COLORS = {
+    hedge: ['#24421f', '#2f5a29', '#3f7436'],
+    trees: ['#142a13', '#1f3d1c', '#2c5428'],
+    rocks: ['#2e2a28', '#4a4440', '#6a625a'],
+  };
+
   const mapCache = {};
   function getMap(def) {
     if (!mapCache[def.id]) mapCache[def.id] = buildMap(def);
     return mapCache[def.id];
+  }
+
+  // なめらかなノイズ (エリアの境目をうねらせるのに使う)
+  function valueNoise(seed) {
+    const hash = (x, y) => {
+      let n = (x * 374761393 + y * 668265263 + seed * 982451653) | 0;
+      n = Math.imul(n ^ (n >>> 13), 1274126177);
+      return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+    };
+    const sm = (t) => t * t * (3 - 2 * t);
+    return (x, y) => {
+      const x0 = Math.floor(x);
+      const y0 = Math.floor(y);
+      const fx = sm(x - x0);
+      const fy = sm(y - y0);
+      const a = lerp(hash(x0, y0), hash(x0 + 1, y0), fx);
+      const b = lerp(hash(x0, y0 + 1), hash(x0 + 1, y0 + 1), fx);
+      return lerp(a, b, fy) * 2 - 1;
+    };
   }
 
   function buildMap(def) {
@@ -373,53 +400,192 @@
     const areaOf = new Int8Array(w * h).fill(-1);
     const keep = new Uint8Array(w * h); // 物を置かない所 (魔巣・転移碑・通り道のまわり)
     const idx = (x, y) => y * w + x;
+    const inside = (x, y) => x >= 0 && y >= 0 && x < w && y < h;
     const fill = (rect, v) => {
       const [x, y, rw, rh] = rect;
-      for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) if (i >= 0 && j >= 0 && i < w && j < h) tiles[idx(i, j)] = v;
+      for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) if (inside(i, j)) tiles[idx(i, j)] = v;
     };
     const mark = (cx, cy, r) => {
       for (let j = Math.floor(cy - r); j <= Math.ceil(cy + r); j++) {
         for (let i = Math.floor(cx - r); i <= Math.ceil(cx + r); i++) {
-          if (i >= 0 && j >= 0 && i < w && j < h && (i - cx) ** 2 + (j - cy) ** 2 <= r * r) keep[idx(i, j)] = 1;
+          if (inside(i, j) && (i - cx) ** 2 + (j - cy) ** 2 <= r * r) keep[idx(i, j)] = 1;
         }
       }
     };
-    def.areas.forEach((a, ai) => {
-      const [x, y, aw, ah] = a.rect;
-      for (let j = y; j < y + ah; j++) for (let i = x; i < x + aw; i++) areaOf[idx(i, j)] = ai;
-    });
-    for (const r of def.walls) fill(r, T.WALL);
+    // エリアの形: layout の文字 1 つが scale × scale タイル。境目はノイズでうねらせる
+    const L = def.layout;
+    const aIndex = Object.fromEntries(def.areas.map((a, i) => [a.id, i]));
+    const nx = valueNoise(def.seed);
+    const ny = valueNoise(def.seed + 101);
+    const freq = 1 / 7;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const sx = x + 0.5 + nx(x * freq, y * freq) * L.warp;
+        const sy = y + 0.5 + ny(x * freq, y * freq) * L.warp;
+        const r = clamp(Math.floor(sy / L.scale), 0, L.rows.length - 1);
+        const row = L.rows[r];
+        const ch = row[clamp(Math.floor(sx / L.scale), 0, row.length - 1)];
+        areaOf[idx(x, y)] = aIndex[L.key[ch]];
+      }
+    }
+    // 外周と、エリアの境目の壁 (右か下のとなりが別のエリアなら壁にする)
+    const border = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = idx(x, y);
+        const edge = x === 0 || y === 0 || x === w - 1 || y === h - 1;
+        const diff = (x < w - 1 && areaOf[i + 1] !== areaOf[i]) || (y < h - 1 && areaOf[i + w] !== areaOf[i]);
+        if (edge || diff) {
+          tiles[i] = T.WALL;
+          if (!edge) border[i] = 1;
+        }
+      }
+    }
+    // つながっているエリアの境目に、通り道 (幅 5 タイル) をあける
+    for (const [a0, b0] of def.links) {
+      const a = aIndex[a0];
+      const b = aIndex[b0];
+      const cand = [];
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const i = idx(x, y);
+          if (!border[i]) continue;
+          const near = new Set([areaOf[i], areaOf[i - 1], areaOf[i + 1], areaOf[i - w], areaOf[i + w]]);
+          if (near.has(a) && near.has(b)) cand.push([x, y]);
+        }
+      }
+      if (!cand.length) continue;
+      // 境目のまん中あたり (なるべく長い境目の中ほど) をえらぶ
+      const cx = cand.reduce((s, c) => s + c[0], 0) / cand.length;
+      const cy = cand.reduce((s, c) => s + c[1], 0) / cand.length;
+      let best = cand[0];
+      let bd = 1e9;
+      for (const c of cand) {
+        const d = (c[0] - cx) ** 2 + (c[1] - cy) ** 2;
+        if (d < bd) {
+          bd = d;
+          best = c;
+        }
+      }
+      for (let j = best[1] - 2; j <= best[1] + 2; j++) {
+        for (let i = best[0] - 2; i <= best[0] + 2; i++) {
+          if (inside(i, j) && border[idx(i, j)]) tiles[idx(i, j)] = T.FLOOR;
+        }
+      }
+      mark(best[0], best[1], 4);
+    }
+    const ruin = new Uint8Array(w * h); // data の walls で置いた壁 (石の壁で描く)
+    for (const r of def.walls) {
+      fill(r, T.WALL);
+      const [x, y, rw, rh] = r;
+      for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) if (inside(i, j)) ruin[idx(i, j)] = 1;
+    }
     for (const f of def.features) fill(f.rect, f.type === 'water' ? T.WATER : T.FEATURE);
+    for (const g of def.gates) fill(g.rect, T.FLOOR);
+
+    // エリアの端からの距離 (エリアの外・通れない所から何タイル離れているか)
+    const edgeDist = new Int16Array(w * h).fill(-1);
+    const q = [];
+    for (let i = 0; i < w * h; i++) {
+      if (MOVE_BLOCK[tiles[i]]) {
+        edgeDist[i] = 0;
+        q.push(i);
+      }
+    }
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = idx(x, y);
+        if (edgeDist[i] < 0 && ((x > 0 && areaOf[i - 1] !== areaOf[i]) || (x < w - 1 && areaOf[i + 1] !== areaOf[i]) || (y > 0 && areaOf[i - w] !== areaOf[i]) || (y < h - 1 && areaOf[i + w] !== areaOf[i]))) {
+          edgeDist[i] = 0;
+          q.push(i);
+        }
+      }
+    }
+    for (let head = 0; head < q.length; head++) {
+      const i = q[head];
+      const x = i % w;
+      const y = (i / w) | 0;
+      for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) {
+        if (n >= 0 && edgeDist[n] < 0) {
+          edgeDist[n] = edgeDist[i] + 1;
+          q.push(n);
+        }
+      }
+    }
+    // 魔巣・転移碑・決闘場などを、自分のエリアの中の十分内側へ寄せる
+    const taken = [];
+    const snap = (x, y, ai, margin, spacing = 0) => {
+      let best = null;
+      let bd = 1e9;
+      for (let j = 0; j < h; j++) {
+        for (let i = 0; i < w; i++) {
+          const k = idx(i, j);
+          if (areaOf[k] !== ai || tiles[k] !== T.FLOOR || edgeDist[k] < margin) continue;
+          const d = (i - x) ** 2 + (j - y) ** 2;
+          if (d >= bd) continue;
+          if (spacing && taken.some((t) => (t[0] - i) ** 2 + (t[1] - j) ** 2 < spacing * spacing)) continue;
+          bd = d;
+          best = [i, j];
+        }
+      }
+      if (!best) best = [x, y];
+      if (spacing) taken.push(best);
+      return best;
+    };
+    def.areas.forEach((a, ai) => {
+      for (const n of a.nests) [n.x, n.y] = snap(n.x, n.y, ai, NESTS[n.type].r / TILE + 2.5, 5);
+      a.stone = snap(a.stone[0], a.stone[1], ai, 2.5, 4);
+      a.mimics = (a.mimics || []).map((m) => snap(m[0], m[1], ai, 2, 3));
+    });
+    for (const l of def.lairs) [l.x, l.y] = snap(l.x, l.y, aIndex[l.area], Math.max(3, l.r - 1.5));
+
     // 物を置かない所
     for (const a of def.areas) {
       for (const n of a.nests) mark(n.x, n.y, 3);
       mark(a.stone[0], a.stone[1], 2.5);
-      for (const m of a.mimics || []) mark(m[0], m[1], 1.5);
+      for (const m of a.mimics) mark(m[0], m[1], 1.5);
     }
     for (const l of def.lairs) mark(l.x, l.y, l.r + 0.5);
     for (const g of def.gates) mark(g.rect[0] + g.rect[2] / 2, g.rect[1] + g.rect[3] / 2, 4);
     for (const f of def.features) {
       if (f.door) mark(f.door[0], f.door[1], 2);
       const [x, y, rw, rh] = f.rect;
-      for (let j = y - 1; j <= y + rh; j++) for (let i = x - 1; i <= x + rw; i++) if (i >= 0 && j >= 0 && i < w && j < h) keep[idx(i, j)] = 1;
+      for (let j = y - 1; j <= y + rh; j++) for (let i = x - 1; i <= x + rw; i++) if (inside(i, j)) keep[idx(i, j)] = 1;
     }
-    // 壁のすき間 (通り道) のまわり
-    for (let y = 1; y < h - 1; y++) {
-      for (let x = 1; x < w - 1; x++) {
-        if (tiles[idx(x, y)] !== T.FLOOR) continue;
-        const lr = tiles[idx(x - 1, y)] === T.WALL && tiles[idx(x + 1, y)] === T.WALL;
-        const ud = tiles[idx(x, y - 1)] === T.WALL && tiles[idx(x, y + 1)] === T.WALL;
-        const edgeL = tiles[idx(x - 1, y)] === T.WALL || tiles[idx(x + 1, y)] === T.WALL;
-        const edgeU = tiles[idx(x, y - 1)] === T.WALL || tiles[idx(x, y + 1)] === T.WALL;
-        if (lr || ud || (edgeL && edgeU)) mark(x, y, 3);
-      }
-    }
-    // 壁の 1 列内側にも置かない (外周に沿って歩けるように)
+    // 壁のまわりにも置かない (壁に沿って歩けるように)
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         if (tiles[idx(x, y)] !== T.WALL) continue;
-        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (x + i >= 0 && y + j >= 0 && x + i < w && y + j < h) keep[idx(x + i, y + j)] = 1;
+        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (inside(x + i, y + j)) keep[idx(x + i, y + j)] = 1;
       }
+    }
+    // どこからも歩いて行けない小さなすき間は、壁でうめる
+    {
+      const start = def.areas.find((ar) => ar.start) || def.areas[0];
+      const seen = new Uint8Array(w * h);
+      const s0 = idx(start.stone[0], start.stone[1]);
+      const qq = [s0];
+      seen[s0] = 1;
+      for (let head = 0; head < qq.length; head++) {
+        const i = qq[head];
+        const x = i % w;
+        for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) {
+          if (n >= 0 && n < w * h && !seen[n] && !MOVE_BLOCK[tiles[n]]) {
+            seen[n] = 1;
+            qq.push(n);
+          }
+        }
+      }
+      for (let i = 0; i < w * h; i++) if (!seen[i] && tiles[i] === T.FLOOR) tiles[i] = T.WALL;
+    }
+    // エリアごとのタイルの一覧・中心 (いちばん奥まった所)
+    const areaTiles = def.areas.map(() => []);
+    const centers = def.areas.map(() => ({ x: 0, y: 0, d: -1 }));
+    for (let i = 0; i < w * h; i++) {
+      const ai = areaOf[i];
+      if (ai < 0 || tiles[i] !== T.FLOOR) continue;
+      areaTiles[ai].push(i);
+      if (edgeDist[i] > centers[ai].d) centers[ai] = { x: i % w, y: (i / w) | 0, d: edgeDist[i] };
     }
     // 木や岩をばらまく。まわり 1 マスに何もない所にだけ置くので、道はふさがらない
     const rng = mulberry32(def.seed);
@@ -430,12 +596,13 @@
     };
     const tileOf = { tree: T.TREE, rock: T.ROCK, bone: T.BONE, fence: T.FENCE };
     for (const s of def.scatter) {
-      const ai = def.areas.findIndex((a) => a.id === s.area);
-      const [ax, ay, aw, ah] = def.areas[ai].rect;
+      const ai = aIndex[s.area];
+      const list = areaTiles[ai];
       let placed = 0;
       for (let tries = 0; tries < s.n * 60 && placed < s.n; tries++) {
-        const x = ax + 1 + Math.floor(rng() * (aw - 2));
-        const y = ay + 1 + Math.floor(rng() * (ah - 2));
+        const k = list[Math.floor(rng() * list.length)];
+        const x = k % w;
+        const y = (k / w) | 0;
         const len = s.tile === 'fence' ? 3 + Math.floor(rng() * 3) : 1;
         if (!clearAround(x, y, x + len - 1, y)) continue;
         let ok = true;
@@ -445,15 +612,44 @@
         placed++;
       }
     }
-    const map = { def, w, h, tiles, areaOf, idx };
+    const map = { def, w, h, tiles, areaOf, idx, areaTiles, centers, ruin, maskCache: {} };
     map.bg = renderBg(map);
     map.mini = renderMini(map);
     // 霧のかたまり (解放前のエリアに漂う)
-    map.wisps = def.areas.map((a) => {
-      const [x, y, aw, ah] = a.rect;
-      return Array.from({ length: Math.ceil((aw * ah) / 60) }, () => ({ x: (x + rng() * aw) * TILE, y: (y + rng() * ah) * TILE, r: 50 + rng() * 70, ph: rng() * TAU }));
-    });
+    map.wisps = def.areas.map((a, ai) => Array.from({ length: Math.ceil(areaTiles[ai].length / 60) }, () => {
+      const k = areaTiles[ai][Math.floor(rng() * areaTiles[ai].length)];
+      return { x: tc(k % w), y: tc((k / w) | 0), r: 50 + rng() * 70, ph: rng() * TAU };
+    }));
     return map;
+  }
+
+  // エリアの形の絵 (1 タイル = 1 ピクセル)。拡大して描くと、ふちがやわらかくなる
+  function areaMask(map, ai, color) {
+    const key = `${ai}:${color}`;
+    if (map.maskCache[key]) return map.maskCache[key];
+    const c = document.createElement('canvas');
+    c.width = map.w;
+    c.height = map.h;
+    const g = c.getContext('2d');
+    const img = g.createImageData(map.w, map.h);
+    const [r, gg, b] = color;
+    for (let i = 0; i < map.w * map.h; i++) {
+      if (map.areaOf[i] !== ai) continue;
+      img.data[i * 4] = r;
+      img.data[i * 4 + 1] = gg;
+      img.data[i * 4 + 2] = b;
+      img.data[i * 4 + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    map.maskCache[key] = c;
+    return c;
+  }
+
+  // エリアの中のでたらめなタイル (はぐれ悪魔・演出用)
+  function randomAreaTile(map, ai) {
+    const list = map.areaTiles[ai];
+    const k = list[Math.floor(Math.random() * list.length)];
+    return { x: k % map.w, y: (k / map.w) | 0 };
   }
 
   function renderBg(map) {
@@ -488,14 +684,6 @@
         }
       }
     }
-    // 村の道
-    const village = def.areas.find((a) => a.theme === 'village');
-    if (village) {
-      g.fillStyle = 'rgba(120,100,70,0.45)';
-      const [vx, vy, vw, vh] = village.rect;
-      g.fillRect(vx * TILE, (vy + 6) * TILE, vw * TILE, 3 * TILE);
-      g.fillRect((vx + 13) * TILE, vy * TILE, 3 * TILE, vh * TILE);
-    }
     // タイルの物
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
@@ -503,12 +691,33 @@
         const px = x * TILE;
         const py = y * TILE;
         if (t === T.WALL) {
-          g.fillStyle = '#3a3446';
-          g.fillRect(px, py, TILE, TILE);
-          g.fillStyle = '#4e465e';
-          g.fillRect(px, py, TILE, 6);
-          g.fillStyle = 'rgba(0,0,0,0.25)';
-          g.fillRect(px + (y % 2 ? 10 : 0), py + 6, 1, 14);
+          // エリアの境目の壁は、エリアの景色に合わせる (生け垣・木立ち・岩場)。砦跡の城壁などは石の壁
+          const style = map.ruin[idx(x, y)] ? 'stone' : WALL_STYLE[(def.areas[areaOf[idx(x, y)]] || def.areas[0]).theme] || 'stone';
+          if (style === 'stone') {
+            g.fillStyle = '#3a3446';
+            g.fillRect(px, py, TILE, TILE);
+            g.fillStyle = '#4e465e';
+            g.fillRect(px, py, TILE, 6);
+            g.fillStyle = 'rgba(0,0,0,0.25)';
+            g.fillRect(px + (y % 2 ? 10 : 0), py + 6, 1, 14);
+          } else {
+            const col = WALL_COLORS[style];
+            g.fillStyle = col[0];
+            g.fillRect(px, py, TILE, TILE);
+            for (let k = 0; k < 3; k++) {
+              const bx = px + 4 + rng() * 12;
+              const by = py + 4 + rng() * 12;
+              const r = 7 + rng() * 5;
+              g.fillStyle = col[1];
+              g.beginPath();
+              g.arc(bx, by, r, 0, TAU);
+              g.fill();
+              g.fillStyle = col[2];
+              g.beginPath();
+              g.arc(bx - r * 0.3, by - r * 0.35, r * 0.45, 0, TAU);
+              g.fill();
+            }
+          }
         } else if (t === T.TREE) {
           g.fillStyle = 'rgba(0,0,0,0.25)';
           g.beginPath();
@@ -1994,8 +2203,10 @@
     if (!prog.travel.includes(a.id)) prog.travel.push(a.id);
     showBanner(`${a.name} 解放!`, sub, '', 4, '#7dffb0');
     sfx('liberate');
-    const [x, y, w, h] = a.rect;
-    for (let i = 0; i < 80; i++) addPart({ x: (x + Math.random() * w) * TILE, y: (y + Math.random() * h) * TILE, vx: 0, vy: rnd(-40, -10), life: rnd(0.8, 2), color: pick(['#fff3b0', '#7dffb0', '#ffffff']), size: rnd(1.5, 3), glow: true });
+    for (let i = 0; i < 80; i++) {
+      const t = randomAreaTile(G.map, area.i);
+      addPart({ x: t.x * TILE + Math.random() * TILE, y: t.y * TILE + Math.random() * TILE, vx: 0, vy: rnd(-40, -10), life: rnd(0.8, 2), color: pick(['#fff3b0', '#7dffb0', '#ffffff']), size: rnd(1.5, 3), glow: true });
+    }
     collectAllMats();
     writeSave();
   }
@@ -2010,10 +2221,10 @@
     const n = G.enemies.filter((e) => e.area === area && !e.home && !e.dormant).length;
     const cap = Math.max(2, Math.round(a2cap(area) * 0.15));
     if (n >= cap) return;
-    const [x, y, w, h] = area.def.rect;
     for (let k = 0; k < 20; k++) {
-      const px = (x + 1 + Math.random() * (w - 2)) * TILE;
-      const py = (y + 1 + Math.random() * (h - 2)) * TILE;
+      const t = randomAreaTile(G.map, area.i);
+      const px = tc(t.x);
+      const py = tc(t.y);
       const d = dist(px, py, P.x, P.y);
       if (d < 220 || d > 520 || hitsTiles(px, py, 8, MOVE_BLOCK)) continue;
       spawnEnemy(pick(area.def.enemies.slice(0, 3)), px, py, area, null);
@@ -2032,8 +2243,6 @@
     const b = { id, def, lair: l, lv, total, state: 'sleep', t: 0, parts: [], atk: def.atk * lvMul.atk(lv), cx: tc(l.x), cy: tc(l.y), R: l.r * TILE, act: 0, step: 0 };
     // 戦うエリア: 決闘場 (円) に入ると戦いが始まり、そのあとはこのエリアの中を動ける
     b.area = G.map.areaOf[l.y * G.map.w + l.x];
-    const [ax, ay, aw, ah] = G.def.areas[b.area].rect;
-    b.box = { x0: (ax + 1) * TILE, y0: (ay + 1) * TILE, x1: (ax + aw - 1) * TILE, y1: (ay + ah - 1) * TILE };
     b.exits = areaExits(b.area);
     resetBoss(b);
     return b;
@@ -2105,10 +2314,18 @@
       else if (b.id === 'N1') updateDragon(b, dt);
       for (const p of b.parts) {
         if (p.dead) continue;
-        // ボスもエリアの外へは出ない
-        const m = p.r * 0.6;
-        p.x = clamp(p.x, b.box.x0 + m, b.box.x1 - m);
-        p.y = clamp(p.y, b.box.y0 + m, b.box.y1 - m);
+        // ボスもエリアの外へは出ない (外に出たら、最後にいたエリアの中の場所へ戻す)
+        const tx = Math.floor(p.x / TILE);
+        const ty = Math.floor(p.y / TILE);
+        const inArea = tx > 0 && ty > 0 && tx < G.map.w - 1 && ty < G.map.h - 1 && G.map.areaOf[ty * G.map.w + tx] === b.area && !SHOT_BLOCK[G.tiles[ty * G.map.w + tx]];
+        if (inArea) {
+          p.lx = p.x;
+          p.ly = p.y;
+        } else if (p.lx != null) {
+          p.x = p.lx;
+          p.y = p.ly;
+          if (p.mode === 'jump') p.tx = p.x, p.ty = p.y;
+        }
         if (!G.dead && !(p.h > 6) && dist(p.x, p.y, P.x, P.y) < p.r + P.r - 2) hurtPlayer(b.atk, b.lv);
       }
       b.parts = b.parts.filter((p) => !p.dead);
@@ -2890,13 +3107,15 @@
   function drawFog(view) {
     G.areas.forEach((a, ai) => {
       if (a.fog <= 0.01) return;
-      const [x, y, w, h] = a.def.rect;
-      const px = x * TILE;
-      const py = y * TILE;
-      if (px > view.x1 || py > view.y1 || px + w * TILE < view.x0 || py + h * TILE < view.y0) return;
+      // エリアの形の絵を拡大して重ねる (ふちがぼやけて、霧らしくなる)
       const fog = THEMES[a.def.theme].fog;
-      ctx.fillStyle = `rgba(${fog[0]},${fog[1]},${fog[2]},${0.32 * a.fog})`;
-      ctx.fillRect(px, py, w * TILE, h * TILE);
+      const tx0 = clamp(Math.floor(view.x0 / TILE), 0, G.map.w - 1);
+      const ty0 = clamp(Math.floor(view.y0 / TILE), 0, G.map.h - 1);
+      const tx1 = clamp(Math.ceil(view.x1 / TILE), tx0 + 1, G.map.w);
+      const ty1 = clamp(Math.ceil(view.y1 / TILE), ty0 + 1, G.map.h);
+      ctx.globalAlpha = 0.32 * a.fog;
+      ctx.drawImage(areaMask(G.map, ai, fog), tx0, ty0, tx1 - tx0, ty1 - ty0, tx0 * TILE, ty0 * TILE, (tx1 - tx0) * TILE, (ty1 - ty0) * TILE);
+      ctx.globalAlpha = 1;
       for (const wp of G.map.wisps[ai]) {
         const wx = wp.x + Math.sin(G.t * 0.2 + wp.ph) * 30;
         const wy = wp.y + Math.cos(G.t * 0.15 + wp.ph) * 20;
@@ -3709,9 +3928,9 @@
     ctx.drawImage(G.map.mini, x, y, mw, mh);
     ctx.globalAlpha = 1;
     for (const a of G.areas) {
-      const [ax, ay, aw, ah] = a.def.rect;
-      ctx.fillStyle = a.free ? 'rgba(90,255,150,0.18)' : 'rgba(150,40,200,0.35)';
-      ctx.fillRect(x + ax * k, y + ay * k, aw * k, ah * k);
+      ctx.globalAlpha = a.free ? 0.18 : 0.4;
+      ctx.drawImage(areaMask(G.map, a.i, a.free ? [90, 255, 150] : [150, 40, 200]), x, y, mw, mh);
+      ctx.globalAlpha = 1;
     }
     for (const n of G.nests) {
       if (n.dead) continue;
@@ -4105,15 +4324,19 @@
     g.imageSmoothingEnabled = true;
     g.drawImage(map.bg, 0, 0, c.width, c.height);
     const free = (a) => (G && G.def === def ? G.areas.find((x) => x.def === a).free : prog.areas.includes(a.id));
-    def.areas.forEach((a) => {
-      const [x, y, w, h] = a.rect.map((v) => v * 8);
-      g.fillStyle = free(a) ? 'rgba(80,255,150,0.12)' : 'rgba(90,20,130,0.5)';
-      g.fillRect(x, y, w, h);
+    def.areas.forEach((a, ai) => {
+      g.globalAlpha = free(a) ? 0.14 : 0.5;
+      g.drawImage(areaMask(map, ai, free(a) ? [80, 255, 150] : [90, 20, 130]), 0, 0, c.width, c.height);
       if (selArea === a.id) {
-        g.strokeStyle = '#fff';
-        g.lineWidth = 3;
-        g.strokeRect(x + 2, y + 2, w - 4, h - 4);
+        g.globalAlpha = 0.28;
+        g.drawImage(areaMask(map, ai, [255, 255, 255]), 0, 0, c.width, c.height);
       }
+      g.globalAlpha = 1;
+    });
+    def.areas.forEach((a, ai) => {
+      const ctr = map.centers[ai];
+      const x = ctr.x * 8 + 4;
+      const y = ctr.y * 8 + 4;
       g.font = '800 22px system-ui, sans-serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
@@ -4121,13 +4344,13 @@
       g.strokeStyle = 'rgba(0,0,0,0.85)';
       g.fillStyle = '#fff';
       const label = `${a.name}${a.strong ? ' ★' : ''}`;
-      g.strokeText(label, x + w / 2, y + h / 2 - 12);
-      g.fillText(label, x + w / 2, y + h / 2 - 12);
+      g.strokeText(label, x, y - 12);
+      g.fillText(label, x, y - 12);
       g.font = '700 16px system-ui, sans-serif';
       const sub = `Lv${a.lv[0] + D.lv}〜${Math.min(99, a.lv[1] + D.lv)}`;
       g.fillStyle = free(a) ? '#7dffb0' : lvColor(a.lv[1] + D.lv - powerLv());
-      g.strokeText(sub, x + w / 2, y + h / 2 + 12);
-      g.fillText(sub, x + w / 2, y + h / 2 + 12);
+      g.strokeText(sub, x, y + 12);
+      g.fillText(sub, x, y + 12);
       // 転移碑
       const sx = a.stone[0] * 8 + 4;
       const sy = a.stone[1] * 8 + 4;
@@ -4178,7 +4401,7 @@
       const f = localFrac(c, e);
       const tx = Math.floor(f.u * map.w);
       const ty = Math.floor(f.v * map.h);
-      const a = def.areas.find((ar) => tx >= ar.rect[0] && tx < ar.rect[0] + ar.rect[2] && ty >= ar.rect[1] && ty < ar.rect[1] + ar.rect[3]);
+      const a = tx >= 0 && ty >= 0 && tx < map.w && ty < map.h ? def.areas[map.areaOf[ty * map.w + tx]] : null;
       if (a) {
         selArea = a.id;
         sfx('ui');
