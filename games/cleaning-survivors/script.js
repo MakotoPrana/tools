@@ -1365,6 +1365,8 @@
       const ch = noiseBuf.getChannelData(0);
       for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
       setVolume();
+      // 音を出せるようになる前 (最初に画面を触る前) に決めていた曲を流す
+      if (want) bgm(want);
     }
 
     // 広告のあいだと、CrazyGames の設定で消音にしているときは音を出さない
@@ -1475,8 +1477,11 @@
     const SONGS = {
       main: { bpm: 148, chords: [[48, 52, 55], [45, 48, 52], [41, 45, 48], [43, 47, 50]] },
       boss: { bpm: 166, chords: [[45, 48, 52], [41, 45, 48], [38, 41, 45], [40, 44, 47]] },
+      // タイトル・メニューの静かな曲 (ドラムなし。やわらかい音だけ)
+      menu: { bpm: 84, calm: true, chords: [[48, 52, 55, 59], [45, 48, 52, 55], [41, 45, 48, 52], [43, 47, 50, 53]] },
     };
     let song = null;
+    let want = null; // 流したい曲 (音を出せるようになる前も覚えておく)
     let step = 0;
     let nextTime = 0;
     let timer = null;
@@ -1490,6 +1495,18 @@
         const chord = s.chords[bar];
         const when = nextTime - ac.currentTime;
         const sixteenth = 60 / s.bpm / 4;
+        if (s.calm) {
+          // 小節の頭に和音をのばし、8分音符でゆっくり分散和音を鳴らす
+          if (st === 0) chord.forEach((n, i) => tone(mf(n), 0, sixteenth * 15, 'sine', i ? 0.035 : 0.05, when, bgmGain));
+          if (st % 8 === 0) tone(mf(chord[0] - 12), 0, sixteenth * 7, 'triangle', 0.12, when, bgmGain);
+          if (st % 2 === 0) {
+            const n = chord[[0, 2, 1, 3, 2, 1, 3, 2][st / 2]] + 12;
+            tone(mf(n), 0, sixteenth * 2.6, 'sine', 0.045, when, bgmGain);
+          }
+          nextTime += sixteenth;
+          step++;
+          continue;
+        }
         if (st % 2 === 0) {
           const n = chord[0] - 12 + (st % 4 === 2 ? 12 : 0);
           tone(mf(n), 0, sixteenth * 1.8, 'triangle', 0.22, when, bgmGain);
@@ -1505,6 +1522,7 @@
     }
 
     function bgm(name) {
+      want = name;
       if (!ac) return;
       if (name === song) return;
       song = name;
@@ -3152,6 +3170,8 @@
     keys.delete(keyName(e));
   });
   window.addEventListener('blur', () => keys.clear());
+  // ブラウザは画面を触るまで音を出せないので、どこを触っても音を出せるようにする (タイトルの曲がすぐ流れる)
+  window.addEventListener('pointerdown', () => Sound.init(), { capture: true });
 
   canvas.addEventListener('pointerdown', (e) => {
     Sound.init();
@@ -4482,8 +4502,16 @@
       }
     }
     e.hp -= dmg;
-    e.flash = 0.09;
+    e.flash = 0.12;
     e.aggro = true;
+    // 当たったところに衝撃のマーク (白に濃いふち。明るい床でも見える)。同じゴミには 0.1 秒に 1 回まで
+    // (粒が多すぎるときは出さない。ほかの演出の粒が足りなくならないように)
+    if (G.time - (e.hitFxT ?? -9) > 0.1 && G.parts.length < MAX_PARTICLES * 0.6) {
+      e.hitFxT = G.time;
+      const kl = Math.hypot(kx, ky);
+      const off = kl > 0 ? e.r * 0.5 : 0;
+      addPart(e.x - (kl ? (kx / kl) * off : 0) + rand(-3, 3), e.y - (kl ? (ky / kl) * off : 0) + rand(-3, 3), 0, 0, 0.16, Math.min(14, 7 + e.r * 0.25), '#fff', 'hit');
+    }
     if (!e.boss && !e.def.source) {
       const kb = (e.elite ? 0.25 : 1) * G.stats.knock;
       e.kx += kx * kb;
@@ -5393,14 +5421,15 @@
     for (let i = 0; i < G.dumps.length; i++) if (i !== on) G.dumps[i].t = 0;
     if (on < 0) return;
     const d = G.dumps[on];
-    if (G.box <= 0) {
+    // 1 コインにもならない量 (4 未満) では捨てない (立っているだけで「ゴミ捨て完了!」が出続けないように)
+    if (G.box < 4) {
       d.t = 0;
       return;
     }
     d.t += dt;
     if (d.t >= DUMP_TIME) {
       d.t = 0;
-      const coins = Math.max(1, Math.floor(G.box / 4)); // 少しだけ捨てても「+0 コイン」にはしない
+      const coins = Math.floor(G.box / 4);
       G.dumpCoins += coins;
       G.box = 0;
       G.dumpCount++;
@@ -5950,10 +5979,13 @@
         }
       } else if (zn.kind === 'foam') {
         // 泡: 白とピンクの泡がふくらんだりしぼんだりする
-        ctx.fillStyle = `rgba(255,240,250,${0.18 * a})`;
+        ctx.fillStyle = `rgba(255,225,245,${0.28 * a})`;
         ctx.beginPath();
         ctx.arc(zn.x, zn.y, zn.r, 0, TAU);
         ctx.fill();
+        ctx.strokeStyle = `rgba(160,50,120,${0.45 * a})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
         ctx.strokeStyle = `rgba(255,200,235,${0.75 * a})`;
         ctx.lineWidth = 1.5;
         for (let k = 0; k < 9; k++) {
@@ -5966,11 +5998,14 @@
         }
       } else {
         const acid = zn.kind === 'acid';
-        ctx.fillStyle = acid ? `rgba(180,255,100,${0.25 * a})` : `rgba(110,235,205,${0.25 * a})`;
+        ctx.fillStyle = acid ? `rgba(150,235,60,${0.32 * a})` : `rgba(70,215,180,${0.32 * a})`;
         ctx.beginPath();
         ctx.arc(zn.x, zn.y, zn.r, 0, TAU);
         ctx.fill();
-        ctx.strokeStyle = acid ? `rgba(200,255,140,${0.6 * a})` : `rgba(170,255,235,${0.6 * a})`;
+        ctx.strokeStyle = acid ? `rgba(60,110,10,${0.6 * a})` : `rgba(10,100,80,${0.6 * a})`;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.strokeStyle = acid ? `rgba(220,255,160,${0.8 * a})` : `rgba(190,255,240,${0.8 * a})`;
         ctx.lineWidth = 1.5;
         ctx.stroke();
         for (let k = 0; k < 4; k++) {
@@ -6004,6 +6039,9 @@
         ctx.beginPath();
         ctx.roundRect(-hw, -8, hw * 2, 16, 6);
         ctx.fill();
+        ctx.strokeStyle = 'rgba(40,50,60,0.6)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
         ctx.strokeStyle = 'rgba(0,0,0,0.25)';
         ctx.lineWidth = 1;
         const off = (p.anim * 40) % 8;
@@ -6114,9 +6152,11 @@
         ctx.arc(0, 0, e.r * 1.15, 0, TAU);
         ctx.stroke();
       }
+      // 攻撃が当たったら、少しふくらんで白く光る
+      if (e.flash > 0) ctx.scale(1 + e.flash * 1.1, 1 + e.flash * 1.1);
       drawEnemyBody(ctx, e.type, e.r, e.t, 0, e.rot);
       if (e.flash > 0) {
-        ctx.globalAlpha *= 0.6;
+        ctx.globalAlpha *= 0.85;
         drawEnemyBody(ctx, e.type, e.r, e.t, 1, e.rot);
       }
       ctx.restore();
@@ -6134,19 +6174,28 @@
       const s = w.s;
       const half = ((s.angle / 2) * Math.PI) / 180;
       const g = ctx.createRadialGradient(p.x, p.y, 8, p.x, p.y, s.range);
-      g.addColorStop(0, w.evo ? 'rgba(180,120,255,0.35)' : 'rgba(170,220,255,0.32)');
-      g.addColorStop(1, 'rgba(170,220,255,0)');
+      g.addColorStop(0, w.evo ? 'rgba(160,100,255,0.45)' : 'rgba(110,190,255,0.45)');
+      g.addColorStop(1, w.evo ? 'rgba(160,100,255,0.12)' : 'rgba(110,190,255,0.12)');
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
       ctx.arc(p.x, p.y, s.range, w.ang - half, w.ang + half);
       ctx.closePath();
       ctx.fill();
-      const pulse = 1 - Math.max(0, w.t) / s.cd;
-      ctx.strokeStyle = `rgba(200,235,255,${0.15 + pulse * 0.25})`;
+      // 範囲のふち (明るい床でも見えるように濃い色)
+      ctx.strokeStyle = w.evo ? 'rgba(90,40,170,0.55)' : 'rgba(30,100,170,0.5)';
       ctx.lineWidth = 2;
+      ctx.stroke();
+      // 吸いこむ波 (外から主人公へ縮んでいく)
+      const pulse = 1 - Math.max(0, w.t) / s.cd;
+      const pr = s.range * (1 - pulse * 0.6);
       ctx.beginPath();
-      ctx.arc(p.x, p.y, s.range * (1 - pulse * 0.6), w.ang - half, w.ang + half);
+      ctx.arc(p.x, p.y, pr, w.ang - half, w.ang + half);
+      ctx.strokeStyle = `rgba(20,70,130,${0.2 + pulse * 0.3})`;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(220,240,255,${0.35 + pulse * 0.45})`;
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
 
@@ -6159,14 +6208,20 @@
       const g = ctx.createRadialGradient(p.x, p.y, r * 0.2, p.x, p.y, r);
       const col = w.evo ? '255,214,120' : '150,230,255';
       g.addColorStop(0, `rgba(${col},0)`);
-      g.addColorStop(0.75, `rgba(${col},${0.1 + pulse * 0.12})`);
-      g.addColorStop(1, `rgba(${col},${0.28 + pulse * 0.25})`);
+      g.addColorStop(0.75, `rgba(${col},${0.14 + pulse * 0.2})`);
+      g.addColorStop(1, `rgba(${col},${0.35 + pulse * 0.35})`);
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(p.x, p.y, r, 0, TAU);
       ctx.fill();
-      ctx.strokeStyle = `rgba(${col},${0.45 + pulse * 0.4})`;
-      ctx.lineWidth = 2;
+      const dark = w.evo ? '150,95,10' : '20,90,130';
+      ctx.strokeStyle = `rgba(${dark},${0.4 + pulse * 0.35})`;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(${col},${0.6 + pulse * 0.4})`;
+      ctx.lineWidth = 2.5;
       ctx.setLineDash([10, 8]);
       ctx.beginPath();
       ctx.arc(p.x, p.y, r, tm * 0.8, tm * 0.8 + TAU);
@@ -6242,9 +6297,7 @@
     for (const sw of G.swings) {
       const a = sw.life / sw.max;
       const prog = 1 - a;
-      ctx.strokeStyle = sw.evo ? `rgba(120,230,255,${0.7 * a})` : `rgba(235,245,255,${0.6 * a})`;
       ctx.lineCap = 'round';
-      ctx.lineWidth = 14;
       ctx.beginPath();
       if (sw.half >= Math.PI) {
         ctx.arc(sw.x, sw.y, sw.r * 0.8, sw.a, sw.a + TAU * prog);
@@ -6254,6 +6307,11 @@
         const to = from + 2 * sw.half * sw.side * prog;
         ctx.arc(sw.x, sw.y, sw.r * 0.8, Math.min(from, to), Math.max(from, to));
       }
+      ctx.strokeStyle = sw.evo ? `rgba(10,70,110,${0.45 * a})` : `rgba(30,45,70,${0.4 * a})`;
+      ctx.lineWidth = 19;
+      ctx.stroke();
+      ctx.strokeStyle = sw.evo ? `rgba(120,230,255,${0.85 * a})` : `rgba(235,245,255,${0.8 * a})`;
+      ctx.lineWidth = 14;
       ctx.stroke();
       ctx.lineWidth = 3;
       ctx.strokeStyle = `rgba(255,255,255,${0.8 * a})`;
@@ -6304,10 +6362,13 @@
     for (const bl of G.blasts) {
       const a = clamp(bl.life / bl.max, 0, 1);
       const r = Math.max(1, bl.r * (1.1 - a * 0.4));
-      ctx.fillStyle = bl.press ? `rgba(220,190,130,${0.35 * a})` : bl.evo ? `rgba(255,200,240,${0.45 * a})` : `rgba(200,240,255,${0.45 * a})`;
+      ctx.fillStyle = bl.press ? `rgba(200,150,70,${0.42 * a})` : bl.evo ? `rgba(255,170,230,${0.5 * a})` : `rgba(150,215,255,${0.5 * a})`;
       ctx.beginPath();
       ctx.arc(bl.x, bl.y, r, 0, TAU);
       ctx.fill();
+      ctx.strokeStyle = bl.press ? `rgba(90,55,15,${0.6 * a})` : bl.evo ? `rgba(140,30,100,${0.55 * a})` : `rgba(20,80,140,${0.55 * a})`;
+      ctx.lineWidth = 6;
+      ctx.stroke();
       ctx.strokeStyle = `rgba(255,255,255,${0.9 * a})`;
       ctx.lineWidth = 3;
       ctx.stroke();
@@ -6325,6 +6386,9 @@
       ctx.beginPath();
       ctx.roundRect(-sz, -sz * 0.7, sz * 2, sz * 1.4, 3);
       ctx.fill();
+      ctx.strokeStyle = 'rgba(40,50,60,0.6)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
       ctx.fillStyle = b.evo ? '#ff8a5c' : '#6fd3a8';
       ctx.fillRect(-sz, sz * 0.15, sz * 2, sz * 0.55);
       ctx.restore();
@@ -6376,6 +6440,21 @@
       if (q.kind === 'flash') {
         ctx.fillStyle = `rgba(255,255,255,${0.7 * a})`;
         ctx.fillRect(q.x - 8, q.y - 8, 16, 16);
+      } else if (q.kind === 'hit') {
+        // 衝撃のマーク: 8本のとげの星が、ぱっと広がって消える
+        const sz = q.size * (0.7 + (1 - a) * 0.6);
+        ctx.beginPath();
+        for (let k = 0; k < 16; k++) {
+          const rr = k % 2 ? sz * 0.38 : sz;
+          const ang = q.rot + (k / 16) * TAU;
+          ctx.lineTo(q.x + Math.cos(ang) * rr, q.y + Math.sin(ang) * rr);
+        }
+        ctx.closePath();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(40,30,20,0.75)';
+        ctx.stroke();
+        ctx.fillStyle = '#fffbe6';
+        ctx.fill();
       } else if (q.kind === 'twinkle') {
         const s = q.size * Math.sin(a * Math.PI);
         ctx.beginPath();
@@ -6978,7 +7057,7 @@
   function showTitle() {
     G = null;
     rerender = showTitle;
-    Sound.bgm(null);
+    Sound.bgm('menu');
     show('title', `
       <div class="panel bare">
         <p class="logo${LATIN.includes(lang) ? ' en' : ''}"><small>${t('logoSmall')}</small>${t('logo')}</p>
@@ -7009,7 +7088,7 @@
   function showRooms() {
     G = null;
     rerender = showRooms;
-    Sound.bgm(null);
+    Sound.bgm('menu');
     const ch = curChar();
     const hard = save.mode === 'hard';
     const rooms = STAGES.map((r, i) => {
@@ -7139,7 +7218,7 @@
   function showCharSelect() {
     G = null;
     rerender = showCharSelect;
-    Sound.bgm(null);
+    Sound.bgm('menu');
     if (!selCharId) selCharId = curChar().id;
     const c = CHARS.find((q) => q.id === selCharId) || CHARS[0];
     const ok = charUnlocked(c);
@@ -8110,6 +8189,7 @@
       w.evo = evo;
       recalcStats();
     },
+    spawn: (type, x, y) => spawnEnemy(type, x, y),
     // 宣伝用の画像を作るときに、清掃員 (char) やゴミ (enemy) を大きく描く
     art: (kind, id, size = 256) => {
       const cv = document.createElement('canvas');
