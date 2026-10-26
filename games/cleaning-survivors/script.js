@@ -1396,6 +1396,22 @@
       o.stop(t + dur + 0.02);
     }
 
+    // のばす音 (静かな曲の和音): ふわっと立ち上がって、のばしてから消える
+    function pad(freq, dur, type, vol, when = 0, dest = bgmGain) {
+      const t = ac.currentTime + when;
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol, t + Math.min(0.25, dur * 0.2));
+      g.gain.setValueAtTime(vol, t + dur * 0.6);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(dest);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    }
+
     function noise(dur, vol, type, f1, f2, when = 0, q = 1, dest = seGain) {
       const t = ac.currentTime + when;
       const src = ac.createBufferSource();
@@ -1496,12 +1512,12 @@
         const when = nextTime - ac.currentTime;
         const sixteenth = 60 / s.bpm / 4;
         if (s.calm) {
-          // 小節の頭に和音をのばし、8分音符でゆっくり分散和音を鳴らす
-          if (st === 0) chord.forEach((n, i) => tone(mf(n), 0, sixteenth * 15, 'sine', i ? 0.035 : 0.05, when, bgmGain));
-          if (st % 8 === 0) tone(mf(chord[0] - 12), 0, sixteenth * 7, 'triangle', 0.12, when, bgmGain);
+          // 小節のあいだ和音をのばし、8分音符でゆっくり分散和音を鳴らす (スマホのスピーカーでも聞こえるように、低すぎない音域で)
+          if (st === 0) chord.forEach((n, i) => pad(mf(n + 12), sixteenth * 16, 'triangle', i ? 0.028 : 0.04, when));
+          if (st % 8 === 0) pad(mf(chord[0]), sixteenth * 8, 'triangle', 0.1, when);
           if (st % 2 === 0) {
-            const n = chord[[0, 2, 1, 3, 2, 1, 3, 2][st / 2]] + 12;
-            tone(mf(n), 0, sixteenth * 2.6, 'sine', 0.045, when, bgmGain);
+            const n = chord[[0, 2, 1, 3, 2, 1, 3, 2][st / 2]] + 24;
+            tone(mf(n), 0, sixteenth * 3, 'triangle', 0.09, when, bgmGain);
           }
           nextTime += sixteenth;
           step++;
