@@ -32,6 +32,7 @@
     <div class="board-wrap" id="board-wrap">
       <div class="board" id="board-box">
         <canvas id="board" aria-label="ゲーム画面"></canvas>
+        <button type="button" id="pause-in" class="pause-in" aria-label="メニュー" tabindex="-1" hidden>Ⅱ</button>
 
         <!-- スマホの操作ボタン (プレイ中だけ出す) -->
         <div class="touch" id="touch" hidden>
@@ -48,8 +49,9 @@
     </div>
 
     <p class="howto">
-      パソコン: WASD で移動、マウスでねらって左クリックで撃つ。R リロード / Space 回避 / 1〜6・ホイール 持ち替え / E 調べる / F 回復薬 / M マップ / Esc メニュー。
-      スマホ: 横持ちで、画面の左半分で移動、右半分でねらって撃つ。
+      武器は近くの敵を自動でねらって撃ち、持っている武器は全部同時に攻撃します。
+      パソコン: WASD で移動。マウスを押している間は、その向きに撃つ。Space 回避 / R リロード / E 調べる / F 回復薬 / M マップ / Esc メニュー。
+      スマホ: 横持ちで、画面の左半分で移動。右半分をなぞると、その向きに撃つ。
     </p>
   </main>
 

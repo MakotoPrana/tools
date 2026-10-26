@@ -45,7 +45,6 @@ body {
 }
 
 .app {
-  max-width: 1280px;
   margin: 0 auto;
   padding: 0 16px 16px;
 }
@@ -77,14 +76,14 @@ body {
   cursor: pointer;
 }
 
-/* ゲーム画面 (16:9 を保ったまま、画面に収まる大きさにする) */
+/* ゲーム画面。大きさは script.js の layout() が、使える場所いっぱいになるように決める */
 .board-wrap { display: flex; justify-content: center; }
 
 .board {
   position: relative;
-  width: min(100%, calc((100svh - 56px) * 16 / 9));
-  aspect-ratio: 16 / 9;
-  border-radius: 12px;
+  width: 100%;
+  height: 360px;
+  border-radius: 10px;
   overflow: hidden;
   background: var(--board-bg);
   touch-action: none;
@@ -95,15 +94,35 @@ body {
 
 #board { display: block; width: 100%; height: 100%; cursor: crosshair; }
 
-/* 横持ちのスマホでは、ヘッダーを小さくして画面を広く使う */
-@media (max-height: 500px) {
-  .app { padding: 0 6px 6px; }
-  .top { height: 30px; }
-  .top h1 { font-size: 0.85rem; }
-  .icon-btn { height: 26px; }
-  .board { width: min(100%, calc((100svh - 34px) * 16 / 9)); border-radius: 6px; }
-  .howto { display: none; }
+/* プレイ中は画面がスクロールしないようにする */
+body.playing { overflow: hidden; }
+
+/* スマホ (と高さの低い画面): 余白を減らし、プレイ中は上の見出しを隠す */
+body.compact .app { padding: 0 4px 4px; }
+body.compact .top { height: 30px; }
+body.compact .top h1 { font-size: 0.85rem; }
+body.compact .icon-btn { height: 26px; }
+body.compact .board { border-radius: 4px; }
+body.compact.playing .top { display: none; }
+body.compact.playing .app { padding: 4px; }
+
+/* ゲーム画面の中のメニューボタン (見出しを隠したとき用。ミニマップの下) */
+.pause-in {
+  position: absolute;
+  right: 1.2cqw;
+  top: 15.5cqh;
+  width: 9cqh;
+  height: 9cqh;
+  border-radius: 2cqh;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(10, 8, 16, 0.6);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  font-size: 3.4cqh;
+  touch-action: none;
 }
+body:not(.compact) .pause-in { display: none; }
 
 /* 縦持ちのスマホ: ゲーム全体を 90° 回して横向きにする (--rw・--rh は回したあとの幅と高さ。script.js が入れる) */
 body.rotated { overflow: hidden; }
@@ -114,19 +133,8 @@ body.rotated .app {
   width: var(--rw);
   height: var(--rh);
   max-width: none;
-  padding: 0 6px 6px;
   transform-origin: top left;
   transform: translateX(var(--rh)) rotate(90deg);
-}
-body.rotated .top { height: 30px; }
-body.rotated .top h1 { font-size: 0.85rem; }
-body.rotated .icon-btn { height: 26px; }
-body.rotated .board { width: min(100%, calc((var(--rh) - 36px) * 16 / 9)); border-radius: 6px; }
-body.rotated .howto { display: none; }
-
-@media (max-width: 600px) {
-  .app { padding: 0 8px 16px; }
-  .board { border-radius: 8px; }
 }
 
 .howto { margin: 10px 0 0; color: var(--muted); font-size: 0.8rem; }
@@ -165,7 +173,7 @@ body.rotated .howto { display: none; }
 .toast {
   position: absolute;
   left: 50%;
-  top: 22%;
+  top: 38%;
   transform: translateX(-50%);
   max-width: 86%;
   padding: 1.2cqh 3cqh;

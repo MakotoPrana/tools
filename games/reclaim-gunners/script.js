@@ -11,7 +11,7 @@
   // ===================================================================
   // 基本の値
   // ===================================================================
-  const VW = 640; // 1 画面の大きさ (論理ピクセル)
+  let VW = 640; // 1 画面の横幅 (論理ピクセル)。画面の縦横比に合わせて layout() が変える
   const VH = 360;
   const TILE = 20;
   const TAU = Math.PI * 2;
@@ -285,19 +285,8 @@
 
   // スマホを縦に持っているときは、ゲーム全体を 90° 回して横向きで遊べるようにする
   // (画面が自動で回らないとき用。自動で横になったときは、ふつうの横向き表示)
-  const coarse = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  const touchDev = !!((window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0);
   let rotated = false;
-  function updateRotation() {
-    const want = coarse && settings.rotate !== false && window.innerHeight > window.innerWidth;
-    if (want !== rotated) {
-      rotated = want;
-      document.body.classList.toggle('rotated', rotated);
-    }
-    if (rotated) {
-      document.body.style.setProperty('--rw', `${window.innerHeight}px`);
-      document.body.style.setProperty('--rh', `${window.innerWidth}px`);
-    }
-  }
   // 画面の座標 → 要素の中の割合 (0〜1)。回しているときは軸を入れかえる
   function localFrac(el, e) {
     const r = el.getBoundingClientRect();
@@ -305,8 +294,47 @@
     return { u: (e.clientX - r.left) / r.width, v: (e.clientY - r.top) / r.height };
   }
 
+  // ゲーム画面を、使える場所いっぱいに広げる。
+  // 縦横比は 4:3〜2.2:1 の間で画面に合わせ、見える範囲の横幅 (VW) を変える (高さ VH は 360 のまま)
+  const headerEl = document.querySelector('.top');
+  const howtoEl = document.querySelector('.howto');
+  function layout() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const want = touchDev && settings.rotate !== false && vh > vw;
+    if (want !== rotated) {
+      rotated = want;
+      document.body.classList.toggle('rotated', rotated);
+    }
+    // スマホでは、プレイ中は上の見出しを隠して画面を広く使う (メニューのボタンはゲーム画面の中に出す)
+    const compact = touchDev || vh < 500;
+    document.body.classList.toggle('compact', compact);
+    document.body.classList.toggle('playing', screen === 'play');
+    const W = rotated ? vh : vw;
+    const H = rotated ? vw : vh;
+    if (rotated) {
+      document.body.style.setProperty('--rw', `${W}px`);
+      document.body.style.setProperty('--rh', `${H}px`);
+    }
+    const rs = getComputedStyle(document.documentElement);
+    const inset = rotated ? 0 : (parseFloat(rs.paddingTop) || 0) + (parseFloat(rs.paddingBottom) || 0);
+    const padX = compact ? 4 : 16;
+    const aw = W - padX * 2;
+    const ah = H - inset - (headerEl.hidden || getComputedStyle(headerEl).display === 'none' ? 0 : headerEl.offsetHeight) - (compact ? 8 : 20);
+    const ar = clamp(aw / Math.max(1, ah), 4 / 3, 2.2);
+    let bw = aw;
+    let bh = aw / ar;
+    if (bh > ah) {
+      bh = ah;
+      bw = ah * ar;
+    }
+    boardBox.style.width = `${Math.floor(bw)}px`;
+    boardBox.style.height = `${Math.floor(bh)}px`;
+    VW = Math.round((VH * bw) / bh);
+    howtoEl.hidden = touchDev;
+  }
+
   function resize() {
-    updateRotation();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = Math.max(1, Math.round(boardBox.clientWidth * dpr));
     const h = Math.max(1, Math.round(boardBox.clientHeight * dpr));
@@ -316,7 +344,8 @@
     }
     scale = w / VW;
   }
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', () => setTimeout(layout, 200));
 
   // ===================================================================
   // ステージのマップを作る
@@ -702,7 +731,6 @@
     P.y = pt.y;
     G.cam.x = P.x;
     G.cam.y = P.y;
-    P.cur = Math.max(0, hero.equipped.findIndex((id) => id));
     updateFlow();
   }
 
@@ -766,8 +794,7 @@
     keys[k] = true;
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
     touchMode = false;
-    if (/^Digit[1-6]$/.test(k)) selectSlot(Number(k.slice(5)) - 1);
-    else if (k === 'KeyR') manualReload();
+    if (k === 'KeyR') manualReload();
     else if (k === 'Space') dodge();
     else if (k === 'KeyE') doInteract();
     else if (k === 'KeyF') usePotion();
@@ -787,11 +814,6 @@
   });
 
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  canvas.addEventListener('wheel', (e) => {
-    if (screen !== 'play' || ui.open) return;
-    e.preventDefault();
-    cycleSlot(e.deltaY > 0 ? 1 : -1);
-  }, { passive: false });
 
   canvas.addEventListener('pointerdown', (e) => {
     if (screen !== 'play' || ui.open) return;
@@ -800,11 +822,6 @@
       touchMode = true;
       e.preventDefault();
       canvas.setPointerCapture(e.pointerId);
-      const slot = slotAt(p.x, p.y);
-      if (slot >= 0) {
-        selectSlot(slot);
-        return;
-      }
       if (p.x < VW / 2) {
         if (!sticks.move) sticks.move = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y };
       } else if (!sticks.aim) {
@@ -814,11 +831,6 @@
       touchMode = false;
       mouse.x = p.x;
       mouse.y = p.y;
-      const slot = slotAt(p.x, p.y);
-      if (slot >= 0) {
-        selectSlot(slot);
-        return;
-      }
       if (e.button === 0) mouse.down = true;
       else if (e.button === 2) dodge();
     }
@@ -864,9 +876,11 @@
   bindBtn('t-reload', () => manualReload());
   bindBtn('t-potion', () => usePotion());
   bindBtn('t-interact', () => doInteract());
-  document.getElementById('pause-btn').addEventListener('click', () => {
-    if (screen === 'play' && !ui.open) showPause();
-  });
+  for (const id of ['pause-btn', 'pause-in']) {
+    document.getElementById(id).addEventListener('click', () => {
+      if (screen === 'play' && !ui.open) showPause();
+    });
+  }
 
   function moveInput() {
     let mx = 0;
@@ -1022,30 +1036,9 @@
   // ===================================================================
   // 主人公
   // ===================================================================
-  const curWeaponId = () => hero.equipped[P.cur] || null;
-
-  function selectSlot(i) {
-    if (i < 0 || i >= hero.equipped.length || !hero.equipped[i] || i === P.cur) return;
-    const old = curWeaponId();
-    if (old) {
-      const st = ensureWs(old);
-      st.reloadT = 0; // リロードは中断する (持ち替えでリロード時間を隠せる)
-      st.charge = 0;
-    }
-    P.cur = i;
-    sfx('ui');
-  }
-
-  function cycleSlot(dir) {
-    const n = hero.equipped.length;
-    for (let k = 1; k <= n; k++) {
-      const i = (P.cur + dir * k + n * 10) % n;
-      if (hero.equipped[i]) {
-        selectSlot(i);
-        return;
-      }
-    }
-  }
+  // 装備している武器はすべて同時に撃つ。どれも、それぞれの射程の中のいちばん近い敵を自動でねらう
+  const equippedIds = () => hero.equipped.filter(Boolean);
+  const mainWeaponId = () => equippedIds()[0] || null;
 
   function reloadTime(w) {
     return w.reload * (1 - 0.025 * rank('rel'));
@@ -1061,12 +1054,12 @@
     sfx('reload');
   }
 
+  // R: 弾の減っている武器をまとめてリロードする
   function manualReload() {
-    const id = curWeaponId();
-    if (!id) return;
-    const w = WEAPON[id];
-    if (w.mana) return;
-    startReload(w, ensureWs(id));
+    for (const id of equippedIds()) {
+      const w = WEAPON[id];
+      if (!w.mana) startReload(w, ensureWs(id));
+    }
   }
 
   function dodge() {
@@ -1113,42 +1106,44 @@
     sfx('pick');
   }
 
-  function aimAngle() {
+  // 自分でねらうとき (マウスを押している間・スマホで右側をなぞっている間) の向き。null なら自動でねらう
+  function manualAim() {
     if (touchMode) {
       if (sticks.aim) {
         const dx = sticks.aim.x - sticks.aim.ox;
         const dy = sticks.aim.y - sticks.aim.oy;
-        if (Math.hypot(dx, dy) > 8) {
-          let a = Math.atan2(dy, dx);
-          if (settings.autoAim) a = autoAim(a);
-          return a;
-        }
+        if (Math.hypot(dx, dy) > 8) return Math.atan2(dy, dx);
       }
-      return P.aim;
+      return null;
     }
+    if (!mouse.down) return null;
     const wx = G.cam.x - VW / 2 + mouse.x;
     const wy = G.cam.y - VH / 2 + mouse.y;
     return Math.atan2(wy - P.y, wx - P.x);
   }
 
-  // スマホのオートエイム: スティックの向きの 30° 以内にいる、いちばん近い敵へ
-  function autoAim(a) {
-    let best = null;
-    let bd = 360 * 360;
-    const check = (t) => {
-      if (t.dead || t.dormant) return;
-      const d = dist2(P.x, P.y, t.x, t.y);
-      if (d > bd) return;
-      const ta = Math.atan2(t.y - P.y, t.x - P.x);
-      if (Math.abs(angNorm(ta - a)) > 0.52) return;
-      if (!lineClear(P.x, P.y, t.x, t.y)) return;
-      bd = d;
-      best = ta;
+  // ねらえる相手を近い順に並べる (このフレームで 1 回だけ作る)。壁の向こうの相手は、必要になったときに調べる
+  function buildTargets() {
+    const list = [];
+    const add = (t) => {
+      if (t.dead || t.dormant || t.crumble > 0) return;
+      const d = dist(P.x, P.y, t.x, t.y);
+      if (d < 560) list.push({ t, d, los: null });
     };
-    for (const e of G.enemies) check(e);
-    for (const n of G.nests) check(n);
-    for (const b of G.bosses) for (const p of b.parts) if (b.state === 'fight') check(p);
-    return best == null ? a : best;
+    for (const e of G.enemies) add(e);
+    for (const n of G.nests) add(n);
+    for (const b of G.bosses) if (b.state === 'fight') for (const p of b.parts) if (!(p.h > 6)) add(p);
+    list.sort((a, b) => a.d - b.d);
+    P.targets = list;
+  }
+
+  function nearestTarget(range) {
+    for (const c of P.targets) {
+      if (c.d - c.t.r > range) return null;
+      if (c.los == null) c.los = lineClear(P.x, P.y, c.t.x, c.t.y);
+      if (c.los) return c;
+    }
+    return null;
   }
 
   function updatePlayer(dt) {
@@ -1157,13 +1152,9 @@
     P.dodgeCd = Math.max(0, P.dodgeCd - dt);
     P.twinBoost = Math.max(0, P.twinBoost - dt);
     P.hurtT = Math.max(0, P.hurtT - dt);
-    P.aim = aimAngle();
-    P.wasFiring = P.firing;
-    P.firing = touchMode ? !!(sticks.aim && Math.hypot(sticks.aim.x - sticks.aim.ox, sticks.aim.y - sticks.aim.oy) > 8) : mouse.down;
-    const id = curWeaponId();
-    const w = id ? WEAPON[id] : null;
+    P.heavyT = Math.max(0, (P.heavyT || 0) - dt);
     let sp = moveSpeed();
-    if (w && w.cat === 'heavy' && P.firing) sp *= 0.75;
+    if (P.heavyT > 0) sp *= 0.75; // 重火器を撃っている間は遅くなる
     if (P.rollT > 0) {
       P.rollT -= dt;
       moveCircle(P, Math.cos(P.dodgeDir) * 290 * dt, Math.sin(P.dodgeDir) * 290 * dt, P.r, MOVE_BLOCK);
@@ -1192,14 +1183,37 @@
         P.y = G.lock.cy + (dy / d) * m;
       }
     }
-    if (w) updateWeapon(w, dt);
-    // 魔導の魔力は持っているだけで回復する
-    for (const wid of hero.equipped) {
-      if (!wid) continue;
+    // ねらいと射撃
+    const man = manualAim();
+    buildTargets();
+    G.beam = null;
+    let face = null;
+    equippedIds().forEach((id, i) => {
+      const w = WEAPON[id];
+      const st = ensureWs(id);
+      let ang = null;
+      let tdist = w.range;
+      if (man != null) ang = man;
+      else if (settings.autoAim) {
+        const c = nearestTarget(w.range * 0.95);
+        if (c) {
+          ang = Math.atan2(c.t.y - P.y, c.t.x - P.x);
+          tdist = c.d;
+        }
+      }
+      if (ang != null) st.aim = ang;
+      if (face == null && ang != null) face = ang;
+      updateWeapon(w, st, dt, ang, tdist, i);
+    });
+    // 撃っていないときは、歩いている向きを向く
+    if (face != null) P.aim = face;
+    else if (P.moving) P.aim = Math.atan2(my, mx);
+    // 魔導の魔力は持っているだけで回復する (光線は出している間は回復しない)
+    for (const wid of equippedIds()) {
       const ww = WEAPON[wid];
       if (!ww.mana) continue;
       const st = ensureWs(wid);
-      if (wid === id && P.firing && ww.kind === 'beam') continue;
+      if (st.beaming) continue;
       st.mana = Math.min(ww.mana[0], st.mana + ww.mana[2] * dt);
     }
     P.shownHp = P.shownHp > P.hp ? Math.max(P.hp, P.shownHp - maxHp() * 0.5 * dt) : P.hp;
@@ -1219,9 +1233,12 @@
     updateInteract();
   }
 
-  function updateWeapon(w, dt) {
-    const st = ensureWs(w.id);
+  // ang: 撃つ向き (null ならねらう相手がいないので撃たない)。tdist: 相手までの距離 (グレネードの着弾点)
+  function updateWeapon(w, st, dt, ang, tdist, slot) {
     st.cd -= dt;
+    st.beaming = false;
+    const firing = ang != null;
+    st.active = firing;
     const lv = hero.weapons[w.id] || 0;
     const mag = weaponMag(w, lv);
     if (st.reloadT > 0) {
@@ -1236,15 +1253,19 @@
       startReload(w, st);
       return;
     }
-    if (w.spin) st.spin = P.firing ? Math.min(1, st.spin + dt / w.spin) : Math.max(0, st.spin - dt * 2);
-    // 長押しで引き絞る武器は、離したときに撃つ
+    if (w.spin) st.spin = firing ? Math.min(1, st.spin + dt / w.spin) : Math.max(0, st.spin - dt * 2);
+    // 引き絞る武器は、ためきったら撃つ (相手がいなくなったら、ためた分で撃つ)
     if (w.charge) {
-      if (P.firing && st.cd <= 0) st.charge += dt;
-      if (!P.firing && st.charge > 0) {
+      if (firing && st.cd <= 0) {
+        st.charge += dt;
+        st.chargeAim = ang;
+      }
+      const full = st.charge >= 0.8;
+      if (st.charge > 0 && (full || !firing)) {
         const k = Math.min(1, st.charge / 0.8);
         st.charge = 0;
-        if (st.cd <= 0 && st.ammo > 0) {
-          fire(w, 1 + (w.charge - 1) * k);
+        if (st.cd <= 0 && st.ammo > 0 && k > 0.15) {
+          fire(w, 1 + (w.charge - 1) * k, firing ? ang : st.chargeAim, tdist, slot);
           st.ammo--;
           st.cd = 1 / w.rate;
         }
@@ -1252,14 +1273,14 @@
       return;
     }
     if (w.kind === 'beam') {
-      G.beam = null;
-      if (P.firing && st.mana > 0) {
+      if (firing && st.mana > 0) {
+        st.beaming = true;
         st.mana = Math.max(0, st.mana - w.mana[1] * dt);
-        fireBeam(w, lv, dt);
+        fireBeam(w, st, lv, dt, ang);
       }
       return;
     }
-    if (!P.firing || st.cd > 0) return;
+    if (!firing || st.cd > 0) return;
     let rate = w.rate;
     if (w.spin) rate = lerp(w.rateMin, w.rate, st.spin);
     if (w.twin && P.twinBoost > 0) rate *= 1.5;
@@ -1270,27 +1291,26 @@
       st.ammo--;
     }
     st.cd = 1 / rate;
-    fire(w, 1);
+    fire(w, 1, ang, tdist, slot);
   }
 
-  function fire(w, mult) {
+  function fire(w, mult, a, tdist, slot = 0) {
     const lv = hero.weapons[w.id] || 0;
     const dmg = w.dmg * upgMul(lv) * mult;
-    const a = P.aim;
-    let ox = P.x + Math.cos(a) * 12;
-    let oy = P.y + Math.sin(a) * 12;
+    // 2 丁目からは、少し横から撃つ (左右の手)
+    const side = slot % 2 ? -1 : 1;
+    let ox = P.x + Math.cos(a) * 12 + Math.cos(a + Math.PI / 2) * 3 * side * (slot ? 1 : 0.5);
+    let oy = P.y + Math.sin(a) * 12 + Math.sin(a + Math.PI / 2) * 3 * side * (slot ? 1 : 0.5);
     if (w.twin) {
       P.twinSide *= -1;
       ox += Math.cos(a + Math.PI / 2) * 4 * P.twinSide;
       oy += Math.sin(a + Math.PI / 2) * 4 * P.twinSide;
     }
+    if (w.cat === 'heavy') P.heavyT = 0.25;
     sfx(`shot_${w.cat}`);
     addPart({ x: ox, y: oy, vx: 0, vy: 0, life: 0.06, color: '#fff3b0', size: 5, glow: true });
     if (w.kind === 'grenade') {
-      const wx = touchMode ? P.x + Math.cos(a) * w.range : G.cam.x - VW / 2 + mouse.x;
-      const wy = touchMode ? P.y + Math.sin(a) * w.range : G.cam.y - VH / 2 + mouse.y;
-      let d = Math.min(w.range, dist(P.x, P.y, wx, wy));
-      d = Math.max(40, d);
+      const d = clamp(tdist, 40, w.range);
       G.bullets.push({ type: 'grenade', w, sx: ox, sy: oy, tx: P.x + Math.cos(a) * d, ty: P.y + Math.sin(a) * d, t: 0, dur: d / w.speed, x: ox, y: oy, dmg, elem: w.elem });
       return;
     }
@@ -1313,8 +1333,7 @@
     }
   }
 
-  function fireBeam(w, lv, dt) {
-    const a = P.aim;
+  function fireBeam(w, st, lv, dt, a) {
     const sx = P.x + Math.cos(a) * 12;
     const sy = P.y + Math.sin(a) * 12;
     let len = w.range;
@@ -1327,9 +1346,9 @@
     const ex = sx + Math.cos(a) * len;
     const ey = sy + Math.sin(a) * len;
     G.beam = { sx, sy, ex, ey };
-    P.beamT = (P.beamT || 0) - dt;
-    if (P.beamT > 0) return;
-    P.beamT = 1 / w.rate;
+    st.beamT = (st.beamT || 0) - dt;
+    if (st.beamT > 0) return;
+    st.beamT = 1 / w.rate;
     const dmg = w.dmg * upgMul(lv);
     forAllTargets((t) => {
       const d = segDist(t.x, t.y, sx, sy, ex, ey);
@@ -1981,7 +2000,7 @@
       gainExp(exp);
       hero.gold += gold;
       sub = `解放のごほうび  +${fmt(exp)} EXP  ・  +${fmt(gold)} G`;
-      if (a.town) sub += '\n町に人が戻り、お店が開いた!';
+      if (a.town) sub += '\n町に人が戻り、武器屋が開いた!  黄色い矢印の先へ';
     } else {
       sub = '残党を一掃した';
     }
@@ -2456,16 +2475,19 @@
       }
       useStone(it.s);
     } else if (it.type === 'shop') {
-      const area = G.areas.find((a) => {
-        const [x, y, w, h] = a.def.rect;
-        return it.f.door[0] >= x && it.f.door[0] < x + w && it.f.door[1] >= y && it.f.door[1] < y + h;
-      });
-      if (area && !area.free) {
+      if (!shopOpen(it.f)) {
         toast('武器屋は悪魔に占拠されている\n（町を解放すると開く）', 2);
         return;
       }
+      hero.shopSeen = Object.assign({}, hero.shopSeen, { [it.f.shop]: true });
       showShop(it.f.shop);
     }
+  }
+
+  // お店は、建物のあるエリア (町) を解放すると開く
+  function shopOpen(f) {
+    const ai = G.map.areaOf[f.door[1] * G.map.w + f.door[0]];
+    return !!(G.areas[ai] && G.areas[ai].free);
   }
 
   function useStone(s) {
@@ -2675,6 +2697,7 @@
 
     drawFeaturesLive(inView);
     drawFog(view);
+    drawShops(inView);
     drawSeals();
     drawLairs();
     for (const t of G.teles) drawTele(t);
@@ -2745,6 +2768,114 @@
       ctx.fillStyle = '#6a4a2a';
       circle(ctx, 0, 0, 4);
       ctx.restore();
+    }
+  }
+
+  // 武器屋: 屋根の上の大きな看板と、入口の光。初めて入るまでは入口の上で矢印がはねる
+  function drawShops(inView) {
+    for (const f of G.def.features) {
+      if (!f.shop) continue;
+      const [x, y, w] = f.rect;
+      const cx = (x + w / 2) * TILE;
+      const top = y * TILE;
+      const dx = tc(f.door[0]);
+      const dy = tc(f.door[1]);
+      if (!inView(cx, top, 80) && !inView(dx, dy, 40)) continue;
+      const open = shopOpen(f);
+      ctx.save();
+      if (open) {
+        const g = ctx.createRadialGradient(dx, dy, 0, dx, dy, 34);
+        g.addColorStop(0, `rgba(255,216,74,${0.45 + Math.sin(G.t * 3) * 0.12})`);
+        g.addColorStop(1, 'rgba(255,216,74,0)');
+        ctx.fillStyle = g;
+        circle(ctx, dx, dy, 34);
+      }
+      // 看板
+      const sw = 74;
+      const sh = 22;
+      const sy = top - 26;
+      ctx.strokeStyle = '#5a3a1a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 24, sy + sh);
+      ctx.lineTo(cx - 24, top + 8);
+      ctx.moveTo(cx + 24, sy + sh);
+      ctx.lineTo(cx + 24, top + 8);
+      ctx.stroke();
+      if (open) {
+        ctx.shadowColor = '#ffd84a';
+        ctx.shadowBlur = 10 + Math.sin(G.t * 3) * 4;
+      }
+      ctx.fillStyle = open ? '#3a2410' : '#2a2630';
+      roundRect(ctx, cx - sw / 2, sy, sw, sh, 4);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = open ? '#ffd84a' : '#5a5560';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // 銃のマーク
+      ctx.fillStyle = open ? '#ffd84a' : '#6a6570';
+      ctx.fillRect(cx - sw / 2 + 7, sy + 8, 12, 4);
+      ctx.fillRect(cx - sw / 2 + 8, sy + 11, 4, 6);
+      txt('武器屋', cx + 7, sy + sh / 2 + 0.5, 12, open ? '#ffe9a8' : '#8a8590', 'center', 900);
+      if (!open) {
+        // 占拠されている間は板で打ちつけてある
+        ctx.strokeStyle = '#7a1f3a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx - sw / 2 + 4, sy + 3);
+        ctx.lineTo(cx + sw / 2 - 4, sy + sh - 3);
+        ctx.moveTo(cx + sw / 2 - 4, sy + 3);
+        ctx.lineTo(cx - sw / 2 + 4, sy + sh - 3);
+        ctx.stroke();
+      } else if (!(hero.shopSeen && hero.shopSeen[f.shop])) {
+        const b = Math.abs(Math.sin(G.t * 4)) * 6;
+        ctx.fillStyle = '#ffd84a';
+        ctx.strokeStyle = '#3a2410';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(dx - 8, dy - 34 - b);
+        ctx.lineTo(dx + 8, dy - 34 - b);
+        ctx.lineTo(dx, dy - 22 - b);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+        txt('入口', dx, dy - 42 - b, 8, '#ffe9a8', 'center', 800);
+      }
+      ctx.restore();
+    }
+  }
+
+  // 開いた武器屋が画面の外にあるときは、画面の端に矢印を出す (初めて入るまで)
+  function drawShopPointer() {
+    for (const f of G.def.features) {
+      if (!f.shop || !shopOpen(f) || (hero.shopSeen && hero.shopSeen[f.shop])) continue;
+      const dx = tc(f.door[0]);
+      const dy = tc(f.door[1]);
+      const sx = dx - (G.cam.x - VW / 2);
+      const sy = dy - (G.cam.y - VH / 2);
+      if (sx > 20 && sx < VW - 20 && sy > 20 && sy < VH - 20) continue;
+      const a = Math.atan2(sy - VH / 2, sx - VW / 2);
+      const m = 34;
+      const k = Math.min((VW / 2 - m) / Math.max(0.001, Math.abs(Math.cos(a))), (VH / 2 - m) / Math.max(0.001, Math.abs(Math.sin(a))));
+      const px = VW / 2 + Math.cos(a) * k;
+      const py = VH / 2 + Math.sin(a) * k;
+      const b = Math.sin(G.t * 5) * 3;
+      ctx.save();
+      ctx.translate(px + Math.cos(a) * b, py + Math.sin(a) * b);
+      ctx.rotate(a);
+      ctx.fillStyle = '#ffd84a';
+      ctx.strokeStyle = '#3a2410';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(12, 0);
+      ctx.lineTo(-6, -9);
+      ctx.lineTo(-6, 9);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+      ctx.restore();
+      txt('武器屋', px - Math.cos(a) * 20, py - Math.sin(a) * 16, 9, '#ffe9a8', 'center', 900);
     }
   }
 
@@ -3186,7 +3317,9 @@
 
   function drawPlayer() {
     if (P.inv > 0 && P.rollT <= 0 && Math.floor(G.t * 20) % 2) return;
-    drawHeroSprite(ctx, P.x, P.y, heroDef, P.aim, 1, P.walk, P.rollT > 0, P.hurtT > 0, curWeaponId());
+    // 持っている武器を全部描く (2 丁目は反対の手)。それぞれ、ねらっている向きを向く
+    const guns = equippedIds().map((id) => ({ id, aim: ensureWs(id).aim != null ? ensureWs(id).aim : P.aim }));
+    drawHeroSprite(ctx, P.x, P.y, heroDef, P.aim, 1, P.walk, P.rollT > 0, P.hurtT > 0, guns);
     // 回避のクールダウン
     if (P.dodgeCd > 0) {
       ctx.strokeStyle = 'rgba(255,255,255,0.6)';
@@ -3196,8 +3329,8 @@
       ctx.stroke();
     }
     // チャージ
-    const id = curWeaponId();
-    if (id && WEAPON[id].charge) {
+    for (const id of equippedIds()) {
+      if (!WEAPON[id].charge) continue;
       const st = ensureWs(id);
       if (st.charge > 0) {
         const k = Math.min(1, st.charge / 0.8);
@@ -3210,7 +3343,8 @@
     }
   }
 
-  function drawHeroSprite(c, x, y, def, aim, s = 1, walk = 0, rolling = false, hurt = false, wid = null) {
+  // guns: [{ id, aim }] 持っている武器と、その向き
+  function drawHeroSprite(c, x, y, def, aim, s = 1, walk = 0, rolling = false, hurt = false, guns = []) {
     c.save();
     c.translate(x, y);
     c.scale(s, s);
@@ -3219,11 +3353,18 @@
     c.ellipse(0, 7, 7, 3, 0, 0, TAU);
     c.fill();
     if (rolling) c.rotate(walk * 3);
-    const gunBehind = Math.sin(aim) < -0.2;
-    const drawGun = () => {
+    const drawGun = (g, i) => {
       c.save();
-      c.rotate(aim);
-      const w = wid ? WEAPON[wid] : null;
+      // 3 丁目からは背中に背負う (小さく、斜めに)
+      if (i >= 2) {
+        c.translate((i % 2 ? -1 : 1) * 3, -1);
+        c.rotate(-Math.PI / 2 + (i % 2 ? -0.5 : 0.5));
+        c.scale(0.7, 0.7);
+      } else {
+        c.translate(0, i ? 2 : 0);
+        c.rotate(g.aim);
+      }
+      const w = g.id ? WEAPON[g.id] : null;
       const len = !w ? 9 : w.cat === 'heavy' ? 15 : w.cat === 'prec' ? 16 : w.cat === 'shot' ? 13 : w.cat === 'magic' ? 14 : 10;
       c.fillStyle = w && w.cat === 'magic' ? '#8a5a2a' : '#2a2a30';
       c.fillRect(3, -1.5, len, w && w.cat === 'heavy' ? 4.5 : 3);
@@ -3233,7 +3374,8 @@
       }
       c.restore();
     };
-    if (gunBehind) drawGun();
+    const behind = (g, i) => i >= 2 || Math.sin(g.aim) < -0.2;
+    guns.forEach((g, i) => behind(g, i) && drawGun(g, i));
     const step = Math.sin(walk) * 1.5;
     c.fillStyle = '#2a2430';
     c.fillRect(-4, 4 + step * 0.3, 3, 4);
@@ -3280,7 +3422,7 @@
         circle(c, 1.6 + ex, -5 + ey, 0.9);
       }
     }
-    if (!gunBehind) drawGun();
+    guns.forEach((g, i) => !behind(g, i) && drawGun(g, i));
     c.restore();
   }
 
@@ -3396,11 +3538,7 @@
     const x0 = VW / 2 - w / 2;
     return hero.equipped.map((id, i) => ({ x: x0 + i * (s + gap), y: VH - s - 8, w: s, h: s, id }));
   }
-  function slotAt(x, y) {
-    if (!hero || screen !== 'play') return -1;
-    const r = slotRects().findIndex((r) => x >= r.x - 2 && x <= r.x + r.w + 2 && y >= r.y - 4 && y <= r.y + r.h + 4);
-    return r;
-  }
+
 
   const CAT_COLORS = { hand: '#6fb0ff', shot: '#ff9a5a', heavy: '#ff6a6a', prec: '#7dffb0', magic: '#c88aff', special: '#ffd84a' };
   const CAT_ICON = { hand: '拳', shot: '散', heavy: '重', prec: '狙', magic: '魔', special: '★' };
@@ -3453,6 +3591,7 @@
     }
 
     drawMinimap();
+    drawShopPointer();
 
     // お金と素材
     txt(`${fmt(hero.gold)} G`, 10, VH - 14, 10, '#ffd84a', 'left', 800);
@@ -3465,12 +3604,13 @@
     // 武器スロット
     const rects = slotRects();
     rects.forEach((r, i) => {
-      const cur = i === P.cur;
-      ctx.fillStyle = cur ? 'rgba(80,40,120,0.85)' : 'rgba(0,0,0,0.55)';
+      // 撃っている武器のふちを光らせる (全部の武器が同時に撃つ)
+      const active = r.id && ensureWs(r.id).active;
+      ctx.fillStyle = r.id ? 'rgba(60,30,90,0.75)' : 'rgba(0,0,0,0.45)';
       roundRect(ctx, r.x, r.y, r.w, r.h, 5);
       ctx.fill();
-      ctx.strokeStyle = cur ? '#d0a0ff' : 'rgba(255,255,255,0.2)';
-      ctx.lineWidth = cur ? 1.5 : 1;
+      ctx.strokeStyle = active ? '#ffd84a' : r.id ? '#b08ad8' : 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = active ? 1.8 : 1;
       ctx.stroke();
       if (!r.id) return;
       const w = WEAPON[r.id];
@@ -3498,12 +3638,7 @@
         ctx.stroke();
       }
     });
-    const cid = curWeaponId();
-    if (cid) {
-      const w = WEAPON[cid];
-      const r = rects[P.cur];
-      txt(w.name, VW / 2, r.y - 8, 8, '#fff', 'center');
-    }
+    if (rects.length) txt(settings.autoAim ? '自動でねらって撃つ' : 'ねらって撃つ', VW / 2, rects[0].y - 7, 7, 'rgba(255,255,255,0.7)', 'center');
 
     // 調べる
     if (G.interact && !touchMode) {
@@ -3571,8 +3706,14 @@
     }
     for (const f of G.def.features) {
       if (!f.shop) continue;
-      ctx.fillStyle = '#ffd84a';
-      ctx.fillRect(x + f.door[0] * k - 1, y + f.door[1] * k - 1, 2.5, 2.5);
+      const sx = x + f.door[0] * k;
+      const sy = y + f.door[1] * k;
+      ctx.fillStyle = shopOpen(f) ? '#ffd84a' : '#6a6570';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.fillRect(sx - 3, sy - 3, 6, 6);
+      ctx.strokeRect(sx - 3, sy - 3, 6, 6);
+      txt('店', sx, sy - 7, 6, shopOpen(f) ? '#ffe9a8' : '#aaa', 'center', 900);
     }
     for (const b of G.bosses) {
       ctx.strokeStyle = '#ff5a5a';
@@ -3648,9 +3789,15 @@
   actions.back = () => uiBack();
   actions.close = () => uiClose();
 
+  let lastScreen = null;
   function updateChrome() {
     const playing = screen === 'play';
+    if (screen !== lastScreen) {
+      lastScreen = screen;
+      layout();
+    }
     document.getElementById('pause-btn').hidden = !playing;
+    document.getElementById('pause-in').hidden = !playing || ui.open;
     touchEl.hidden = !(playing && touchMode && !ui.open);
   }
 
@@ -3720,7 +3867,7 @@
         const g = c.getContext('2d');
         const def = HEROES.find((x) => x.id === c.dataset.hero);
         g.clearRect(0, 0, 72, 72);
-        drawHeroSprite(g, 36, 42, def, 0.3, 3.2, 0, false, false, def.id === 'mira' ? 'E1' : def.id === 'gald' ? 'C1' : 'A1');
+        drawHeroSprite(g, 36, 42, def, 0.3, 3.2, 0, false, false, [{ id: def.id === 'mira' ? 'E1' : def.id === 'gald' ? 'C1' : 'A1', aim: 0.3 }]);
       }
     };
     uiShow(fn);
@@ -4234,7 +4381,6 @@
   };
   function fixCur() {
     if (!P) return;
-    if (!hero.equipped[P.cur]) P.cur = Math.max(0, hero.equipped.findIndex(Boolean));
     for (const id of hero.equipped) if (id) ensureWs(id);
   }
 
@@ -4369,7 +4515,7 @@
         ${head('設定')}
         <div class="list">
           <div class="row"><div class="t">効果音</div><input type="range" min="0" max="1" step="0.1" value="${settings.se}" data-set="se"></div>
-          <div class="row"><div><div class="t">オートエイム（スマホ）</div><div class="s">スティックの向きの近くの敵へ自動でねらう</div></div><button class="btn small" data-act="toggleSet" data-id="autoAim">${settings.autoAim ? 'ON' : 'OFF'}</button></div>
+          <div class="row"><div><div class="t">自動でねらって撃つ</div><div class="s">近くの敵へ武器が自動でねらいを向けて撃つ。OFF のときは、マウスを押している間（スマホは右側をなぞっている間）だけ撃つ</div></div><button class="btn small" data-act="toggleSet" data-id="autoAim">${settings.autoAim ? 'ON' : 'OFF'}</button></div>
           <div class="row"><div class="t">ダメージの数字</div><button class="btn small" data-act="toggleSet" data-id="numbers">${settings.numbers ? 'ON' : 'OFF'}</button></div>
           <div class="row"><div><div class="t">縦持ちのとき横向きに回す（スマホ）</div><div class="s">画面が自動で回らないときに、ゲームを 90° 回して横向きで遊ぶ</div></div><button class="btn small" data-act="toggleSet" data-id="rotate">${settings.rotate ? 'ON' : 'OFF'}</button></div>
         </div>
@@ -4378,7 +4524,7 @@
   actions.toggleSet = (d) => {
     settings[d.id] = !settings[d.id];
     saveSettings();
-    resize();
+    layout();
     rerender();
   };
   uiEl.addEventListener('input', (e) => {
@@ -4450,7 +4596,7 @@
     };
   }
 
-  resize();
+  layout();
   showTitle();
   requestAnimationFrame(frame);
 })();
