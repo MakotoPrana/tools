@@ -771,17 +771,13 @@
       play: 'はじめる',
       cleaners: '清掃員',
       tutorial: 'チュートリアル',
-      tutAskTitle: 'はじめての方へ',
-      tutAskText: 'まずは<b>チュートリアル</b>で遊び方を覚えませんか? 3部屋だけの小さな家を、ヒントを見ながら<b>2〜3分</b>で片付けます。',
-      tutAskPlay: 'チュートリアルを遊ぶ',
-      tutAskSkip: 'スキップ',
-      tutAskNote: 'スキップすると、この案内はもう出ません。チュートリアルはタイトルとステージ選択からいつでも遊べます。',
       tutorialMeta: '2〜3分で遊び方を覚える、3部屋だけの小さな家',
       recommended: 'はじめての方に',
       toStage1: 'ステージ1へ',
       noteTutorial: 'チュートリアル完了! 次はステージ1「ゴミ屋敷の1階」に挑戦しよう',
       noteTutorialRetry: 'もう一度チュートリアルに挑戦してみよう',
-      tutMove: 'まずは歩いてみよう。<b>WASD・矢印キー</b> (スマホは画面を指でなぞる) で移動。清掃ギアは<b>自動で</b>動く',
+      tutMove: 'まずは歩いてみよう。<b>WASD・矢印キー</b> で移動。清掃ギアは<b>自動で</b>動く',
+      tutMoveTouch: 'まずは歩いてみよう。<b>画面を指でなぞって</b>移動。清掃ギアは<b>自動で</b>動く',
       tutKill: 'ゴミに近づこう。近くのゴミに、清掃ギアが<b>自動で</b>ダメージを与える。キャラの足もとの<b>体力ゲージ</b>に気をつけて',
       tutDust: '片付けたゴミは<b>ダスト</b> (ひし形) を落とす。拾うと経験値になり、たまると<b>レベルアップ</b>',
       tutLevelUp: (a, b) => `レベルアップ! 清掃ギアかパッシブを1つ選ぼう。ギアは${a}つ・パッシブは${b}つまでしか持てないので、組み合わせを考えよう`,
@@ -988,17 +984,13 @@
       play: 'Play',
       cleaners: 'Cleaners',
       tutorial: 'Tutorial',
-      tutAskTitle: 'New to the game?',
-      tutAskText: 'Want to learn the basics in the <b>tutorial</b> first? You\'ll clean a tiny three-room house in <b>2–3 minutes</b> with hints along the way.',
-      tutAskPlay: 'Play the tutorial',
-      tutAskSkip: 'Skip',
-      tutAskNote: 'If you skip, this message won\'t appear again. You can play the tutorial anytime from the title screen or stage select.',
       tutorialMeta: 'A tiny three-room house to learn the basics in 2–3 minutes',
       recommended: 'New players',
       toStage1: 'Go to Stage 1',
       noteTutorial: 'Tutorial complete! Next, take on Stage 1, "The Trash House: 1st Floor"',
       noteTutorialRetry: 'Give the tutorial another try',
-      tutMove: 'First, try walking. Move with <b>WASD / arrow keys</b> (on phones, drag on the screen). Your cleaning gear works <b>automatically</b>',
+      tutMove: 'First, try walking. Move with <b>WASD / arrow keys</b>. Your cleaning gear works <b>automatically</b>',
+      tutMoveTouch: 'First, try walking. <b>Drag on the screen</b> to move. Your cleaning gear works <b>automatically</b>',
       tutKill: 'Get close to the trash. Your gear damages nearby trash <b>automatically</b>. Keep an eye on the <b>HP gauge</b> under your character',
       tutDust: 'Cleared trash drops <b>dust</b> (diamonds). Pick it up for experience and <b>level up</b>',
       tutLevelUp: (a, b) => `Level up! Pick one gear or passive. You can only carry ${a} gear and ${b} passives, so think about your combination`,
@@ -1206,7 +1198,7 @@
     char: 'cleaner',
     mode: 'normal',
     tutorialDone: false,
-    tutorialSeen: false, // チュートリアルを始めたか、案内でスキップを選んだ (もう案内を出さない)
+    tutorialSeen: false, // チュートリアルを始めたか (はじめての「はじめる」でチュートリアルを始めるのは1回だけ)
   });
 
   // raw: 保存の文字列 (省略するとこの端末の localStorage から読む)
@@ -5578,6 +5570,8 @@
     },
   ];
   const tutorBox = document.getElementById('tutor');
+  // 移動のヒントは、スマホ・タブレットでは指の操作だけ、パソコンではキーの操作だけを出す
+  const tutKey = (step) => (step.key === 'tutMove' && matchMedia('(pointer: coarse)').matches ? 'tutMoveTouch' : step.key);
 
   // 1秒に読める文字数のめやす (ヒントを出しておく長さに使う)
   const READ_SPEED = { ja: 10, en: 22, zh: 9, ko: 13, fr: 20, de: 19, es: 20, it: 20, pt: 20 };
@@ -5592,7 +5586,7 @@
     const step = TUT_STEPS[tu.step];
     if (!step) return;
     // 条件を満たしたら次の手順へ。読み終わる前に消えないように、文の長さに合わせて 4〜9 秒は出しておく
-    const minT = clamp(t(step.key).replace(/<[^>]+>/g, '').length / (READ_SPEED[lang] || 10), 4, 9);
+    const minT = clamp(t(tutKey(step)).replace(/<[^>]+>/g, '').length / (READ_SPEED[lang] || 10), 4, 9);
     if (tu.stepT > minT && (step.done(G) || (step.max && tu.stepT > step.max))) {
       tu.step++;
       tu.stepT = 0;
@@ -5608,7 +5602,7 @@
     const step = tu && TUT_STEPS[tu.step];
     tutorBox.hidden = !step;
     if (!step) return;
-    tutorBox.innerHTML = `<span class="tutor-no">${tu.step + 1}/${TUT_STEPS.length}</span><span class="tutor-text">${t(step.key)}</span>`;
+    tutorBox.innerHTML = `<span class="tutor-no">${tu.step + 1}/${TUT_STEPS.length}</span><span class="tutor-text">${t(tutKey(step))}</span>`;
     tutorBox.classList.remove('pop');
     void tutorBox.offsetWidth;
     tutorBox.classList.add('pop');
@@ -7153,21 +7147,6 @@
       </div>`);
   }
 
-  // はじめて「はじめる」を押したときの、チュートリアルの案内
-  function showTutorialAsk() {
-    rerender = showTutorialAsk;
-    show('tutAsk', `
-      <div class="panel tut-ask">
-        ${panelHead(t('tutAskTitle'), 'title')}
-        <p class="tut-ask-text">${t('tutAskText')}</p>
-        <div class="actions">
-          <button type="button" class="btn primary" data-act="start" data-arg="${TUT}" data-focus>${t('tutAskPlay')}</button>
-          <button type="button" class="btn" data-act="skipTutorial">${t('tutAskSkip')}</button>
-        </div>
-        <p class="tut-ask-note">${t('tutAskNote')}</p>
-      </div>`);
-  }
-
   const unlockText = (c) => t('unlockText', c.unlock + 1, L(STAGES[c.unlock], 'name'));
   const traitText = (c) => t('trait', L(c, 'trait'), L(c, 'traitDesc'));
 
@@ -8049,12 +8028,8 @@
 
   Object.assign(actions, {
     title: showTitle,
-    play: () => (save.tutorialSeen ? showCharSelect() : showTutorialAsk()),
-    skipTutorial: () => {
-      save.tutorialSeen = true;
-      persist();
-      showCharSelect();
-    },
+    // はじめての人は、確認なしでチュートリアルから始める
+    play: () => (save.tutorialSeen ? showCharSelect() : startGame(TUT)),
     charSelect: () => showCharSelect(),
     // キャラ選択: アイコンを押すと下に説明を出す。仲間になっていない清掃員は、なり方だけ見られる
     selChar: (id) => {

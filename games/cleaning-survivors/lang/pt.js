@@ -38,17 +38,13 @@
     play: "Jogar",
     cleaners: "Faxineiros",
     tutorial: "Tutorial",
-    tutAskTitle: "É novo por aqui?",
-    tutAskText: "Quer aprender o básico no <b>tutorial</b> primeiro? Você vai limpar uma casinha de três cômodos em <b>2–3 minutos</b>, com dicas pelo caminho.",
-    tutAskPlay: "Jogar o tutorial",
-    tutAskSkip: "Pular",
-    tutAskNote: "Se você pular, esta mensagem não vai aparecer de novo. Você pode jogar o tutorial quando quiser pela tela de título ou pela seleção de fase.",
     tutorialMeta: "Uma casinha de três cômodos para aprender o básico em 2–3 minutos",
     recommended: "Para iniciantes",
     toStage1: "Ir para a fase 1",
     noteTutorial: "Tutorial concluído! Agora encare a fase 1, \"A casa do lixo: térreo\"",
     noteTutorialRetry: "Tente o tutorial de novo",
-    tutMove: "Primeiro, experimente andar. Mova-se com <b>WASD / setas</b> (no celular, arraste o dedo na tela). Seu equipamento de limpeza funciona <b>sozinho</b>",
+    tutMove: "Primeiro, experimente andar. Mova-se com <b>WASD / setas</b>. Seu equipamento de limpeza funciona <b>sozinho</b>",
+    tutMoveTouch: "Primeiro, experimente andar. <b>Arraste o dedo na tela</b> para se mover. Seu equipamento de limpeza funciona <b>sozinho</b>",
     tutKill: "Chegue perto do lixo. Seu equipamento causa dano <b>automaticamente</b> ao lixo próximo. Fique de olho na <b>barra de PV</b> embaixo do personagem",
     tutDust: "O lixo eliminado deixa <b>poeira</b> (losangos). Recolha para ganhar experiência e <b>subir de nível</b>",
     tutLevelUp: (a, b) => `Subiu de nível! Escolha um equipamento ou uma passiva. Você só pode levar ${a} equipamentos e ${b} passivas, então pense na combinação`,
@@ -372,7 +368,7 @@
     <p>Tire o lixo de uma casa abarrotada com seu equipamento de limpeza e <b>deixe todos os cômodos brilhando em até 10 minutos</b>. Você só controla o movimento: o equipamento de limpeza funciona sozinho. O lixo eliminado deixa poeira, que você recolhe como experiência. Ao subir de nível, escolha um novo equipamento ou uma passiva para ficar mais forte. Você perde se o tempo acabar ou seus PV chegarem a zero.</p>
 
     <h3>Tutorial</h3>
-    <p>Se você é novo, comece pelo "Tutorial" na tela de título (ele também é oferecido na primeira vez que você aperta "Jogar"). Você limpa uma casinha de três cômodos em 2–3 minutos enquanto as dicas na parte de baixo da tela e uma seta verde ensinam o movimento, subir de nível, os focos, concluir cômodos, os baús e os pontos de coleta. O tutorial não conta para o progresso.</p>
+    <p>Se você é novo, comece pelo "Tutorial" na tela de título (ele também começa sozinho na primeira vez que você aperta "Jogar"). Você limpa uma casinha de três cômodos em 2–3 minutos enquanto as dicas na parte de baixo da tela e uma seta verde ensinam o movimento, subir de nível, os focos, concluir cômodos, os baús e os pontos de coleta. O tutorial não conta para o progresso.</p>
 
     <h3>Plantas e focos</h3>
     <p>São 10 fases. Cada fase é uma casa de 5–7 cômodos separados por paredes e portas. Os cômodos têm "focos" cercados por um círculo vermelho pontilhado (montes de lixo, ralos, ninhos de mofo, pilhas de caixas), de onde sai a maior parte do lixo. Os focos sujam o chão ao redor até você destruí-los. Eles também ficam envoltos numa "barreira de sujeira" (uma película marrom) que os deixa mais duros quanto mais sujo estiver o chão ao redor. Acima de cada foco aparecem a força da barreira (uma barra de 5 níveis) e quanto do seu dano está passando (por ex. "DANO 12%"). Quanto mais vermelha a barra, mais duro o foco. Limpar ao redor abaixa a barra e faz seus ataques funcionarem, então esfregue ao redor primeiro. Quanto mais focos você destrói, menos lixo aparece. O minimapa no canto superior esquerdo mostra o quanto cada cômodo está sujo e onde estão os focos (em vermelho).</p>

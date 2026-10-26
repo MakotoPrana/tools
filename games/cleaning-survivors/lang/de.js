@@ -38,17 +38,13 @@
     play: "Spielen",
     cleaners: "Putzkräfte",
     tutorial: "Tutorial",
-    tutAskTitle: "Neu im Spiel?",
-    tutAskText: "Willst du zuerst im <b>Tutorial</b> die Grundlagen lernen? Du putzt ein kleines Haus mit drei Räumen in <b>2–3 Minuten</b>, mit Tipps unterwegs.",
-    tutAskPlay: "Tutorial spielen",
-    tutAskSkip: "Überspringen",
-    tutAskNote: "Wenn du überspringst, erscheint dieser Hinweis nicht mehr. Das Tutorial kannst du jederzeit über den Titelbildschirm oder die Levelauswahl spielen.",
     tutorialMeta: "Ein kleines Haus mit drei Räumen, um in 2–3 Minuten die Grundlagen zu lernen",
     recommended: "Für Neulinge",
     toStage1: "Zu Level 1",
     noteTutorial: "Tutorial geschafft! Als Nächstes: Level 1, „Das Müllhaus: Erdgeschoss“",
     noteTutorialRetry: "Versuch das Tutorial noch einmal",
-    tutMove: "Lauf zuerst ein Stück. Bewege dich mit <b>WASD / Pfeiltasten</b> (auf dem Handy über den Bildschirm wischen). Deine Putzausrüstung arbeitet <b>automatisch</b>",
+    tutMove: "Lauf zuerst ein Stück. Bewege dich mit <b>WASD / Pfeiltasten</b>. Deine Putzausrüstung arbeitet <b>automatisch</b>",
+    tutMoveTouch: "Lauf zuerst ein Stück. <b>Wische über den Bildschirm</b>, um dich zu bewegen. Deine Putzausrüstung arbeitet <b>automatisch</b>",
     tutKill: "Geh näher an den Müll heran. Deine Ausrüstung beschädigt Müll in der Nähe <b>automatisch</b>. Achte auf die <b>LP-Leiste</b> unter deiner Figur",
     tutDust: "Beseitigter Müll lässt <b>Staub</b> (Rauten) fallen. Sammle ihn für Erfahrung und <b>steig im Level auf</b>",
     tutLevelUp: (a, b) => `Level-up! Wähle eine Ausrüstung oder ein Passiv. Du kannst nur ${a} Ausrüstungen und ${b} Passive tragen, also überleg dir deine Kombination`,
@@ -372,7 +368,7 @@
     <p>Räume mit deiner Putzausrüstung ein vermülltes Haus aus und <b>bring alle Räume in 10 Minuten zum Glänzen</b>. Du steuerst nur die Bewegung, die Putzausrüstung arbeitet von selbst. Beseitigter Müll lässt Staub fallen, den du als Erfahrung einsammelst. Beim Level-up wählst du eine neue Ausrüstung oder ein Passiv und wirst stärker. Du verlierst, wenn die Zeit abläuft oder deine LP auf null fallen.</p>
 
     <h3>Tutorial</h3>
-    <p>Neulinge fangen am besten mit „Tutorial“ auf dem Titelbildschirm an (es wird dir auch beim ersten Druck auf „Spielen“ angeboten). Du putzt in 2–3 Minuten ein kleines Haus mit drei Räumen, während Tipps unten im Bild und ein grüner Pfeil dich durch Bewegung, Level-up, Quellen, das Abschließen von Räumen, Truhen und Müllplätze führen. Das Tutorial zählt nicht zum Fortschritt.</p>
+    <p>Neulinge fangen am besten mit „Tutorial“ auf dem Titelbildschirm an (beim ersten Druck auf „Spielen“ startet es automatisch). Du putzt in 2–3 Minuten ein kleines Haus mit drei Räumen, während Tipps unten im Bild und ein grüner Pfeil dich durch Bewegung, Level-up, Quellen, das Abschließen von Räumen, Truhen und Müllplätze führen. Das Tutorial zählt nicht zum Fortschritt.</p>
 
     <h3>Grundrisse und Quellen</h3>
     <p>Es gibt 10 Level. Jedes Level ist ein Haus mit 5–7 Räumen, getrennt durch Wände und Türen. In den Räumen gibt es rot gepunktet umrandete „Quellen“ (Müllhaufen, Abflüsse, Schimmelnester, Kartonstapel), aus denen der meiste Müll kommt. Quellen verschmutzen den Boden um sich herum, bis du sie zerstörst. Außerdem sind sie von einer „Schmutzbarriere“ (einem braunen Film) umgeben, die sie umso härter macht, je dreckiger der Boden drumherum ist. Über jeder Quelle siehst du die Stärke der Barriere (eine 5-stufige Leiste) und wie viel deines Schadens gerade durchkommt (z. B. „SCH 12 %“). Je röter die Leiste, desto härter die Quelle. Putzt du drumherum, sinkt die Leiste und deine Angriffe wirken, also schrubb zuerst drumherum. Je mehr Quellen du zerstörst, desto weniger Müll entsteht. Die Minikarte oben links zeigt, wie dreckig jeder Raum ist und wo die Quellen (rot) sind.</p>

@@ -38,17 +38,13 @@
     play: "Jouer",
     cleaners: "Agents",
     tutorial: "Tutoriel",
-    tutAskTitle: "Nouveau venu ?",
-    tutAskText: "Voulez-vous d'abord apprendre les bases dans le <b>tutoriel</b> ? Vous nettoierez une petite maison de trois pièces en <b>2 à 3 minutes</b>, guidé par des conseils.",
-    tutAskPlay: "Jouer au tutoriel",
-    tutAskSkip: "Passer",
-    tutAskNote: "Si vous passez, ce message ne s'affichera plus. Le tutoriel reste accessible à tout moment depuis l'écran titre ou le choix du niveau.",
     tutorialMeta: "Une petite maison de trois pièces pour apprendre les bases en 2 à 3 minutes",
     recommended: "Débutants",
     toStage1: "Aller au niveau 1",
     noteTutorial: "Tutoriel terminé ! Attaquez maintenant le niveau 1, « La maison des déchets : rez-de-chaussée »",
     noteTutorialRetry: "Retentez le tutoriel",
-    tutMove: "Commencez par marcher. Déplacez-vous avec <b>ZQSD / WASD / flèches</b> (sur mobile, faites glisser le doigt sur l'écran). Votre équipement attaque <b>tout seul</b>",
+    tutMove: "Commencez par marcher. Déplacez-vous avec <b>ZQSD / WASD / flèches</b>. Votre équipement attaque <b>tout seul</b>",
+    tutMoveTouch: "Commencez par marcher. <b>Faites glisser le doigt sur l'écran</b> pour vous déplacer. Votre équipement attaque <b>tout seul</b>",
     tutKill: "Approchez-vous des déchets. Votre équipement abîme <b>automatiquement</b> ceux qui sont proches. Surveillez la <b>jauge de PV</b> sous votre personnage",
     tutDust: "Les déchets nettoyés laissent de la <b>poussière</b> (losanges). Ramassez-la pour gagner de l'expérience et <b>monter de niveau</b>",
     tutLevelUp: (a, b) => `Niveau supérieur ! Choisissez un équipement ou un passif. Vous ne pouvez porter que ${a} équipements et ${b} passifs : réfléchissez à votre combinaison`,
@@ -372,7 +368,7 @@
     <p>Débarrassez une maison encombrée de ses déchets avec votre équipement de ménage et <b>faites briller toutes les pièces en moins de 10 minutes</b>. Vous ne contrôlez que vos déplacements : l'équipement attaque tout seul. Les déchets nettoyés laissent de la poussière, que vous ramassez comme expérience. À chaque niveau, choisissez un nouvel équipement ou un passif pour devenir plus fort. Vous échouez si le temps est écoulé ou si vos PV tombent à zéro.</p>
 
     <h3>Tutoriel</h3>
-    <p>Si vous débutez, commencez par « Tutoriel » sur l'écran titre (il vous est aussi proposé la première fois que vous appuyez sur « Jouer »). Vous nettoyez une petite maison de trois pièces en 2 à 3 minutes, guidé par des conseils en bas de l'écran et une flèche verte : déplacement, montée de niveau, sources, fin d'une pièce, coffres et bennes. Le tutoriel ne compte pas dans la progression.</p>
+    <p>Si vous débutez, commencez par « Tutoriel » sur l'écran titre (il démarre aussi automatiquement la première fois que vous appuyez sur « Jouer »). Vous nettoyez une petite maison de trois pièces en 2 à 3 minutes, guidé par des conseils en bas de l'écran et une flèche verte : déplacement, montée de niveau, sources, fin d'une pièce, coffres et bennes. Le tutoriel ne compte pas dans la progression.</p>
 
     <h3>Plans et sources</h3>
     <p>Il y a 10 niveaux. Chaque niveau est une maison de 5 à 7 pièces séparées par des murs et des portes. Les pièces contiennent des « sources » entourées d'un cercle rouge en pointillés (tas d'ordures, évacuations, nids de moisissure, tas de cartons), d'où sortent la plupart des déchets. Les sources salissent le sol autour d'elles tant qu'elles ne sont pas détruites. Elles sont aussi protégées par une « barrière de crasse » (un film brun) qui les rend d'autant plus solides que le sol autour est sale. Au-dessus de chaque source s'affichent la force de la barrière (jauge à 5 crans) et la part de vos dégâts qui passe (par ex. « DÉG 12 % »). Plus la jauge est rouge, plus la source est solide. Nettoyer autour fait baisser la jauge et rend vos attaques efficaces : frottez autour d'abord. Plus vous détruisez de sources, moins il apparaît de déchets. La mini-carte en haut à gauche montre la saleté de chaque pièce et l'emplacement des sources (en rouge).</p>

@@ -38,17 +38,13 @@
     play: "Gioca",
     cleaners: "Addetti",
     tutorial: "Tutorial",
-    tutAskTitle: "Sei nuovo?",
-    tutAskText: "Vuoi imparare le basi nel <b>tutorial</b>? Pulirai una casetta di tre stanze in <b>2–3 minuti</b>, con suggerimenti lungo la strada.",
-    tutAskPlay: "Gioca il tutorial",
-    tutAskSkip: "Salta",
-    tutAskNote: "Se salti, questo messaggio non comparirà più. Puoi giocare il tutorial quando vuoi dalla schermata del titolo o dalla scelta del livello.",
     tutorialMeta: "Una casetta di tre stanze per imparare le basi in 2–3 minuti",
     recommended: "Per i principianti",
     toStage1: "Vai al livello 1",
     noteTutorial: "Tutorial completato! Ora affronta il livello 1, «La casa dei rifiuti: piano terra»",
     noteTutorialRetry: "Riprova il tutorial",
-    tutMove: "Per prima cosa, prova a camminare. Muoviti con <b>WASD / frecce</b> (sul telefono, trascina il dito sullo schermo). I tuoi attrezzi lavorano <b>da soli</b>",
+    tutMove: "Per prima cosa, prova a camminare. Muoviti con <b>WASD / frecce</b>. I tuoi attrezzi lavorano <b>da soli</b>",
+    tutMoveTouch: "Per prima cosa, prova a camminare. <b>Trascina il dito sullo schermo</b> per muoverti. I tuoi attrezzi lavorano <b>da soli</b>",
     tutKill: "Avvicinati ai rifiuti. I tuoi attrezzi danneggiano <b>automaticamente</b> i rifiuti vicini. Tieni d'occhio la <b>barra dei PS</b> sotto il personaggio",
     tutDust: "I rifiuti eliminati lasciano <b>polvere</b> (rombi). Raccoglila per ottenere esperienza e <b>salire di livello</b>",
     tutLevelUp: (a, b) => `Livello su! Scegli un attrezzo o un passivo. Puoi portare solo ${a} attrezzi e ${b} passivi, quindi pensa alla combinazione`,
@@ -372,7 +368,7 @@
     <p>Libera dai rifiuti una casa stracolma con i tuoi attrezzi per le pulizie e <b>fai splendere tutte le stanze entro 10 minuti</b>. Controlli solo il movimento: gli attrezzi lavorano da soli. I rifiuti eliminati lasciano polvere, che raccogli come esperienza. Quando sali di livello, scegli un nuovo attrezzo o un passivo per diventare più forte. Perdi se scade il tempo o se i tuoi PS arrivano a zero.</p>
 
     <h3>Tutorial</h3>
-    <p>Se sei nuovo, comincia da «Tutorial» nella schermata del titolo (ti viene proposto anche la prima volta che premi «Gioca»). Pulisci una casetta di tre stanze in 2–3 minuti mentre i suggerimenti in basso e una freccia verde ti insegnano il movimento, il livello su, le sorgenti, il completamento delle stanze, i forzieri e i cassonetti. Il tutorial non conta per il completamento.</p>
+    <p>Se sei nuovo, comincia da «Tutorial» nella schermata del titolo (parte anche da solo la prima volta che premi «Gioca»). Pulisci una casetta di tre stanze in 2–3 minuti mentre i suggerimenti in basso e una freccia verde ti insegnano il movimento, il livello su, le sorgenti, il completamento delle stanze, i forzieri e i cassonetti. Il tutorial non conta per il completamento.</p>
 
     <h3>Piante e sorgenti</h3>
     <p>Ci sono 10 livelli. Ogni livello è una casa di 5–7 stanze divise da muri e porte. Nelle stanze ci sono «sorgenti» circondate da un cerchio rosso tratteggiato (mucchi di rifiuti, scarichi, nidi di muffa, pile di scatoloni), da cui esce la maggior parte dei rifiuti. Le sorgenti sporcano il pavimento intorno finché non le distruggi. Inoltre sono avvolte da una «barriera di sporco» (una pellicola marrone) che le rende tanto più dure quanto più è sporco il pavimento intorno. Sopra ogni sorgente vedi la forza della barriera (una barra a 5 livelli) e quanta parte del tuo danno passa ora (ad es. «DANNO 12%»). Più la barra è rossa, più la sorgente è dura. Pulire intorno abbassa la barra e rende efficaci i tuoi attacchi, quindi strofina intorno prima. Più sorgenti distruggi, meno rifiuti compaiono. La minimappa in alto a sinistra mostra quanto è sporca ogni stanza e dove sono le sorgenti (in rosso).</p>

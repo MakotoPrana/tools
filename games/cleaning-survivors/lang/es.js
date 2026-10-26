@@ -38,17 +38,13 @@
     play: "Jugar",
     cleaners: "Limpiadores",
     tutorial: "Tutorial",
-    tutAskTitle: "¿Eres nuevo?",
-    tutAskText: "¿Quieres aprender lo básico primero en el <b>tutorial</b>? Limpiarás una casita de tres habitaciones en <b>2–3 minutos</b> con pistas por el camino.",
-    tutAskPlay: "Jugar el tutorial",
-    tutAskSkip: "Saltar",
-    tutAskNote: "Si lo saltas, este mensaje no volverá a aparecer. Puedes jugar el tutorial cuando quieras desde la pantalla de título o la selección de nivel.",
     tutorialMeta: "Una casita de tres habitaciones para aprender lo básico en 2–3 minutos",
     recommended: "Para novatos",
     toStage1: "Ir al nivel 1",
     noteTutorial: "¡Tutorial completado! Ahora, a por el nivel 1, «La casa de la basura: planta baja»",
     noteTutorialRetry: "Vuelve a intentar el tutorial",
-    tutMove: "Primero, prueba a caminar. Muévete con <b>WASD / flechas</b> (en el móvil, desliza el dedo por la pantalla). Tu equipo de limpieza funciona <b>solo</b>",
+    tutMove: "Primero, prueba a caminar. Muévete con <b>WASD / flechas</b>. Tu equipo de limpieza funciona <b>solo</b>",
+    tutMoveTouch: "Primero, prueba a caminar. <b>Desliza el dedo por la pantalla</b> para moverte. Tu equipo de limpieza funciona <b>solo</b>",
     tutKill: "Acércate a la basura. Tu equipo daña <b>automáticamente</b> la basura cercana. Vigila la <b>barra de PV</b> bajo tu personaje",
     tutDust: "La basura eliminada suelta <b>polvo</b> (rombos). Recógelo para ganar experiencia y <b>subir de nivel</b>",
     tutLevelUp: (a, b) => `¡Subes de nivel! Elige un equipo o una pasiva. Solo puedes llevar ${a} equipos y ${b} pasivas, así que piensa bien la combinación`,
@@ -372,7 +368,7 @@
     <p>Saca la basura de una casa abarrotada con tu equipo de limpieza y <b>deja todas las habitaciones relucientes en menos de 10 minutos</b>. Solo controlas el movimiento: el equipo de limpieza funciona solo. La basura eliminada suelta polvo, que recoges como experiencia. Al subir de nivel, elige un equipo nuevo o una pasiva para hacerte más fuerte. Pierdes si se acaba el tiempo o tus PV llegan a cero.</p>
 
     <h3>Tutorial</h3>
-    <p>Si eres nuevo, empieza por «Tutorial» en la pantalla de título (también se te ofrece la primera vez que pulsas «Jugar»). Limpias una casita de tres habitaciones en 2–3 minutos mientras las pistas de la parte inferior y una flecha verde te enseñan a moverte, subir de nivel, los focos, terminar habitaciones, los cofres y los contenedores. El tutorial no cuenta para el progreso.</p>
+    <p>Si eres nuevo, empieza por «Tutorial» en la pantalla de título (también empieza solo la primera vez que pulsas «Jugar»). Limpias una casita de tres habitaciones en 2–3 minutos mientras las pistas de la parte inferior y una flecha verde te enseñan a moverte, subir de nivel, los focos, terminar habitaciones, los cofres y los contenedores. El tutorial no cuenta para el progreso.</p>
 
     <h3>Planos y focos</h3>
     <p>Hay 10 niveles. Cada nivel es una casa de 5–7 habitaciones separadas por paredes y puertas. Las habitaciones tienen «focos» rodeados por un círculo rojo punteado (montones de basura, desagües, nidos de moho, pilas de cajas), de donde sale la mayor parte de la basura. Los focos ensucian el suelo a su alrededor hasta que los destruyes. Además, están envueltos en una «barrera de mugre» (una película marrón) que los hace más duros cuanto más sucio está el suelo de alrededor. Encima de cada foco verás la fuerza de la barrera (una barra de 5 niveles) y qué parte de tu daño pasa ahora (p. ej. «DAÑO 12 %»). Cuanto más roja la barra, más duro el foco. Limpiar alrededor baja la barra y hace que tus ataques funcionen, así que friega alrededor primero. Cuantos más focos destruyes, menos basura aparece. El minimapa de arriba a la izquierda muestra lo sucia que está cada habitación y dónde están los focos (en rojo).</p>

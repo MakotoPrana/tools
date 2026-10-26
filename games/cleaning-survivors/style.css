@@ -724,12 +724,6 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0 
 .room.tutorial .room-no { background: var(--mint); color: #08261d; }
 .badge.rec { width: auto; margin-left: 8px; padding: 0 8px; background: var(--mint); color: #08261d; }
 
-/* はじめて「はじめる」を押したときの案内 */
-.tut-ask { max-width: 460px; }
-.tut-ask-text { margin: 8px 0 0; text-align: center; line-height: 1.7; }
-.tut-ask-text b { color: var(--mint); }
-.tut-ask-note { margin: 14px 0 0; color: var(--panel-muted); font-size: 0.78rem; text-align: center; }
-
 /* ギアかパッシブかの札 */
 .kind-tag { display: inline-block; margin-right: 6px; padding: 0 7px; border-radius: 999px; font-size: 0.66rem; font-weight: 800; line-height: 1.6; vertical-align: 2px; white-space: nowrap; }
 .kind-tag.k-gear { background: #3a8dde; color: #fff; }
