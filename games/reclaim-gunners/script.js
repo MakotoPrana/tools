@@ -354,23 +354,23 @@
   // ステージのマップを作る
   // ===================================================================
   const THEMES = {
-    village: { floor: ['#a0906c', '#a89876'], dot: '#8a7a58', fog: [70, 20, 90] },
-    wheat: { floor: ['#c8a64a', '#cfae52'], dot: '#b08f36', fog: [70, 20, 90] },
-    hill: { floor: ['#6c9a4c', '#74a254'], dot: '#5d8a40', fog: [70, 20, 90] },
-    forest: { floor: ['#3f6a3a', '#447040'], dot: '#345a30', fog: [60, 15, 80] },
-    bone: { floor: ['#6d6862', '#746e68'], dot: '#5d5852', fog: [80, 15, 60] },
-    orchard: { floor: ['#5e8e46', '#66964d'], dot: '#c8524a', fog: [70, 20, 90] },
-    river: { floor: ['#7a9a5a', '#82a262'], dot: '#5f7f46', fog: [60, 20, 90] },
-    fort: { floor: ['#8a7f6c', '#928774'], dot: '#6f6656', fog: [80, 20, 80] },
+    village: { floor: ['#a0906c', '#a89876'], dot: '#8a7a58', fog: [70, 20, 90], tex: 'dirt' },
+    wheat: { floor: ['#c8a64a', '#cfae52'], dot: '#b08f36', fog: [70, 20, 90], tex: 'wheat' },
+    hill: { floor: ['#6c9a4c', '#74a254'], dot: '#5d8a40', fog: [70, 20, 90], tex: 'grass', flower: '#f0e060' },
+    forest: { floor: ['#3f6a3a', '#447040'], dot: '#345a30', fog: [60, 15, 80], tex: 'grass' },
+    bone: { floor: ['#6d6862', '#746e68'], dot: '#5d5852', fog: [80, 15, 60], tex: 'crack' },
+    orchard: { floor: ['#5e8e46', '#66964d'], dot: '#c8524a', fog: [70, 20, 90], tex: 'grass', flower: '#f0f0f0' },
+    river: { floor: ['#7a9a5a', '#82a262'], dot: '#5f7f46', fog: [60, 20, 90], tex: 'grass', flower: '#8ab8ff' },
+    fort: { floor: ['#8a7f6c', '#928774'], dot: '#6f6656', fog: [80, 20, 80], tex: 'crack' },
     // ステージ2 ミスト湖沼
-    cove: { floor: ['#8a9a6a', '#92a272'], dot: '#6f7f50', fog: [50, 30, 90] },
-    lakeTown: { floor: ['#9a8a70', '#a2927a'], dot: '#7a6a50', fog: [50, 30, 90] },
-    reed: { floor: ['#8c9a50', '#94a258'], dot: '#6f7d36', fog: [50, 30, 90] },
-    firefly: { floor: ['#2f4a3a', '#345040'], dot: '#c8ff6a', fog: [40, 30, 90] },
-    cathedral: { floor: ['#7a7a84', '#82828c'], dot: '#62626c', fog: [60, 30, 100] },
-    fishing: { floor: ['#b8a67a', '#c0ae82'], dot: '#9a8a5a', fog: [50, 30, 90] },
-    mist: { floor: ['#6a7a76', '#72827e'], dot: '#56645f', fog: [60, 40, 100] },
-    toad: { floor: ['#4a4a32', '#525238'], dot: '#3a3a22', fog: [60, 30, 60] },
+    cove: { floor: ['#8a9a6a', '#92a272'], dot: '#6f7f50', fog: [50, 30, 90], tex: 'grass' },
+    lakeTown: { floor: ['#9a8a70', '#a2927a'], dot: '#7a6a50', fog: [50, 30, 90], tex: 'stone' },
+    reed: { floor: ['#8c9a50', '#94a258'], dot: '#6f7d36', fog: [50, 30, 90], tex: 'grass' },
+    firefly: { floor: ['#2f4a3a', '#345040'], dot: '#c8ff6a', fog: [40, 30, 90], tex: 'grass', glow: 'rgba(200,255,120,0.7)' },
+    cathedral: { floor: ['#7a7a84', '#82828c'], dot: '#62626c', fog: [60, 30, 100], tex: 'stone' },
+    fishing: { floor: ['#b8a67a', '#c0ae82'], dot: '#9a8a5a', fog: [50, 30, 90], tex: 'sand' },
+    mist: { floor: ['#6a7a76', '#72827e'], dot: '#56645f', fog: [60, 40, 100], tex: 'grass' },
+    toad: { floor: ['#4a4a32', '#525238'], dot: '#3a3a22', fog: [60, 30, 60], tex: 'dirt' },
   };
 
   // エリアの境目の壁の見た目 (テーマごと)
@@ -707,44 +707,262 @@
     return { x: k % map.w, y: (k / map.w) | 0 };
   }
 
+  // 色の計算
+  const hexRgb = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const rgbStr = (c, a = 1) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
+  const mixRgb = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+  const shadeRgb = (c, k) => (k >= 0 ? mixRgb(c, [255, 255, 255], k) : mixRgb(c, [0, 0, 0], -k));
+
+  // 背景の解像度 (パソコンでは細かく描く。スマホはメモリを使いすぎないように 1 倍)
+  const BG_SCALE = touchDev ? 1 : 1.5;
+
+  // 背景を 1 枚の絵に描く (ステージに入るときに 1 回だけ)。光は左上から当たる
   function renderBg(map) {
     const { def, w, h, tiles, areaOf, idx } = map;
+    const S = BG_SCALE;
+    const W = w * TILE;
+    const H = h * TILE;
     const c = document.createElement('canvas');
-    c.width = w * TILE;
-    c.height = h * TILE;
+    c.width = Math.round(W * S);
+    c.height = Math.round(H * S);
     const g = c.getContext('2d');
+    g.scale(S, S);
     const rng = mulberry32(def.seed * 7 + 3);
     const inb = (x, y) => x >= 0 && y >= 0 && x < w && y < h;
-    // 床
+    const themeAt = (x, y) => THEMES[(def.areas[areaOf[idx(clamp(x, 0, w - 1), clamp(y, 0, h - 1))]] || def.areas[0]).theme];
+
+    // 1. 地面の色: ノイズで色むらをつける (4px ごとに計算して、なめらかに拡大する)
+    const Q = 4;
+    const sw = Math.ceil(W / Q);
+    const sh = Math.ceil(H / Q);
+    const small = document.createElement('canvas');
+    small.width = sw;
+    small.height = sh;
+    const sg = small.getContext('2d');
+    const img = sg.createImageData(sw, sh);
+    const n1 = valueNoise(def.seed + 7);
+    const n2 = valueNoise(def.seed + 13);
+    const n3 = valueNoise(def.seed + 29);
+    const cols = {};
+    for (const [k, th] of Object.entries(THEMES)) cols[k] = { a: hexRgb(th.floor[0]), b: hexRgb(th.floor[1]), d: hexRgb(th.dot) };
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        const px = x * Q;
+        const py = y * Q;
+        const tx = Math.floor(px / TILE);
+        const ty = Math.floor(py / TILE);
+        const th = (def.areas[areaOf[idx(Math.min(tx, w - 1), Math.min(ty, h - 1))]] || def.areas[0]).theme;
+        const cc = cols[th];
+        const big = (n1(px / 140, py / 140) + n1(px / 60, py / 60) * 0.5) / 1.5;
+        const fine = n2(px / 14, py / 14) * 0.6 + n2(px / 6, py / 6) * 0.4;
+        let col = mixRgb(cc.a, cc.b, clamp(big * 0.5 + 0.5, 0, 1) * 1.6 - 0.3);
+        // 土や草の濃い所 (まだら)
+        const patch = n3(px / 45, py / 45);
+        if (patch > 0.35) col = mixRgb(col, cc.d, Math.min(0.55, (patch - 0.35) * 1.6));
+        col = shadeRgb(col, fine * 0.07 + big * 0.06);
+        const i = (y * sw + x) * 4;
+        img.data[i] = col[0];
+        img.data[i + 1] = col[1];
+        img.data[i + 2] = col[2];
+        img.data[i + 3] = 255;
+      }
+    }
+    sg.putImageData(img, 0, 0);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(small, 0, 0, W, H);
+
+    // 2. 地面の細かい模様 (草・麦・小石・ひび・石だたみ・砂の波)
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const ai = areaOf[idx(x, y)];
-        const th = THEMES[(def.areas[ai] || def.areas[0]).theme];
-        g.fillStyle = th.floor[(x + y) & 1 ? 1 : 0];
-        g.fillRect(x * TILE, y * TILE, TILE, TILE);
-        if (rng() < 0.5) {
-          g.fillStyle = th.dot;
-          g.fillRect(x * TILE + rng() * 16, y * TILE + rng() * 16, 2 + rng() * 2, 2);
+        const t = tiles[idx(x, y)];
+        if (t === T.WATER || t === T.SWAMP) continue;
+        const th = themeAt(x, y);
+        const base = hexRgb(th.floor[0]);
+        const px = x * TILE;
+        const py = y * TILE;
+        const tex = th.tex || 'grass';
+        if (tex === 'grass') {
+          for (let k = 0; k < 5; k++) {
+            const bx = px + rng() * TILE;
+            const by = py + rng() * TILE;
+            const lean = rng() * 4 - 2;
+            g.strokeStyle = rgbStr(shadeRgb(base, rng() < 0.5 ? -0.25 : 0.18), 0.55);
+            g.lineWidth = 1;
+            g.beginPath();
+            g.moveTo(bx, by);
+            g.lineTo(bx + lean, by - 3 - rng() * 3);
+            g.stroke();
+          }
+          if (th.flower && rng() < 0.06) {
+            g.fillStyle = th.flower;
+            for (let k = 0; k < 3; k++) circle(g, px + rng() * TILE, py + rng() * TILE, 1.1);
+          }
+        } else if (tex === 'wheat') {
+          for (let k = 0; k < 4; k++) {
+            const bx = px + 2 + k * 5 + rng() * 2;
+            const by = py + 6 + rng() * 12;
+            g.strokeStyle = 'rgba(140,100,30,0.45)';
+            g.lineWidth = 1;
+            g.beginPath();
+            g.moveTo(bx, by + 4);
+            g.lineTo(bx + 1, by - 3);
+            g.stroke();
+            g.fillStyle = 'rgba(240,205,110,0.7)';
+            g.beginPath();
+            g.ellipse(bx + 1, by - 4, 1.2, 2.4, 0.2, 0, TAU);
+            g.fill();
+          }
+        } else if (tex === 'dirt' || tex === 'crack') {
+          if (rng() < 0.35) {
+            const bx = px + rng() * TILE;
+            const by = py + rng() * TILE;
+            const r = 1 + rng() * 1.8;
+            g.fillStyle = rgbStr(shadeRgb(base, -0.3), 0.7);
+            g.beginPath();
+            g.ellipse(bx + 0.6, by + 0.6, r, r * 0.75, 0, 0, TAU);
+            g.fill();
+            g.fillStyle = rgbStr(shadeRgb(base, 0.25), 0.9);
+            g.beginPath();
+            g.ellipse(bx, by, r, r * 0.75, 0, 0, TAU);
+            g.fill();
+          }
+          if (tex === 'crack' && rng() < 0.12) {
+            g.strokeStyle = rgbStr(shadeRgb(base, -0.45), 0.6);
+            g.lineWidth = 0.8;
+            g.beginPath();
+            let cx = px + rng() * TILE;
+            let cy = py + rng() * TILE;
+            g.moveTo(cx, cy);
+            for (let k = 0; k < 3; k++) {
+              cx += rng() * 12 - 6;
+              cy += rng() * 12 - 6;
+              g.lineTo(cx, cy);
+            }
+            g.stroke();
+          }
+        } else if (tex === 'stone') {
+          // 石だたみ (2 × 2 タイルに 3 枚ほど)
+          if (x % 2 === 0 && y % 2 === 0) {
+            for (let k = 0; k < 3; k++) {
+              const sx = px + rng() * 26;
+              const sy = py + rng() * 26;
+              const ww = 12 + rng() * 10;
+              const hh = 10 + rng() * 8;
+              g.fillStyle = rgbStr(shadeRgb(base, rng() * 0.16 - 0.08), 0.8);
+              roundRect(g, sx, sy, ww, hh, 2);
+              g.fill();
+              g.strokeStyle = rgbStr(shadeRgb(base, -0.35), 0.45);
+              g.lineWidth = 0.8;
+              g.stroke();
+              g.fillStyle = 'rgba(255,255,255,0.08)';
+              g.fillRect(sx + 1, sy + 1, ww - 2, 1.2);
+            }
+          }
+        } else if (tex === 'sand') {
+          if (rng() < 0.3) {
+            g.strokeStyle = rgbStr(shadeRgb(base, -0.18), 0.5);
+            g.lineWidth = 0.8;
+            g.beginPath();
+            const bx = px + rng() * 10;
+            const by = py + rng() * TILE;
+            g.moveTo(bx, by);
+            g.quadraticCurveTo(bx + 5, by - 2, bx + 10, by);
+            g.stroke();
+          }
         }
-        if (th === THEMES.firefly && rng() < 0.05) {
-          g.fillStyle = 'rgba(200,255,120,0.6)';
-          g.fillRect(x * TILE + rng() * 18, y * TILE + rng() * 18, 1.5, 1.5);
-        }
-        if (th === THEMES.wheat && y % 2 === 0) {
-          g.fillStyle = 'rgba(150,110,30,0.25)';
-          g.fillRect(x * TILE, y * TILE + 8, TILE, 3);
-        }
-        if (th === THEMES.bone && rng() < 0.08) {
-          g.strokeStyle = 'rgba(30,25,25,0.5)';
-          g.lineWidth = 1;
-          g.beginPath();
-          g.moveTo(x * TILE + rng() * 20, y * TILE + rng() * 20);
-          g.lineTo(x * TILE + rng() * 20, y * TILE + rng() * 20);
-          g.stroke();
+        if (th.glow && rng() < 0.05) {
+          g.fillStyle = th.glow;
+          g.fillRect(px + rng() * 18, py + rng() * 18, 1.5, 1.5);
         }
       }
     }
-    // タイルの物
+
+    // 3. 水と沼
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const t = tiles[idx(x, y)];
+        const px = x * TILE;
+        const py = y * TILE;
+        if (t === T.WATER && map.lake[idx(x, y)]) {
+          // 岸からの距離で、深い所ほど暗く
+          let d = 4;
+          for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) if (inb(x + i, y + j) && !map.lake[idx(x + i, y + j)]) d = Math.min(d, Math.max(Math.abs(i), Math.abs(j)));
+          const deep = clamp((d - 1) / 3, 0, 1);
+          g.fillStyle = rgbStr(mixRgb([70, 130, 160], [22, 52, 92], deep));
+          g.fillRect(px, py, TILE, TILE);
+          if (d <= 1) {
+            g.fillStyle = 'rgba(200,230,240,0.25)';
+            g.fillRect(px + rng() * 8, py + rng() * 16, 10, 1.2);
+          }
+        } else if (t === T.SWAMP) {
+          const gr = g.createRadialGradient(px + 10, py + 10, 2, px + 10, py + 10, 16);
+          gr.addColorStop(0, '#34442a');
+          gr.addColorStop(1, 'rgba(52,68,42,0.75)');
+          g.fillStyle = gr;
+          g.fillRect(px, py, TILE, TILE);
+          if (rng() < 0.18) {
+            // 浮き草
+            g.fillStyle = 'rgba(110,150,70,0.85)';
+            g.beginPath();
+            const lx = px + 4 + rng() * 12;
+            const ly = py + 4 + rng() * 12;
+            g.arc(lx, ly, 2.6, 0.4, TAU - 0.2);
+            g.lineTo(lx, ly);
+            g.fill();
+          }
+          if (rng() < 0.25) {
+            g.strokeStyle = 'rgba(170,200,140,0.35)';
+            g.lineWidth = 0.8;
+            g.beginPath();
+            g.ellipse(px + 4 + rng() * 12, py + 4 + rng() * 12, 2.5, 1.5, 0, 0, TAU);
+            g.stroke();
+          }
+        }
+      }
+    }
+
+    // 4. 影 (壁・木・岩・家などの形を右下へずらし、ぼかして重ねる)
+    const shadow = document.createElement('canvas');
+    shadow.width = c.width;
+    shadow.height = c.height;
+    const shg = shadow.getContext('2d');
+    shg.scale(S, S);
+    shg.fillStyle = '#000';
+    const SX = 5;
+    const SY = 7;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const t = tiles[idx(x, y)];
+        const px = x * TILE + SX;
+        const py = y * TILE + SY;
+        if (t === T.WALL || t === T.FEATURE) shg.fillRect(px, py, TILE, TILE);
+        else if (t === T.TREE) {
+          shg.beginPath();
+          shg.ellipse(px + 11, py + 8, 12, 9, 0, 0, TAU);
+          shg.fill();
+        } else if (t === T.ROCK || t === T.BONE) {
+          shg.beginPath();
+          shg.ellipse(px + 10, py + 11, 8, 5, 0, 0, TAU);
+          shg.fill();
+        } else if (t === T.FENCE || t === T.REED) shg.fillRect(px + 2, py + 8, TILE - 4, 6);
+      }
+    }
+    for (const f of def.features) {
+      if (f.type === 'water') continue;
+      const [x, y, rw, rh] = f.rect;
+      shg.fillRect(x * TILE + SX * 1.6, y * TILE + SY * 1.6, rw * TILE, rh * TILE);
+    }
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    if ('filter' in g) g.filter = `blur(${Math.round(4 * S)}px)`;
+    g.globalAlpha = 0.38;
+    g.drawImage(shadow, 0, 0);
+    g.restore();
+
+    // 5. タイルの物 (光が左上から当たるように陰をつける)
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const t = tiles[idx(x, y)];
@@ -753,173 +971,281 @@
         if (t === T.WALL) {
           // エリアの境目の壁は、エリアの景色に合わせる (生け垣・木立ち・岩場)。砦跡の城壁などは石の壁
           const style = map.ruin[idx(x, y)] ? 'stone' : WALL_STYLE[(def.areas[areaOf[idx(x, y)]] || def.areas[0]).theme] || 'stone';
-          if (style === 'stone') {
-            g.fillStyle = '#3a3446';
-            g.fillRect(px, py, TILE, TILE);
-            g.fillStyle = '#4e465e';
-            g.fillRect(px, py, TILE, 6);
-            g.fillStyle = 'rgba(0,0,0,0.25)';
-            g.fillRect(px + (y % 2 ? 10 : 0), py + 6, 1, 14);
-          } else {
-            const col = WALL_COLORS[style];
-            g.fillStyle = col[0];
-            g.fillRect(px, py, TILE, TILE);
-            for (let k = 0; k < 3; k++) {
-              const bx = px + 4 + rng() * 12;
-              const by = py + 4 + rng() * 12;
-              const r = 7 + rng() * 5;
-              g.fillStyle = col[1];
-              g.beginPath();
-              g.arc(bx, by, r, 0, TAU);
-              g.fill();
-              g.fillStyle = col[2];
-              g.beginPath();
-              g.arc(bx - r * 0.3, by - r * 0.35, r * 0.45, 0, TAU);
-              g.fill();
-            }
-          }
+          if (style === 'stone') drawStoneWall(g, px, py, x, y, rng);
+          else drawBushWall(g, px, py, WALL_COLORS[style], style, rng);
         } else if (t === T.TREE) {
-          g.fillStyle = 'rgba(0,0,0,0.25)';
-          g.beginPath();
-          g.ellipse(px + 11, py + 15, 10, 5, 0, 0, TAU);
-          g.fill();
-          g.fillStyle = '#244a22';
-          g.beginPath();
-          g.arc(px + 10, py + 9, 10, 0, TAU);
-          g.fill();
-          g.fillStyle = '#346a30';
-          g.beginPath();
-          g.arc(px + 8, py + 7, 6, 0, TAU);
-          g.fill();
+          drawTree(g, px + 10, py + 9, rng);
         } else if (t === T.ROCK) {
-          g.fillStyle = '#5d5d66';
-          g.beginPath();
-          g.ellipse(px + 10, py + 12, 9, 7, 0, 0, TAU);
-          g.fill();
-          g.fillStyle = '#8a8a94';
-          g.beginPath();
-          g.ellipse(px + 9, py + 10, 6, 4, 0, 0, TAU);
-          g.fill();
+          drawRock(g, px + 10, py + 11, 7 + rng() * 2.5, rng);
         } else if (t === T.BONE) {
-          g.strokeStyle = '#ddd3bd';
+          const a = rng() * 0.8 - 0.4;
+          g.save();
+          g.translate(px + 10, py + 10);
+          g.rotate(a);
+          const bg = g.createLinearGradient(0, -3, 0, 3);
+          bg.addColorStop(0, '#f2ead6');
+          bg.addColorStop(1, '#a89c80');
+          g.strokeStyle = bg;
           g.lineWidth = 3;
           g.lineCap = 'round';
           g.beginPath();
-          g.moveTo(px + 3, py + 14);
-          g.lineTo(px + 17, py + 6);
+          g.moveTo(-7, 2);
+          g.lineTo(7, -2);
           g.stroke();
-          g.fillStyle = '#ddd3bd';
-          for (const [bx, by] of [[3, 14], [17, 6]]) {
-            g.beginPath();
-            g.arc(px + bx, py + by, 3, 0, TAU);
-            g.fill();
+          g.fillStyle = bg;
+          for (const [bx, by] of [[-7, 2], [7, -2]]) {
+            circle(g, bx - 1, by - 1.5, 2.2);
+            circle(g, bx + 1, by + 1.5, 2.2);
           }
-        } else if (t === T.WATER && map.lake[idx(x, y)]) {
-          // 湖
-          g.fillStyle = '#2a5a8a';
-          g.fillRect(px, py, TILE, TILE);
-          const shore = (dx, dy) => inb(x + dx, y + dy) && !map.lake[idx(x + dx, y + dy)];
-          g.fillStyle = '#4a8ac0';
-          if (shore(0, -1)) g.fillRect(px, py, TILE, 3);
-          if (shore(0, 1)) g.fillRect(px, py + TILE - 3, TILE, 3);
-          if (shore(-1, 0)) g.fillRect(px, py, 3, TILE);
-          if (shore(1, 0)) g.fillRect(px + TILE - 3, py, 3, TILE);
-          if (rng() < 0.15) {
-            g.fillStyle = 'rgba(255,255,255,0.18)';
-            g.fillRect(px + rng() * 12, py + rng() * 16, 6, 1.5);
-          }
-        } else if (t === T.SWAMP) {
-          g.fillStyle = '#3a4a2e';
-          g.fillRect(px, py, TILE, TILE);
-          g.fillStyle = 'rgba(90,110,60,0.6)';
-          g.fillRect(px + rng() * 10, py + rng() * 14, 8, 3);
-          if (rng() < 0.3) {
-            g.strokeStyle = 'rgba(160,190,120,0.5)';
-            g.lineWidth = 1;
-            g.beginPath();
-            g.arc(px + 4 + rng() * 12, py + 4 + rng() * 12, 1.5 + rng() * 1.5, 0, TAU);
-            g.stroke();
-          }
+          g.restore();
         } else if (t === T.REED) {
-          g.strokeStyle = '#5a6a24';
-          g.lineWidth = 1.6;
-          g.lineCap = 'round';
-          for (let k = 0; k < 6; k++) {
-            const bx = px + 3 + rng() * 14;
+          for (let k = 0; k < 8; k++) {
+            const bx = px + 2 + rng() * 16;
+            const top = py + 1 + rng() * 5;
+            g.strokeStyle = rgbStr(mixRgb([70, 90, 30], [150, 170, 70], rng()), 0.95);
+            g.lineWidth = 1.3;
+            g.lineCap = 'round';
             g.beginPath();
-            g.moveTo(bx, py + 18);
-            g.quadraticCurveTo(bx + rng() * 6 - 3, py + 8, bx + rng() * 8 - 4, py + 1 + rng() * 4);
+            g.moveTo(bx, py + 19);
+            g.quadraticCurveTo(bx + rng() * 6 - 3, py + 9, bx + rng() * 8 - 4, top);
             g.stroke();
           }
-          g.fillStyle = '#7a5a2a';
-          g.fillRect(px + 8, py + 3, 3, 6);
+          g.fillStyle = '#6a4a22';
+          roundRect(g, px + 8, py + 2, 3, 7, 1.5);
+          g.fill();
+          g.fillStyle = 'rgba(255,230,180,0.3)';
+          g.fillRect(px + 8.4, py + 3, 1, 4);
         } else if (t === T.FENCE) {
-          g.fillStyle = '#7a4f26';
+          const wood = g.createLinearGradient(0, py + 6, 0, py + 16);
+          wood.addColorStop(0, '#9a6a36');
+          wood.addColorStop(1, '#5c3a1a');
+          g.fillStyle = wood;
           g.fillRect(px, py + 7, TILE, 3);
           g.fillRect(px, py + 13, TILE, 3);
-          g.fillStyle = '#5c3a1a';
+          g.fillStyle = '#4c2e14';
           g.fillRect(px + 2, py + 4, 3, 14);
           g.fillRect(px + 14, py + 4, 3, 14);
+          g.fillStyle = 'rgba(255,220,170,0.35)';
+          g.fillRect(px + 2, py + 4, 1, 14);
+          g.fillRect(px + 14, py + 4, 1, 14);
         }
       }
     }
-    // 家・お店・風車・池
-    for (const f of def.features) {
-      const [x, y, rw, rh] = f.rect;
-      const px = x * TILE;
-      const py = y * TILE;
-      const pw = rw * TILE;
-      const ph = rh * TILE;
-      if (f.type === 'water') {
-        g.fillStyle = '#2f6a9e';
-        roundRect(g, px, py, pw, ph, 10);
-        g.fill();
-        g.strokeStyle = '#6aa8d8';
-        g.lineWidth = 2;
-        g.stroke();
-        g.fillStyle = 'rgba(255,255,255,0.18)';
-        g.fillRect(px + 8, py + 8, pw * 0.4, 2);
-      } else if (f.type === 'house' || f.type === 'shop') {
-        g.fillStyle = 'rgba(0,0,0,0.3)';
-        g.fillRect(px + 4, py + 6, pw, ph);
-        g.fillStyle = '#8a6a48';
-        g.fillRect(px, py + ph * 0.45, pw, ph * 0.55);
-        g.fillStyle = f.type === 'shop' ? '#3a5aa8' : '#a8483a';
-        g.beginPath();
-        g.moveTo(px - 3, py + ph * 0.5);
-        g.lineTo(px + pw / 2, py - 2);
-        g.lineTo(px + pw + 3, py + ph * 0.5);
-        g.closePath();
-        g.fill();
-        g.fillStyle = 'rgba(255,255,255,0.15)';
-        g.fillRect(px + 2, py + ph * 0.45, pw - 4, 2);
-        g.fillStyle = '#3a2614';
-        if (f.door) {
-          g.fillRect(tc(f.door[0]) - 6, py + ph - 14, 12, 14);
-        } else {
-          g.fillRect(px + pw / 2 - 5, py + ph - 12, 10, 12);
-        }
-        g.fillStyle = '#e8d890';
-        g.fillRect(px + 8, py + ph * 0.6, 8, 6);
-        g.fillRect(px + pw - 16, py + ph * 0.6, 8, 6);
-      } else if (f.type === 'windmill') {
-        g.fillStyle = 'rgba(0,0,0,0.3)';
-        g.beginPath();
-        g.ellipse(px + pw / 2 + 4, py + ph - 4, pw / 2, 10, 0, 0, TAU);
-        g.fill();
-        g.fillStyle = '#d8d0bc';
-        g.beginPath();
-        g.moveTo(px + 10, py + ph);
-        g.lineTo(px + pw / 2 - 8, py + 8);
-        g.lineTo(px + pw / 2 + 8, py + 8);
-        g.lineTo(px + pw - 10, py + ph);
-        g.closePath();
-        g.fill();
-        g.fillStyle = '#8a5a3a';
-        g.fillRect(px + pw / 2 - 5, py + ph - 14, 10, 14);
-      }
-    }
+    // 6. 家・お店・風車・池
+    for (const f of def.features) drawFeature(g, f, rng);
     return c;
+  }
+
+  function drawStoneWall(g, px, py, x, y, rng) {
+    const gr = g.createLinearGradient(0, py, 0, py + TILE);
+    gr.addColorStop(0, '#5e566c');
+    gr.addColorStop(0.35, '#463e54');
+    gr.addColorStop(1, '#2e2838');
+    g.fillStyle = gr;
+    g.fillRect(px, py, TILE, TILE);
+    // れんがの目地
+    g.strokeStyle = 'rgba(20,16,26,0.55)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (let r = 0; r < 3; r++) {
+      const yy = py + 7 + r * 5;
+      g.moveTo(px, yy);
+      g.lineTo(px + TILE, yy);
+      const off = (r + y) % 2 ? 4 : 12;
+      g.moveTo(px + off, yy);
+      g.lineTo(px + off, yy + 5);
+    }
+    g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.16)';
+    g.fillRect(px, py, TILE, 2);
+    if (rng() < 0.2) {
+      g.fillStyle = 'rgba(90,120,70,0.45)';
+      circle(g, px + rng() * TILE, py + 6 + rng() * 12, 2 + rng() * 2);
+    }
+  }
+
+  function drawBushWall(g, px, py, col, style, rng) {
+    const c0 = hexRgb(col[0]);
+    const c1 = hexRgb(col[1]);
+    const c2 = hexRgb(col[2]);
+    g.fillStyle = col[0];
+    g.fillRect(px, py, TILE, TILE);
+    for (let k = 0; k < 3; k++) {
+      const bx = px + 4 + rng() * 12;
+      const by = py + 3 + rng() * 12;
+      const r = (style === 'rocks' ? 6 : 7) + rng() * 5;
+      const gr = g.createRadialGradient(bx - r * 0.35, by - r * 0.4, r * 0.1, bx, by, r);
+      gr.addColorStop(0, rgbStr(style === 'rocks' ? shadeRgb(c2, 0.15) : c2));
+      gr.addColorStop(0.55, rgbStr(c1));
+      gr.addColorStop(1, rgbStr(shadeRgb(c0, -0.2)));
+      g.fillStyle = gr;
+      g.beginPath();
+      if (style === 'rocks') g.ellipse(bx, by, r, r * 0.8, rng() * 0.6, 0, TAU);
+      else g.arc(bx, by, r, 0, TAU);
+      g.fill();
+      if (style === 'reeds') {
+        g.strokeStyle = 'rgba(190,200,110,0.6)';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(bx, by + 2);
+        g.lineTo(bx + rng() * 4 - 2, by - r);
+        g.stroke();
+      }
+    }
+  }
+
+  function drawTree(g, x, y, rng) {
+    // 幹
+    g.fillStyle = '#4a3220';
+    g.fillRect(x - 1.5, y + 3, 3, 6);
+    // 葉 (3 つの丸を重ねる)
+    const blobs = [[-3, 1, 7], [3, 0, 7], [0, -3, 8]];
+    for (const [dx, dy, r0] of blobs) {
+      const r = r0 + rng() * 1.5;
+      const cx = x + dx;
+      const cy = y + dy;
+      const gr = g.createRadialGradient(cx - r * 0.4, cy - r * 0.45, r * 0.15, cx, cy, r);
+      gr.addColorStop(0, '#5a9a4a');
+      gr.addColorStop(0.55, '#2f6a2c');
+      gr.addColorStop(1, '#173a18');
+      g.fillStyle = gr;
+      circle(g, cx, cy, r);
+    }
+    g.fillStyle = 'rgba(200,255,160,0.12)';
+    circle(g, x - 3, y - 5, 2.5);
+  }
+
+  function drawRock(g, x, y, r, rng) {
+    const gr = g.createRadialGradient(x - r * 0.4, y - r * 0.5, r * 0.1, x, y, r * 1.1);
+    gr.addColorStop(0, '#b4b2b8');
+    gr.addColorStop(0.5, '#7a7880');
+    gr.addColorStop(1, '#3e3c44');
+    g.fillStyle = gr;
+    g.beginPath();
+    g.moveTo(x - r, y + r * 0.3);
+    g.quadraticCurveTo(x - r * 0.9, y - r * 0.7, x - r * 0.1, y - r * 0.8);
+    g.quadraticCurveTo(x + r * 0.9, y - r * 0.8, x + r, y + r * 0.1);
+    g.quadraticCurveTo(x + r * 0.8, y + r * 0.75, x, y + r * 0.7);
+    g.quadraticCurveTo(x - r * 0.8, y + r * 0.7, x - r, y + r * 0.3);
+    g.fill();
+    g.strokeStyle = 'rgba(30,28,34,0.5)';
+    g.lineWidth = 0.8;
+    g.beginPath();
+    g.moveTo(x - r * 0.2, y - r * 0.6);
+    g.lineTo(x + r * 0.1, y);
+    g.lineTo(x - r * 0.1 + rng() * 2, y + r * 0.5);
+    g.stroke();
+  }
+
+  function drawFeature(g, f, rng) {
+    const [x, y, rw, rh] = f.rect;
+    const px = x * TILE;
+    const py = y * TILE;
+    const pw = rw * TILE;
+    const ph = rh * TILE;
+    if (f.type === 'water') {
+      const gr = g.createRadialGradient(px + pw / 2, py + ph / 2, 2, px + pw / 2, py + ph / 2, Math.max(pw, ph) * 0.6);
+      gr.addColorStop(0, '#1e4a7e');
+      gr.addColorStop(1, '#4a8ab4');
+      g.fillStyle = gr;
+      roundRect(g, px, py, pw, ph, Math.min(pw, ph) * 0.45);
+      g.fill();
+      g.strokeStyle = 'rgba(160,140,100,0.8)';
+      g.lineWidth = 2.5;
+      g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.2)';
+      g.fillRect(px + pw * 0.2, py + ph * 0.25, pw * 0.35, 1.5);
+      g.fillRect(px + pw * 0.4, py + ph * 0.55, pw * 0.3, 1.2);
+    } else if (f.type === 'house' || f.type === 'shop') {
+      const wallTop = py + ph * 0.45;
+      // 壁 (板張り)
+      const wg = g.createLinearGradient(px, 0, px + pw, 0);
+      wg.addColorStop(0, '#a07a52');
+      wg.addColorStop(1, '#6e5034');
+      g.fillStyle = wg;
+      g.fillRect(px, wallTop, pw, py + ph - wallTop);
+      g.strokeStyle = 'rgba(40,26,14,0.35)';
+      g.lineWidth = 1;
+      g.beginPath();
+      for (let yy = wallTop + 5; yy < py + ph; yy += 5) {
+        g.moveTo(px, yy);
+        g.lineTo(px + pw, yy);
+      }
+      g.stroke();
+      // 屋根 (左は日なた、右は日かげ)
+      const roof = f.type === 'shop' ? ['#5a7ad0', '#2e4a98'] : ['#c8604a', '#8a3428'];
+      g.fillStyle = roof[0];
+      g.beginPath();
+      g.moveTo(px - 4, py + ph * 0.5);
+      g.lineTo(px + pw / 2, py - 3);
+      g.lineTo(px + pw / 2, py + ph * 0.5);
+      g.closePath();
+      g.fill();
+      g.fillStyle = roof[1];
+      g.beginPath();
+      g.moveTo(px + pw / 2, py - 3);
+      g.lineTo(px + pw + 4, py + ph * 0.5);
+      g.lineTo(px + pw / 2, py + ph * 0.5);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = 'rgba(0,0,0,0.18)';
+      g.lineWidth = 1;
+      for (let k = 1; k < 4; k++) {
+        const t = k / 4;
+        g.beginPath();
+        g.moveTo(lerp(px + pw / 2, px - 4, t), lerp(py - 3, py + ph * 0.5, t));
+        g.lineTo(lerp(px + pw / 2, px + pw + 4, t), lerp(py - 3, py + ph * 0.5, t));
+        g.stroke();
+      }
+      g.fillStyle = 'rgba(0,0,0,0.25)';
+      g.fillRect(px - 4, py + ph * 0.5, pw + 8, 2.5);
+      // 煙突
+      g.fillStyle = '#6a5a5a';
+      g.fillRect(px + pw * 0.72, py + ph * 0.08, 5, 9);
+      // 戸と窓 (窓には明かり)
+      g.fillStyle = '#3a2614';
+      const dx = f.door ? tc(f.door[0]) - 6 : px + pw / 2 - 5;
+      roundRect(g, dx, py + ph - 14, 12, 14, 3);
+      g.fill();
+      g.fillStyle = '#d8b060';
+      circle(g, dx + 9, py + ph - 7, 1);
+      for (const wx of [px + 6, px + pw - 15]) {
+        const lg = g.createRadialGradient(wx + 4.5, py + ph * 0.66, 1, wx + 4.5, py + ph * 0.66, 7);
+        lg.addColorStop(0, '#fff2b0');
+        lg.addColorStop(1, '#c89040');
+        g.fillStyle = lg;
+        g.fillRect(wx, py + ph * 0.6, 9, 7);
+        g.strokeStyle = '#4a3020';
+        g.lineWidth = 1;
+        g.strokeRect(wx, py + ph * 0.6, 9, 7);
+        g.beginPath();
+        g.moveTo(wx + 4.5, py + ph * 0.6);
+        g.lineTo(wx + 4.5, py + ph * 0.6 + 7);
+        g.stroke();
+      }
+    } else if (f.type === 'windmill') {
+      const tg = g.createLinearGradient(px + 10, 0, px + pw - 10, 0);
+      tg.addColorStop(0, '#ece4d0');
+      tg.addColorStop(1, '#a8a090');
+      g.fillStyle = tg;
+      g.beginPath();
+      g.moveTo(px + 10, py + ph);
+      g.lineTo(px + pw / 2 - 8, py + 8);
+      g.lineTo(px + pw / 2 + 8, py + 8);
+      g.lineTo(px + pw - 10, py + ph);
+      g.closePath();
+      g.fill();
+      g.fillStyle = '#6a4a2a';
+      g.beginPath();
+      g.moveTo(px + pw / 2 - 11, py + 10);
+      g.lineTo(px + pw / 2, py + 2);
+      g.lineTo(px + pw / 2 + 11, py + 10);
+      g.closePath();
+      g.fill();
+      g.fillStyle = '#5a3a20';
+      roundRect(g, px + pw / 2 - 5, py + ph - 14, 10, 14, 4);
+      g.fill();
+    }
   }
 
   function renderMini(map) {
@@ -1823,6 +2149,7 @@
       addPart({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(0.25, 0.5), color: pick(['#ffb84a', '#ff7a2c', '#fff0a0']), size: rnd(2, 4), glow: true });
     }
     addPart({ x, y, vx: 0, vy: 0, life: 0.25, color: '#ffcf6a', size: rad, ring: true });
+    addPart({ x, y, vx: 0, vy: 0, life: 0.3, color: '#ffb060', size: rad * 1.6, light: true });
     G.shake = Math.max(G.shake, Math.min(6, rad / 12));
     sfx('explode');
   }
@@ -3295,6 +3622,77 @@
     ctx.fillText(s, x, y);
   }
 
+  // 何度も使う絵 (丸い体の陰影・やわらかい影・光)
+  const SPR = (() => {
+    const make = (size, fn) => {
+      const c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      fn(c.getContext('2d'), size);
+      return c;
+    };
+    // 丸い体に重ねる陰影 (左上が明るく、右下が暗い)
+    const shade = make(64, (g, n) => {
+      const gr = g.createRadialGradient(n * 0.34, n * 0.3, n * 0.03, n * 0.5, n * 0.5, n * 0.5);
+      gr.addColorStop(0, 'rgba(255,255,255,0.5)');
+      gr.addColorStop(0.28, 'rgba(255,255,255,0.08)');
+      gr.addColorStop(0.65, 'rgba(0,0,0,0)');
+      gr.addColorStop(1, 'rgba(0,0,0,0.42)');
+      g.fillStyle = gr;
+      g.beginPath();
+      g.arc(n / 2, n / 2, n / 2, 0, TAU);
+      g.fill();
+    });
+    // 足もとのやわらかい影
+    const shadow = make(64, (g, n) => {
+      const gr = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+      gr.addColorStop(0, 'rgba(0,0,0,0.45)');
+      gr.addColorStop(0.6, 'rgba(0,0,0,0.25)');
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr;
+      g.fillRect(0, 0, n, n);
+    });
+    const glows = {};
+    // 光 (色ごとに 1 枚作っておく。'lighter' で重ねる)
+    const glow = (color) => {
+      if (!glows[color]) {
+        glows[color] = make(64, (g, n) => {
+          const gr = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+          gr.addColorStop(0, color);
+          gr.addColorStop(0.3, color.replace(/[\d.]+\)$/, '0.35)'));
+          gr.addColorStop(1, 'rgba(0,0,0,0)');
+          g.fillStyle = gr;
+          g.fillRect(0, 0, n, n);
+        });
+      }
+      return glows[color];
+    };
+    return { shade, shadow, glow };
+  })();
+  const toRgba = (c) => {
+    if (c.startsWith('rgba')) return c.replace(/[\d.]+\)$/, '1)');
+    if (c.startsWith('rgb(')) return c.replace('rgb(', 'rgba(').replace(')', ',1)');
+    const [r, g, b] = hexRgb(c);
+    return `rgba(${r},${g},${b},1)`;
+  };
+  function drawShade(c, x, y, r, a = 1) {
+    c.globalAlpha *= a;
+    c.drawImage(SPR.shade, x - r, y - r, r * 2, r * 2);
+    c.globalAlpha /= a;
+  }
+  function drawSoftShadow(c, x, y, rx, ry) {
+    c.drawImage(SPR.shadow, x - rx, y - ry, rx * 2, ry * 2);
+  }
+  // 光を足す (明るく重ねる)
+  function drawGlow(c, x, y, r, color, a = 1) {
+    const op = c.globalCompositeOperation;
+    c.globalCompositeOperation = 'lighter';
+    c.globalAlpha *= a;
+    c.drawImage(SPR.glow(toRgba(color)), x - r, y - r, r * 2, r * 2);
+    c.globalAlpha /= a;
+    c.globalCompositeOperation = op;
+  }
+
   function circle(c, x, y, r) {
     c.beginPath();
     c.arc(x, y, Math.max(0, r), 0, TAU);
@@ -3320,7 +3718,8 @@
     const span = map.w * TILE - VW;
     const x = (Math.sin(backdropT * 0.05) * 0.5 + 0.5) * span;
     const y = (Math.sin(backdropT * 0.03) * 0.5 + 0.5) * (map.h * TILE - VH);
-    ctx.drawImage(map.bg, x, y, VW, VH, 0, 0, VW, VH);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(map.bg, x * BG_SCALE, y * BG_SCALE, VW * BG_SCALE, VH * BG_SCALE, 0, 0, VW, VH);
     ctx.fillStyle = 'rgba(40,10,60,0.55)';
     ctx.fillRect(0, 0, VW, VH);
     for (let i = 0; i < 8; i++) {
@@ -3342,11 +3741,12 @@
     ctx.translate(-camX, -camY);
     const bx = clamp(camX, 0, G.map.w * TILE - VW);
     const by = clamp(camY, 0, G.map.h * TILE - VH);
-    ctx.drawImage(G.map.bg, bx, by, VW, VH, bx, by, VW, VH);
     ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(G.map.bg, bx * BG_SCALE, by * BG_SCALE, VW * BG_SCALE, VH * BG_SCALE, bx, by, VW, VH);
     const view = { x0: camX - 40, y0: camY - 40, x1: camX + VW + 40, y1: camY + VH + 40 };
     const inView = (x, y, r = 0) => x + r > view.x0 && x - r < view.x1 && y + r > view.y0 && y - r < view.y1;
 
+    drawLakeShimmer(view);
     drawFeaturesLive(inView);
     drawFog(view);
     drawShops(inView);
@@ -3388,6 +3788,7 @@
     ctx.restore();
     ctx.imageSmoothingEnabled = false;
     drawMist();
+    drawVignette();
     drawHud();
     if (G.fade > 0) {
       ctx.fillStyle = `rgba(0,0,0,${G.fade})`;
@@ -3769,8 +4170,10 @@
     g.addColorStop(0, n.hitFlash > 0 ? '#ffffff' : c2);
     g.addColorStop(0.5, c1);
     g.addColorStop(1, c0);
+    drawGlow(ctx, 0, 0, r * 2.4, c2, 0.25 + Math.sin(n.ph * 3) * 0.08);
     ctx.fillStyle = g;
     circle(ctx, 0, 0, r);
+    drawShade(ctx, 0, 0, r, 0.7);
     if (n.type === 'eye') {
       // 主人公を見つめる大きな目
       const a = Math.atan2(P.y - n.y, P.x - n.x);
@@ -3802,10 +4205,7 @@
     ctx.save();
     ctx.translate(e.x, e.y);
     if (e.crumble > 0) ctx.globalAlpha = clamp(e.crumble, 0.2, 1);
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath();
-    ctx.ellipse(0, r * 0.8, r * 0.9, r * 0.35, 0, 0, TAU);
-    ctx.fill();
+    drawSoftShadow(ctx, def.fly ? 2 : 1, r * 0.8 + (def.fly ? 4 : 0), r * 1.15, r * 0.5);
     if (e.elite) {
       ctx.strokeStyle = `rgba(255,216,74,${0.6 + Math.sin(G.t * 6) * 0.3})`;
       ctx.lineWidth = 2;
@@ -3818,6 +4218,7 @@
     const flash = e.hitFlash > 0;
     const col = flash ? '#ffffff' : e.freezeT > 0 ? '#bfefff' : e.slowT > 0 ? mix(def.color, '#8fd8ff') : def.color;
     const fx = e.faceX || 1;
+    ctx.save();
     switch (def.id) {
       case 'imp': {
         ctx.fillStyle = flash ? '#fff' : '#7a1f1f';
@@ -4006,6 +4407,9 @@
         eyes(fx, -2, 1.5, '#fff');
     }
     ctx.restore();
+    // 丸みの陰影 (箱や骨・半透明の敵にはつけない)
+    if (!['mimic', 'skel', 'wraith', 'moth'].includes(def.id)) drawShade(ctx, 0, 0, r * 1.02, 0.85);
+    ctx.restore();
   }
 
   // 毒の沼
@@ -4023,6 +4427,46 @@
     ctx.fillStyle = '#e0ff9a';
     const b = (G.t * 1.5 + z.x * 0.1) % 1;
     circle(ctx, z.x + Math.sin(z.x) * z.r * 0.4, z.y - b * 6, 1.5);
+    ctx.globalAlpha = 1;
+  }
+
+  // 画面のふちを少し暗くする (目が中央に行くように)。画面の幅が変わったら作り直す
+  let vignette = null;
+  function drawVignette() {
+    if (!vignette || vignette.width !== VW) {
+      vignette = document.createElement('canvas');
+      vignette.width = VW;
+      vignette.height = VH;
+      const g = vignette.getContext('2d');
+      const gr = g.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, Math.hypot(VW, VH) * 0.58);
+      gr.addColorStop(0, 'rgba(0,0,0,0)');
+      gr.addColorStop(1, 'rgba(10,4,20,0.5)');
+      g.fillStyle = gr;
+      g.fillRect(0, 0, VW, VH);
+    }
+    ctx.drawImage(vignette, 0, 0);
+  }
+
+  // 湖の水面のきらめき (見えている所だけ)
+  function drawLakeShimmer(view) {
+    const m = G.map;
+    if (!m.lake) return;
+    const x0 = clamp(Math.floor(view.x0 / TILE), 0, m.w - 1);
+    const x1 = clamp(Math.ceil(view.x1 / TILE), 0, m.w - 1);
+    const y0 = clamp(Math.floor(view.y0 / TILE), 0, m.h - 1);
+    const y1 = clamp(Math.ceil(view.y1 / TILE), 0, m.h - 1);
+    ctx.fillStyle = '#e8f6ff';
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = y * m.w + x;
+        if (!m.lake[i] || (x * 7 + y * 13) % 3) continue;
+        const ph = G.t * 1.3 + x * 0.7 + y * 1.9;
+        const a = Math.max(0, Math.sin(ph)) * 0.35;
+        if (a < 0.03) continue;
+        ctx.globalAlpha = a;
+        ctx.fillRect(x * TILE + 4 + Math.sin(ph * 0.5) * 3, y * TILE + 9 + ((x * 3) % 7), 8, 1.2);
+      }
+    }
     ctx.globalAlpha = 1;
   }
 
@@ -4076,6 +4520,7 @@
         ctx.beginPath();
         ctx.ellipse(0, 0, p.r, p.r * 0.85, 0, 0, TAU);
         ctx.fill();
+        drawShade(ctx, 0, 0, p.r, 0.6);
         if (p.size === 2) {
           ctx.fillStyle = '#ffd84a';
           ctx.beginPath();
@@ -4217,6 +4662,7 @@
           ctx.beginPath();
           ctx.ellipse(0, 0, p.r * 1.15, p.r * 0.85, 0, 0, TAU);
           ctx.fill();
+          drawShade(ctx, 0, 0, p.r * 1.05, 0.7);
           ctx.fillStyle = flash ? '#fff' : '#8a9a4a';
           for (const [x, y] of [[-12, -6], [10, 4], [-4, 10], [14, -10]]) circle(ctx, x, y, 4);
           ctx.fillStyle = flash ? '#fff' : '#c8c070';
@@ -4271,10 +4717,7 @@
     c.save();
     c.translate(x, y);
     c.scale(s, s);
-    c.fillStyle = 'rgba(0,0,0,0.3)';
-    c.beginPath();
-    c.ellipse(0, 7, 7, 3, 0, 0, TAU);
-    c.fill();
+    drawSoftShadow(c, 1, 7.5, 9, 4);
     if (rolling) c.rotate(walk * 3);
     const drawGun = (g, i) => {
       c.save();
@@ -4307,8 +4750,13 @@
     c.beginPath();
     c.ellipse(0, 1, def.id === 'gald' ? 7.5 : 6.2, 6, 0, 0, TAU);
     c.fill();
+    // ベルト
+    c.fillStyle = 'rgba(40,28,20,0.85)';
+    c.fillRect(def.id === 'gald' ? -7 : -6, 2.5, def.id === 'gald' ? 14 : 12, 1.6);
+    drawShade(c, 0, 1, def.id === 'gald' ? 7.5 : 6.4, 0.9);
     c.fillStyle = hurt ? '#ffffff' : '#f1d3b0';
     circle(c, 0, -5, 4.3);
+    drawShade(c, 0, -5, 4.4, 0.7);
     if (def.id === 'kai') {
       c.fillStyle = '#5a3a20';
       c.beginPath();
@@ -4376,11 +4824,13 @@
     }
     if (b.type === 'flame') {
       const k = b.travel / b.range;
+      drawGlow(ctx, b.x, b.y, 10 + k * 14, '#ff9a3c', 0.5 * (1 - k));
       ctx.fillStyle = `rgba(255,${Math.round(200 - k * 150)},60,${0.8 - k * 0.6})`;
       circle(ctx, b.x, b.y, 3 + k * 9);
       return;
     }
     if (b.type === 'magic') {
+      drawGlow(ctx, b.x, b.y, 14, col, 0.8);
       ctx.fillStyle = col;
       ctx.globalAlpha = 0.35;
       circle(ctx, b.x, b.y, 6);
@@ -4399,6 +4849,7 @@
       ctx.restore();
       return;
     }
+    drawGlow(ctx, b.x, b.y, 7, col, 0.55);
     const len = b.w.cat === 'prec' ? 12 : 6;
     const l = Math.hypot(b.vx, b.vy) || 1;
     ctx.strokeStyle = col;
@@ -4411,10 +4862,8 @@
   }
 
   function drawEBullet(b) {
+    drawGlow(ctx, b.x, b.y, b.r * 3.2, b.color, 0.7);
     ctx.fillStyle = b.color;
-    ctx.globalAlpha = 0.35;
-    circle(ctx, b.x, b.y, b.r + 2.5);
-    ctx.globalAlpha = 1;
     circle(ctx, b.x, b.y, b.r);
     ctx.fillStyle = '#fff';
     circle(ctx, b.x, b.y, b.r * 0.4);
@@ -4442,6 +4891,11 @@
         ctx.lineTo(p.x2, p.y2);
         ctx.stroke();
       } else {
+        if (p.light) {
+          drawGlow(ctx, p.x, p.y, p.size, p.color, k);
+          continue;
+        }
+        if (p.glow) drawGlow(ctx, p.x, p.y, p.size * 3, p.color, Math.min(1, k * 1.5));
         ctx.fillStyle = p.color;
         circle(ctx, p.x, p.y, p.size * (p.glow ? 1 : 0.5 + k * 0.5));
       }
@@ -4972,7 +5426,8 @@
       for (const ar of def.areas) if (prog.travel.includes(ar.id)) points.push({ id: ar.id, name: ar.name });
       for (const l of def.lairs) if (l.travel && prog.travel.includes(l.travel)) points.push({ id: l.travel, name: `${l.name}（守護者の決闘場）` });
       for (const en of def.entries || []) if (prog.travel.includes(en.id)) points.push({ id: en.id, name: `${en.name}（${stageDef(def.gates.find((g) => g.boss === en.boss).to).name}から）` });
-      const canStart = (ar) => prog.travel.includes(ar.id) || (ar.start && prog.travel.length === 0);
+      // 最初のエリア (始まりの村) からは、いつでも始められる
+      const canStart = (ar) => prog.travel.includes(ar.id) || !!ar.start;
       let info = '<span class="muted">エリアを押すと、くわしく出ます</span>';
       if (a) {
         const lv0 = a.lv[0] + D.lv;
