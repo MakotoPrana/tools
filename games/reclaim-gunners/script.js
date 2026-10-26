@@ -356,6 +356,9 @@
     hill: { floor: ['#6c9a4c', '#74a254'], dot: '#5d8a40', fog: [70, 20, 90] },
     forest: { floor: ['#3f6a3a', '#447040'], dot: '#345a30', fog: [60, 15, 80] },
     bone: { floor: ['#6d6862', '#746e68'], dot: '#5d5852', fog: [80, 15, 60] },
+    orchard: { floor: ['#5e8e46', '#66964d'], dot: '#c8524a', fog: [70, 20, 90] },
+    river: { floor: ['#7a9a5a', '#82a262'], dot: '#5f7f46', fog: [60, 20, 90] },
+    fort: { floor: ['#8a7f6c', '#928774'], dot: '#6f6656', fog: [80, 20, 80] },
   };
 
   const mapCache = {};
@@ -917,7 +920,8 @@
     return G.tiles[y * G.map.w + x];
   }
 
-  function hitsTiles(x, y, r, block) {
+  // area >= 0 のときは、そのエリアの外のタイルも通れない (ボス戦の結界)
+  function hitsTiles(x, y, r, block, area = -1) {
     const x0 = Math.floor((x - r) / TILE);
     const x1 = Math.floor((x + r) / TILE);
     const y0 = Math.floor((y - r) / TILE);
@@ -927,7 +931,7 @@
         let t;
         if (i < 0 || j < 0 || i >= G.map.w || j >= G.map.h) t = T.WALL;
         else t = G.tiles[j * G.map.w + i];
-        if (!block[t]) continue;
+        if (!block[t] && !(area >= 0 && G.map.areaOf[j * G.map.w + i] !== area)) continue;
         const nx = clamp(x, i * TILE, i * TILE + TILE);
         const ny = clamp(y, j * TILE, j * TILE + TILE);
         if ((nx - x) ** 2 + (ny - y) ** 2 < r * r) return true;
@@ -936,7 +940,10 @@
     return false;
   }
 
-  function moveCircle(o, dx, dy, r, block) {
+  // ボス戦の間、主人公が出られないエリア (-1 なら制限なし)
+  const lockArea = () => (G.lock ? G.lock.area : -1);
+
+  function moveCircle(o, dx, dy, r, block, area = -1) {
     let hit = false;
     const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 6));
     const sx = dx / steps;
@@ -944,14 +951,14 @@
     for (let s = 0; s < steps; s++) {
       if (sx) {
         o.x += sx;
-        if (hitsTiles(o.x, o.y, r, block)) {
+        if (hitsTiles(o.x, o.y, r, block, area)) {
           o.x -= sx;
           hit = true;
         }
       }
       if (sy) {
         o.y += sy;
-        if (hitsTiles(o.x, o.y, r, block)) {
+        if (hitsTiles(o.x, o.y, r, block, area)) {
           o.y -= sy;
           hit = true;
         }
@@ -1079,8 +1086,7 @@
       for (let d = 0; d < 120; d += 4) {
         const nx = P.x + Math.cos(a) * 4;
         const ny = P.y + Math.sin(a) * 4;
-        if (hitsTiles(nx, ny, P.r, MOVE_BLOCK)) break;
-        if (G.lock && dist(nx, ny, G.lock.cx, G.lock.cy) > G.lock.R - P.r) break;
+        if (hitsTiles(nx, ny, P.r, MOVE_BLOCK, lockArea())) break;
         P.x = nx;
         P.y = ny;
       }
@@ -1157,10 +1163,10 @@
     if (P.heavyT > 0) sp *= 0.75; // 重火器を撃っている間は遅くなる
     if (P.rollT > 0) {
       P.rollT -= dt;
-      moveCircle(P, Math.cos(P.dodgeDir) * 290 * dt, Math.sin(P.dodgeDir) * 290 * dt, P.r, MOVE_BLOCK);
+      moveCircle(P, Math.cos(P.dodgeDir) * 290 * dt, Math.sin(P.dodgeDir) * 290 * dt, P.r, MOVE_BLOCK, lockArea());
     } else if (P.tackleT > 0) {
       P.tackleT -= dt;
-      moveCircle(P, Math.cos(P.dodgeDir) * 320 * dt, Math.sin(P.dodgeDir) * 320 * dt, P.r, MOVE_BLOCK);
+      moveCircle(P, Math.cos(P.dodgeDir) * 320 * dt, Math.sin(P.dodgeDir) * 320 * dt, P.r, MOVE_BLOCK, lockArea());
       const dmg = 15 + powerLv() * 3;
       forTargets(P.x, P.y, P.r + 16, (t) => {
         if (P.tackleHit.has(t)) return;
@@ -1168,21 +1174,10 @@
         damageTarget(t, dmg, { elem: 'phys', dirx: Math.cos(P.dodgeDir), diry: Math.sin(P.dodgeDir), knock: 220, sx: P.x, sy: P.y });
       });
     } else {
-      moveCircle(P, mx * sp * dt, my * sp * dt, P.r, MOVE_BLOCK);
+      moveCircle(P, mx * sp * dt, my * sp * dt, P.r, MOVE_BLOCK, lockArea());
     }
     P.moving = !!(mx || my);
     if (P.moving) P.walk += dt * 10;
-    // 決闘場の結界
-    if (G.lock) {
-      const dx = P.x - G.lock.cx;
-      const dy = P.y - G.lock.cy;
-      const d = Math.hypot(dx, dy);
-      const m = G.lock.R - P.r;
-      if (d > m) {
-        P.x = G.lock.cx + (dx / d) * m;
-        P.y = G.lock.cy + (dy / d) * m;
-      }
-    }
     // ねらいと射撃
     const man = manualAim();
     buildTargets();
@@ -1701,15 +1696,6 @@
         e.los = lineClear(e.x, e.y, P.x, P.y);
       }
       updateEnemyAI(e, dt, dp);
-      if (e.lair) {
-        const dx = e.x - e.lair.cx;
-        const dy = e.y - e.lair.cy;
-        const d = Math.hypot(dx, dy);
-        if (d > e.lair.R - e.r) {
-          e.x = e.lair.cx + (dx / d) * (e.lair.R - e.r);
-          e.y = e.lair.cy + (dy / d) * (e.lair.R - e.r);
-        }
-      }
       if (!G.dead && !e.dormant && dp < e.r + P.r) hurtPlayer(e.atk, e.lv);
     }
     G.enemies = G.enemies.filter((e) => !e.dead);
@@ -1943,7 +1929,7 @@
       if (!G.dead && dp < n.r + P.r) {
         // 魔巣は体当たりしてこないが、押し返す
         const a = Math.atan2(P.y - n.y, P.x - n.x);
-        moveCircle(P, Math.cos(a) * 2, Math.sin(a) * 2, P.r, MOVE_BLOCK);
+        moveCircle(P, Math.cos(a) * 2, Math.sin(a) * 2, P.r, MOVE_BLOCK, lockArea());
       }
     }
   }
@@ -2017,7 +2003,7 @@
   // 解放したエリアの「はぐれ悪魔」
   function updateStrays(dt) {
     const area = G.areas[G.curArea];
-    if (!area || !area.free || G.lock) return;
+    if (!area || !area.free || area.def.town || G.lock) return;
     G.strayT -= dt;
     if (G.strayT > 0) return;
     G.strayT = 5;
@@ -2044,8 +2030,33 @@
     const lv = Math.min(99, def.lv + D.lv);
     const total = def.hp * lvMul.hp(lv);
     const b = { id, def, lair: l, lv, total, state: 'sleep', t: 0, parts: [], atk: def.atk * lvMul.atk(lv), cx: tc(l.x), cy: tc(l.y), R: l.r * TILE, act: 0, step: 0 };
+    // 戦うエリア: 決闘場 (円) に入ると戦いが始まり、そのあとはこのエリアの中を動ける
+    b.area = G.map.areaOf[l.y * G.map.w + l.x];
+    const [ax, ay, aw, ah] = G.def.areas[b.area].rect;
+    b.box = { x0: (ax + 1) * TILE, y0: (ay + 1) * TILE, x1: (ax + aw - 1) * TILE, y1: (ay + ah - 1) * TILE };
+    b.exits = areaExits(b.area);
     resetBoss(b);
     return b;
+  }
+
+  // エリアの出入り口 (となりのエリアへ歩いて出られるタイルの辺)。結界を描くのに使う
+  function areaExits(ai) {
+    const { w, h, areaOf } = G.map;
+    const out = [];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (areaOf[i] !== ai || MOVE_BLOCK[G.tiles[i]]) continue;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const n = ny * w + nx;
+          if (areaOf[n] !== ai && !MOVE_BLOCK[G.tiles[n]]) out.push({ x, y, dx, dy });
+        }
+      }
+    }
+    return out;
   }
 
   function bossPart(b, x, y, r, hp, extra = {}) {
@@ -2073,12 +2084,12 @@
         const dp = dist(P.x, P.y, b.cx, b.cy);
         if (!G.dead && !G.lock && dp < b.R + 50 && dp >= b.R - 4 && !(b.warnT > G.t)) {
           b.warnT = G.t + 8;
-          toast(`この先は ${b.def.name}（Lv${b.lv}）の決闘場\n入ると、倒すか力尽きるまで出られない`, 2.6);
+          toast(`この先は ${b.def.name}（Lv${b.lv}）の決闘場\n入ると、倒すか力尽きるまでこのエリアから出られない`, 2.6);
         }
         if (!G.dead && !G.lock && dp < b.R - 4) {
           b.state = 'fight';
           G.lock = b;
-          showBanner(b.def.name, `Lv${b.lv}  ・  決闘場の結界が閉じた!`, lvColor(b.lv - powerLv()) === '#ff5a5a' ? '危険!' : '', 3, '#ff8aa8');
+          showBanner(b.def.name, `Lv${b.lv}  ・  エリアの出口に結界が張られた!`, lvColor(b.lv - powerLv()) === '#ff5a5a' ? '危険!' : '', 3, '#ff8aa8');
           sfx('boss');
           G.shake = 6;
         }
@@ -2094,13 +2105,10 @@
       else if (b.id === 'N1') updateDragon(b, dt);
       for (const p of b.parts) {
         if (p.dead) continue;
-        const dx = p.x - b.cx;
-        const dy = p.y - b.cy;
-        const d = Math.hypot(dx, dy);
-        if (d > b.R - p.r * 0.6) {
-          p.x = b.cx + (dx / d) * (b.R - p.r * 0.6);
-          p.y = b.cy + (dy / d) * (b.R - p.r * 0.6);
-        }
+        // ボスもエリアの外へは出ない
+        const m = p.r * 0.6;
+        p.x = clamp(p.x, b.box.x0 + m, b.box.x1 - m);
+        p.y = clamp(p.y, b.box.y0 + m, b.box.y1 - m);
         if (!G.dead && !(p.h > 6) && dist(p.x, p.y, P.x, P.y) < p.r + P.r - 2) hurtPlayer(b.atk, b.lv);
       }
       b.parts = b.parts.filter((p) => !p.dead);
@@ -2938,10 +2946,20 @@
       if (b.state === 'dead') continue;
       ctx.save();
       if (b.state === 'fight') {
-        ctx.strokeStyle = `rgba(200,90,255,${0.7 + Math.sin(G.t * 6) * 0.2})`;
-        ctx.lineWidth = 3;
+        // 戦闘中は、エリアの出入り口をふさぐ結界
+        ctx.fillStyle = `rgba(176,75,255,${0.55 + Math.sin(G.t * 5) * 0.2})`;
         ctx.shadowColor = '#b04bff';
         ctx.shadowBlur = 10;
+        for (const e of b.exits) {
+          const x = e.x * TILE;
+          const y = e.y * TILE;
+          if (e.dx > 0) ctx.fillRect(x + TILE - 3, y, 4, TILE);
+          else if (e.dx < 0) ctx.fillRect(x - 1, y, 4, TILE);
+          else if (e.dy > 0) ctx.fillRect(x, y + TILE - 3, TILE, 4);
+          else ctx.fillRect(x, y - 1, TILE, 4);
+        }
+        ctx.restore();
+        continue;
       } else {
         ctx.strokeStyle = 'rgba(255,80,80,0.35)';
         ctx.lineWidth = 1.5;
@@ -4241,7 +4259,7 @@
   function showStoneMenu(s) {
     const fn = () => {
       const area = s.area;
-      const canRe = area && area.free;
+      const canRe = area && area.free && !area.def.town;
       return `
       <div class="overlay"><div class="panel narrow">
         ${head('転移碑', s.name)}
