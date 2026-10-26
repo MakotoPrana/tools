@@ -124,7 +124,7 @@
   }
 
   // 設定はセーブとは別に、変えたらすぐ保存する
-  const settings = Object.assign({ se: 0.7, autoAim: true, numbers: true }, (() => {
+  const settings = Object.assign({ se: 0.7, autoAim: true, numbers: true, rotate: true }, (() => {
     try {
       return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
     } catch (e) {
@@ -282,7 +282,31 @@
   const canvas = document.getElementById('board');
   const ctx = canvas.getContext('2d');
   let scale = 1; // 論理ピクセル → Canvas のピクセル
+
+  // スマホを縦に持っているときは、ゲーム全体を 90° 回して横向きで遊べるようにする
+  // (画面が自動で回らないとき用。自動で横になったときは、ふつうの横向き表示)
+  const coarse = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  let rotated = false;
+  function updateRotation() {
+    const want = coarse && settings.rotate !== false && window.innerHeight > window.innerWidth;
+    if (want !== rotated) {
+      rotated = want;
+      document.body.classList.toggle('rotated', rotated);
+    }
+    if (rotated) {
+      document.body.style.setProperty('--rw', `${window.innerHeight}px`);
+      document.body.style.setProperty('--rh', `${window.innerWidth}px`);
+    }
+  }
+  // 画面の座標 → 要素の中の割合 (0〜1)。回しているときは軸を入れかえる
+  function localFrac(el, e) {
+    const r = el.getBoundingClientRect();
+    if (rotated) return { u: (e.clientY - r.top) / r.height, v: 1 - (e.clientX - r.left) / r.width };
+    return { u: (e.clientX - r.left) / r.width, v: (e.clientY - r.top) / r.height };
+  }
+
   function resize() {
+    updateRotation();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = Math.max(1, Math.round(boardBox.clientWidth * dpr));
     const h = Math.max(1, Math.round(boardBox.clientHeight * dpr));
@@ -725,8 +749,8 @@
   let touchMode = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
 
   function logical(e) {
-    const r = canvas.getBoundingClientRect();
-    return { x: ((e.clientX - r.left) / r.width) * VW, y: ((e.clientY - r.top) / r.height) * VH };
+    const f = localFrac(canvas, e);
+    return { x: f.u * VW, y: f.v * VH };
   }
 
   window.addEventListener('keydown', (e) => {
@@ -3986,9 +4010,9 @@
       g.stroke();
     }
     c.onclick = (e) => {
-      const r = c.getBoundingClientRect();
-      const tx = Math.floor(((e.clientX - r.left) / r.width) * map.w);
-      const ty = Math.floor(((e.clientY - r.top) / r.height) * map.h);
+      const f = localFrac(c, e);
+      const tx = Math.floor(f.u * map.w);
+      const ty = Math.floor(f.v * map.h);
       const a = def.areas.find((ar) => tx >= ar.rect[0] && tx < ar.rect[0] + ar.rect[2] && ty >= ar.rect[1] && ty < ar.rect[1] + ar.rect[3]);
       if (a) {
         selArea = a.id;
@@ -4347,12 +4371,14 @@
           <div class="row"><div class="t">効果音</div><input type="range" min="0" max="1" step="0.1" value="${settings.se}" data-set="se"></div>
           <div class="row"><div><div class="t">オートエイム（スマホ）</div><div class="s">スティックの向きの近くの敵へ自動でねらう</div></div><button class="btn small" data-act="toggleSet" data-id="autoAim">${settings.autoAim ? 'ON' : 'OFF'}</button></div>
           <div class="row"><div class="t">ダメージの数字</div><button class="btn small" data-act="toggleSet" data-id="numbers">${settings.numbers ? 'ON' : 'OFF'}</button></div>
+          <div class="row"><div><div class="t">縦持ちのとき横向きに回す（スマホ）</div><div class="s">画面が自動で回らないときに、ゲームを 90° 回して横向きで遊ぶ</div></div><button class="btn small" data-act="toggleSet" data-id="rotate">${settings.rotate ? 'ON' : 'OFF'}</button></div>
         </div>
       </div></div>`);
   }
   actions.toggleSet = (d) => {
     settings[d.id] = !settings[d.id];
     saveSettings();
+    resize();
     rerender();
   };
   uiEl.addEventListener('input', (e) => {

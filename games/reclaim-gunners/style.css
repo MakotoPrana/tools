@@ -105,6 +105,25 @@ body {
   .howto { display: none; }
 }
 
+/* 縦持ちのスマホ: ゲーム全体を 90° 回して横向きにする (--rw・--rh は回したあとの幅と高さ。script.js が入れる) */
+body.rotated { overflow: hidden; }
+body.rotated .app {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--rw);
+  height: var(--rh);
+  max-width: none;
+  padding: 0 6px 6px;
+  transform-origin: top left;
+  transform: translateX(var(--rh)) rotate(90deg);
+}
+body.rotated .top { height: 30px; }
+body.rotated .top h1 { font-size: 0.85rem; }
+body.rotated .icon-btn { height: 26px; }
+body.rotated .board { width: min(100%, calc((var(--rh) - 36px) * 16 / 9)); border-radius: 6px; }
+body.rotated .howto { display: none; }
+
 @media (max-width: 600px) {
   .app { padding: 0 8px 16px; }
   .board { border-radius: 8px; }
