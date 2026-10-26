@@ -198,79 +198,296 @@
   }
 
   // ===================================================================
-  // 効果音 (Web Audio で鳴らす)
+  // 効果音 (Web Audio で作る)
+  //   銃声は「破裂の高い音 (クラック)」「胴の音 (ノイズを絞った音)」「低いドン (サイン波)」「残響」を重ねて作る
   // ===================================================================
   let actx = null;
+  let AU = null; // { master, comp, verb, noise }
   const sfxLast = {};
+
+  function audioInit() {
+    if (AU) return AU;
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = actx.createDynamicsCompressor(); // たくさん同時に鳴っても割れないように
+    comp.threshold.value = -16;
+    comp.knee.value = 12;
+    comp.ratio.value = 8;
+    comp.attack.value = 0.002;
+    comp.release.value = 0.15;
+    comp.connect(actx.destination);
+    const master = actx.createGain();
+    master.connect(comp);
+    // 残響 (外で撃ったときの、はね返る音)
+    const sr = actx.sampleRate;
+    const ir = actx.createBuffer(2, Math.floor(sr * 1.4), sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < d.length; i++) {
+        const t = i / d.length;
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3.2) * (i < sr * 0.012 ? 0.3 : 1);
+      }
+    }
+    const verb = actx.createConvolver();
+    verb.buffer = ir;
+    const verbOut = actx.createGain();
+    verbOut.gain.value = 0.55;
+    verb.connect(verbOut).connect(master);
+    // ノイズの元 (2 秒ぶん。毎回ちがう所から鳴らす)
+    const noise = actx.createBuffer(1, sr * 2, sr);
+    const nd = noise.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    AU = { master, comp, verb, noise };
+    return AU;
+  }
+
+  // ノイズの音。type: lowpass / highpass / bandpass。f1 を渡すと、周波数をなめらかに変える
+  function nz(t, { type = 'bandpass', f = 1200, f1 = null, q = 0.8, gain = 0.5, attack = 0.001, dur = 0.1, verb = 0.25, pan = 0 }) {
+    const src = actx.createBufferSource();
+    src.buffer = AU.noise;
+    const filt = actx.createBiquadFilter();
+    filt.type = type;
+    filt.frequency.setValueAtTime(f, t);
+    if (f1) filt.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    filt.Q.value = q;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gain, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(filt).connect(g);
+    out(g, verb, pan);
+    src.start(t, Math.random() * 1.5);
+    src.stop(t + dur + 0.05);
+  }
+  // 音の高さのある音 (低いドン・弦・金属の響き)
+  function tn(t, { wave = 'sine', f = 120, f1 = null, gain = 0.5, attack = 0.002, dur = 0.12, verb = 0.2, pan = 0 }) {
+    const o = actx.createOscillator();
+    o.type = wave;
+    o.frequency.setValueAtTime(f, t);
+    if (f1) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gain, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g);
+    out(g, verb, pan);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+  }
+  function out(node, verb, pan) {
+    let n = node;
+    if (pan && actx.createStereoPanner) {
+      const p = actx.createStereoPanner();
+      p.pan.value = pan;
+      n.connect(p);
+      n = p;
+    }
+    n.connect(AU.master);
+    if (verb > 0) {
+      const s = actx.createGain();
+      s.gain.value = verb;
+      n.connect(s).connect(AU.verb);
+    }
+  }
+  // 金属の小さな音 (遊底・弾倉・ポンプ)
+  function clack(t, f = 2600, gain = 0.25) {
+    nz(t, { type: 'bandpass', f, q: 6, gain, dur: 0.035, verb: 0.08 });
+    nz(t, { type: 'highpass', f: 4000, gain: gain * 0.6, dur: 0.018, verb: 0 });
+  }
+
+  // 武器ごとの銃声
+  const GUN_SOUNDS = {
+    // リボルバー: 乾いた破裂と、低いドン
+    A1: (t) => {
+      nz(t, { type: 'bandpass', f: 2600, q: 0.7, gain: 0.8, dur: 0.06, verb: 0.35 });
+      nz(t, { type: 'lowpass', f: 1400, f1: 300, gain: 0.7, dur: 0.16, verb: 0.4 });
+      tn(t, { f: 170, f1: 50, gain: 0.55, dur: 0.12, verb: 0.1 });
+    },
+    // サブマシンガン: 軽く短い連射音
+    A2: (t) => {
+      nz(t, { type: 'bandpass', f: 3000, q: 0.9, gain: 0.45, dur: 0.035, verb: 0.2 });
+      nz(t, { type: 'lowpass', f: 1600, f1: 500, gain: 0.35, dur: 0.07, verb: 0.2 });
+      tn(t, { f: 210, f1: 80, gain: 0.3, dur: 0.05, verb: 0 });
+    },
+    // 二丁拳銃: リボルバーより少し高く、左右に振る
+    A3: (t, side) => {
+      nz(t, { type: 'bandpass', f: 3000, q: 0.8, gain: 0.6, dur: 0.05, verb: 0.3, pan: side * 0.4 });
+      nz(t, { type: 'lowpass', f: 1600, f1: 400, gain: 0.5, dur: 0.12, verb: 0.3, pan: side * 0.4 });
+      tn(t, { f: 190, f1: 60, gain: 0.4, dur: 0.09, verb: 0.05, pan: side * 0.4 });
+    },
+    // 聖銀銃: 破裂のあとに、澄んだ鐘の響き
+    A4: (t) => {
+      GUN_SOUNDS.A1(t);
+      tn(t + 0.01, { wave: 'triangle', f: 1760, gain: 0.12, dur: 0.6, verb: 0.6 });
+      tn(t + 0.01, { wave: 'sine', f: 2637, gain: 0.07, dur: 0.5, verb: 0.6 });
+    },
+    // ショットガン: 重く広がる爆音。ポンプは撃ったあとにガシャッと引く
+    B1: (t) => {
+      GUN_SOUNDS._shot(t, 1);
+      clack(t + 0.34, 1800, 0.28);
+      clack(t + 0.46, 2400, 0.3);
+    },
+    B2: (t) => GUN_SOUNDS._shot(t, 1.15),
+    B3: (t) => {
+      GUN_SOUNDS._shot(t, 0.9);
+      nz(t + 0.01, { type: 'highpass', f: 5000, gain: 0.25, dur: 0.12, verb: 0.2 });
+    },
+    B4: (t) => {
+      GUN_SOUNDS._shot(t, 1.1);
+      nz(t + 0.02, { type: 'bandpass', f: 600, f1: 2400, q: 0.6, gain: 0.35, dur: 0.35, verb: 0.3 });
+    },
+    _shot: (t, k) => {
+      nz(t, { type: 'lowpass', f: 3400, f1: 600, gain: 0.95 * k, dur: 0.26, verb: 0.55 });
+      nz(t, { type: 'bandpass', f: 1300, q: 0.5, gain: 0.6 * k, dur: 0.12, verb: 0.3 });
+      tn(t, { f: 120, f1: 38, gain: 0.85 * k, dur: 0.22, verb: 0.1 });
+    },
+    // ガトリング: 短い破裂が続く
+    C1: (t) => {
+      nz(t, { type: 'bandpass', f: 1900, q: 1, gain: 0.42, dur: 0.04, verb: 0.15 });
+      tn(t, { f: 150, f1: 60, gain: 0.32, dur: 0.045, verb: 0 });
+    },
+    // グレネード: ポンッという低い発射音
+    C2: (t) => {
+      tn(t, { f: 95, f1: 45, gain: 0.8, dur: 0.16, verb: 0.2 });
+      nz(t, { type: 'lowpass', f: 700, gain: 0.45, dur: 0.12, verb: 0.2 });
+      clack(t + 0.02, 1200, 0.15);
+    },
+    // 火炎放射器: シューッという炎の音
+    C3: (t) => nz(t, { type: 'bandpass', f: 900, f1: 1600, q: 0.4, gain: 0.22, attack: 0.02, dur: 0.14, verb: 0.15 }),
+    // 魔導ロケット: ドンと撃って、シュオーッと飛ぶ
+    C4: (t) => {
+      tn(t, { f: 110, f1: 40, gain: 0.7, dur: 0.2, verb: 0.3 });
+      nz(t, { type: 'bandpass', f: 500, f1: 3000, q: 0.7, gain: 0.45, attack: 0.03, dur: 0.6, verb: 0.35 });
+    },
+    // 狩猟弓: 弦がビンと鳴る
+    D1: (t) => {
+      tn(t, { wave: 'triangle', f: 240, f1: 170, gain: 0.4, dur: 0.18, verb: 0.15 });
+      nz(t, { type: 'highpass', f: 3500, gain: 0.2, dur: 0.05, verb: 0.1 });
+    },
+    // ライフル: 鋭い破裂と、長く残る残響
+    D2: (t) => {
+      nz(t, { type: 'highpass', f: 2800, gain: 0.85, dur: 0.05, verb: 0.6 });
+      nz(t, { type: 'bandpass', f: 900, q: 0.6, gain: 0.7, dur: 0.2, verb: 0.6 });
+      tn(t, { f: 130, f1: 40, gain: 0.7, dur: 0.16, verb: 0.2 });
+      clack(t + 0.28, 2200, 0.18);
+    },
+    // クロスボウ: ガシッと撃ち出す
+    D3: (t) => {
+      tn(t, { wave: 'triangle', f: 320, f1: 130, gain: 0.45, dur: 0.1, verb: 0.1 });
+      clack(t, 1600, 0.3);
+      nz(t, { type: 'highpass', f: 3000, gain: 0.15, dur: 0.06, verb: 0.1 });
+    },
+    // 対魔ライフル: いちばん重い銃声と、光のうなり
+    D4: (t) => {
+      nz(t, { type: 'highpass', f: 2200, gain: 1, dur: 0.07, verb: 0.7 });
+      nz(t, { type: 'lowpass', f: 1800, f1: 200, gain: 0.85, dur: 0.35, verb: 0.7 });
+      tn(t, { f: 90, f1: 30, gain: 0.95, dur: 0.3, verb: 0.2 });
+      tn(t, { wave: 'sawtooth', f: 880, f1: 1760, gain: 0.06, dur: 0.3, verb: 0.4 });
+    },
+    // 魔導: 火の玉のボッ / 氷のキン / 雷のバチッ
+    E1: (t) => {
+      nz(t, { type: 'bandpass', f: 500, f1: 1400, q: 0.8, gain: 0.4, attack: 0.01, dur: 0.2, verb: 0.3 });
+      tn(t, { f: 180, f1: 90, gain: 0.25, dur: 0.12, verb: 0.1 });
+    },
+    E2: (t) => {
+      nz(t, { type: 'highpass', f: 5000, gain: 0.25, attack: 0.005, dur: 0.15, verb: 0.4 });
+      tn(t, { wave: 'sine', f: 1500, f1: 2400, gain: 0.12, dur: 0.18, verb: 0.5 });
+    },
+    E3: (t) => {
+      nz(t, { type: 'bandpass', f: 3200, q: 0.4, gain: 0.55, dur: 0.1, verb: 0.35 });
+      nz(t + 0.03, { type: 'bandpass', f: 2200, q: 0.5, gain: 0.35, dur: 0.08, verb: 0.3 });
+      tn(t, { wave: 'square', f: 70, f1: 40, gain: 0.15, dur: 0.12, verb: 0.1 });
+    },
+    E4: (t) => tn(t, { wave: 'sawtooth', f: 220, f1: 230, gain: 0.05, attack: 0.02, dur: 0.12, verb: 0.2 }),
+    S1: (t) => {
+      GUN_SOUNDS.A1(t);
+      tn(t, { wave: 'sawtooth', f: 140, f1: 70, gain: 0.15, dur: 0.2, verb: 0.3 });
+    },
+    S2: (t) => GUN_SOUNDS.E1(t),
+  };
+
+  function gunSound(w, side = 0) {
+    if (!settings.se) return;
+    const now = performance.now();
+    const key = `g_${w.id}`;
+    if (sfxLast[key] && now - sfxLast[key] < 45) return;
+    sfxLast[key] = now;
+    try {
+      audioInit();
+      if (actx.state === 'suspended') actx.resume();
+      AU.master.gain.value = settings.se * 0.6;
+      const fn = GUN_SOUNDS[w.id] || GUN_SOUNDS.A1;
+      fn(actx.currentTime + 0.005, side);
+    } catch (e) { /* 音が鳴らなくても遊べる */ }
+  }
+
   function sfx(type) {
     if (!settings.se) return;
     const now = performance.now();
     if (sfxLast[type] && now - sfxLast[type] < 40) return;
     sfxLast[type] = now;
     try {
-      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      audioInit();
       if (actx.state === 'suspended') actx.resume();
-      const t = actx.currentTime;
-      const vol = settings.se * 0.25;
-      const tone = (f0, f1, dur, wave = 'square', v = 1) => {
-        const o = actx.createOscillator();
-        const g = actx.createGain();
-        o.type = wave;
-        o.frequency.setValueAtTime(f0, t);
-        o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
-        g.gain.setValueAtTime(vol * v, t);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        o.connect(g).connect(actx.destination);
-        o.start(t);
-        o.stop(t + dur + 0.02);
-      };
-      const noise = (dur, v = 1, freq = 1200) => {
-        const len = Math.floor(actx.sampleRate * dur);
-        const buf = actx.createBuffer(1, len, actx.sampleRate);
-        const d = buf.getChannelData(0);
-        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-        const s = actx.createBufferSource();
-        s.buffer = buf;
-        const f = actx.createBiquadFilter();
-        f.type = 'lowpass';
-        f.frequency.value = freq;
-        const g = actx.createGain();
-        g.gain.value = vol * v;
-        s.connect(f).connect(g).connect(actx.destination);
-        s.start(t);
-      };
+      AU.master.gain.value = settings.se * 0.6;
+      const t = actx.currentTime + 0.005;
       switch (type) {
-        case 'shot_hand': tone(900, 300, 0.07, 'square', 0.35); break;
-        case 'shot_shot': noise(0.16, 0.9, 1800); break;
-        case 'shot_heavy': noise(0.06, 0.5, 2400); break;
-        case 'shot_prec': tone(1400, 200, 0.1, 'sawtooth', 0.35); break;
-        case 'shot_magic': tone(500, 1100, 0.1, 'triangle', 0.5); break;
-        case 'shot_special': tone(300, 900, 0.1, 'sawtooth', 0.4); break;
-        case 'hit': tone(220, 120, 0.04, 'square', 0.18); break;
-        case 'kill': tone(320, 80, 0.09, 'square', 0.25); break;
-        case 'block': tone(1800, 1500, 0.05, 'triangle', 0.25); break;
-        case 'hurt': tone(180, 60, 0.18, 'sawtooth', 0.5); break;
-        case 'explode': noise(0.35, 1, 600); break;
-        case 'nest': noise(0.6, 1.2, 400); tone(120, 40, 0.6, 'sawtooth', 0.5); break;
-        case 'reload': tone(600, 900, 0.06, 'square', 0.2); break;
-        case 'coin': tone(1300, 1800, 0.06, 'square', 0.15); break;
-        case 'pick': tone(700, 1400, 0.1, 'triangle', 0.4); break;
-        case 'dodge': noise(0.12, 0.4, 900); break;
-        case 'ui': tone(700, 900, 0.05, 'triangle', 0.3); break;
-        case 'buy': tone(880, 1760, 0.15, 'triangle', 0.5); break;
-        case 'boss': tone(90, 50, 0.9, 'sawtooth', 0.7); break;
-        case 'liberate':
+        case 'hit': // 弾が肉に当たる、にぶい音
+          nz(t, { type: 'lowpass', f: 900, gain: 0.16, dur: 0.05, verb: 0 });
+          break;
+        case 'kill':
+          nz(t, { type: 'bandpass', f: 700, f1: 220, q: 1.2, gain: 0.3, dur: 0.16, verb: 0.15 });
+          tn(t, { f: 160, f1: 60, gain: 0.2, dur: 0.12, verb: 0 });
+          break;
+        case 'block': // 盾や鎧に弾かれる、キンという音
+          tn(t, { wave: 'triangle', f: 2400, f1: 2100, gain: 0.18, dur: 0.12, verb: 0.3 });
+          nz(t, { type: 'highpass', f: 4000, gain: 0.15, dur: 0.03, verb: 0.1 });
+          break;
+        case 'hurt':
+          nz(t, { type: 'lowpass', f: 600, gain: 0.45, dur: 0.15, verb: 0.1 });
+          tn(t, { wave: 'sawtooth', f: 160, f1: 70, gain: 0.18, dur: 0.18, verb: 0.05 });
+          break;
+        case 'explode': // 地面がゆれる爆発
+          nz(t, { type: 'lowpass', f: 900, f1: 120, gain: 1, attack: 0.004, dur: 0.9, verb: 0.6 });
+          nz(t, { type: 'bandpass', f: 2000, q: 0.4, gain: 0.35, dur: 0.12, verb: 0.3 });
+          tn(t, { f: 70, f1: 28, gain: 0.9, dur: 0.7, verb: 0.2 });
+          break;
+        case 'nest': // 魔巣がつぶれる: 爆発と、うなり声
+          nz(t, { type: 'lowpass', f: 700, f1: 100, gain: 0.95, dur: 1, verb: 0.6 });
+          tn(t, { wave: 'sawtooth', f: 110, f1: 35, gain: 0.3, attack: 0.03, dur: 0.9, verb: 0.5 });
+          tn(t, { f: 55, f1: 25, gain: 0.7, dur: 0.8, verb: 0.2 });
+          break;
+        case 'reload': // 弾倉を抜いて、差しこむ
+          clack(t, 1700, 0.3);
+          clack(t + 0.13, 2600, 0.32);
+          tn(t + 0.13, { wave: 'triangle', f: 3200, f1: 3000, gain: 0.05, dur: 0.08, verb: 0.1 });
+          break;
+        case 'coin':
+          tn(t, { wave: 'triangle', f: 2100, gain: 0.08, dur: 0.12, verb: 0.2 });
+          tn(t + 0.04, { wave: 'triangle', f: 2800, gain: 0.07, dur: 0.14, verb: 0.2 });
+          break;
+        case 'pick':
+          tn(t, { wave: 'sine', f: 700, f1: 1400, gain: 0.18, dur: 0.14, verb: 0.3 });
+          break;
+        case 'dodge': // 衣のこすれる音
+          nz(t, { type: 'bandpass', f: 1200, f1: 500, q: 0.6, gain: 0.25, attack: 0.02, dur: 0.18, verb: 0.05 });
+          break;
+        case 'ui':
+          clack(t, 2200, 0.12);
+          break;
+        case 'buy':
+          tn(t, { wave: 'triangle', f: 660, gain: 0.18, dur: 0.25, verb: 0.4 });
+          tn(t + 0.07, { wave: 'triangle', f: 990, gain: 0.16, dur: 0.3, verb: 0.4 });
+          clack(t, 1400, 0.15);
+          break;
+        case 'boss': // 低く重いうなり
+          tn(t, { wave: 'sawtooth', f: 60, f1: 40, gain: 0.35, attack: 0.1, dur: 1.6, verb: 0.6 });
+          tn(t, { f: 45, gain: 0.5, attack: 0.1, dur: 1.6, verb: 0.3 });
+          nz(t, { type: 'lowpass', f: 300, gain: 0.4, attack: 0.2, dur: 1.4, verb: 0.5 });
+          break;
+        case 'liberate': // 霧が晴れる、明るい和音
           [523, 659, 784, 1047].forEach((f, i) => {
-            const o = actx.createOscillator();
-            const g = actx.createGain();
-            o.type = 'triangle';
-            o.frequency.value = f;
-            g.gain.setValueAtTime(0.0001, t + i * 0.12);
-            g.gain.exponentialRampToValueAtTime(vol * 0.8, t + i * 0.12 + 0.02);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.5);
-            o.connect(g).connect(actx.destination);
-            o.start(t + i * 0.12);
-            o.stop(t + i * 0.12 + 0.55);
+            tn(t + i * 0.12, { wave: 'triangle', f, gain: 0.22, attack: 0.02, dur: 0.9, verb: 0.6 });
+            tn(t + i * 0.12, { wave: 'sine', f: f * 2, gain: 0.06, attack: 0.02, dur: 0.7, verb: 0.6 });
           });
           break;
         default: break;
@@ -1957,7 +2174,7 @@
       oy += Math.sin(a + Math.PI / 2) * 4 * P.twinSide;
     }
     if (w.cat === 'heavy') P.heavyT = 0.25;
-    sfx(`shot_${w.cat}`);
+    gunSound(w, w.twin ? P.twinSide : 0);
     addPart({ x: ox, y: oy, vx: 0, vy: 0, life: 0.06, color: '#fff3b0', size: 5, glow: true });
     if (w.kind === 'grenade') {
       const d = clamp(tdist, 40, w.range);
@@ -1999,6 +2216,7 @@
     st.beamT = (st.beamT || 0) - dt;
     if (st.beamT > 0) return;
     st.beamT = 1 / w.rate;
+    gunSound(w);
     const dmg = w.dmg * upgMul(lv);
     forAllTargets((t) => {
       const d = segDist(t.x, t.y, sx, sy, ex, ey);
@@ -3610,8 +3828,11 @@
   // ===================================================================
   // 描画
   // ===================================================================
+  // 画面の文字 (ダークファンタジー風の明朝体)。weight に 'display' を渡すと、見出し用の古風な文字にする
+  const FONT_UI = '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif';
+  const FONT_DISPLAY = '"Zen Antique", "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif';
   function txt(s, x, y, size = 9, color = '#fff', align = 'left', weight = 700) {
-    ctx.font = `${weight} ${size}px system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", sans-serif`;
+    ctx.font = weight === 'display' ? `400 ${size}px ${FONT_DISPLAY}` : `${Math.max(500, Math.min(800, weight))} ${size}px ${FONT_UI}`;
     ctx.textAlign = align;
     ctx.textBaseline = 'middle';
     ctx.lineWidth = Math.max(2, size / 4);
@@ -3620,6 +3841,29 @@
     ctx.strokeText(s, x, y);
     ctx.fillStyle = color;
     ctx.fillText(s, x, y);
+  }
+
+  // HUD の枠: 黒い革の地に、古い金の二重線と、角の小さな菱形
+  function hudFrame(x, y, w, h, glow = null) {
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, 'rgba(34,22,18,0.88)');
+    g.addColorStop(1, 'rgba(12,7,6,0.88)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = glow || 'rgba(200,160,90,0.75)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.strokeStyle = 'rgba(200,160,90,0.28)';
+    ctx.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
+    ctx.fillStyle = '#e0b860';
+    for (const [cx, cy] of [[x, y], [x + w, y], [x, y + h], [x + w, y + h]]) {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 2.5);
+      ctx.lineTo(cx + 2.5, cy);
+      ctx.lineTo(cx, cy + 2.5);
+      ctx.lineTo(cx - 2.5, cy);
+      ctx.fill();
+    }
   }
 
   // 何度も使う絵 (丸い体の陰影・やわらかい影・光)
@@ -4923,26 +5167,34 @@
   function drawHud() {
     const m = maxHp();
     // 体力
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    roundRect(ctx, 6, 6, 150, 40, 6);
-    ctx.fill();
-    ctx.fillStyle = '#2a1a22';
-    ctx.fillRect(12, 12, 138, 9);
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.fillRect(12, 12, 138 * clamp(P.shownHp / m, 0, 1), 9);
+    hudFrame(6, 6, 152, 42);
+    ctx.fillStyle = '#1a0606';
+    ctx.fillRect(12, 12, 140, 9);
+    ctx.fillStyle = 'rgba(255,230,200,0.55)';
+    ctx.fillRect(12, 12, 140 * clamp(P.shownHp / m, 0, 1), 9);
     const f = P.hp / m;
-    ctx.fillStyle = f > 0.6 ? '#5fe07a' : f > 0.3 ? '#ffd84a' : Math.floor(G.t * 4) % 2 ? '#ff4a4a' : '#ff8a8a';
-    ctx.fillRect(12, 12, 138 * clamp(f, 0, 1), 9);
-    txt(`HP ${Math.ceil(P.hp)}/${m}`, 14, 16.5, 7, '#fff');
+    // 体力は血の色。少なくなると脈打つ
+    const hg = ctx.createLinearGradient(0, 12, 0, 21);
+    const low = f <= 0.3 && Math.floor(G.t * 4) % 2;
+    hg.addColorStop(0, low ? '#ff6a5a' : f > 0.6 ? '#e04a3a' : '#d0402a');
+    hg.addColorStop(1, low ? '#a01a1a' : '#6a0e10');
+    ctx.fillStyle = hg;
+    ctx.fillRect(12, 12, 140 * clamp(f, 0, 1), 9);
+    ctx.fillStyle = 'rgba(255,220,180,0.25)';
+    ctx.fillRect(12, 12, 140 * clamp(f, 0, 1), 2);
+    ctx.strokeStyle = 'rgba(200,160,90,0.8)';
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(11.5, 11.5, 141, 10);
+    txt(`HP ${Math.ceil(P.hp)}/${m}`, 15, 16.5, 7, '#fff0d8');
     const pl = powerLv();
-    txt(`戦力 Lv${pl}`, 12, 30, 9, '#ffe9a8');
-    txt(`EXP ${fmt(hero.exp)}`, 66, 30, 8, '#c8b8ff');
+    txt(`戦力 Lv${pl}`, 12, 30, 9, '#f0d890');
+    txt(`EXP ${fmt(hero.exp)}`, 70, 30, 8, '#d8c0a0');
     if (G.expPop > 0) {
       ctx.globalAlpha = Math.min(1, G.expPopT);
       txt(`+${fmt(G.expPop)}`, 66, 40, 7, '#e8d8ff');
       ctx.globalAlpha = 1;
     }
-    txt(`回復薬 ${hero.potions}`, 12, 40, 7, '#9affb0');
+    txt(`回復薬 ${hero.potions}`, 12, 40.5, 7, '#9ad8a0');
 
     // いるエリア
     const area = G.areas[G.curArea];
@@ -4951,7 +5203,7 @@
       const lv1 = Math.min(99, area.def.lv[1] + D.lv);
       const left = area.nests.filter((n) => !n.dead).length;
       const status = area.free ? '解放済み ✓' : `魔巣 ${left}/${area.def.nests.length}`;
-      txt(area.def.name, VW / 2, 12, 10, '#fff', 'center', 800);
+      txt(area.def.name, VW / 2, 12, 11, '#f0d890', 'center', 'display');
       txt(`推奨 Lv${lv0}〜${lv1}  ・  ${status}`, VW / 2, 24, 7.5, area.free ? '#7dffb0' : lvColor(lv1 - pl), 'center');
     }
 
@@ -4960,10 +5212,12 @@
       const b = G.lock;
       const w = 280;
       const x = VW / 2 - w / 2;
-      txt(`${b.def.name}  Lv${b.lv}`, VW / 2, 38, 9, lvColor(b.lv - pl), 'center', 800);
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(x, 46, w, 6);
-      ctx.fillStyle = '#ff4a6a';
+      txt(`${b.def.name}  Lv${b.lv}`, VW / 2, 37, 10, lvColor(b.lv - pl), 'center', 'display');
+      hudFrame(x - 4, 43, w + 8, 12, 'rgba(220,90,70,0.9)');
+      const bg = ctx.createLinearGradient(0, 46, 0, 52);
+      bg.addColorStop(0, '#c02a2a');
+      bg.addColorStop(1, '#4a0608');
+      ctx.fillStyle = bg;
       ctx.fillRect(x, 46, w * clamp(bossHp(b) / b.total, 0, 1), 6);
     }
 
@@ -4971,7 +5225,7 @@
     drawShopPointer();
 
     // お金と素材
-    txt(`${fmt(hero.gold)} G`, 10, VH - 14, 10, '#ffd84a', 'left', 800);
+    txt(`${fmt(hero.gold)} G`, 10, VH - 14, 11, '#e8c060', 'left', 'display');
     G.matLog.forEach((mlog, i) => {
       ctx.globalAlpha = Math.min(1, mlog.t);
       txt(mlog.text, 10, VH - 28 - (G.matLog.length - 1 - i) * 11, 7.5, '#e0c0ff');
@@ -4983,12 +5237,15 @@
     rects.forEach((r, i) => {
       // 撃っている武器のふちを光らせる (全部の武器が同時に撃つ)
       const active = r.id && ensureWs(r.id).active;
-      ctx.fillStyle = r.id ? 'rgba(60,30,90,0.75)' : 'rgba(0,0,0,0.45)';
-      roundRect(ctx, r.x, r.y, r.w, r.h, 5);
-      ctx.fill();
-      ctx.strokeStyle = active ? '#ffd84a' : r.id ? '#b08ad8' : 'rgba(255,255,255,0.2)';
-      ctx.lineWidth = active ? 1.8 : 1;
-      ctx.stroke();
+      if (r.id) hudFrame(r.x, r.y, r.w, r.h, active ? '#ffd070' : null);
+      else {
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = 'rgba(200,160,90,0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      }
+      if (active) drawGlow(ctx, r.x + r.w / 2, r.y + r.h / 2, r.w * 0.9, '#ff9a40', 0.25);
       if (!r.id) return;
       const w = WEAPON[r.id];
       const st = ensureWs(r.id);
@@ -5006,20 +5263,19 @@
       }
       if (st.reloadT > 0) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        roundRect(ctx, r.x, r.y, r.w, r.h, 5);
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = '#f0d890';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(r.x + r.w / 2, r.y + r.h / 2, 9, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - st.reloadT / reloadTime(w)));
         ctx.stroke();
       }
     });
-    if (rects.length) txt(settings.autoAim ? '自動でねらって撃つ' : 'ねらって撃つ', VW / 2, rects[0].y - 7, 7, 'rgba(255,255,255,0.7)', 'center');
+    if (rects.length) txt(settings.autoAim ? '自動でねらって撃つ' : 'ねらって撃つ', VW / 2, rects[0].y - 7, 7, 'rgba(232,212,168,0.75)', 'center');
 
     // 調べる
     if (G.interact && !touchMode) {
-      txt(`[E] ${G.interact.label}`, VW / 2, VH - 64, 9, '#9ad8ff', 'center');
+      txt(`[E] ${G.interact.label}`, VW / 2, VH - 64, 9, '#f0d890', 'center');
     }
 
     // バナー
@@ -5027,13 +5283,25 @@
       const b = G.banner;
       const k = Math.min(1, (b.max - b.t) * 4, b.t * 2);
       ctx.globalAlpha = clamp(k, 0, 1);
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
       const lines = b.sub ? b.sub.split('\n') : [];
-      const hgt = 30 + lines.length * 12;
-      ctx.fillRect(0, 70, VW, hgt);
-      txt(b.text, VW / 2, 86, 16, b.color, 'center', 900);
-      if (b.warn) txt(b.warn, VW / 2 + ctx.measureText(b.text).width / 2 + 20, 86, 11, '#ff5a5a', 'left', 900);
-      lines.forEach((l, i) => txt(l, VW / 2, 104 + i * 12, 8.5, '#eee', 'center'));
+      const hgt = 32 + lines.length * 12;
+      const bg = ctx.createLinearGradient(0, 0, VW, 0);
+      bg.addColorStop(0, 'rgba(8,4,4,0)');
+      bg.addColorStop(0.2, 'rgba(20,8,8,0.82)');
+      bg.addColorStop(0.8, 'rgba(20,8,8,0.82)');
+      bg.addColorStop(1, 'rgba(8,4,4,0)');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 69, VW, hgt);
+      const lg = ctx.createLinearGradient(0, 0, VW, 0);
+      lg.addColorStop(0, 'rgba(224,184,96,0)');
+      lg.addColorStop(0.5, 'rgba(224,184,96,0.85)');
+      lg.addColorStop(1, 'rgba(224,184,96,0)');
+      ctx.fillStyle = lg;
+      ctx.fillRect(0, 69, VW, 1);
+      ctx.fillRect(0, 69 + hgt, VW, 1);
+      txt(b.text, VW / 2, 87, 17, b.color, 'center', 'display');
+      if (b.warn) txt(b.warn, VW / 2 + ctx.measureText(b.text).width / 2 + 20, 87, 12, '#ff5a4a', 'left', 'display');
+      lines.forEach((l, i) => txt(l, VW / 2, 106 + i * 12, 8.5, '#eadcc0', 'center'));
       ctx.globalAlpha = 1;
     }
 
@@ -5062,8 +5330,7 @@
     const mh = G.map.h * k;
     const x = VW - mw - 8;
     const y = 6;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(x - 2, y - 2, mw + 4, mh + 4);
+    hudFrame(x - 4, y - 4, mw + 8, mh + 8);
     ctx.globalAlpha = 0.85;
     ctx.drawImage(G.map.mini, x, y, mw, mh);
     ctx.globalAlpha = 1;
@@ -5472,7 +5739,7 @@
       const ctr = map.centers[ai];
       const x = ctr.x * 8 + 4;
       const y = ctr.y * 8 + 4;
-      g.font = '800 22px system-ui, sans-serif';
+      g.font = `400 24px ${FONT_DISPLAY}`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.lineWidth = 5;
@@ -5481,7 +5748,7 @@
       const label = `${a.name}${a.strong ? ' ★' : ''}`;
       g.strokeText(label, x, y - 12);
       g.fillText(label, x, y - 12);
-      g.font = '700 16px system-ui, sans-serif';
+      g.font = `700 16px ${FONT_UI}`;
       const sub = `Lv${a.lv[0] + D.lv}〜${Math.min(99, a.lv[1] + D.lv)}`;
       g.fillStyle = free(a) ? '#7dffb0' : lvColor(a.lv[1] + D.lv - powerLv());
       g.strokeText(sub, x, y + 12);
@@ -5530,7 +5797,7 @@
     for (const f of def.features) {
       if (!f.shop) continue;
       g.fillStyle = '#ffd84a';
-      g.font = '800 14px system-ui, sans-serif';
+      g.font = `800 14px ${FONT_UI}`;
       g.strokeStyle = '#000';
       g.lineWidth = 4;
       g.strokeText('武器屋', f.door[0] * 8 + 4, f.door[1] * 8 + 14);
@@ -5980,6 +6247,14 @@
       },
       god() {
         P.inv = 1e9;
+      },
+      // 音をためす (エラーを隠さずに鳴らす)
+      sounds() {
+        audioInit();
+        const t = actx.currentTime;
+        const ids = Object.keys(GUN_SOUNDS).filter((k) => !k.startsWith('_'));
+        ids.forEach((id, i) => GUN_SOUNDS[id](t + i * 0.5, 0));
+        return ids.length;
       },
     };
   }
