@@ -44,6 +44,11 @@ export const lvMul = {
   gold: (l) => 1 + 0.15 * (l - 1),
 };
 
+// 魂: 経験値とお金をひとつにまとめたもの。敵を倒すと自動で集まり、能力ボード・武器屋・改造などすべてに使う
+//   もらえる量 = データの exp と gold をそれぞれレベル補正して足したもの
+export const soulGain = (exp, gold, lv) => exp * lvMul.exp(lv) + gold * lvMul.gold(lv);
+export const souls = (n) => tr('{n} 魂', { n: Math.floor(n).toLocaleString('ja-JP') });
+
 // スマホを縦に持っているときは、ゲーム全体を 90° 回して横向きで遊べるようにする
 // (画面が自動で回らないとき用。自動で横になったときは、ふつうの横向き表示)
 export const touchDev = !!((window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0);

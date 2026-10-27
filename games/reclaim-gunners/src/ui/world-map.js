@@ -1,7 +1,6 @@
 // 全体図
-import { LINKS, STAGES, tr } from '../core/config.js';
+import { LINKS, STAGES, souls, tr } from '../core/config.js';
 import { loadSave, save, setSave } from '../core/save.js';
-import { fmt } from '../core/util.js';
 import { D, hero, heroDef, prog } from '../game/hero.js';
 import { G, setG, stageDef } from '../game/stage.js';
 import { actions } from './actions.js';
@@ -78,7 +77,7 @@ export function showWorld() {
       <div class="panel-head">
         <button class="btn small back-btn" data-act="toTitle">${tr('‹ タイトル')}</button>
         <h2>${tr('ヴェルデ地方')}</h2>
-        <span class="stat">${heroDef.name} ・ <span style="color:${D.color}">${D.name}</span> ・ <span class="gold">${fmt(hero.gold)} G</span> ・ EXP ${fmt(hero.exp)}</span>
+        <span class="stat">${heroDef.name} ・ <span style="color:${D.color}">${D.name}</span> ・ <span class="soul">${souls(hero.souls)}</span></span>
       </div>
       <div class="world">
         <img src="assets/worldmap.jpg" width="${WORLD_W}" height="${WORLD_H}" alt="">

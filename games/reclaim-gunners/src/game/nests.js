@@ -1,14 +1,14 @@
 // 魔巣とエリアの解放
 import { sfx } from '../audio/sound.js';
-import { ENEMY, MOVE_BLOCK, NESTS, TAU, TILE, lvMul, tr } from '../core/config.js';
+import { ENEMY, MOVE_BLOCK, NESTS, TAU, TILE, lvMul, soulGain, souls, tr } from '../core/config.js';
 import { writeSave } from '../core/save.js';
-import { dist, fmt, lerp, pick, rnd, tc } from '../core/util.js';
+import { dist, lerp, pick, rnd, tc } from '../core/util.js';
 import { setTimeLater } from './bosses.js';
 import { addPoison, enemyShot, ring } from './bullets.js';
 import { hitsTiles, lineClear, lockArea, moveCircle } from './collision.js';
-import { dropGold, gainExp, spawnEnemy, spawnFromNest } from './enemies.js';
+import { gainSouls, spawnEnemy, spawnFromNest } from './enemies.js';
 import { addPart, showBanner } from './fx.js';
-import { D, hero, prog, rank } from './hero.js';
+import { D, prog, rank } from './hero.js';
 import { collectAllMats } from './pickups.js';
 import { G, P } from './stage.js';
 import { toast } from '../ui/toast.js';
@@ -96,10 +96,10 @@ export function destroyNest(n) {
   }
   addPart({ x: n.x, y: n.y, vx: 0, vy: 0, life: 0.4, color: '#d07aff', size: n.r * 3, ring: true });
   const typeMul = { small: 1, big: 4 }[n.type] || 2;
-  dropGold(n.x, n.y, Math.round(20 * lvMul.gold(n.lv) * typeMul * D.reward * (1 + 0.03 * rank('gold'))));
+  gainSouls(Math.round(20 * lvMul.gold(n.lv) * typeMul * D.reward * (1 + 0.03 * rank('gold'))));
   const mats = n.area.def.enemies;
   for (let i = 0; i < typeMul; i++) G.pickups.push({ type: 'mat', id: ENEMY[pick(mats)].mat, x: n.x, y: n.y, vx: rnd(-50, 50), vy: rnd(-50, 50), life: 9999 });
-  // 眷属は崩れて消える (経験値は入る)
+  // 眷属は崩れて消える (魂は入る)
   for (const e of G.enemies) if (e.home === n && !e.dead) e.crumble = rnd(0.3, 3);
   const a = n.area;
   const left = a.nests.filter((x) => !x.dead).length;
@@ -118,11 +118,9 @@ export function liberate(area) {
   if (first && !area.reinvaded) {
     prog.areas.push(a.id);
     const lv = Math.min(99, a.lv[1] + D.lv);
-    const exp = Math.round(60 * lvMul.exp(lv) * a.nests.length * D.reward);
-    const gold = Math.round(40 * lvMul.gold(lv) * a.nests.length * D.reward);
-    gainExp(exp);
-    hero.gold += gold;
-    sub = tr('解放のごほうび  +{exp} EXP  ・  +{gold} G', { exp: fmt(exp), gold: fmt(gold) });
+    const gain = Math.round(soulGain(60, 40, lv) * a.nests.length * D.reward);
+    gainSouls(gain);
+    sub = tr('解放のごほうび  +{n}', { n: souls(gain) });
     if (a.town) sub += `\n${tr('町に人が戻り、武器屋が開いた!  黄色い矢印の先へ')}`;
   } else {
     sub = tr('残党を一掃した');

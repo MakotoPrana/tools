@@ -12,9 +12,8 @@ export function installDebug() {
     get G() { return G; },
     get P() { return P; },
     get hero() { return hero; },
-    give(exp = 10000, gold = 10000) {
-      hero.exp += exp;
-      hero.gold += gold;
+    give(n = 20000) {
+      hero.souls += n;
     },
     clearArea(i) {
       const a = G.areas[i == null ? G.curArea : i];

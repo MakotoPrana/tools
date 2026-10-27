@@ -1,7 +1,6 @@
 // タイトル・主人公選択・難易度
-import { CATS, DIFFS, DIFF_IDS, HEROES, tr } from '../core/config.js';
-import { goldAtSave, newProgress, save, saveOk, setGoldAtSave } from '../core/save.js';
-import { fmt } from '../core/util.js';
+import { CATS, DIFFS, DIFF_IDS, HEROES, souls, tr } from '../core/config.js';
+import { newProgress, save, saveOk, setSoulsAtSave } from '../core/save.js';
 import { D, diffId, hero, heroDef, prog, setD, setDiffId, setHero, setHeroDef, setProg } from '../game/hero.js';
 import { G, setG } from '../game/stage.js';
 import { clearEff } from '../game/weapon-mods.js';
@@ -61,7 +60,7 @@ export function showHeroSelect() {
         <p class="muted">${tr('体力 {hp} ・ 移動速度 {spd} ・ 回避: {dn}（{dd}）', { hp: h.hp, spd: h.speed, dn: h.dodgeName, dd: h.dodgeDesc })}</p>
         <div class="cats">${cats}</div>
         <p>${tr('特性: {v}', { v: h.trait })}</p>
-        <p class="muted">${tr('解放したエリア {a} ・ 所持金 {g} G ・ EXP {e}', { a: hh.progress.normal.areas.length, g: fmt(hh.gold), e: fmt(hh.exp) })}</p>
+        <p class="muted">${tr('解放したエリア {a} ・ {s}', { a: hh.progress.normal.areas.length, s: souls(hh.souls) })}</p>
       </div>
       <div class="btn-row"><button class="btn primary" data-act="heroOk">${tr('{name} で始める', { name: h.name })}</button></div>
     </div></div>`;
@@ -116,6 +115,6 @@ actions.pickDiff = (d) => {
   setD(DIFFS[diffId]);
   if (!hero.progress[diffId]) hero.progress[diffId] = newProgress();
   setProg(hero.progress[diffId]);
-  setGoldAtSave(hero.gold);
+  setSoulsAtSave(hero.souls);
   showWorld();
 };

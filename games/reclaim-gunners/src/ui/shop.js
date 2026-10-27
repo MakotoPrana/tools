@@ -1,7 +1,6 @@
 // お店 (武器を買う・改造の入口・道具)
 import { sfx } from '../audio/sound.js';
-import { CATS, ITEMS, SHOPS, WEAPON, WEAPONS, tr } from '../core/config.js';
-import { fmt } from '../core/util.js';
+import { CATS, ITEMS, SHOPS, WEAPON, WEAPONS, souls, tr } from '../core/config.js';
 import { canEquip, hero, maxPotions, prog } from '../game/hero.js';
 import { P, ensureWs, stageDef } from '../game/stage.js';
 import { effW, modTotal } from '../game/weapon-mods.js';
@@ -36,11 +35,11 @@ export function showShop(shopId) {
         const w = WEAPON[id];
         const owned = hero.weapons[id] != null;
         const can = canEquip(w);
-        const ok = !owned && can && hero.gold >= w.price;
+        const ok = !owned && can && hero.souls >= w.price;
         return `<div class="row wrow ${can ? '' : 'dim'}"><img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><div>
           <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name} <span class="muted">T${w.tier}</span></div>
           <div class="s">${weaponStats(w)} ・ ${w.desc}</div></div>
-          <button class="btn small ${ok ? 'primary' : ''}" data-act="buyW" data-id="${id}" ${ok ? '' : 'disabled'}>${owned ? tr('所持') : !can ? tr('この主人公は使えない') : `${fmt(w.price)} G`}</button>
+          <button class="btn small ${ok ? 'primary' : ''}" data-act="buyW" data-id="${id}" ${ok ? '' : 'disabled'}>${owned ? tr('所持') : !can ? tr('この主人公は使えない') : souls(w.price)}</button>
         </div>`;
       }).join('');
       const nextHint = phase === 1 ? tr('ステージのエリアを半分解放すると、品ぞろえが増える') : phase === 2 ? tr('ステージを全部解放してヌシを倒すと、目玉の品が並ぶ') : tr('品ぞろえは最大');
@@ -57,14 +56,14 @@ export function showShop(shopId) {
       body = shop.items.map((id) => {
         const it = ITEMS[id];
         const full = hero.potions >= maxPotions();
-        const ok = !full && hero.gold >= it.price;
+        const ok = !full && hero.souls >= it.price;
         return `<div class="row"><div><div class="t">${it.name} <span class="muted">${hero.potions}/${maxPotions()}</span></div><div class="s">${tr('{desc}（転移碑を使うと全回復する）', { desc: it.desc })}</div></div>
-          <button class="btn small ${ok ? 'primary' : ''}" data-act="buyItem" data-id="${id}" ${ok ? '' : 'disabled'}>${full ? tr('満タン') : `${fmt(it.price)} G`}</button></div>`;
+          <button class="btn small ${ok ? 'primary' : ''}" data-act="buyItem" data-id="${id}" ${ok ? '' : 'disabled'}>${full ? tr('満タン') : souls(it.price)}</button></div>`;
       }).join('');
     }
     return `
     <div class="overlay"><div class="panel">
-      ${head(shop.name, `<span class="gold">${fmt(hero.gold)} G</span>`)}
+      ${head(shop.name, `<span class="soul">${souls(hero.souls)}</span>`)}
       <div class="tabs">
         <button class="btn small ${shopTab === 'buy' ? 'on' : ''}" data-act="shopTab" data-id="buy">${tr('武器を買う')}</button>
         <button class="btn small ${shopTab === 'up' ? 'on' : ''}" data-act="shopTab" data-id="up">${tr('強化')}</button>
@@ -81,8 +80,8 @@ actions.shopTab = (d) => {
 };
 actions.buyW = (d) => {
   const w = WEAPON[d.id];
-  if (hero.weapons[w.id] != null || hero.gold < w.price || !canEquip(w)) return;
-  hero.gold -= w.price;
+  if (hero.weapons[w.id] != null || hero.souls < w.price || !canEquip(w)) return;
+  hero.souls -= w.price;
   hero.weapons[w.id] = 0;
   const empty = hero.equipped.indexOf(null);
   if (empty >= 0) hero.equipped[empty] = w.id;
@@ -95,8 +94,8 @@ actions.openMods = (d) => showMods(d.id, curShop);
 actions.viewMods = (d) => showMods(d.id, null);
 actions.buyItem = (d) => {
   const it = ITEMS[d.id];
-  if (hero.gold < it.price || hero.potions >= maxPotions()) return;
-  hero.gold -= it.price;
+  if (hero.souls < it.price || hero.potions >= maxPotions()) return;
+  hero.souls -= it.price;
   hero.potions++;
   sfx('buy');
   rerender();

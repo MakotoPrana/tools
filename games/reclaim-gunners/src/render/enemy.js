@@ -105,6 +105,8 @@ export function drawEnemy(e) {
       ctx.fillStyle = col;
       circle(ctx, 0, 0, r);
       eyes(fx, -3, 1.6, '#ffe45c');
+      if (e.stunT > 0) txt('★', 0, -r - 10 + Math.sin(G.t * 8) * 2, 8, '#ffe45c', 'center');
+      if (e.facing == null) break; // 盾が壊れた
       ctx.rotate(e.facing);
       ctx.fillStyle = flash ? '#fff' : '#8a7a6a';
       ctx.fillRect(r - 3, -r, 5, r * 2);

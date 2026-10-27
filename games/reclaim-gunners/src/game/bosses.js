@@ -1,10 +1,10 @@
 // ボスの共通の流れ: 出現・決闘場の結界・撃破
 import { out, sfx } from '../audio/sound.js';
-import { BOSSES, MATERIALS, MOVE_BLOCK, SHOT_BLOCK, STAGES, T, TILE, lvMul, tr } from '../core/config.js';
+import { BOSSES, MATERIALS, MOVE_BLOCK, SHOT_BLOCK, STAGES, T, TILE, lvMul, soulGain, souls, tr } from '../core/config.js';
 import { writeSave } from '../core/save.js';
-import { dist, fmt, pick, rnd, tc } from '../core/util.js';
+import { dist, pick, rnd, tc } from '../core/util.js';
 import { updateBlob, updateDragon, updateGolem, updateSiren, updateToad } from './boss-ai.js';
-import { gainExp } from './enemies.js';
+import { gainSouls } from './enemies.js';
 import { addPart, addText, showBanner } from './fx.js';
 import { D, hero, lvColor, powerLv, prog } from './hero.js';
 import { updateFlow } from './pathfinding.js';
@@ -164,11 +164,9 @@ export function bossDefeated(b) {
   let sub = '';
   if (first) {
     prog.bosses.push(b.id);
-    const exp = Math.round(b.def.exp * lvMul.exp(b.lv) * D.reward);
-    const gold = Math.round(b.def.gold * lvMul.gold(b.lv) * D.reward);
-    gainExp(exp);
-    hero.gold += gold;
-    sub = `+${fmt(exp)} EXP  ・  +${fmt(gold)} G  ・  ${MATERIALS[b.def.mat]}`;
+    const gain = Math.round(soulGain(b.def.exp, b.def.gold, b.lv) * D.reward);
+    gainSouls(gain);
+    sub = `+${souls(gain)}  ・  ${MATERIALS[b.def.mat]}`;
   }
   hero.materials[b.def.mat] = (hero.materials[b.def.mat] || 0) + 1;
   // 門の結界を解く

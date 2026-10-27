@@ -1,6 +1,6 @@
 // ダメージ: 当たる相手さがし・ダメージの計算・爆発・連鎖
 import { sfx } from '../audio/sound.js';
-import { CELL, TAU } from '../core/config.js';
+import { CELL, TAU, tr } from '../core/config.js';
 import { settings } from '../core/save.js';
 import { angNorm, dist, dist2, pick, rnd } from '../core/util.js';
 import { bossPartDown } from './bosses.js';
@@ -65,15 +65,18 @@ export function damageTarget(t, base, o) {
   if (w && w.bossMul && t.kind !== 'enemy') d *= 1 + w.bossMul;
   if (w && w.close && o.close) d *= 1 + w.close;
   d *= dealtMul(t.lv - powerLv());
-  // オーク重盾兵: 正面からの攻撃は盾で防ぐ。ゴーレム: 正面は硬く、背中が弱点
+  // オーク重盾兵: 正面からの攻撃は盾で受けて 25% に減らす。受けるたびに盾がすり減り、壊れると盾なしになる
+  // ゴーレム: 正面は硬く、背中が弱点
   if (t.facing != null && o.sx != null) {
     const from = Math.atan2(o.sy - t.y, o.sx - t.x);
     const front = Math.abs(angNorm(from - t.facing)) < 1.1;
     if (t.kind === 'enemy' && t.def.ai === 'shield' && front && !o.aoe) {
       addPart({ x: t.x + Math.cos(t.facing) * t.r, y: t.y + Math.sin(t.facing) * t.r, vx: rnd(-40, 40), vy: rnd(-40, 40), life: 0.2, color: '#fff', size: 2 });
-      sfx('block');
       t.aggro = true;
-      return 0;
+      t.shieldHp -= d;
+      if (t.shieldHp <= 0) breakShield(t);
+      else sfx('block');
+      d *= 0.25;
     }
     if (t.kind === 'boss' && t.boss.id === 'G2') {
       if (front) {
@@ -150,4 +153,13 @@ export function chainLightning(from, dmg, n, w, hitSet) {
     damageTarget(best, dmg, { elem: 'thunder', w, sx: cur.x, sy: cur.y });
     cur = best;
   }
+}
+
+// 盾が壊れると、少しのあいだよろめき、そのあとは盾なしで向かってくる
+function breakShield(t) {
+  for (let i = 0; i < 10; i++) addPart({ x: t.x + Math.cos(t.facing) * t.r, y: t.y + Math.sin(t.facing) * t.r, vx: rnd(-90, 90), vy: rnd(-90, 90), life: rnd(0.3, 0.6), color: pick(['#8a7a6a', '#5a4a3a', '#d8d0c0']), size: rnd(2, 3.5) });
+  addText(t.x, t.y - t.r - 12, tr('盾が壊れた!'), '#ffd84a', 9);
+  sfx('block');
+  t.facing = null;
+  t.stunT = 1.5;
 }

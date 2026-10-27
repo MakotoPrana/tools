@@ -1,5 +1,5 @@
 // HUD: 体力・武器スロット・エリアの名前
-import { TAU, VH, VW, tr } from '../core/config.js';
+import { TAU, VH, VW, souls, tr } from '../core/config.js';
 import { settings } from '../core/save.js';
 import { clamp, fmt } from '../core/util.js';
 import { bossHp } from '../game/bosses.js';
@@ -49,12 +49,6 @@ export function drawHud() {
   txt(`HP ${Math.ceil(P.hp)}/${m}`, 15, 16.5, 7, '#fff0d8');
   const pl = powerLv();
   txt(tr('戦力 Lv{n}', { n: pl }), 12, 30, 9, '#f0d890');
-  txt(`EXP ${fmt(hero.exp)}`, 70, 30, 8, '#d8c0a0');
-  if (G.expPop > 0) {
-    ctx.globalAlpha = Math.min(1, G.expPopT);
-    txt(`+${fmt(G.expPop)}`, 66, 40, 7, '#e8d8ff');
-    ctx.globalAlpha = 1;
-  }
   txt(tr('回復薬 {n}', { n: hero.potions }), 12, 40.5, 7, '#9ad8a0');
 
   // いるエリア
@@ -85,11 +79,16 @@ export function drawHud() {
   drawMinimap();
   drawShopPointer();
 
-  // お金と素材
-  txt(`${fmt(hero.gold)} G`, 10, VH - 14, 11, '#e8c060', 'left', 'display');
+  // 魂と素材
+  txt(souls(hero.souls), 10, VH - 14, 11, '#b8d8ff', 'left', 'display');
+  if (G.soulPop > 0) {
+    ctx.globalAlpha = Math.min(1, G.soulPopT);
+    txt(`+${fmt(G.soulPop)}`, 12, VH - 26, 8, '#e0f0ff');
+    ctx.globalAlpha = 1;
+  }
   G.matLog.forEach((mlog, i) => {
     ctx.globalAlpha = Math.min(1, mlog.t);
-    txt(mlog.text, 10, VH - 28 - (G.matLog.length - 1 - i) * 11, 7.5, '#e0c0ff');
+    txt(mlog.text, 10, VH - 38 - (G.matLog.length - 1 - i) * 11, 7.5, '#e0c0ff');
   });
   ctx.globalAlpha = 1;
 

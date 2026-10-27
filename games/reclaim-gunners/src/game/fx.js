@@ -34,8 +34,8 @@ export function updateFx(dt) {
   for (const t of done) if (t.onDone) t.onDone(t);
   for (const m of G.matLog) m.t -= dt;
   G.matLog = G.matLog.filter((m) => m.t > 0);
-  G.expPopT = Math.max(0, G.expPopT - dt);
-  if (G.expPopT <= 0) G.expPop = 0;
+  G.soulPopT = Math.max(0, G.soulPopT - dt);
+  if (G.soulPopT <= 0) G.soulPop = 0;
   G.shake = Math.max(0, G.shake - dt * 20);
   if (G.banner) {
     G.banner.t -= dt;

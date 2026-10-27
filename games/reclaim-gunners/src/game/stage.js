@@ -54,8 +54,8 @@ export function startStage(stageId, pointId, opt = {}) {
     strayT: 3,
     gateMsgT: 0,
     fade: 1,
-    expPop: 0,
-    expPopT: 0,
+    soulPop: 0,
+    soulPopT: 0,
     matLog: [],
     interact: null,
   };

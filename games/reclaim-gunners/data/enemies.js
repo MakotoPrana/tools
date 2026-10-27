@@ -19,7 +19,7 @@ RG.ENEMIES = [
   { id: 'shaman', name: '呪術師', ai: 'shooter', healer: true, summon: 'imp', hp: 30, atk: 4, speed: 38, r: 9, weak: ['holy'], resist: [], exp: 14, gold: 8, mat: 'curseTag', demon: true, color: '#6b3b8f', shot: { cd: 2.2, speed: 120, n: 1 } },
   { id: 'worm', name: '爆裂ワーム', ai: 'chase', hp: 14, atk: 18, speed: 60, r: 8, weak: ['ice'], resist: ['fire'], exp: 8, gold: 5, mat: 'powder', color: '#b0753a' },
   { id: 'shadow', name: 'シャドウ', ai: 'chase', hp: 26, atk: 12, speed: 85, r: 8, weak: ['holy'], resist: ['phys'], exp: 13, gold: 7, mat: 'shade', demon: true, color: '#2c2638' },
-  { id: 'orc', name: 'オーク重盾兵', ai: 'shield', hp: 60, atk: 12, speed: 38, r: 11, weak: ['thunder'], resist: ['phys'], exp: 16, gold: 10, mat: 'brokenShield', color: '#5f8a3e' },
+  { id: 'orc', name: 'オーク重盾兵', ai: 'shield', hp: 50, atk: 12, speed: 38, r: 11, weak: ['thunder'], resist: ['phys'], exp: 16, gold: 10, mat: 'brokenShield', color: '#5f8a3e' },
   { id: 'moth', name: '毒蛾', ai: 'chase', fly: true, poisonTrail: true, hp: 18, atk: 3, speed: 60, r: 7, weak: ['fire'], resist: [], exp: 9, gold: 5, mat: 'scale', color: '#b9a64a' },
   { id: 'eye', name: '魔眼', ai: 'shooter', fly: true, hp: 34, atk: 16, speed: 38, r: 9, weak: ['thunder'], resist: [], exp: 15, gold: 9, mat: 'lens', demon: true, color: '#c2457a', shot: { cd: 2.4, speed: 260, n: 1 } },
   { id: 'mimic', name: 'ミミック', ai: 'mimic', hp: 50, atk: 14, speed: 85, r: 9, weak: ['ice'], resist: [], exp: 18, gold: 40, mat: 'tongue', color: '#9a6a34' },

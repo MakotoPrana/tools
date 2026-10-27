@@ -286,13 +286,7 @@ export function drawStone(s) {
 }
 
 export function drawPickup(p) {
-  if (p.type === 'coin') {
-    if (p.life < 2 && Math.floor(p.life * 8) % 2) return;
-    ctx.fillStyle = '#b8860b';
-    circle(ctx, p.x, p.y, 3.5);
-    ctx.fillStyle = '#ffd84a';
-    circle(ctx, p.x - 0.5, p.y - 0.5, 2.6);
-  } else if (p.type === 'mat') {
+  if (p.type === 'mat') {
     const b = Math.sin(G.t * 5 + p.x) * 1.5;
     ctx.fillStyle = 'rgba(200,140,255,0.35)';
     circle(ctx, p.x, p.y + b, 8);

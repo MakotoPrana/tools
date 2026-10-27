@@ -1,5 +1,5 @@
 /*
- * 主人公・武器カテゴリ・能力ボードのデータ (SPEC.md の「主人公」「経験値と能力ボード」)
+ * 主人公・武器カテゴリ・能力ボードのデータ (SPEC.md の「主人公」「魂と能力ボード」)
  */
 window.RG = window.RG || {};
 
@@ -63,7 +63,7 @@ RG.HEROES = [
   },
 ];
 
-// 能力ボード。ランクを 1 上げるのに必要な経験値 = base × (次のランク) ^ 1.5 (切り上げ)
+// 能力ボード。ランクを 1 上げるのに必要な魂 = base × (次のランク) ^ 1.5 (切り上げ)
 // max はヒーローごとに上書きできる (maxBy)
 RG.BOARD = [
   { id: 'hp', name: '最大体力', max: 40, base: 20, fx: (r, h) => `+${r * (h === 'gald' ? 12 : 8)}` },
@@ -74,15 +74,15 @@ RG.BOARD = [
   { id: 'crit', name: '会心率', max: 30, base: 30, fx: (r) => `+${r}%` },
   { id: 'critd', name: '会心ダメージ', max: 30, base: 30, fx: (r) => `×${(1.5 + r * 0.05).toFixed(2)}` },
   { id: 'dodge', name: '回避クールダウン', max: 15, base: 30, fx: (r) => `−${r * 3}%` },
-  { id: 'gold', name: '金運', max: 25, base: 25, fx: (r) => RG.t('獲得するお金 +{v}%', { v: r * 3 }) },
+  { id: 'gold', name: '魂の収穫', max: 25, base: 25, fx: (r) => RG.t('獲得する魂 +{v}%', { v: r * 3 }) },
   { id: 'mat', name: '素材運', max: 25, base: 25, fx: (r) => RG.t('素材のドロップ率 +{v}%', { v: r * 3 }) },
   { id: 'pot', name: '回復薬の所持数', max: 3, base: 400, fx: (r) => RG.t('{v} 個', { v: 3 + r }) },
 ];
 
 // 武器スロット (最初は 2 つ。4 回開けて最大 6 つ)
 RG.SLOTS = [
-  { exp: 1500, cond: null },
-  { exp: 12000, cond: { gates: 2 }, condText: '境界の守護者を 2 体倒す' },
-  { exp: 60000, cond: { gates: 5 }, condText: '境界の守護者を 5 体倒す' },
-  { exp: 200000, cond: { nushi: 3 }, condText: 'ヌシを 3 体倒す' },
+  { cost: 1500, cond: null },
+  { cost: 12000, cond: { gates: 2 }, condText: '境界の守護者を 2 体倒す' },
+  { cost: 60000, cond: { gates: 5 }, condText: '境界の守護者を 5 体倒す' },
+  { cost: 200000, cond: { nushi: 3 }, condText: 'ヌシを 3 体倒す' },
 ];

@@ -1,6 +1,6 @@
 // 敵: 出現・動き・倒したときのごほうび
 import { sfx } from '../audio/sound.js';
-import { ENEMY, FLY_BLOCK, GHOST_BLOCK, MAX_ENEMIES, MOVE_BLOCK, T, TAU, lvMul } from '../core/config.js';
+import { ENEMY, FLY_BLOCK, GHOST_BLOCK, MAX_ENEMIES, MOVE_BLOCK, T, TAU, lvMul, soulGain } from '../core/config.js';
 import { angNorm, clamp, dist, dist2, pick, rnd, rndi } from '../core/util.js';
 import { addPoison, enemyShot, ring } from './bullets.js';
 import { hitsTiles, lineClear, moveCircle, tileAt } from './collision.js';
@@ -25,7 +25,7 @@ export function spawnEnemy(id, x, y, area, home, opt = {}) {
     r: def.r * (elite ? 1.2 : 1), hp, maxHp: hp, atk: def.atk * lvMul.atk(lv) * (elite ? 1.3 : 1),
     speed: def.speed * rnd(0.92, 1.08), state: opt.dormant ? 'dormant' : opt.chase ? 'chase' : 'idle', dormant: !!opt.dormant,
     t: rnd(0, 2), ph: 0, wt: 0, wx: x, wy: y, kx: 0, ky: 0, hitFlash: 0, slowT: 0, freezeT: 0, burnT: 0, burnDps: 0, burnTick: 0,
-    cd: rnd(0.5, 2), aggro: false, facing: def.ai === 'shield' ? 0 : null, lair: opt.lair || null, crumble: 0, seen: 0, los: false, losT: 0, dead: false,
+    cd: rnd(0.5, 2), aggro: false, facing: def.ai === 'shield' ? 0 : null, shieldHp: hp * 0.6, stunT: 0, lair: opt.lair || null, crumble: 0, seen: 0, los: false, losT: 0, dead: false,
   };
   G.enemies.push(e);
   if (home) home.children++;
@@ -257,9 +257,16 @@ export function updateEnemyAI(e, dt, dp) {
       break;
     }
     case 'shield': {
-      const turn = 2.2 * dt;
-      e.facing += clamp(angNorm(toP - e.facing), -turn, turn);
-      moveEnemy(e, chaseAngle(e, dp), e.speed, dt);
+      // 盾が壊れたあとは、よろめいてから盾なしで追いかける
+      if (e.stunT > 0) {
+        e.stunT -= dt;
+        break;
+      }
+      if (e.facing != null) {
+        const turn = 1.4 * dt;
+        e.facing += clamp(angNorm(toP - e.facing), -turn, turn);
+      }
+      moveEnemy(e, chaseAngle(e, dp), e.speed * (e.facing == null ? 1.15 : 1), dt);
       break;
     }
     case 'charge': {
@@ -309,8 +316,7 @@ export function killEnemy(e, w, crumbled) {
   e.dead = true;
   if (e.home) e.home.children--;
   const mul = D.reward * (e.elite ? 3 : 1) * (e.mini ? 0.3 : 1);
-  const exp = Math.round(e.def.exp * lvMul.exp(e.lv) * mul);
-  gainExp(exp);
+  gainSouls(Math.max(1, Math.round(soulGain(e.def.exp, e.def.gold, e.lv) * mul * (1 + 0.03 * rank('gold')))));
   hero.kills++;
   for (let i = 0; i < 8; i++) addPart({ x: e.x, y: e.y, vx: rnd(-80, 80), vy: rnd(-80, 80), life: rnd(0.2, 0.45), color: crumbled ? '#4a2a5a' : e.def.color, size: rnd(2, 3.5) });
   if (crumbled) return;
@@ -326,26 +332,15 @@ export function killEnemy(e, w, crumbled) {
       }
     }
   }
-  const gold = Math.max(1, Math.round(e.def.gold * lvMul.gold(e.lv) * mul * (1 + 0.03 * rank('gold'))));
-  dropGold(e.x, e.y, gold);
   const matRate = 0.15 * (1 + 0.03 * rank('mat')) * (heroDef.id === 'mira' ? 1.2 : 1) * D.mat;
   if (e.elite || Math.random() < matRate) G.pickups.push({ type: 'mat', id: e.def.mat, x: e.x, y: e.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 9999 });
   if (Math.random() < 0.02) G.pickups.push({ type: 'heart', x: e.x, y: e.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 12 });
   if (w && w.demonHeal && e.def.demon) P.hp = Math.min(maxHp(), P.hp + w.demonHeal);
 }
 
-export function gainExp(n) {
-  hero.exp += n;
-  G.expPop += n;
-  G.expPopT = 1.5;
-}
-
-export function dropGold(x, y, amount) {
-  const n = Math.min(6, Math.max(1, Math.ceil(amount / 15)));
-  let left = amount;
-  for (let i = 0; i < n; i++) {
-    const v = i === n - 1 ? left : Math.floor(amount / n);
-    left -= v;
-    G.pickups.push({ type: 'coin', amt: v, x, y, vx: rnd(-70, 70), vy: rnd(-70, 70), life: 10 });
-  }
+// 魂は拾わなくても、倒した瞬間に自動で集まる
+export function gainSouls(n) {
+  hero.souls += n;
+  G.soulPop += n;
+  G.soulPopT = 1.5;
 }

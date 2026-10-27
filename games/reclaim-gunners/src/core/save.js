@@ -9,8 +9,7 @@ import { flashSaving } from '../ui/toast.js';
 // ===================================================================
 export const newProgress = () => ({ areas: [], bosses: [], travel: [], cleared: false });
 export const newHero = () => ({
-  exp: 0,
-  gold: 0,
+  souls: 0, // 魂 (経験値とお金をまとめたもの)
   board: {},
   slots: 0, // 開けた武器スロットの数 (最初の 2 つに足す数)
   weapons: { A1: 0 }, // 持っている武器
@@ -36,6 +35,12 @@ export function loadSave() {
     const hh = Object.assign(newHero(), s.heroes[h.id] || {});
     hh.progress = Object.assign({ normal: null, hard: null, extreme: null }, hh.progress);
     if (!hh.progress.normal) hh.progress.normal = newProgress();
+    // 前の版の経験値とお金は、足して魂にする
+    if (hh.exp != null || hh.gold != null) {
+      hh.souls += (hh.exp || 0) + (hh.gold || 0);
+      delete hh.exp;
+      delete hh.gold;
+    }
     while (hh.equipped.length < 2 + hh.slots) hh.equipped.push(null);
     // 前の版の「+強化値」は、改造の「威力」に移す
     for (const id in hh.weapons) {
@@ -52,7 +57,7 @@ export function loadSave() {
 
 export let save = loadSave();
 export let saveOk = true;
-export let goldAtSave = 0;
+export let soulsAtSave = 0;
 
 export function writeSave(showIcon = true) {
   try {
@@ -61,7 +66,7 @@ export function writeSave(showIcon = true) {
   } catch (e) {
     saveOk = false;
   }
-  if (hero) goldAtSave = hero.gold;
+  if (hero) soulsAtSave = hero.souls;
   if (showIcon && saveOk) flashSaving();
 }
 
@@ -80,9 +85,9 @@ export const saveSettings = () => {
   } catch (e) { /* 保存できなくても遊べる */ }
 };
 
-// ほかのモジュールから goldAtSave を入れかえるとき
-export function setGoldAtSave(v) {
-  goldAtSave = v;
+// ほかのモジュールから soulsAtSave を入れかえるとき
+export function setSoulsAtSave(v) {
+  soulsAtSave = v;
 }
 
 // ほかのモジュールから save を入れかえるとき

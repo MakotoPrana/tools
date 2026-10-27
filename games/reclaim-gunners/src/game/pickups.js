@@ -1,4 +1,4 @@
-// 拾うもの (お金・素材)
+// 拾うもの (素材・回復のハート)
 import { out, sfx } from '../audio/sound.js';
 import { MATERIALS, tr } from '../core/config.js';
 import { dist } from '../core/util.js';
@@ -24,10 +24,7 @@ export function updatePickups(dt) {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     if (d < P.r + 6 && !G.dead) {
-      if (p.type === 'coin') {
-        hero.gold += p.amt;
-        sfx('coin');
-      } else if (p.type === 'mat') {
+      if (p.type === 'mat') {
         gainMat(p.id);
       } else if (p.type === 'heart') {
         P.hp = Math.min(maxHp(), P.hp + maxHp() * 0.1);

@@ -1,7 +1,6 @@
 // 武器の改造 (スキルツリー) の画面
 import { sfx } from '../audio/sound.js';
-import { CATS, SHOPS, WEAPON, tr } from '../core/config.js';
-import { fmt } from '../core/util.js';
+import { CATS, SHOPS, WEAPON, souls, tr } from '../core/config.js';
 import { hero } from '../game/hero.js';
 import { clearEff, effW, modCost, modLv, modReqOk, modShow, modTotal } from '../game/weapon-mods.js';
 import { actions } from './actions.js';
@@ -29,7 +28,7 @@ export function showMods(id, shopId) {
       const reqOk = modReqOk(id, m);
       const cost = modCost(w, m, lv);
       const capped = shop && lv >= cap;
-      const ok = shop && reqOk && !max && !capped && hero.gold >= cost;
+      const ok = shop && reqOk && !max && !capped && hero.souls >= cost;
       const pips = Array.from({ length: RG.MOD_MAX }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
       const now = lv ? m.desc.replace('{v}', modShow(m, lv)) : '—';
       const next = max ? '' : m.desc.replace('{v}', modShow(m, lv + 1));
@@ -38,7 +37,7 @@ export function showMods(id, shopId) {
       else if (!reqOk) btn = `<span class="muted">🔒 ${tr('{name} Lv{n} が必要', { name: byId[m.req[0]].name, n: m.req[1] })}</span>`;
       else if (!shop) btn = '';
       else if (capped) btn = `<span class="muted">${tr('この店では Lv{n} まで', { n: cap })}</span>`;
-      else btn = `<button class="btn small ${ok ? 'primary' : ''}" data-act="modUp" data-id="${m.id}" ${ok ? '' : 'disabled'}>${fmt(cost)} G</button>`;
+      else btn = `<button class="btn small ${ok ? 'primary' : ''}" data-act="modUp" data-id="${m.id}" ${ok ? '' : 'disabled'}>${souls(cost)}</button>`;
       return `<div class="mnode ${m.req ? 'uniq' : ''} ${reqOk ? '' : 'locked'} ${max ? 'max' : ''}">
         ${m.req ? `<div class="mreq">↑ ${byId[m.req[0]].name} Lv${m.req[1]}</div>` : ''}
         <div class="mname">${m.name} <span class="mlv">Lv${lv}/${RG.MOD_MAX}</span></div>
@@ -50,7 +49,7 @@ export function showMods(id, shopId) {
     const rowsHtml = tiers.map((t, i) => `<div class="mtier"><div class="mtl">${i === 0 ? tr('基礎（{cat}）', { cat: CATS[w.cat].name }) : tr('{name} 固有 {n} 段目', { name: w.name, n: i })}</div><div class="mrow">${t.map(node).join('')}</div></div>`).join('');
     return `
     <div class="overlay"><div class="panel">
-      ${head(tr('改造'), `<span class="gold">${fmt(hero.gold)} G</span>`)}
+      ${head(tr('改造'), `<span class="soul">${souls(hero.souls)}</span>`)}
       <div class="row wrow"><img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><div>
         <div class="t">${w.name} <span class="gold">★${modTotal(id)}</span></div>
         <div class="s">${weaponStats(effW(id))}</div></div></div>
@@ -71,8 +70,8 @@ actions.modUp = (d) => {
   const cap = shop.phases[shopPhase(shop) - 1].max;
   const lv = modLv(id, m.id);
   const cost = modCost(w, m, lv);
-  if (lv >= RG.MOD_MAX || lv >= cap || !modReqOk(id, m) || hero.gold < cost) return;
-  hero.gold -= cost;
+  if (lv >= RG.MOD_MAX || lv >= cap || !modReqOk(id, m) || hero.souls < cost) return;
+  hero.souls -= cost;
   hero.mods[id] = hero.mods[id] || {};
   hero.mods[id][m.id] = lv + 1;
   clearEff();
