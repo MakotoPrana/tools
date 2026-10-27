@@ -172,6 +172,10 @@
   const GAMES_URL = `${SITE_URL}games/`;
   const trackedURL = (url, placement) => `${url}?utm_source=itch.io&utm_medium=demo&utm_campaign=mole_demo&utm_content=${placement}`;
   const isPlayable = (no) => no <= PLAYABLE_STAGES;
+  // Google アナリティクスにイベントを送る。タグのない itch.io 版では何もしない
+  const trackEvent = (name, params) => {
+    if (typeof window.gtag === 'function') window.gtag('event', name, params);
+  };
 
   const lerp = (a, b, t) => a + (b - a) * t;
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -2417,6 +2421,7 @@
     hideOverlay();
     game.start();
     renderHud();
+    trackEvent('stage_start', { stage_no: s.no });
   };
 
   const leavePlay = () => {
@@ -2447,6 +2452,7 @@
     fieldEl.classList.remove('stunned');
     renderHud();
     Sound.end(r.cleared);
+    trackEvent('stage_end', { stage_no: stage.no, cleared: r.cleared, score: r.score, stars: r.stars, legend_caught: r.legendCaught });
 
     // 演出: クリアは紙吹雪と光、失敗は盤面を暗くして揺らす
     showCrowd(r.cleared);
