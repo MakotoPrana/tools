@@ -559,13 +559,11 @@ input[type="range"] { accent-color: var(--gold); }
 .langs .btn.on { border-color: var(--gold); color: #fff3d0; box-shadow: inset 0 0 0 1px rgba(224, 184, 96, 0.5), 0 0 8px rgba(224, 184, 96, 0.25); }
 
 /* 武器の強化 (スキルツリー): 武器を根に、左から右へ枝分かれする。線は .kids と .tn の擬似要素で引く */
-.tlegend { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 0; font-size: 0.75em; }
-.tlegend .lg::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; border: 1px solid; }
-.lg.base::before { border-color: rgba(200, 160, 90, 0.7); background: #3a2416; }
-.lg.uniq::before { border-color: rgba(200, 90, 255, 0.7); background: #2c1630; }
-.lg.sp::before { border-color: rgba(255, 200, 90, 0.9); background: #4a2e0e; }
-.stree { overflow-x: auto; padding: 10px 2px 12px; --line: rgba(200, 160, 90, 0.28); --line-on: rgba(232, 192, 104, 0.85); }
+.tpanel { height: 100%; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.tpanel .panel-head { margin-bottom: 2px; }
+.stree { position: relative; flex: 1; min-height: 0; overflow: hidden; --line: rgba(200, 160, 90, 0.28); --line-on: rgba(232, 192, 104, 0.85); }
 .tn { position: relative; display: flex; align-items: center; }
+.stree > .tn { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .kids { position: relative; display: flex; flex-direction: column; gap: 8px; padding-left: 34px; }
 .kids::before { content: ""; position: absolute; left: 0; top: 50%; width: 17px; border-top: 2px solid var(--line-on); }
 .kids > .tn::before { content: ""; position: absolute; left: -17px; top: 50%; width: 17px; border-top: 2px solid var(--line); }
@@ -598,16 +596,13 @@ input[type="range"] { accent-color: var(--gold); }
 .tpips i { flex: 1; height: 3px; background: rgba(0, 0, 0, 0.55); }
 .tpips i.on { background: #e8c068; }
 .tdetail {
-  position: sticky; bottom: -14px; margin: 4px -14px -14px; padding: 8px 14px 12px;
-  display: flex; flex-direction: column; gap: 4px;
+  flex: none; display: flex; align-items: center; gap: 10px; margin: 0 -14px; padding: 8px 14px 10px;
   border-top: 1px solid rgba(200, 160, 90, 0.45); background: rgba(16, 9, 8, 0.97);
 }
-.tdetail .s { font-size: 0.82em; line-height: 1.4; }
-/* 横持ちのスマホなど、高さが足りないとき: 武器の行は根のノードと同じなので隠し、説明を小さくする */
-@media (max-height: 420px) {
-  .tinfo { display: none; }
-  .stree { padding-top: 4px; }
-  .tdetail { padding: 5px 14px 8px; gap: 2px; }
-  .tdetail .s { font-size: 0.75em; }
-}
-.tbtns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 0.85em; min-height: 1.8em; }
+.tinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tdetail .t { font-weight: 800; }
+.tdetail .s { font-size: 0.82em; line-height: 1.35; }
+.tbtns { flex: none; display: flex; gap: 8px; align-items: center; }
+/* 押しやすい大きなボタン (値段は下に小さく) */
+.btn.tbig { min-width: max(110px, 7.5em); min-height: max(46px, 2.9em); padding: 4px 14px; flex-direction: column; gap: 0; font-size: 1.05em; font-weight: 800; line-height: 1.15; }
+.btn.tbig small { font-size: 0.72em; font-weight: 600; opacity: 0.9; }

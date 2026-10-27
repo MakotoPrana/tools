@@ -1,19 +1,18 @@
 // 武器の強化 (スキルツリー) の画面
 import { sfx } from '../audio/sound.js';
-import { CATS, SHOPS, WEAPON, souls, tr } from '../core/config.js';
+import { SHOPS, WEAPON, souls, tr } from '../core/config.js';
 import { hero } from '../game/hero.js';
 import { spDesc, spLv, spOwned, spState, spUnlockCost, spUpCost } from '../game/specials.js';
-import { clearEff, effW, modCost, modLv, modReqOk, modShow, modTotal } from '../game/weapon-mods.js';
+import { clearEff, modCost, modLv, modReqOk, modShow, modTotal } from '../game/weapon-mods.js';
 import { actions } from './actions.js';
 import { head, rerender, ui, uiShow } from './core.js';
-import { weaponStats } from './equip.js';
 import { curShop, shopPhase } from './shop.js';
 
 // ---------- 武器の強化 (スキルツリー) ----------
 //   武器を根にして、左から右へ枝分かれする
 //     基礎の改造 (カテゴリごとの 4 つ) → その武器だけの改造 (前の改造が決まった Lv になると上げられる)
 //     必殺技 1 → 2 → 3 (前の必殺技の Lv と、魂・悪魔の心臓で習得する)
-//   ノードを押すと、下にくわしい説明と強化のボタンが出る
+//   ノードを押すと、下に短い説明と大きな強化のボタンが出る。画面はスクロールしない (ツリーを枠に合わせて縮める)
 //   shopId があるときだけ強化・習得できる (上げられる Lv は、お店の格まで)。必殺技のセットはどこでもできる
 let selKey = null;
 
@@ -35,18 +34,15 @@ export function showMods(id, shopId) {
         <img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30">
         <div class="tname">${w.name}</div><div class="tlv gold">★${modTotal(id)}</div></div>
       <div class="kids">${kids.join('')}</div></div>`;
+    // スクロールせずに 1 画面に収める: 上から 見出し → ツリー (枠に合わせて縮める) → 選んだノードと大きなボタン
     return `
-    <div class="overlay"><div class="panel">
-      ${head(tr('強化'), `<span class="soul">${souls(hero.souls)}</span>`)}
-      <div class="row wrow tinfo"><img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><div>
-        <div class="t">${w.name} <span class="gold">★${modTotal(id)}</span></div>
-        <div class="s">${weaponStats(effW(id))}</div></div></div>
-      ${shop ? '' : `<p class="muted" style="font-size:0.85em">${tr('強化は武器屋で行う（ここでは見るだけ。必殺技のセットはできる）')}</p>`}
-      <p class="tlegend"><span class="lg base">${tr('基礎（{cat}）', { cat: CATS[w.cat].name })}</span><span class="lg uniq">${tr('{name} 固有', { name: w.name })}</span><span class="lg sp">${tr('必殺技')}</span></p>
+    <div class="overlay"><div class="panel tpanel">
+      ${head(`${tr('強化')} ・ ${w.name}`, `<span class="soul">${souls(hero.souls)}</span>`)}
       <div class="stree">${root}</div>
       ${detail(selKey, ctx)}
     </div></div>`;
   };
+  fn.after = fitTree;
   fn.modsId = id;
   uiShow(fn);
 }
@@ -96,40 +92,56 @@ function branch(key, kids, ctx) {
   </div>`;
 }
 
-// 選んだノードのくわしい説明と、強化・習得・セットのボタン
+// 選んだノードの短い説明と、大きな強化・習得・セットのボタン (説明は「次の Lv」の効果だけ)
 function detail(key, ctx) {
   const { id, shop, cap, byId } = ctx;
   const n = nodeInfo(key, ctx);
-  const capNote = shop && n.lv >= cap && n.lv < n.max ? `<span class="muted">${tr('この店では Lv{n} まで', { n: cap })}</span>` : '';
-  let body = '';
+  const capped = shop && n.lv >= cap && n.lv < n.max;
+  const big = (act, data, label, ok, primary = true) => `<button class="btn tbig ${ok && primary ? 'primary' : ''}" data-act="${act}" ${data} ${ok ? '' : 'disabled'}>${label}</button>`;
+  let line = '';
+  let note = '';
   let btns = '';
   if (n.m) {
     const m = n.m;
-    const now = n.lv ? m.desc.replace('{v}', modShow(m, n.lv)) : '—';
-    const next = n.lv < n.max ? m.desc.replace('{v}', modShow(m, n.lv + 1)) : '';
-    body = `<div class="s">${tr('いま')}: ${now}${next ? `<br>${tr('次')}: ${next}` : ''}</div>`;
-    if (!n.reqOk) body += `<div class="s muted">🔒 ${tr('{name} Lv{n} が必要', { name: byId[m.req[0]].name, n: m.req[1] })}</div>`;
+    line = n.lv < n.max ? `${tr('次')}: ${m.desc.replace('{v}', modShow(m, n.lv + 1))}` : m.desc.replace('{v}', modShow(m, n.lv));
+    if (!n.reqOk) note = `🔒 ${tr('{name} Lv{n} が必要', { name: byId[m.req[0]].name, n: m.req[1] })}`;
     if (n.lv >= n.max) btns = `<span class="gold">${tr('最大')}</span>`;
-    else if (shop && n.reqOk && !capNote) btns = `<button class="btn small ${n.ready ? 'primary' : ''}" data-act="modUp" data-id="${m.id}" ${n.ready ? '' : 'disabled'}>${tr('強化')} ${souls(n.cost)}</button>`;
+    else if (shop && n.reqOk && !capped) btns = big('modUp', `data-id="${m.id}"`, `${tr('強化')}<small>${souls(n.cost)}</small>`, n.ready);
   } else {
-    body = `<div class="s">${spDesc(id, n.i)}</div>`;
+    line = spDesc(id, n.i);
     if (n.own) {
-      btns = n.set ? `<span class="tag">${tr('セット中')}</span>` : `<button class="btn small" data-act="spSet" data-i="${n.i}">${tr('セットする')}</button>`;
-      if (n.lv >= n.max) btns += ` <span class="gold">${tr('最大')}</span>`;
-      else if (shop && !capNote) btns += ` <button class="btn small ${n.ready ? 'primary' : ''}" data-act="spUp" data-i="${n.i}" ${n.ready ? '' : 'disabled'}>${tr('強化')} ${souls(n.cost)}</button>`;
+      btns = n.set ? `<span class="tag">${tr('セット中')}</span>` : big('spSet', `data-i="${n.i}"`, tr('セットする'), true, false);
+      if (n.lv >= n.max) btns += `<span class="gold">${tr('最大')}</span>`;
+      else if (shop && !capped) btns += big('spUp', `data-i="${n.i}"`, `${tr('強化')}<small>${souls(n.cost)}</small>`, n.ready);
     } else {
-      const prev = RG.SPECIALS[id][n.i - 1];
-      if (!n.reqOk) body += `<div class="s muted">🔒 ${tr('{name} Lv{n} が必要', { name: prev.name, n: n.unlock.req })}</div>`;
-      body += `<div class="s muted">${tr('習得: {s} ・ 悪魔の心臓 {h}/{n}', { s: souls(n.unlock.souls), h: n.hearts, n: n.unlock.hearts })}</div>`;
-      if (shop) btns = `<button class="btn small ${n.ready ? 'primary' : ''}" data-act="spLearn" data-i="${n.i}" ${n.ready ? '' : 'disabled'}>${tr('習得する')}</button>`;
+      note = n.reqOk ? tr('悪魔の心臓 {h}/{n}', { h: n.hearts, n: n.unlock.hearts }) : `🔒 ${tr('{name} Lv{n} が必要', { name: RG.SPECIALS[id][n.i - 1].name, n: n.unlock.req })}`;
+      if (shop) btns = big('spLearn', `data-i="${n.i}"`, `${tr('習得する')}<small>${souls(n.unlock.souls)}</small>`, n.ready);
     }
   }
+  if (capped) note = tr('この店では Lv{n} まで', { n: cap });
+  if (!shop && !note) note = tr('強化は武器屋で行う');
   return `<div class="tdetail">
-    <div class="t">${n.kind === 'sp' ? `✦ ${tr('必殺技')} ・ ` : ''}${n.name} <span class="muted">${n.kind === 'sp' && !n.own ? tr('未習得') : `Lv${n.lv}/${n.max}`}</span></div>
-    ${body}
-    <div class="tbtns">${btns} ${capNote}</div>
+    <div class="tinfo">
+      <div class="t">${n.kind === 'sp' ? '✦ ' : ''}${n.name} <span class="muted">${n.kind === 'sp' && !n.own ? tr('未習得') : `Lv${n.lv}/${n.max}`}</span></div>
+      <div class="s">${line}</div>
+      ${note ? `<div class="s muted">${note}</div>` : ''}
+    </div>
+    <div class="tbtns">${btns}</div>
   </div>`;
 }
+
+// ツリーを枠に収まる大きさにして、まん中に置く (大きい画面では少しだけ大きくする)
+function fitTree() {
+  const box = document.querySelector('.stree');
+  const root = box && box.firstElementChild;
+  if (!root) return;
+  root.style.transform = '';
+  const s = Math.min(1.2, box.clientWidth / root.offsetWidth, box.clientHeight / root.offsetHeight);
+  const x = (box.clientWidth - root.offsetWidth * s) / 2;
+  const y = (box.clientHeight - root.offsetHeight * s) / 2;
+  root.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+}
+window.addEventListener('resize', () => requestAnimationFrame(fitTree));
 
 const modsWeapon = () => {
   const fn = ui.stack[ui.stack.length - 1];
