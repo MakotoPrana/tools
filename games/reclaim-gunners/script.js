@@ -86,7 +86,8 @@
     gold: 0,
     board: {},
     slots: 0, // 開けた武器スロットの数 (最初の 2 つに足す数)
-    weapons: { A1: 0 }, // 持っている武器と強化値
+    weapons: { A1: 0 }, // 持っている武器
+    mods: {}, // 武器の改造 { 武器の id: { 改造の id: Lv } }
     equipped: ['A1', null],
     specials: [],
     materials: {},
@@ -109,6 +110,14 @@
       hh.progress = Object.assign({ normal: null, hard: null, extreme: null }, hh.progress);
       if (!hh.progress.normal) hh.progress.normal = newProgress();
       while (hh.equipped.length < 2 + hh.slots) hh.equipped.push(null);
+      // 前の版の「+強化値」は、改造の「威力」に移す
+      for (const id in hh.weapons) {
+        if (hh.weapons[id] > 0) {
+          hh.mods[id] = hh.mods[id] || {};
+          hh.mods[id].dmg = Math.max(hh.mods[id].dmg || 0, Math.min(RG.MOD_MAX, hh.weapons[id]));
+        }
+        hh.weapons[id] = 0;
+      }
       s.heroes[h.id] = hh;
     }
     return s;
@@ -161,9 +170,48 @@
   const moveSpeed = () => ((120 * heroDef.speed) / 100) * (1 + 0.015 * rank('spd'));
   const maxPotions = () => 3 + rank('pot');
   const canEquip = (w) => w.cat === 'special' || heroDef.cats.includes(w.cat);
-  const upgMul = (lv) => 1 + 0.12 * lv;
-  const weaponMag = (w, lv) => (w.mag ? w.mag + Math.floor(lv / 5) * Math.max(1, Math.round(w.mag * 0.1)) : 0);
-  const upgradeCost = (w, lv) => Math.ceil(((w.price || w.basePrice || 300) * 0.3 * Math.pow(1.25, lv)) / 100) * 100;
+  // ---------- 武器の改造 (data/mods.js) ----------
+  const modLv = (id, mid) => (hero.mods[id] && hero.mods[id][mid]) || 0;
+  const modTotal = (id) => Object.values(hero.mods[id] || {}).reduce((a, b) => a + b, 0);
+  // 改造 1 Lv の値段。もとにする値段は武器の値段 (隠し武器は 15 万)
+  const modCost = (w, m, lv) => Math.ceil(((w.price || w.basePrice || 150000) * 0.15 * m.cost * Math.pow(1.28, lv)) / 10) * 10;
+  const modValue = (m, lv) => (m.mode === 'step' ? Math.floor(lv / m.step) * m.per : m.per * lv);
+  // 説明の {v} に入れる数
+  function modShow(m, lv) {
+    const v = Math.abs(modValue(m, lv));
+    if (m.show === 'pct') return String(Math.round(v * 1000) / 10);
+    if (m.show === 'sec') return v.toFixed(1);
+    return String(Math.round(v * 100) / 100);
+  }
+  const modReqOk = (id, m) => !m.req || modLv(id, m.req[0]) >= m.req[1];
+  // 改造を入れた武器 (もとの武器を継いで、変わった値だけ上書きする)。戦いではこれを使う
+  const effCache = {};
+  function effW(id) {
+    if (effCache[id]) return effCache[id];
+    const w = WEAPON[id];
+    const e = Object.create(w);
+    const D = RG.MOD_DEFAULTS;
+    for (const k in D) if (w[k] == null) e[k] = D[k];
+    if (w.mana) Object.assign(e, { manaMax: w.mana[0], manaCost: w.mana[1], manaRegen: w.mana[2] });
+    for (const m of RG.modsOf(w)) {
+      const lv = modLv(id, m.id);
+      if (!lv || e[m.stat] == null) continue;
+      const v = modValue(m, lv);
+      e[m.stat] = m.mode === 'mul' ? e[m.stat] * (1 + v) : e[m.stat] + v;
+    }
+    if (w.mag) e.mag = Math.round(e.mag);
+    e.pellets = Math.round(e.pellets);
+    e.pierce = Math.round(e.pierce);
+    e.chain = Math.round(e.chain);
+    e.freezeN = Math.max(1, Math.round(e.freezeN));
+    e.movePen = Math.max(0, e.movePen);
+    if (w.mana) e.mana = [Math.round(e.manaMax), e.manaCost, e.manaRegen];
+    effCache[id] = e;
+    return e;
+  }
+  const clearEff = () => {
+    for (const k in effCache) delete effCache[k];
+  };
   const slotCount = () => 2 + hero.slots;
   const gatesBeaten = () => prog.bosses.filter((id) => BOSSES[id] && BOSSES[id].kind === 'gate').length;
   const nushiBeaten = () => prog.bosses.filter((id) => BOSSES[id] && BOSSES[id].kind === 'nushi').length;
@@ -174,7 +222,7 @@
     for (const id of hero.equipped) {
       if (!id) continue;
       const w = WEAPON[id];
-      wb = Math.max(wb, (w.tier - 1) * 6 + (hero.weapons[id] || 0));
+      wb = Math.max(wb, (w.tier - 1) * 6 + Math.floor(modTotal(id) / 5));
     }
     return clamp(1 + Math.floor(rankSum() / 5) + wb, 1, 99);
   }
@@ -1627,9 +1675,8 @@
 
   function ensureWs(id) {
     if (P.ws[id]) return P.ws[id];
-    const w = WEAPON[id];
-    const lv = hero.weapons[id] || 0;
-    P.ws[id] = { ammo: weaponMag(w, lv), reloadT: 0, cd: 0, mana: w.mana ? w.mana[0] : 0, spin: 0, charge: 0 };
+    const w = effW(id);
+    P.ws[id] = { ammo: w.mag || 0, reloadT: 0, cd: 0, mana: w.mana ? w.mana[0] : 0, spin: 0, charge: 0 };
     return P.ws[id];
   }
 
@@ -1943,7 +1990,7 @@
 
   function startReload(w, st) {
     if (!w.mag || st.reloadT > 0) return;
-    if (st.ammo >= weaponMag(w, hero.weapons[w.id] || 0)) return;
+    if (st.ammo >= w.mag) return;
     if (P.kaiInstant) {
       P.kaiInstant = false;
       st.reloadT = 0.05;
@@ -1954,7 +2001,7 @@
   // R: 弾の減っている武器をまとめてリロードする
   function manualReload() {
     for (const id of equippedIds()) {
-      const w = WEAPON[id];
+      const w = effW(id);
       if (!w.mana) startReload(w, ensureWs(id));
     }
   }
@@ -1965,7 +2012,7 @@
     const a = mx || my ? Math.atan2(my, mx) : P.aim;
     P.dodgeDir = a;
     P.dodgeCd = heroDef.dodgeCd * (1 - 0.03 * rank('dodge'));
-    P.twinBoost = 1;
+    P.twinBoost = 3; // 回避してからの時間は 3 − これ
     sfx('dodge');
     if (heroDef.dodge === 'roll') {
       P.rollT = 0.3;
@@ -2050,7 +2097,7 @@
     P.hurtT = Math.max(0, P.hurtT - dt);
     P.heavyT = Math.max(0, (P.heavyT || 0) - dt);
     let sp = moveSpeed();
-    if (P.heavyT > 0) sp *= 0.75; // 重火器を撃っている間は遅くなる
+    if (P.heavyT > 0) sp *= 1 - (P.heavyPen || 0); // 重火器を撃っている間は遅くなる
     P.slowT = Math.max(0, (P.slowT || 0) - dt);
     if (P.slowT > 0) sp *= 0.6; // 泥・氷の弾に当たると遅くなる
     if (tileAt(P.x, P.y) === T.SWAMP && P.rollT <= 0 && P.tackleT <= 0) sp *= 0.7; // 沼
@@ -2083,7 +2130,7 @@
     G.beam = null;
     let face = null;
     equippedIds().forEach((id, i) => {
-      const w = WEAPON[id];
+      const w = effW(id);
       const st = ensureWs(id);
       let ang = null;
       let tdist = w.range;
@@ -2104,7 +2151,7 @@
     else if (P.moving) P.aim = Math.atan2(my, mx);
     // 魔導の魔力は持っているだけで回復する (光線は出している間は回復しない)
     for (const wid of equippedIds()) {
-      const ww = WEAPON[wid];
+      const ww = effW(wid);
       if (!ww.mana) continue;
       const st = ensureWs(wid);
       if (st.beaming) continue;
@@ -2133,8 +2180,7 @@
     st.beaming = false;
     const firing = ang != null;
     st.active = firing;
-    const lv = hero.weapons[w.id] || 0;
-    const mag = weaponMag(w, lv);
+    const mag = w.mag;
     if (st.reloadT > 0) {
       st.reloadT -= dt;
       if (st.reloadT <= 0) {
@@ -2154,9 +2200,9 @@
         st.charge += dt;
         st.chargeAim = ang;
       }
-      const full = st.charge >= 0.8;
+      const full = st.charge >= w.chargeT;
       if (st.charge > 0 && (full || !firing)) {
-        const k = Math.min(1, st.charge / 0.8);
+        const k = Math.min(1, st.charge / w.chargeT);
         st.charge = 0;
         if (st.cd <= 0 && st.ammo > 0 && k > 0.15) {
           fire(w, 1 + (w.charge - 1) * k, firing ? ang : st.chargeAim, tdist, slot);
@@ -2170,14 +2216,14 @@
       if (firing && st.mana > 0) {
         st.beaming = true;
         st.mana = Math.max(0, st.mana - w.mana[1] * dt);
-        fireBeam(w, st, lv, dt, ang);
+        fireBeam(w, st, dt, ang);
       }
       return;
     }
     if (!firing || st.cd > 0) return;
     let rate = w.rate;
     if (w.spin) rate = lerp(w.rateMin, w.rate, st.spin);
-    if (w.twin && P.twinBoost > 0) rate *= 1.5;
+    if (w.twin && 3 - P.twinBoost < w.twinT) rate *= w.twinBoost;
     if (w.mana) {
       if (st.mana < w.mana[1]) return;
       st.mana -= w.mana[1];
@@ -2189,8 +2235,7 @@
   }
 
   function fire(w, mult, a, tdist, slot = 0) {
-    const lv = hero.weapons[w.id] || 0;
-    const dmg = w.dmg * upgMul(lv) * mult;
+    const dmg = w.dmg * mult;
     // 2 丁目からは、少し横から撃つ (左右の手)
     const side = slot % 2 ? -1 : 1;
     let ox = P.x + Math.cos(a) * 12 + Math.cos(a + Math.PI / 2) * 3 * side * (slot ? 1 : 0.5);
@@ -2200,7 +2245,10 @@
       ox += Math.cos(a + Math.PI / 2) * 4 * P.twinSide;
       oy += Math.sin(a + Math.PI / 2) * 4 * P.twinSide;
     }
-    if (w.cat === 'heavy') P.heavyT = 0.25;
+    if (w.cat === 'heavy') {
+      P.heavyT = 0.25;
+      P.heavyPen = w.movePen;
+    }
     gunSound(w, w.twin ? P.twinSide : 0);
     addPart({ x: ox, y: oy, vx: 0, vy: 0, life: 0.06, color: '#fff3b0', size: 5, glow: true });
     if (w.kind === 'grenade') {
@@ -2227,7 +2275,7 @@
     }
   }
 
-  function fireBeam(w, st, lv, dt, a) {
+  function fireBeam(w, st, dt, a) {
     const sx = P.x + Math.cos(a) * 12;
     const sy = P.y + Math.sin(a) * 12;
     let len = w.range;
@@ -2244,7 +2292,7 @@
     if (st.beamT > 0) return;
     st.beamT = 1 / w.rate;
     gunSound(w);
-    const dmg = w.dmg * upgMul(lv);
+    const dmg = w.dmg;
     forAllTargets((t) => {
       const d = segDist(t.x, t.y, sx, sy, ex, ey);
       if (d < t.r + 5) damageTarget(t, dmg, { elem: w.elem, w, dirx: Math.cos(a), diry: Math.sin(a), sx: P.x, sy: P.y });
@@ -2322,17 +2370,20 @@
     const critRate = 0.05 + rank('crit') * 0.01 + (heroDef.id === 'kai' ? 0.05 : 0) + ((w && w.crit) || 0);
     const crit = !o.noCrit && Math.random() < critRate;
     if (crit) {
-      d *= 1.5 + 0.05 * rank('critd');
+      d *= 1.5 + 0.05 * rank('critd') + ((w && w.critd) || 0);
       if (heroDef.id === 'kai') P.kaiInstant = true;
     }
     const tdef = t.kind === 'enemy' ? t.def : t.kind === 'boss' ? t.boss.def : null;
     if (tdef) {
-      if (tdef.weak && tdef.weak.includes(o.elem)) d *= 1.5;
+      if (tdef.weak && tdef.weak.includes(o.elem)) d *= (w && w.weakMul) || 1.5;
       else if (tdef.resist && tdef.resist.includes(o.elem)) d *= 0.5;
       if (w && w.demonBonus && tdef.demon) d *= w.demonBonus;
+      if (w && w.execute && t.kind === 'enemy' && t.hp < t.maxHp * 0.3) d *= 1 + w.execute;
       if (tdef.armor) d *= 1 - tdef.armor;
     }
     if (heroDef.id === 'mira' && o.elem !== 'phys') d *= 1.15;
+    if (w && w.bossMul && t.kind !== 'enemy') d *= 1 + w.bossMul;
+    if (w && w.close && o.close) d *= 1 + w.close;
     d *= dealtMul(t.lv - powerLv());
     // オーク重盾兵: 正面からの攻撃は盾で防ぐ。ゴーレム: 正面は硬く、背中が弱点
     if (t.facing != null && o.sx != null) {
@@ -2366,15 +2417,15 @@
         t.ky += (o.diry || 0) * k;
       }
       if (w && w.slow) {
-        t.slowT = 2;
+        t.slowT = w.slowT || 2;
         t.chill = (t.chill || 0) + 1;
-        if (t.chill >= 5) {
+        if (t.chill >= (w.freezeN || 5)) {
           t.chill = 0;
-          t.freezeT = 1.5;
+          t.freezeT = w.freezeT || 1.5;
         }
       }
       if (w && w.burn) {
-        t.burnT = 3;
+        t.burnT = w.burnT || 3;
         t.burnDps = base * w.burn;
       }
       if (t.hp <= 0) killEnemy(t, w);
@@ -2413,7 +2464,7 @@
         }
       }
       if (!best) return;
-      dmg *= 0.8;
+      dmg *= (w && w.chainMul) || 0.8;
       hitSet.add(best);
       addPart({ x: cur.x, y: cur.y, x2: best.x, y2: best.y, vx: 0, vy: 0, life: 0.15, color: '#ffe45c', size: 1.5, line: true });
       damageTarget(best, dmg, { elem: 'thunder', w, sx: cur.x, sy: cur.y });
@@ -2452,7 +2503,8 @@
         if (best) {
           const cur = Math.atan2(b.vy, b.vx);
           const want = Math.atan2(best.y - b.y, best.x - b.x);
-          const na = cur + clamp(angNorm(want - cur), -5 * dt, 5 * dt);
+          const turn = b.w.turn || 5;
+          const na = cur + clamp(angNorm(want - cur), -turn * dt, turn * dt);
           b.vx = Math.cos(na) * b.sp;
           b.vy = Math.sin(na) * b.sp;
         }
@@ -2485,7 +2537,7 @@
             alive = false;
             return;
           }
-          damageTarget(t, b.dmg, { elem: b.elem, w: b.w, dirx: b.vx / b.sp, diry: b.vy / b.sp, knock: b.w.knock || 15, sx: P.x, sy: P.y });
+          damageTarget(t, b.dmg, { elem: b.elem, w: b.w, dirx: b.vx / b.sp, diry: b.vy / b.sp, knock: b.w.knock || 15, sx: P.x, sy: P.y, close: b.travel < 70 });
           if (b.w.chain) chainLightning(t, b.dmg, b.w.chain, b.w, b.hit);
           b.pierce--;
           if (b.pierce < 0) alive = false;
@@ -5089,10 +5141,11 @@
     }
     // チャージ
     for (const id of equippedIds()) {
-      if (!WEAPON[id].charge) continue;
+      const cw = effW(id);
+      if (!cw.charge) continue;
       const st = ensureWs(id);
       if (st.charge > 0) {
-        const k = Math.min(1, st.charge / 0.8);
+        const k = Math.min(1, st.charge / cw.chargeT);
         ctx.strokeStyle = k >= 1 ? '#ffe45c' : '#ffffff';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -5390,7 +5443,7 @@
       }
       if (active) drawGlow(ctx, r.x + r.w / 2, r.y + r.h / 2, r.w * 0.9, '#ff9a40', 0.25);
       if (!r.id) return;
-      const w = WEAPON[r.id];
+      const w = effW(r.id);
       const st = ensureWs(r.id);
       ctx.save();
       ctx.translate(r.x + r.w / 2 - 5, r.y + 12);
@@ -5398,8 +5451,8 @@
       ctx.scale(0.62, 0.62);
       RG.drawWeapon(ctx, r.id);
       ctx.restore();
-      const lv = hero.weapons[r.id] || 0;
-      if (lv) txt(`+${lv}`, r.x + r.w - 2, r.y + 5, 6, '#ffe45c', 'right');
+      const lv = modTotal(r.id);
+      if (lv) txt(`★${lv}`, r.x + r.w - 2, r.y + 5, 6, '#ffe45c', 'right');
       txt(String(i + 1), r.x + 3, r.y + 5, 6, '#aaa', 'left');
       if (w.mana) {
         ctx.fillStyle = '#2a2040';
@@ -5672,6 +5725,7 @@
   actions.heroOk = () => {
     heroDef = HEROES.find((x) => x.id === selHero);
     hero = save.heroes[selHero];
+    clearEff();
     showDifficulty();
   };
 
@@ -6142,15 +6196,16 @@
         const id = hero.equipped[i];
         const locked = i >= hero.equipped.length;
         slots.push(`<button class="slot ${id ? 'filled' : ''} ${i === selSlot && !locked ? 'sel' : ''} ${locked ? 'locked' : ''}" data-act="${locked ? '' : 'pickSlot'}" data-i="${i}">
-          ${locked ? '🔒' : id ? `<img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><span class="sn">${WEAPON[id].name}${hero.weapons[id] ? ` +${hero.weapons[id]}` : ''}</span>` : `<span class="muted">${tr('空き')}</span>`}</button>`);
+          ${locked ? '🔒' : id ? `<img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><span class="sn">${WEAPON[id].name}${modTotal(id) ? ` <span class="gold">★${modTotal(id)}</span>` : ''}</span>` : `<span class="muted">${tr('空き')}</span>`}</button>`);
       }
       const owned = WEAPONS.filter((w) => hero.weapons[w.id] != null);
       const rows = owned.map((w) => {
-        const lv = hero.weapons[w.id];
+        const lv = modTotal(w.id);
         const inSlot = hero.equipped.indexOf(w.id);
         return `<div class="row wrow ${canEquip(w) ? '' : 'dim'}"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
-          <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name}${lv ? ` +${lv}` : ''} ${inSlot >= 0 ? `<span class="tag">${tr('スロット{n}', { n: inSlot + 1 })}</span>` : ''}</div>
-          <div class="s">${weaponStats(w, lv)} ・ ${w.desc}</div></div>
+          <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name}${lv ? ` <span class="gold">★${lv}</span>` : ''} ${inSlot >= 0 ? `<span class="tag">${tr('スロット{n}', { n: inSlot + 1 })}</span>` : ''}</div>
+          <div class="s">${weaponStats(effW(w.id))} ・ ${w.desc}</div></div>
+          <button class="btn small" data-act="viewMods" data-id="${w.id}">${tr('改造')}</button>
           ${canEquip(w) ? `<button class="btn small" data-act="equip" data-id="${w.id}" ${hero.equipped[selSlot] === w.id ? 'disabled' : ''}>${tr('スロット{n}へ', { n: selSlot + 1 })}</button>` : `<span class="muted">${tr('使えない')}</span>`}
         </div>`;
       }).join('');
@@ -6188,10 +6243,10 @@
     for (const id of hero.equipped) if (id) ensureWs(id);
   }
 
-  function weaponStats(w, lv) {
-    const dmg = Math.round(w.dmg * upgMul(lv));
-    const parts = [`${tr('威力 {v}', { v: dmg })}${w.pellets ? `×${w.pellets}` : ''}`, tr('連射 {v}/秒', { v: w.rate })];
-    if (w.mag) parts.push(tr('装弾 {v}', { v: weaponMag(w, lv) }));
+  function weaponStats(w) {
+    const dmg = Math.round(w.dmg);
+    const parts = [`${tr('威力 {v}', { v: dmg })}${w.pellets > 1 ? `×${w.pellets}` : ''}`, tr('連射 {v}/秒', { v: Math.round(w.rate * 10) / 10 })];
+    if (w.mag) parts.push(tr('装弾 {v}', { v: w.mag }));
     if (w.mana) parts.push(tr('魔力 {v}', { v: w.mana[0] }));
     parts.push(ELEMS[w.elem] ? ELEMS[w.elem].name : tr('全属性'));
     return parts.join(tr(' ・ '));
@@ -6206,8 +6261,10 @@
     return 1;
   }
   let shopTab = 'buy';
+  let curShop = null;
   function showShop(shopId) {
     const shop = SHOPS[shopId];
+    curShop = shopId;
     shopTab = 'buy';
     const fn = () => {
       const phase = shopPhase(shop);
@@ -6222,7 +6279,7 @@
           const ok = !owned && can && hero.gold >= w.price;
           return `<div class="row wrow ${can ? '' : 'dim'}"><img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><div>
             <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name} <span class="muted">T${w.tier}</span></div>
-            <div class="s">${weaponStats(w, 0)} ・ ${w.desc}</div></div>
+            <div class="s">${weaponStats(w)} ・ ${w.desc}</div></div>
             <button class="btn small ${ok ? 'primary' : ''}" data-act="buyW" data-id="${id}" ${ok ? '' : 'disabled'}>${owned ? tr('所持') : !can ? tr('この主人公は使えない') : `${fmt(w.price)} G`}</button>
           </div>`;
         }).join('');
@@ -6230,18 +6287,12 @@
         body += `<p class="muted" style="font-size:0.85em">${tr('品ぞろえ 第{n}段階 ・ {hint}', { n: phase, hint: nextHint })}</p>`;
       } else if (shopTab === 'up') {
         const owned = WEAPONS.filter((w) => hero.weapons[w.id] != null && canEquip(w));
-        body = owned.map((w) => {
-          const lv = hero.weapons[w.id];
-          const done = lv >= max;
-          const cost = upgradeCost(w, lv);
-          const ok = !done && hero.gold >= cost;
-          return `<div class="row wrow"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
-            <div class="t">${w.name} <span class="gold">+${lv}</span>${done ? '' : ` → <span class="gold">+${lv + 1}</span>`}</div>
-            <div class="s">${tr('威力 {v}', { v: Math.round(w.dmg * upgMul(lv)) })}${done ? '' : ` → ${Math.round(w.dmg * upgMul(lv + 1))}`}${!done && weaponMag(w, lv + 1) > weaponMag(w, lv) ? ` ・ ${tr('装弾 +{v}', { v: weaponMag(w, lv + 1) - weaponMag(w, lv) })}` : ''}</div></div>
-            <button class="btn small ${ok ? 'primary' : ''}" data-act="upW" data-id="${w.id}" ${ok ? '' : 'disabled'}>${done ? tr('この店では +{n} まで', { n: max }) : `${fmt(cost)} G`}</button>
-          </div>`;
-        }).join('') || `<p class="muted">${tr('強化できる武器がない')}</p>`;
-        body += `<p class="muted" style="font-size:0.85em">${tr('この店で強化できるのは +{n} まで（お店の格による）', { n: max })}</p>`;
+        body = owned.map((w) => `<div class="row wrow"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
+            <div class="t">${w.name} <span class="gold">★${modTotal(w.id)}</span><span class="muted"> / ${RG.modsOf(w).length * RG.MOD_MAX}</span></div>
+            <div class="s">${weaponStats(effW(w.id))}</div></div>
+            <button class="btn small primary" data-act="openMods" data-id="${w.id}">${tr('改造する')}</button>
+          </div>`).join('') || `<p class="muted">${tr('改造できる武器がない')}</p>`;
+        body += `<p class="muted" style="font-size:0.85em">${tr('この店で上げられるのは、それぞれの改造の Lv{n} まで（お店の格による）', { n: max })}</p>`;
       } else {
         body = shop.items.map((id) => {
           const it = ITEMS[id];
@@ -6280,13 +6331,76 @@
     toast(tr('{name} を手に入れた', { name: w.name }) + (empty >= 0 ? tr('（スロット{n}に装備）', { n: empty + 1 }) : tr('（装備から入れ替えられます）')), 2);
     rerender();
   };
-  actions.upW = (d) => {
-    const w = WEAPON[d.id];
-    const lv = hero.weapons[w.id];
-    const cost = upgradeCost(w, lv);
-    if (hero.gold < cost) return;
+  actions.openMods = (d) => showMods(d.id, curShop);
+  actions.viewMods = (d) => showMods(d.id, null);
+
+  // ---------- 武器の改造 (スキルツリー) ----------
+  //   1 段目: カテゴリの基礎の改造 / 2 段目から: その武器だけの改造 (前の改造が決まった Lv になると上げられる)
+  //   shopId があるときだけ上げられる (上げられる Lv は、お店の格まで)
+  function showMods(id, shopId) {
+    const w = WEAPON[id];
+    const fn = () => {
+      const shop = shopId ? SHOPS[shopId] : null;
+      const cap = shop ? shop.phases[shopPhase(shop) - 1].max : 0;
+      const mods = RG.modsOf(w);
+      const byId = Object.fromEntries(mods.map((m) => [m.id, m]));
+      // 段: 前の改造をたどった深さ
+      const depth = (m) => (m.req ? 1 + depth(byId[m.req[0]]) : 0);
+      const tiers = [];
+      for (const m of mods) (tiers[depth(m)] = tiers[depth(m)] || []).push(m);
+      const node = (m) => {
+        const lv = modLv(id, m.id);
+        const max = lv >= RG.MOD_MAX;
+        const reqOk = modReqOk(id, m);
+        const cost = modCost(w, m, lv);
+        const capped = shop && lv >= cap;
+        const ok = shop && reqOk && !max && !capped && hero.gold >= cost;
+        const pips = Array.from({ length: RG.MOD_MAX }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
+        const now = lv ? m.desc.replace('{v}', modShow(m, lv)) : '—';
+        const next = max ? '' : m.desc.replace('{v}', modShow(m, lv + 1));
+        let btn = '';
+        if (max) btn = `<span class="gold">${tr('最大')}</span>`;
+        else if (!reqOk) btn = `<span class="muted">🔒 ${tr('{name} Lv{n} が必要', { name: byId[m.req[0]].name, n: m.req[1] })}</span>`;
+        else if (!shop) btn = '';
+        else if (capped) btn = `<span class="muted">${tr('この店では Lv{n} まで', { n: cap })}</span>`;
+        else btn = `<button class="btn small ${ok ? 'primary' : ''}" data-act="modUp" data-id="${m.id}" ${ok ? '' : 'disabled'}>${fmt(cost)} G</button>`;
+        return `<div class="mnode ${m.req ? 'uniq' : ''} ${reqOk ? '' : 'locked'} ${max ? 'max' : ''}">
+          ${m.req ? `<div class="mreq">↑ ${byId[m.req[0]].name} Lv${m.req[1]}</div>` : ''}
+          <div class="mname">${m.name} <span class="mlv">Lv${lv}/${RG.MOD_MAX}</span></div>
+          <div class="pips">${pips}</div>
+          <div class="s">${now}${next ? `<br><span class="muted">${tr('次')}: ${next}</span>` : ''}</div>
+          <div class="mbtn">${btn}</div>
+        </div>`;
+      };
+      const rowsHtml = tiers.map((t, i) => `<div class="mtier"><div class="mtl">${i === 0 ? tr('基礎（{cat}）', { cat: CATS[w.cat].name }) : tr('{name} 固有 {n} 段目', { name: w.name, n: i })}</div><div class="mrow">${t.map(node).join('')}</div></div>`).join('');
+      return `
+      <div class="overlay"><div class="panel">
+        ${head(tr('改造'), `<span class="gold">${fmt(hero.gold)} G</span>`)}
+        <div class="row wrow"><img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><div>
+          <div class="t">${w.name} <span class="gold">★${modTotal(id)}</span></div>
+          <div class="s">${weaponStats(effW(id))}</div></div></div>
+        ${shop ? '' : `<p class="muted" style="font-size:0.85em">${tr('改造は武器屋で行う（ここでは見るだけ）')}</p>`}
+        <div class="mtree">${rowsHtml}</div>
+      </div></div>`;
+    };
+    fn.modsId = id;
+    uiShow(fn);
+  }
+  actions.modUp = (d) => {
+    const fn = ui.stack[ui.stack.length - 1];
+    const id = fn && fn.modsId;
+    if (!id || !curShop) return;
+    const w = WEAPON[id];
+    const m = RG.modsOf(w).find((x) => x.id === d.id);
+    const shop = SHOPS[curShop];
+    const cap = shop.phases[shopPhase(shop) - 1].max;
+    const lv = modLv(id, m.id);
+    const cost = modCost(w, m, lv);
+    if (lv >= RG.MOD_MAX || lv >= cap || !modReqOk(id, m) || hero.gold < cost) return;
     hero.gold -= cost;
-    hero.weapons[w.id] = lv + 1;
+    hero.mods[id] = hero.mods[id] || {};
+    hero.mods[id][m.id] = lv + 1;
+    clearEff();
     sfx('buy');
     rerender();
   };
@@ -6407,6 +6521,11 @@
       god() {
         P.inv = 1e9;
       },
+      shop(id = 'village') {
+        showShop(id);
+      },
+      eff: (id) => effW(id),
+      clearEff,
       // 音をためす (エラーを隠さずに鳴らす)
       sounds() {
         audioInit();

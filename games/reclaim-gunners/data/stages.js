@@ -310,15 +310,16 @@ RG.LINKS = [
 ];
 
 // お店。phases: 品ぞろえの段階 (1: 町を解放 / 2: ステージの半分を解放 / 3: ステージを全部解放してヌシを倒す)
+//   max: この店で上げられる、武器の改造それぞれの Lv (最大 10)
 RG.SHOPS = {
   village: {
     name: '始まりの村の武器屋',
     stage: 1,
     nushi: 'N1',
     phases: [
-      { weapons: ['B1', 'C1', 'D1', 'E1'], max: 5 },
-      { weapons: [], max: 7 },
-      { weapons: ['A2'], max: 7 },
+      { weapons: ['B1', 'C1', 'D1', 'E1'], max: 3 },
+      { weapons: [], max: 4 },
+      { weapons: ['A2'], max: 5 },
     ],
     items: ['potion'],
   },
@@ -329,9 +330,9 @@ RG.SHOPS.lume = {
   stage: 2,
   nushi: 'N2',
   phases: [
-    { weapons: ['A2', 'B2', 'D2', 'E2'], max: 10 },
-    { weapons: ['C2'], max: 12 },
-    { weapons: [], max: 12 },
+    { weapons: ['A2', 'B2', 'D2', 'E2'], max: 6 },
+    { weapons: ['C2'], max: 7 },
+    { weapons: [], max: 8 },
   ],
   items: ['potion'],
 };
