@@ -3,6 +3,7 @@ import { CATS, ELEMS, WEAPON, WEAPONS, tr } from '../core/config.js';
 import { clamp } from '../core/util.js';
 import { canEquip, hero } from '../game/hero.js';
 import { P, ensureWs } from '../game/stage.js';
+import { spState } from '../game/specials.js';
 import { effW, modTotal } from '../game/weapon-mods.js';
 import { CAT_COLORS } from '../render/hud.js';
 import { actions } from './actions.js';
@@ -26,7 +27,8 @@ export function showEquip() {
       const inSlot = hero.equipped.indexOf(w.id);
       return `<div class="row wrow ${canEquip(w) ? '' : 'dim'}"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
         <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name}${lv ? ` <span class="gold">★${lv}</span>` : ''} ${inSlot >= 0 ? `<span class="tag">${tr('スロット{n}', { n: inSlot + 1 })}</span>` : ''}</div>
-        <div class="s">${weaponStats(effW(w.id))} ・ ${w.desc}</div></div>
+        <div class="s">${weaponStats(effW(w.id))} ・ ${w.desc}</div>
+        <div class="s"><span class="gold">${tr('必殺技')}: ${RG.SPECIALS[w.id][spState(w.id).set].name}</span></div></div>
         <button class="btn small" data-act="viewMods" data-id="${w.id}">${tr('改造')}</button>
         ${canEquip(w) ? `<button class="btn small" data-act="equip" data-id="${w.id}" ${hero.equipped[selSlot] === w.id ? 'disabled' : ''}>${tr('スロット{n}へ', { n: selSlot + 1 })}</button>` : `<span class="muted">${tr('使えない')}</span>`}
       </div>`;

@@ -8,7 +8,8 @@ import { damageTarget } from './damage.js';
 import { addPart, addText } from './fx.js';
 import { D, hero, heroDef, maxHp, rank } from './hero.js';
 import { flowAngle } from './pathfinding.js';
-import { hurtPlayer } from './player.js';
+import { hurtPlayer, physHit, physPos } from './player.js';
+import { addGauge } from './specials.js';
 import { G, P } from './stage.js';
 
 export function spawnEnemy(id, x, y, area, home, opt = {}) {
@@ -98,7 +99,7 @@ export function updateEnemies(dt) {
         addPoison(e.x, e.y + 3, 13, e.atk * 1.5, e.lv, 3.5);
       }
     }
-    if (!G.dead && !e.dormant && dp < e.r + P.r) hurtPlayer(e.atk, e.lv);
+    if (!G.dead && !e.dormant && !e.def.noTouch && dp < e.r + P.r) hurtPlayer(e.atk, e.lv);
   }
   G.enemies = G.enemies.filter((e) => !e.dead);
   separate();
@@ -175,6 +176,7 @@ export function updateEnemyAI(e, dt, dp) {
   // 追いかけるのをやめる
   if (dp > 720 && !e.lair) {
     e.state = 'idle';
+    e.mode = null;
     e.aggro = false;
     e.wt = 0;
     return;
@@ -269,6 +271,59 @@ export function updateEnemyAI(e, dt, dp) {
       moveEnemy(e, chaseAngle(e, dp), e.speed * (e.facing == null ? 1.15 : 1), dt);
       break;
     }
+    case 'brute': {
+      // 中級悪魔: 近ければ大振り、少し離れていれば突進。どちらも ため → 攻撃 → すき
+      //   ためている間は向きを合わせ、最後の 0.25 秒は向きを固める (白く光るのが合図)
+      e.mode = e.mode || 'approach';
+      if (e.mode === 'approach') {
+        if (dp > 30) moveEnemy(e, chaseAngle(e, dp), e.speed, dt); // ふれるほど近くには寄らない
+        if (e.cd <= 0 && e.los) {
+          if (dp < BRUTE.swingR + 4) startBrute(e, 'swing', toP);
+          else if (dp > 110 && dp < 240 && Math.random() < dt * 1.5) startBrute(e, 'lunge', toP);
+        }
+      } else if (e.mode === 'wind') {
+        e.mt -= dt;
+        if (e.mt > 0.25) e.atkA += clamp(angNorm(toP - e.atkA), -3 * dt, 3 * dt);
+        if (e.atkKind === 'lunge') e.faceX = Math.cos(e.atkA) > 0 ? 1 : -1;
+        if (e.mt <= 0) {
+          sfx('swing');
+          if (e.atkKind === 'swing') {
+            e.slashT = 0.2;
+            const pp = physPos();
+            const d = dist(e.x, e.y, pp.x, pp.y);
+            const off = Math.abs(angNorm(Math.atan2(pp.y - e.y, pp.x - e.x) - e.atkA));
+            if (d < e.r + P.r || (d < BRUTE.swingR + e.r + P.r && off < BRUTE.swingArc)) physHit(e.atk * 1.5, e.lv, e);
+            e.mode = 'recover';
+            e.mt = 0.9;
+          } else {
+            e.mode = 'dash';
+            e.mt = 0.5;
+            e.lungeHit = false;
+          }
+        }
+      } else if (e.mode === 'dash') {
+        e.mt -= dt;
+        moveEnemy(e, e.atkA, 380, dt);
+        const pp = physPos();
+        if (!e.lungeHit && dist(e.x, e.y, pp.x, pp.y) < e.r + P.r + 4) {
+          e.lungeHit = true;
+          physHit(e.atk * 1.3, e.lv, e);
+        }
+        if (Math.random() < 0.5) addPart({ x: e.x, y: e.y + e.r * 0.6, vx: rnd(-20, 20), vy: rnd(-10, 0), life: 0.3, color: '#5a3a3a', size: 2.5 });
+        if (e.mt <= 0) {
+          e.mode = 'recover';
+          e.mt = 0.8;
+        }
+      } else {
+        e.mt -= dt;
+        e.slashT = Math.max(0, (e.slashT || 0) - dt);
+        if (e.mt <= 0) {
+          e.mode = 'approach';
+          e.cd = rnd(0.8, 1.5);
+        }
+      }
+      break;
+    }
     case 'charge': {
       e.mode = e.mode || 'approach';
       if (e.mode === 'approach') {
@@ -311,6 +366,15 @@ export function updateEnemyAI(e, dt, dp) {
   }
 }
 
+// 中級悪魔の攻撃の大きさ (描画でも使う)
+export const BRUTE = { swingR: 44, swingArc: 1.0 };
+function startBrute(e, kind, a) {
+  e.mode = 'wind';
+  e.atkKind = kind;
+  e.mt = e.windT = kind === 'swing' ? 0.75 : 0.65;
+  e.atkA = a;
+}
+
 export function killEnemy(e, w, crumbled) {
   if (e.dead) return;
   e.dead = true;
@@ -318,6 +382,7 @@ export function killEnemy(e, w, crumbled) {
   const mul = D.reward * (e.elite ? 3 : 1) * (e.mini ? 0.3 : 1);
   gainSouls(Math.max(1, Math.round(soulGain(e.def.exp, e.def.gold, e.lv) * mul * (1 + 0.03 * rank('gold')))));
   hero.kills++;
+  addGauge(e.def.mid ? RG.SP_GAIN.mid : e.elite ? RG.SP_GAIN.elite : RG.SP_GAIN.kill * (e.mini ? 0.5 : 1));
   for (let i = 0; i < 8; i++) addPart({ x: e.x, y: e.y, vx: rnd(-80, 80), vy: rnd(-80, 80), life: rnd(0.2, 0.45), color: crumbled ? '#4a2a5a' : e.def.color, size: rnd(2, 3.5) });
   if (crumbled) return;
   sfx('kill');
@@ -333,7 +398,7 @@ export function killEnemy(e, w, crumbled) {
     }
   }
   const matRate = 0.15 * (1 + 0.03 * rank('mat')) * (heroDef.id === 'mira' ? 1.2 : 1) * D.mat;
-  if (e.elite || Math.random() < matRate) G.pickups.push({ type: 'mat', id: e.def.mat, x: e.x, y: e.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 9999 });
+  if (e.elite || e.def.mid || Math.random() < matRate) G.pickups.push({ type: 'mat', id: e.def.mat, x: e.x, y: e.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 9999 });
   if (Math.random() < 0.02) G.pickups.push({ type: 'heart', x: e.x, y: e.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 12 });
   if (w && w.demonHeal && e.def.demon) P.hp = Math.min(maxHp(), P.hp + w.demonHeal);
 }

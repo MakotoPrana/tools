@@ -11,7 +11,7 @@ import { drawHud } from './hud.js';
 import { drawNest } from './nest.js';
 import { drawPlayer } from './player.js';
 import { txt } from './primitives.js';
-import { drawBeam, drawBullet, drawEBullet, drawParts } from './projectiles.js';
+import { drawBeam, drawBullet, drawEBullet, drawLance, drawParts } from './projectiles.js';
 import { resize, scale } from './screen.js';
 import { drawFeaturesLive, drawFog, drawHazard, drawLairs, drawLakeShimmer, drawMist, drawPickup, drawSeals, drawShops, drawStone, drawTele, drawVignette } from './world.js';
 import { screen } from '../ui/core.js';
@@ -79,6 +79,7 @@ export function renderPlay() {
   for (const b of G.bosses) drawBoss(b);
   if (!G.dead) drawPlayer();
   if (G.beam) drawBeam();
+  if (G.lances) for (const l of G.lances) drawLance(l);
   for (const b of G.bullets) if (inView(b.x, b.y)) drawBullet(b);
   for (const b of G.ebullets) if (inView(b.x, b.y)) drawEBullet(b);
   drawParts(inView);
@@ -93,8 +94,8 @@ export function renderPlay() {
     if (e.dormant || !inView(e.x, e.y)) continue;
     const d = dist(e.x, e.y, P.x, P.y);
     const hurt = e.hp < e.maxHp;
-    if (d < 140 || (hurt && d < 300)) {
-      txt(`Lv${e.lv}`, e.x, e.y - e.r - 6, 7, lvColor(e.lv - pl), 'center');
+    if (d < 140 || (hurt && d < 300) || (e.def.mid && d < 320)) {
+      txt(e.def.mid ? `${e.def.name} Lv${e.lv}` : `Lv${e.lv}`, e.x, e.y - e.r - (e.def.mid ? 14 : 6), 7, lvColor(e.lv - pl), 'center');
       if (hurt) {
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(e.x - 10, e.y + e.r + 3, 20, 3);
@@ -107,6 +108,15 @@ export function renderPlay() {
   ctx.imageSmoothingEnabled = false;
   drawMist();
   drawVignette();
+  // 必殺技を出した瞬間の金色の光と、ジャスト回避のゆっくりの間の青み
+  if (G.spFlash > 0) {
+    ctx.fillStyle = `rgba(255,220,120,${G.spFlash * 0.5})`;
+    ctx.fillRect(0, 0, VW, VH);
+  }
+  if (G.slowT > 0) {
+    ctx.fillStyle = `rgba(90,200,255,${Math.min(0.18, G.slowT * 0.4)})`;
+    ctx.fillRect(0, 0, VW, VH);
+  }
   drawHud();
   if (G.fade > 0) {
     ctx.fillStyle = `rgba(0,0,0,${G.fade})`;

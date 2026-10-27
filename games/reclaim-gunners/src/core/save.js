@@ -14,6 +14,8 @@ export const newHero = () => ({
   slots: 0, // 開けた武器スロットの数 (最初の 2 つに足す数)
   weapons: { A1: 0 }, // 持っている武器
   mods: {}, // 武器の改造 { 武器の id: { 改造の id: Lv } }
+  sp: {}, // 必殺技 { 武器の id: { lv: [Lv, Lv, Lv] (-1 は未習得), set: セットしている番号 } }
+  spGauge: 0, // 必殺技ゲージ (0〜100)
   equipped: ['A1', null],
   specials: [],
   materials: {},

@@ -21,6 +21,26 @@ export function drawBeam() {
   ctx.restore();
 }
 
+// 必殺技の貫く一撃 (太い光の帯が細くなって消える)
+export function drawLance(l) {
+  const k = l.t / l.max;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = k;
+  ctx.strokeStyle = l.color;
+  ctx.lineWidth = l.w * (0.4 + k * 0.6);
+  ctx.globalAlpha = 0.35 * k;
+  ctx.beginPath();
+  ctx.moveTo(l.sx, l.sy);
+  ctx.lineTo(l.ex, l.ey);
+  ctx.stroke();
+  ctx.globalAlpha = k;
+  ctx.strokeStyle = '#fffbe8';
+  ctx.lineWidth = Math.max(2, l.w * 0.25 * k);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawBullet(b) {
   const col = ELEMS[b.elem] ? ELEMS[b.elem].color : '#fff3b0';
   if (b.type === 'grenade') {

@@ -74,6 +74,7 @@ RG.BOARD = [
   { id: 'crit', name: '会心率', max: 30, base: 30, fx: (r) => `+${r}%` },
   { id: 'critd', name: '会心ダメージ', max: 30, base: 30, fx: (r) => `×${(1.5 + r * 0.05).toFixed(2)}` },
   { id: 'dodge', name: '回避クールダウン', max: 15, base: 30, fx: (r) => `−${r * 3}%` },
+  { id: 'sp', name: '必殺技チャージ', max: 25, base: 35, fx: (r) => RG.t('ゲージのたまり方 +{v}%', { v: r * 4 }) },
   { id: 'gold', name: '魂の収穫', max: 25, base: 25, fx: (r) => RG.t('獲得する魂 +{v}%', { v: r * 3 }) },
   { id: 'mat', name: '素材運', max: 25, base: 25, fx: (r) => RG.t('素材のドロップ率 +{v}%', { v: r * 3 }) },
   { id: 'pot', name: '回復薬の所持数', max: 3, base: 400, fx: (r) => RG.t('{v} 個', { v: 3 + r }) },

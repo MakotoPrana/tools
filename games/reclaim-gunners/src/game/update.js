@@ -11,8 +11,9 @@ import { updateFlow } from './pathfinding.js';
 import { updatePickups } from './pickups.js';
 import { updatePlayer } from './player.js';
 import { respawn } from './respawn.js';
+import { SP_FULL, updateSpecial } from './specials.js';
 import { G, P } from './stage.js';
-import { dodgeBtn, potionBtn, touchMode } from '../input/input.js';
+import { dodgeBtn, potionBtn, specialBtn, touchMode } from '../input/input.js';
 
 export function rebuildGrid() {
   for (const c of G.grid) c.length = 0;
@@ -25,6 +26,11 @@ export function rebuildGrid() {
 }
 
 export function update(dt) {
+  // ジャスト回避のあと、少しのあいだ時間がゆっくりになる
+  if (G.slowT > 0) {
+    G.slowT -= dt;
+    dt *= 0.3;
+  }
   G.t += dt;
   if (G.dead > 0) {
     G.dead -= dt;
@@ -42,6 +48,7 @@ export function update(dt) {
   }
   rebuildGrid();
   updatePlayer(dt);
+  updateSpecial(dt);
   updateBullets(dt);
   rebuildGrid();
   updateEnemies(dt);
@@ -64,4 +71,5 @@ export function update(dt) {
   dodgeBtn.style.setProperty('--cd', `${Math.round(cd * 360)}deg`);
   dodgeBtn.classList.toggle('cooling', cd > 0);
   potionBtn.classList.toggle('empty', hero.potions <= 0);
+  specialBtn.classList.toggle('ready', (hero.spGauge || 0) >= SP_FULL);
 }

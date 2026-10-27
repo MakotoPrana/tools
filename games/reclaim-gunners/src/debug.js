@@ -2,6 +2,7 @@
 import { GUN_SOUNDS, actx, audioInit } from './audio/sound.js';
 import { tc } from './core/util.js';
 import { hero } from './game/hero.js';
+import { spawnEnemy } from './game/enemies.js';
 import { destroyNest } from './game/nests.js';
 import { G, P } from './game/stage.js';
 import { clearEff, effW } from './game/weapon-mods.js';
@@ -12,6 +13,14 @@ export function installDebug() {
     get G() { return G; },
     get P() { return P; },
     get hero() { return hero; },
+    // 必殺技ゲージを満タンにする / 主人公の近くに中級悪魔を出す
+    sp() {
+      hero.spGauge = 100;
+    },
+    fiend(dx = 120, dy = 0) {
+      const area = G.areas[G.map.areaOf[Math.floor(P.y / 20) * G.map.w + Math.floor(P.x / 20)]];
+      return spawnEnemy('fiend', P.x + dx, P.y + dy, area, null, { chase: true });
+    },
     give(n = 20000) {
       hero.souls += n;
     },

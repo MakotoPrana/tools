@@ -1,6 +1,7 @@
 // 敵の描画
 import { TAU } from '../core/config.js';
 import { clamp } from '../core/util.js';
+import { BRUTE } from '../game/enemies.js';
 import { G } from '../game/stage.js';
 import { ctx } from './canvas.js';
 import { mix } from './color.js';
@@ -101,6 +102,66 @@ export function drawEnemy(e) {
         eyes(fx, -r * 0.8, 1.4, '#ff3a3a');
       }
       break;
+    case 'fiend': {
+      // 攻撃の予兆: ためている間は赤く、最後の 0.15 秒は白く光る (この少し前に回避するとジャスト回避)
+      if (e.mode === 'wind') {
+        const k = clamp(1 - e.mt / e.windT, 0, 1);
+        const hot = e.mt <= 0.15;
+        ctx.save();
+        ctx.rotate(e.atkA);
+        ctx.fillStyle = hot ? 'rgba(255,255,255,0.45)' : `rgba(255,40,40,${0.12 + k * 0.25})`;
+        ctx.strokeStyle = hot ? '#ffffff' : 'rgba(255,90,90,0.8)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        if (e.atkKind === 'swing') {
+          ctx.moveTo(0, 0);
+          ctx.arc(0, 0, BRUTE.swingR + r, -BRUTE.swingArc, BRUTE.swingArc);
+          ctx.closePath();
+        } else ctx.rect(0, -r * 0.9, 160, r * 1.8);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+      if (e.slashT > 0) {
+        ctx.save();
+        ctx.rotate(e.atkA);
+        ctx.strokeStyle = `rgba(255,240,230,${e.slashT * 4})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, BRUTE.swingR + r - 6, -BRUTE.swingArc, BRUTE.swingArc);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // 体: 大きな角と、片腕の長い爪
+      ctx.fillStyle = flash ? '#fff' : '#2a0c12';
+      ctx.beginPath();
+      ctx.moveTo(-5, -r + 3);
+      ctx.quadraticCurveTo(-r - 2, -r - 4, -r + 1, -r - 11);
+      ctx.lineTo(-2, -r + 1);
+      ctx.moveTo(5, -r + 3);
+      ctx.quadraticCurveTo(r + 2, -r - 4, r - 1, -r - 11);
+      ctx.lineTo(2, -r + 1);
+      ctx.fill();
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.ellipse(0, 1, r, r * 1.05, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = flash ? '#fff' : '#4a1018';
+      ctx.beginPath();
+      ctx.ellipse(0, 4, r * 0.6, r * 0.55, 0, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = flash ? '#fff' : '#d8c8b8';
+      ctx.lineWidth = 1.6;
+      const lift = e.mode === 'wind' ? -6 : 0;
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(fx * (r - 2), 2 + i * 2.5);
+        ctx.lineTo(fx * (r + 8), lift - 2 + i * 3.5);
+        ctx.stroke();
+      }
+      eyes(fx, -3, 1.8, e.mode === 'wind' ? '#ffffff' : '#ff3a3a');
+      break;
+    }
     case 'orc': {
       ctx.fillStyle = col;
       circle(ctx, 0, 0, r);

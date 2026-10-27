@@ -2,6 +2,7 @@
 import { VH, VW } from '../core/config.js';
 import { doInteract } from '../game/interact.js';
 import { dodge, manualReload, usePotion } from '../game/player.js';
+import { useSpecial } from '../game/specials.js';
 import { G } from '../game/stage.js';
 import { canvas } from '../render/canvas.js';
 import { localFrac } from '../render/screen.js';
@@ -35,6 +36,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'KeyR') manualReload();
   else if (k === 'Space' || k === 'ShiftLeft' || k === 'ShiftRight') dodge();
   else if (k === 'KeyE') doInteract();
+  else if (k === 'KeyQ') useSpecial();
   else if (k === 'KeyF') usePotion();
   else if (k === 'KeyM') showStageMap('view');
   else if (k === 'KeyP') showPause();
@@ -114,6 +116,8 @@ bindBtn('t-dodge', () => dodge());
 export const dodgeBtn = document.getElementById('t-dodge');
 export const potionBtn = document.getElementById('t-potion');
 bindBtn('t-reload', () => manualReload());
+bindBtn('t-special', () => useSpecial());
+export const specialBtn = document.getElementById('t-special');
 bindBtn('t-potion', () => usePotion());
 bindBtn('t-interact', () => doInteract());
 for (const id of ['pause-btn', 'pause-in']) {

@@ -9,6 +9,7 @@ import { addPart, addText, showBanner } from './fx.js';
 import { D, hero, heroDef, maxHp, moveSpeed, powerLv, rank, recvMul } from './hero.js';
 import { updateInteract } from './interact.js';
 import { G, P, ensureWs } from './stage.js';
+import { justDodge } from './specials.js';
 import { effW } from './weapon-mods.js';
 import { updateWeapon } from './weapons.js';
 import { mouse, moveInput, sticks, touchMode } from '../input/input.js';
@@ -45,6 +46,9 @@ export function dodge() {
   const { mx, my } = moveInput();
   const a = mx || my ? Math.atan2(my, mx) : P.aim;
   P.dodgeDir = a;
+  P.dodgeAt = G.t; // ジャスト回避の判定に使う
+  P.dodgeX = P.x;
+  P.dodgeY = P.y;
   P.dodgeCd = heroDef.dodgeCd * (1 - 0.03 * rank('dodge'));
   P.twinBoost = 3; // 回避してからの時間は 3 − これ
   sfx('dodge');
@@ -206,6 +210,22 @@ export function updatePlayer(dt) {
     }
   }
   updateInteract();
+}
+
+// 物理攻撃の当たり判定に使う主人公の位置。ジャスト回避の受付中は、回避を始めた位置で調べる
+// (よけて動いたぶん攻撃の外に出ても、ジャスト回避になるように)
+export const justOpen = () => P.dodgeAt != null && G.t - P.dodgeAt <= RG.JUST_WINDOW;
+export const physPos = () => (justOpen() ? { x: P.dodgeX, y: P.dodgeY } : { x: P.x, y: P.y });
+
+// 中級悪魔の物理攻撃が当たるとき。当たる直前 (RG.JUST_WINDOW 秒) に回避を始めていればジャスト回避
+export function physHit(raw, srcLv, src) {
+  if (G.dead) return;
+  if (justOpen()) {
+    P.dodgeAt = null; // 1 回の回避で 1 回だけ
+    justDodge(src);
+    return;
+  }
+  hurtPlayer(raw, srcLv);
 }
 
 export function hurtPlayer(raw, srcLv) {

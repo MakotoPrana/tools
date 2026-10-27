@@ -5,6 +5,7 @@ import { clamp, fmt } from '../core/util.js';
 import { bossHp } from '../game/bosses.js';
 import { D, hero, lvColor, maxHp, powerLv } from '../game/hero.js';
 import { reloadTime } from '../game/player.js';
+import { SP_FULL, spState, spWeaponId } from '../game/specials.js';
 import { G, P, ensureWs } from '../game/stage.js';
 import { effW, modTotal } from '../game/weapon-mods.js';
 import { sticks, touchMode } from '../input/input.js';
@@ -28,7 +29,7 @@ export const CAT_COLORS = { hand: '#6fb0ff', shot: '#ff9a5a', heavy: '#ff6a6a', 
 export function drawHud() {
   const m = maxHp();
   // 体力
-  hudFrame(6, 6, 152, 42);
+  hudFrame(6, 6, 152, 56);
   ctx.fillStyle = '#1a0606';
   ctx.fillRect(12, 12, 140, 9);
   ctx.fillStyle = 'rgba(255,230,200,0.55)';
@@ -50,6 +51,18 @@ export function drawHud() {
   const pl = powerLv();
   txt(tr('戦力 Lv{n}', { n: pl }), 12, 30, 9, '#f0d890');
   txt(tr('回復薬 {n}', { n: hero.potions }), 12, 40.5, 7, '#9ad8a0');
+  // 必殺技ゲージ (満タンで金色に脈打つ)。右にセットしている必殺技の名前
+  const g = clamp((hero.spGauge || 0) / SP_FULL, 0, 1);
+  const full = g >= 1;
+  ctx.fillStyle = '#1a1206';
+  ctx.fillRect(12, 48, 140, 5);
+  ctx.fillStyle = full ? (Math.floor(G.t * 5) % 2 ? '#ffe680' : '#ffc23a') : '#b8862a';
+  ctx.fillRect(12, 48, 140 * g, 5);
+  const sid = spWeaponId();
+  if (sid) {
+    const name = RG.SPECIALS[sid][spState(sid).set].name;
+    txt(full ? `${touchMode ? '' : 'Q '}${name}` : name, 152, 42, 6.5, full ? '#ffe680' : '#b8a070', 'right');
+  }
 
   // いるエリア
   const area = G.areas[G.curArea];

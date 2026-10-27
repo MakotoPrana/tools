@@ -5,6 +5,8 @@
  *   ai: chase (追いかける) / dash (ためてから突進) / shooter (離れて撃つ) / mimic (箱に化ける) / shield (正面の盾) / charge (壁まで突進)
  *   split: 倒すと小さく分かれる / poisonTrail: 通った跡に毒の沼 / ghost: 壁をすり抜ける / slowShot: 当たると遅くなる弾
  *   healer: まわりの敵を回復する / summon: ときどき呼ぶ敵
+ *   mid: 中級悪魔。魔巣からは湧かず、まだ解放していないエリアに 1〜2 体いる。brute の動きで、物理攻撃 (ジャスト回避できる) をしてくる
+ *   noTouch: ふれてもダメージを受けない (攻撃は自分の技だけ)
  *   まだ動きを作っていない ai の敵は chase で動く
  */
 window.RG = window.RG || {};
@@ -29,6 +31,7 @@ RG.ENEMIES = [
   { id: 'succ', name: '幻惑の妖魔', ai: 'shooter', hp: 32, atk: 7, speed: 85, r: 8, weak: ['holy'], resist: ['thunder'], exp: 17, gold: 10, mat: 'feather', demon: true, color: '#d86fb2', shot: { cd: 2, speed: 160, n: 3 } },
   { id: 'mino', name: 'ミノタウロス', ai: 'charge', hp: 140, atk: 26, speed: 38, r: 14, weak: ['thunder'], resist: [], exp: 34, gold: 20, mat: 'bullHorn', color: '#8a5a3a' },
   { id: 'dknight', name: 'デーモンナイト', ai: 'chase', hp: 180, atk: 24, speed: 60, r: 12, weak: ['holy'], resist: ['fire', 'ice'], exp: 45, gold: 26, mat: 'crest', demon: true, color: '#3b2a4f' },
+  { id: 'fiend', name: '中級悪魔', ai: 'brute', mid: true, noTouch: true, hp: 110, atk: 13, speed: 62, r: 13, weak: ['holy'], resist: [], exp: 40, gold: 25, mat: 'demonHeart', demon: true, color: '#7a1e2e' },
   { id: 'archd', name: 'アークデーモン', ai: 'shooter', hp: 260, atk: 22, speed: 38, r: 14, weak: ['holy'], resist: ['fire', 'thunder'], exp: 70, gold: 40, mat: 'bloodGem', demon: true, color: '#8f1f3a', shot: { cd: 1.6, speed: 130, n: 8 } },
 ];
 
@@ -61,4 +64,5 @@ RG.MATERIALS = {
   slimeCore: 'スライム王の核', golemCore: 'ゴーレムの魔核', tear: '霧の女王の涙', twinFang: '番犬の双牙', scaleV: '炉心竜の逆鱗',
   seed: '千年樹の種', whip: '炎獄の鞭', dragonSkull: '骨竜の頭骨', toadGland: '大蝦蟇の毒腺', wormHeart: '王蟲の心臓',
   witchEye: '魔女の瞳', phoenixTail: '不死鳥の尾羽', fallenWing: '堕天の羽根', kingHorn: '魔王の角', starCore: '星喰いの核',
+  demonHeart: '悪魔の心臓',
 };

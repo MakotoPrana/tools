@@ -1,12 +1,13 @@
 // ステージの中の状態 (G・P) と、ステージに入るときの用意
-import { BOSSES, CELL, NESTS, STAGES, T, TAU, TILE, lvMul } from '../core/config.js';
-import { clamp, rnd, tc } from '../core/util.js';
+import { BOSSES, CELL, MOVE_BLOCK, NESTS, STAGES, T, TAU, TILE, lvMul } from '../core/config.js';
+import { clamp, dist, rnd, tc } from '../core/util.js';
 import { makeBoss } from './bosses.js';
+import { hitsTiles } from './collision.js';
 import { spawnEnemy } from './enemies.js';
 import { D, hero, maxHp, maxPotions, prog } from './hero.js';
 import { updateFlow } from './pathfinding.js';
 import { effW } from './weapon-mods.js';
-import { getMap } from '../world/mapgen.js';
+import { getMap, randomAreaTile } from '../world/mapgen.js';
 
 export let G = null;
 export let P = null;
@@ -137,6 +138,26 @@ export function spawnNests(area) {
     G.nests.push(nest);
     return nest;
   });
+  if (!a.town) spawnFiends(area);
+}
+
+// 中級悪魔: まだ解放していないエリアに 1〜2 体。魔巣から離れた所にいて、レベルはエリアの最高レベル
+export function spawnFiends(area) {
+  const a = area.def;
+  const have = G.enemies.filter((e) => e.area === area && e.def.mid && !e.dead).length;
+  const n = (Math.random() < 0.5 ? 1 : 2) - have;
+  for (let k = 0; k < n; k++) {
+    for (let tries = 0; tries < 30; tries++) {
+      const t = randomAreaTile(G.map, area.i);
+      const x = tc(t.x);
+      const y = tc(t.y);
+      if (hitsTiles(x, y, 14, MOVE_BLOCK)) continue;
+      if (area.nests.some((ns) => dist(x, y, ns.x, ns.y) < 70)) continue;
+      if (P && dist(x, y, P.x, P.y) < 200) continue;
+      spawnEnemy('fiend', x, y, area, null, { lv: Math.min(99, a.lv[1] + D.lv) });
+      break;
+    }
+  }
 }
 
 // ほかのモジュールから G を入れかえるとき

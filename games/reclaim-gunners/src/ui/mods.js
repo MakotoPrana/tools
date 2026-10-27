@@ -2,6 +2,7 @@
 import { sfx } from '../audio/sound.js';
 import { CATS, SHOPS, WEAPON, souls, tr } from '../core/config.js';
 import { hero } from '../game/hero.js';
+import { spDesc, spLv, spOwned, spState, spUnlockCost, spUpCost } from '../game/specials.js';
 import { clearEff, effW, modCost, modLv, modReqOk, modShow, modTotal } from '../game/weapon-mods.js';
 import { actions } from './actions.js';
 import { head, rerender, ui, uiShow } from './core.js';
@@ -54,12 +55,87 @@ export function showMods(id, shopId) {
         <div class="t">${w.name} <span class="gold">★${modTotal(id)}</span></div>
         <div class="s">${weaponStats(effW(id))}</div></div></div>
       ${shop ? '' : `<p class="muted" style="font-size:0.85em">${tr('改造は武器屋で行う（ここでは見るだけ）')}</p>`}
-      <div class="mtree">${rowsHtml}</div>
+      <div class="mtree">${rowsHtml}${specialsHtml(id, shop, cap)}</div>
     </div></div>`;
   };
   fn.modsId = id;
   uiShow(fn);
 }
+// 必殺技: 3 つ。習得 (前の必殺技の Lv と、魂・悪魔の心臓) → 強化 (Lv10 まで) → セット (どれか 1 つ)
+function specialsHtml(id, shop, cap) {
+  const st = spState(id);
+  const hearts = hero.materials.demonHeart || 0;
+  const nodes = RG.SPECIALS[id].map((sp, i) => {
+    const own = spOwned(id, i);
+    const lv = spLv(id, i);
+    let btn = '';
+    let note = '';
+    if (own) {
+      const pips = Array.from({ length: RG.SP_MAX }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('');
+      note = `<div class="pips">${pips}</div>`;
+      const set = st.set === i;
+      btn = set ? `<span class="tag">${tr('セット中')}</span>` : `<button class="btn small" data-act="spSet" data-i="${i}">${tr('セットする')}</button>`;
+      if (lv >= RG.SP_MAX) btn += ` <span class="gold">${tr('最大')}</span>`;
+      else if (shop && lv >= cap) btn += ` <span class="muted">${tr('この店では Lv{n} まで', { n: cap })}</span>`;
+      else if (shop) {
+        const cost = spUpCost(id, i, lv);
+        btn += ` <button class="btn small ${hero.souls >= cost ? 'primary' : ''}" data-act="spUp" data-i="${i}" ${hero.souls >= cost ? '' : 'disabled'}>${tr('強化')} ${souls(cost)}</button>`;
+      }
+    } else {
+      const c = spUnlockCost(id, i);
+      const prev = RG.SPECIALS[id][i - 1];
+      const reqOk = spOwned(id, i - 1) && spLv(id, i - 1) >= c.req;
+      const ok = shop && reqOk && hero.souls >= c.souls && hearts >= c.hearts;
+      note = `<div class="s muted">${reqOk ? '' : `🔒 ${tr('{name} Lv{n} が必要', { name: prev.name, n: c.req })}<br>`}${tr('習得: {s} ・ 悪魔の心臓 {h}/{n}', { s: souls(c.souls), h: hearts, n: c.hearts })}</div>`;
+      btn = shop ? `<button class="btn small ${ok ? 'primary' : ''}" data-act="spLearn" data-i="${i}" ${ok ? '' : 'disabled'}>${tr('習得する')}</button>` : '';
+    }
+    return `<div class="mnode sp ${own ? '' : 'locked'} ${st.set === i ? 'max' : ''}">
+      <div class="mname">${sp.name} ${own ? `<span class="mlv">Lv${lv}/${RG.SP_MAX}</span>` : ''}</div>
+      ${note}
+      <div class="s">${spDesc(id, i)}</div>
+      <div class="mbtn">${btn}</div>
+    </div>`;
+  }).join('');
+  return `<div class="mtier"><div class="mtl">${tr('必殺技（セットできるのは 1 つ。スロット 1 の武器の必殺技を出す）')}</div><div class="mrow">${nodes}</div></div>`;
+}
+const modsWeapon = () => {
+  const fn = ui.stack[ui.stack.length - 1];
+  return fn && fn.modsId;
+};
+actions.spSet = (d) => {
+  const id = modsWeapon();
+  if (!id || !spOwned(id, +d.i)) return;
+  spState(id).set = +d.i;
+  sfx('ui');
+  rerender();
+};
+actions.spUp = (d) => {
+  const id = modsWeapon();
+  const i = +d.i;
+  if (!id || !curShop || !spOwned(id, i)) return;
+  const shop = SHOPS[curShop];
+  const cap = shop.phases[shopPhase(shop) - 1].max;
+  const lv = spLv(id, i);
+  const cost = spUpCost(id, i, lv);
+  if (lv >= RG.SP_MAX || lv >= cap || hero.souls < cost) return;
+  hero.souls -= cost;
+  spState(id).lv[i] = lv + 1;
+  sfx('buy');
+  rerender();
+};
+actions.spLearn = (d) => {
+  const id = modsWeapon();
+  const i = +d.i;
+  if (!id || !curShop || i < 1 || spOwned(id, i)) return;
+  const c = spUnlockCost(id, i);
+  if (!spOwned(id, i - 1) || spLv(id, i - 1) < c.req) return;
+  if (hero.souls < c.souls || (hero.materials.demonHeart || 0) < c.hearts) return;
+  hero.souls -= c.souls;
+  hero.materials.demonHeart -= c.hearts;
+  spState(id).lv[i] = 0;
+  sfx('buy');
+  rerender();
+};
 actions.modUp = (d) => {
   const fn = ui.stack[ui.stack.length - 1];
   const id = fn && fn.modsId;

@@ -529,6 +529,9 @@ input[type="range"] { accent-color: var(--gold); }
 }
 .t-dodge.cooling { border-color: rgba(216, 176, 100, 0.35); }
 .t-potion.empty { opacity: 0.4; }
+/* 必殺技: ゲージがたまるまで暗く、満タンで金色に光る */
+.t-special { right: 3cqw; bottom: 45cqh; width: 14cqh; height: 14cqh; font-size: 2.8cqh; opacity: 0.45; }
+.t-special.ready { opacity: 1; border-color: #ffd84a; background: rgba(160, 110, 20, 0.6); box-shadow: 0 0 2cqh rgba(255, 216, 74, 0.6); }
 
 /* 言葉ごとの文字の形 (lang.js が html の lang を切り替える) */
 :root:lang(en) {
@@ -569,6 +572,7 @@ input[type="range"] { accent-color: var(--gold); }
 }
 .mnode.uniq { border-color: rgba(200, 90, 255, 0.45); background: linear-gradient(180deg, rgba(44, 22, 48, 0.9), rgba(20, 10, 22, 0.9)); }
 .mnode.locked { opacity: 0.55; }
+.mnode.sp { border-color: rgba(255, 200, 90, 0.5); background: linear-gradient(180deg, rgba(60, 38, 14, 0.92), rgba(26, 16, 8, 0.92)); }
 .mnode.max { border-color: var(--gold); box-shadow: 0 0 8px rgba(224, 184, 96, 0.25); }
 .mreq { font-size: 0.72em; color: #c8a8e8; }
 .mname { font-weight: 800; color: #f0e0c0; }

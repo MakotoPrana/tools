@@ -10,6 +10,7 @@ import { gainSouls, spawnEnemy, spawnFromNest } from './enemies.js';
 import { addPart, showBanner } from './fx.js';
 import { D, prog, rank } from './hero.js';
 import { collectAllMats } from './pickups.js';
+import { addGauge } from './specials.js';
 import { G, P } from './stage.js';
 import { toast } from '../ui/toast.js';
 import { randomAreaTile } from '../world/mapgen.js';
@@ -97,6 +98,7 @@ export function destroyNest(n) {
   addPart({ x: n.x, y: n.y, vx: 0, vy: 0, life: 0.4, color: '#d07aff', size: n.r * 3, ring: true });
   const typeMul = { small: 1, big: 4 }[n.type] || 2;
   gainSouls(Math.round(20 * lvMul.gold(n.lv) * typeMul * D.reward * (1 + 0.03 * rank('gold'))));
+  addGauge(RG.SP_GAIN.nest);
   const mats = n.area.def.enemies;
   for (let i = 0; i < typeMul; i++) G.pickups.push({ type: 'mat', id: ENEMY[pick(mats)].mat, x: n.x, y: n.y, vx: rnd(-50, 50), vy: rnd(-50, 50), life: 9999 });
   // 眷属は崩れて消える (魂は入る)
