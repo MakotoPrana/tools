@@ -49,7 +49,7 @@ export function showShop(shopId) {
       body = owned.map((w) => `<div class="row wrow"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
           <div class="t">${w.name} <span class="gold">★${modTotal(w.id)}</span><span class="muted"> / ${RG.modsOf(w).length * RG.MOD_MAX}</span></div>
           <div class="s">${weaponStats(effW(w.id))}</div></div>
-          <button class="btn small primary" data-act="openMods" data-id="${w.id}">${tr('改造する')}</button>
+          <button class="btn small primary" data-act="openMods" data-id="${w.id}">${tr('スキルツリー')}</button>
         </div>`).join('') || `<p class="muted">${tr('改造できる武器がない')}</p>`;
       body += `<p class="muted" style="font-size:0.85em">${tr('この店で上げられるのは、それぞれの改造の Lv{n} まで（お店の格による）', { n: max })}</p>`;
     } else {

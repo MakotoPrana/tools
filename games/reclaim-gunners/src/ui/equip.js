@@ -29,7 +29,7 @@ export function showEquip() {
         <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name}${lv ? ` <span class="gold">★${lv}</span>` : ''} ${inSlot >= 0 ? `<span class="tag">${tr('スロット{n}', { n: inSlot + 1 })}</span>` : ''}</div>
         <div class="s">${weaponStats(effW(w.id))} ・ ${w.desc}</div>
         <div class="s"><span class="gold">${tr('必殺技')}: ${RG.SPECIALS[w.id][spState(w.id).set].name}</span></div></div>
-        <button class="btn small" data-act="viewMods" data-id="${w.id}">${tr('改造')}</button>
+        <button class="btn small" data-act="viewMods" data-id="${w.id}">${tr('スキルツリー')}</button>
         ${canEquip(w) ? `<button class="btn small" data-act="equip" data-id="${w.id}" ${hero.equipped[selSlot] === w.id ? 'disabled' : ''}>${tr('スロット{n}へ', { n: selSlot + 1 })}</button>` : `<span class="muted">${tr('使えない')}</span>`}
       </div>`;
     }).join('');

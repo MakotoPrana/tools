@@ -558,27 +558,56 @@ input[type="range"] { accent-color: var(--gold); }
 .langs .btn[lang="ko"] { font-family: "Nanum Myeongjo", serif; }
 .langs .btn.on { border-color: var(--gold); color: #fff3d0; box-shadow: inset 0 0 0 1px rgba(224, 184, 96, 0.5), 0 0 8px rgba(224, 184, 96, 0.25); }
 
-/* 武器の改造 (スキルツリー) */
-.mtree { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
-.mtl { font-family: var(--font-display); color: var(--gold); font-size: 0.85em; letter-spacing: 0.06em; margin-bottom: 4px; }
-.mrow { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
-.mnode {
-  position: relative;
-  display: flex; flex-direction: column; gap: 3px;
-  padding: 6px 8px;
-  border: 1px solid rgba(200, 160, 90, 0.35);
-  border-radius: 3px;
-  background: linear-gradient(180deg, rgba(48, 30, 22, 0.9), rgba(24, 14, 12, 0.9));
+/* 武器の強化 (スキルツリー): 武器を根に、左から右へ枝分かれする。線は .kids と .tn の擬似要素で引く */
+.tlegend { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 0; font-size: 0.75em; }
+.tlegend .lg::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; border: 1px solid; }
+.lg.base::before { border-color: rgba(200, 160, 90, 0.7); background: #3a2416; }
+.lg.uniq::before { border-color: rgba(200, 90, 255, 0.7); background: #2c1630; }
+.lg.sp::before { border-color: rgba(255, 200, 90, 0.9); background: #4a2e0e; }
+.stree { overflow-x: auto; padding: 10px 2px 12px; --line: rgba(200, 160, 90, 0.28); --line-on: rgba(232, 192, 104, 0.85); }
+.tn { position: relative; display: flex; align-items: center; }
+.kids { position: relative; display: flex; flex-direction: column; gap: 8px; padding-left: 34px; }
+.kids::before { content: ""; position: absolute; left: 0; top: 50%; width: 17px; border-top: 2px solid var(--line-on); }
+.kids > .tn::before { content: ""; position: absolute; left: -17px; top: 50%; width: 17px; border-top: 2px solid var(--line); }
+.kids > .tn::after { content: ""; position: absolute; left: -17px; top: -4px; bottom: -4px; border-left: 2px solid var(--line-on); }
+.kids > .tn:first-child::after { top: 50%; }
+.kids > .tn:last-child::after { bottom: 50%; }
+.kids > .tn:only-child::after { display: none; }
+.kids > .tn.open::before { border-top-color: var(--line-on); }
+.treq { position: absolute; left: -17px; top: 50%; transform: translate(-30%, -125%); font-size: 0.62em; color: #c8a8e8; white-space: nowrap; pointer-events: none; }
+.tcard {
+  flex: none; width: 120px; display: flex; flex-direction: column; gap: 2px;
+  padding: 5px 7px; text-align: left; font: inherit; color: var(--panel-text); cursor: pointer;
+  border: 1px solid rgba(200, 160, 90, 0.45); border-radius: 3px;
+  background: linear-gradient(180deg, rgba(58, 36, 22, 0.95), rgba(26, 15, 11, 0.95));
 }
-.mnode.uniq { border-color: rgba(200, 90, 255, 0.45); background: linear-gradient(180deg, rgba(44, 22, 48, 0.9), rgba(20, 10, 22, 0.9)); }
-.mnode.locked { opacity: 0.55; }
-.mnode.sp { border-color: rgba(255, 200, 90, 0.5); background: linear-gradient(180deg, rgba(60, 38, 14, 0.92), rgba(26, 16, 8, 0.92)); }
-.mnode.max { border-color: var(--gold); box-shadow: 0 0 8px rgba(224, 184, 96, 0.25); }
-.mreq { font-size: 0.72em; color: #c8a8e8; }
-.mname { font-weight: 800; color: #f0e0c0; }
-.mlv { float: right; font-size: 0.8em; color: var(--gold); font-weight: 700; }
-.pips { display: flex; gap: 2px; }
-.pips i { flex: 1; height: 4px; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(200, 160, 90, 0.25); }
-.pips i.on { background: linear-gradient(90deg, #e0b860, #ffe9a8); border-color: #e0b860; }
-.mnode .s { font-size: 0.78em; line-height: 1.35; flex: 1; }
-.mbtn { display: flex; justify-content: flex-end; font-size: 0.78em; min-height: 1.6em; align-items: center; }
+.tcard:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.tcard.uniq { border-color: rgba(200, 90, 255, 0.55); background: linear-gradient(180deg, rgba(48, 24, 54, 0.95), rgba(22, 10, 24, 0.95)); }
+.tcard.sp { border-color: rgba(255, 200, 90, 0.7); background: linear-gradient(180deg, rgba(74, 46, 14, 0.95), rgba(30, 18, 8, 0.95)); }
+.tcard.locked { opacity: 0.45; }
+.tcard.open:not(.ready) { opacity: 0.8; }
+.tcard.max { border-color: var(--gold); box-shadow: 0 0 8px rgba(224, 184, 96, 0.3); }
+.tcard.ready { box-shadow: 0 0 0 1px rgba(255, 230, 150, 0.35), 0 0 10px rgba(255, 210, 110, 0.35); }
+.tcard.sel { outline: 2px solid #fff0c0; outline-offset: 1px; }
+.troot { width: 96px; align-items: center; text-align: center; cursor: default; border-color: var(--gold); }
+.troot .wicon { width: 60px; height: 30px; }
+.tname { font-weight: 800; font-size: 0.8em; line-height: 1.2; color: #f0e0c0; }
+.tlv { font-size: 0.68em; color: var(--gold); }
+.tset { color: #ffe680; }
+.tpips { display: flex; gap: 1px; }
+.tpips i { flex: 1; height: 3px; background: rgba(0, 0, 0, 0.55); }
+.tpips i.on { background: #e8c068; }
+.tdetail {
+  position: sticky; bottom: -14px; margin: 4px -14px -14px; padding: 8px 14px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  border-top: 1px solid rgba(200, 160, 90, 0.45); background: rgba(16, 9, 8, 0.97);
+}
+.tdetail .s { font-size: 0.82em; line-height: 1.4; }
+/* 横持ちのスマホなど、高さが足りないとき: 武器の行は根のノードと同じなので隠し、説明を小さくする */
+@media (max-height: 420px) {
+  .tinfo { display: none; }
+  .stree { padding-top: 4px; }
+  .tdetail { padding: 5px 14px 8px; gap: 2px; }
+  .tdetail .s { font-size: 0.75em; }
+}
+.tbtns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 0.85em; min-height: 1.8em; }

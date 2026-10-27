@@ -156,8 +156,10 @@ export function updateEnemyAI(e, dt, dp) {
     }
     return;
   }
+  // 敵は、主人公が自分のエリアに入ってこない限り気づかない (撃たれたときは別)
+  const inArea = G.curArea === e.area.i;
   if (e.state === 'idle') {
-    if ((dp < 250 && e.los) || dp < 120 || e.aggro) {
+    if ((inArea && ((dp < 250 && e.los) || dp < 120)) || e.aggro) {
       e.state = 'chase';
     } else {
       e.wt -= dt;
@@ -173,8 +175,10 @@ export function updateEnemyAI(e, dt, dp) {
       return;
     }
   }
-  // 追いかけるのをやめる
-  if (dp > 720 && !e.lair) {
+  // 追いかけるのをやめる: 遠く離れたとき、または主人公がエリアから出て 2 秒たったとき
+  e.outT = inArea ? 0 : (e.outT || 0) + dt;
+  if (!e.lair && (dp > 720 || e.outT > 2)) {
+    e.outT = 0;
     e.state = 'idle';
     e.mode = null;
     e.aggro = false;

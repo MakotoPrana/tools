@@ -23,7 +23,7 @@ export function updateNests(dt) {
     const dp = dist(n.x, n.y, P.x, P.y);
     if (dp > 700 || G.dead) continue;
     n.spawnT -= dt;
-    if (n.nd.attack && dp < 340) nestAttack(n, dt, dp);
+    if (n.nd.attack && dp < 340 && G.curArea === n.area.i) nestAttack(n, dt, dp); // エリアに入ってきたときだけ撃つ
     const cap = Math.round(n.nd.cap * D.cap);
     if (n.spawnT <= 0 && n.children < cap) {
       spawnFromNest(n);

@@ -72,7 +72,7 @@ export function damageTarget(t, base, o) {
     const front = Math.abs(angNorm(from - t.facing)) < 1.1;
     if (t.kind === 'enemy' && t.def.ai === 'shield' && front && !o.aoe) {
       addPart({ x: t.x + Math.cos(t.facing) * t.r, y: t.y + Math.sin(t.facing) * t.r, vx: rnd(-40, 40), vy: rnd(-40, 40), life: 0.2, color: '#fff', size: 2 });
-      t.aggro = true;
+      if (G.curArea === t.area.i) t.aggro = true;
       t.shieldHp -= d;
       if (t.shieldHp <= 0) breakShield(t);
       else sfx('block');
@@ -92,8 +92,11 @@ export function damageTarget(t, base, o) {
   sfx('hit');
   if (w && w.lifesteal) P.hp = Math.min(maxHp(), P.hp + d * w.lifesteal);
   if (t.kind === 'enemy') {
-    t.aggro = true;
-    if (t.state === 'idle') t.state = 'chase';
+    // 撃たれて気づくのは、主人公が同じエリアにいるときだけ (エリアの外からは気づかれない)
+    if (G.curArea === t.area.i) {
+      t.aggro = true;
+      if (t.state === 'idle') t.state = 'chase';
+    }
     if (o.knock && t.def.ai !== 'charge') {
       const k = o.knock / (t.r / 7);
       t.kx += (o.dirx || 0) * k;
