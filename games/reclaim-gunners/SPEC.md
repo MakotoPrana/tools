@@ -730,10 +730,19 @@ LLLLLLLLLLLLLLGGGGGGGGGGGGGGGGGMMMMMMMMMMMMMMMMM
 ## 実装メモ
 
 - ファイル構成（ほかのゲームと同じく `games/reclaim-gunners/` に置く）
-  - `index.html` / `style.css` / `script.js`（ゲームのループ・描画・入力・メニュー画面）
+  - `index.html` / `style.css`
+  - `src/`: ゲームの本体。1 つのファイルが 1 つの役目だけを持つ ES モジュール（ビルドはしない。`index.html` から `src/main.js` を `type="module"` で読む）
+    - `main.js`（入口・メインループ） / `debug.js`（`?debug=1` の道具）
+    - `core/`: `config.js`（基本の値・データの取り出し） / `util.js`（小さな道具） / `save.js`（セーブと設定）
+    - `game/`（ゲームのルール）: `hero.js`（主人公の値・戦力レベル） / `weapon-mods.js`（武器の改造） / `stage.js`（ステージの状態 G・P と入るときの用意） / `player.js` / `weapons.js` / `damage.js` / `bullets.js` / `enemies.js` / `nests.js` / `bosses.js`（ボスの共通の流れ） / `boss-ai.js`（ボスごとの動き） / `pickups.js` / `fx.js` / `interact.js` / `respawn.js` / `collision.js` / `pathfinding.js` / `update.js`（1 フレームの更新）
+    - `world/`: `themes.js`（エリアの見た目の種類） / `mapgen.js`（マップを作る）
+    - `render/`（描くだけ。ゲームの状態は変えない）: `canvas.js` / `screen.js`（レイアウト） / `primitives.js`（文字・枠・影・光） / `color.js` / `background.js`（背景の絵） / `render.js`（描画の入口） / `world.js` / `nest.js` / `enemy.js` / `boss.js` / `player.js` / `projectiles.js` / `hud.js` / `minimap.js`
+    - `ui/`（メニュー画面）: `actions.js`（ボタンの動きの表） / `core.js`（画面の積み重ね） / `title.js` / `world-map.js` / `stage-map.js` / `pause.js` / `board.js` / `equip.js` / `shop.js` / `mods.js` / `materials.js` / `settings.js` / `toast.js`
+    - `input/input.js`（キーボード・マウス・タッチ） / `audio/sound.js`（効果音）
+    - 決まりごと: ほかのモジュールの変数は直接書きかえず、持ち主のモジュールの `setX()` を使う。読みこんだときにすぐ動く処理は、依存のない小さなモジュール（`core/config.js`・`render/canvas.js`・`ui/actions.js`）の値だけを使う（読みこみの順番で値がまだない、ということを起こさないため）
   - `data/heroes.js`（主人公・武器カテゴリ・能力ボード）・`data/weapons.js`・`data/enemies.js`（敵・ボス・素材）・`data/stages.js`（ステージのマップ・エリア・魔巣・転移碑・お店・道具）。必殺技を作るときに `data/specials.js` を足す
   - `lang.js`（言葉。日本語・英語・中国語（簡体字）・韓国語）・`art.js`（武器の絵）
-- URL に `?debug=1` をつけると、ブラウザのコンソールから `RG_DEBUG`（経験値とお金を足す・エリアを解放する・ワープ・無敵）が使える
+- URL に `?debug=1` をつけると、ブラウザのコンソールから `RG_DEBUG`（経験値とお金を足す・エリアを解放する・ワープ・無敵・お店を開く・改造を入れた武器の値）が使える
 - 数値（敵の補正・コスト・価格）はすべて data ファイルに置き、遊びながら調整できるようにする
 - パフォーマンス: 敵 150 体・弾 600 発で 60fps を目標にする。当たり判定は空間グリッド（64px）で絞り込む。見えていないエリアの敵は 0.5 秒ごとにしか動かさない
 - 作る順番（目安）
