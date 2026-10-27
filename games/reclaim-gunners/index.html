@@ -20,51 +20,53 @@
   <!-- ダークファンタジー風の文字 (見出しは Zen Antique、ふだんの文字は しっぽり明朝) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;700;800&family=Zen+Antique&display=swap" />
-  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;700;800&family=Zen+Antique&family=Cinzel:wght@500;700&family=EB+Garamond:wght@500;600;700;800&family=Noto+Serif+SC:wght@500;700;900&family=ZCOOL+XiaoWei&family=Nanum+Myeongjo:wght@700;800&family=Song+Myung&display=swap" />
+  <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
   <main class="app">
     <header class="top">
-      <a class="back" href="../">‹ ゲーム一覧</a>
-      <h1>魔境奪還ガンナーズ</h1>
+      <a class="back" href="../" data-i18n>‹ ゲーム一覧</a>
+      <h1 data-i18n>魔境奪還ガンナーズ</h1>
       <div class="top-btns">
-        <button type="button" id="pause-btn" class="icon-btn" aria-label="メニュー" tabindex="-1" hidden>Ⅱ</button>
+        <button type="button" id="pause-btn" class="icon-btn" aria-label="メニュー" data-i18n-aria tabindex="-1" hidden>Ⅱ</button>
       </div>
     </header>
 
     <div class="board-wrap" id="board-wrap">
       <div class="board" id="board-box">
-        <canvas id="board" aria-label="ゲーム画面"></canvas>
-        <button type="button" id="pause-in" class="pause-in" aria-label="メニュー" tabindex="-1" hidden>Ⅱ</button>
+        <canvas id="board" aria-label="ゲーム画面" data-i18n-aria></canvas>
+        <button type="button" id="pause-in" class="pause-in" aria-label="メニュー" data-i18n-aria tabindex="-1" hidden>Ⅱ</button>
 
         <!-- スマホの操作ボタン (プレイ中だけ出す) -->
         <div class="touch" id="touch" hidden>
-          <button type="button" class="tbtn t-interact" id="t-interact" hidden>調べる</button>
-          <button type="button" class="tbtn t-potion" id="t-potion">回復<small id="t-potion-n">3</small></button>
+          <button type="button" class="tbtn t-interact" id="t-interact" hidden data-i18n>調べる</button>
+          <button type="button" class="tbtn t-potion" id="t-potion"><span data-i18n>回復</span><small id="t-potion-n">3</small></button>
           <button type="button" class="tbtn t-reload" id="t-reload">R</button>
-          <button type="button" class="tbtn t-dodge" id="t-dodge">回避</button>
+          <button type="button" class="tbtn t-dodge" id="t-dodge"><span data-i18n>回避</span></button>
         </div>
 
         <div class="toast" id="toast" hidden></div>
-        <div class="saving" id="saving" hidden><img src="../../assets/favicon.svg" alt="" width="20" height="20" />セーブしました</div>
+        <div class="saving" id="saving" hidden><img src="../../assets/favicon.svg" alt="" width="20" height="20" /><span data-i18n>セーブしました</span></div>
         <div id="ui"></div>
       </div>
     </div>
 
     <p class="howto">
-      武器は近くの敵を自動でねらって撃ち、持っている武器は全部同時に攻撃します。
-      パソコン: WASD で移動。マウスを押している間は、その向きに撃つ。Space 回避 / R リロード / E 調べる / F 回復薬 / M マップ / Esc メニュー。
-      スマホ: 横持ちで、画面の左半分で移動。右半分をなぞると、その向きに撃つ。
+      <span data-i18n>武器は近くの敵を自動でねらって撃ち、持っている武器は全部同時に攻撃します。</span>
+      <span data-i18n>パソコン: WASD で移動。マウスを押している間は、その向きに撃つ。Space / Shift 回避 / R リロード / E 調べる / F 回復薬 / M マップ / Esc メニュー。</span>
+      <span data-i18n>スマホ: 横持ちで、画面の左半分で移動。右半分をなぞると、その向きに撃つ。回避と回復は右下の大きなボタン。</span>
     </p>
   </main>
 
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
-  <script src="data/heroes.js?v=1"></script>
+  <script src="lang.js?v=1"></script>
+  <script src="art.js?v=1"></script>
+  <script src="data/heroes.js?v=2"></script>
   <script src="data/weapons.js?v=1"></script>
   <script src="data/enemies.js?v=1"></script>
-  <script src="data/stages.js?v=1"></script>
-  <script src="script.js?v=1"></script>
+  <script src="data/stages.js?v=2"></script>
+  <script src="script.js?v=2"></script>
 </body>
 </html>

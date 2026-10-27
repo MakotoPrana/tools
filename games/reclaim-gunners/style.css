@@ -499,3 +499,56 @@ input[type="range"] { accent-color: var(--gold); }
 .world svg text { font-family: var(--font-ui); }
 .world img { border-radius: 3px; box-shadow: 0 0 0 1px #3a2a1a, 0 6px 24px rgba(0, 0, 0, 0.7); }
 .stage-map canvas { border-radius: 3px; box-shadow: 0 0 0 1px var(--gold-dim); }
+
+/* 武器の絵 (装備・お店) */
+.row.wrow { grid-template-columns: 64px minmax(0, 1fr) auto; }
+.wicon { display: block; width: 60px; height: 30px; filter: drop-shadow(0 0 4px rgba(224, 184, 96, 0.15)); }
+.slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; }
+.slot .wicon { width: 54px; height: 27px; }
+.slot .sn { line-height: 1.2; overflow-wrap: anywhere; }
+@media (max-width: 520px), (max-height: 420px) {
+  .row.wrow { grid-template-columns: 48px minmax(0, 1fr) auto; }
+  .row.wrow .wicon { width: 46px; height: 23px; }
+}
+
+/* スマホのボタン: 回避と回復を大きく、右手の親指が届く所に置く */
+.t-dodge { right: 3cqw; bottom: 6cqh; width: 22cqh; height: 22cqh; font-size: 4cqh; }
+.t-potion { right: calc(3cqw + 24cqh); bottom: 4cqh; width: 16cqh; height: 16cqh; font-size: 3.2cqh; }
+.t-reload { right: 4cqw; bottom: 31cqh; width: 11cqh; height: 11cqh; font-size: 2.8cqh; }
+.t-interact { right: calc(3cqw + 24cqh); bottom: 23cqh; }
+/* 回避の使えるまでの残り (時計回りに減っていく影) */
+.t-dodge::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: conic-gradient(rgba(0, 0, 0, 0.6) var(--cd, 0deg), transparent 0);
+  pointer-events: none;
+}
+.t-dodge.cooling { border-color: rgba(216, 176, 100, 0.35); }
+.t-potion.empty { opacity: 0.4; }
+
+/* 言葉ごとの文字の形 (lang.js が html の lang を切り替える) */
+:root:lang(en) {
+  --font-display: "Cinzel", "EB Garamond", "Shippori Mincho B1", serif;
+  --font-ui: "EB Garamond", "Shippori Mincho B1", Georgia, serif;
+}
+:root:lang(zh) {
+  --font-display: "ZCOOL XiaoWei", "Noto Serif SC", "Songti SC", serif;
+  --font-ui: "Noto Serif SC", "Songti SC", "SimSun", serif;
+}
+:root:lang(ko) {
+  --font-display: "Song Myung", "Nanum Myeongjo", serif;
+  --font-ui: "Nanum Myeongjo", "AppleMyungjo", "Batang", serif;
+}
+:root:lang(en) .title-logo { letter-spacing: 0.04em; }
+
+/* 言葉を選ぶボタン */
+.langs { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 10px; }
+.row .langs { margin-top: 0; justify-content: flex-end; }
+.langs .btn { font-family: inherit; }
+.langs .btn[lang="ja"] { font-family: "Shippori Mincho B1", serif; }
+.langs .btn[lang="en"] { font-family: "EB Garamond", serif; }
+.langs .btn[lang="zh"] { font-family: "Noto Serif SC", serif; }
+.langs .btn[lang="ko"] { font-family: "Nanum Myeongjo", serif; }
+.langs .btn.on { border-color: var(--gold); color: #fff3d0; box-shadow: inset 0 0 0 1px rgba(224, 184, 96, 0.5), 0 0 8px rgba(224, 184, 96, 0.25); }

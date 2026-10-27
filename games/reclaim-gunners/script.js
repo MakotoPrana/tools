@@ -21,6 +21,8 @@
   const SAVE_KEY = 'reclaimGunners.v1';
   const SETTINGS_KEY = 'reclaimGunners.settings';
   const DEBUG = /[?&]debug=1/.test(location.search);
+  // 言葉 (lang.js)。tr('日本語の文', { 差しこむ値 }) で、選んでいる言葉の文になる
+  const tr = RG.t;
 
   // 難易度 (SPEC.md の「難易度」)
   const DIFFS = {
@@ -29,6 +31,7 @@
     extreme: { name: 'エクストリーム', lv: 40, cap: 2, interval: 0.65, elite: 0.2, reward: 1.7, mat: 1.5, color: '#ff5a6a' },
   };
   const DIFF_IDS = ['normal', 'hard', 'extreme'];
+  RG.i18nExtra.push(DIFFS);
 
   // タイル
   // SWAMP: 沼 (通れるが、足が遅くなる)。REED: 葦 (通れないが、弾は越える)
@@ -127,13 +130,14 @@
   }
 
   // 設定はセーブとは別に、変えたらすぐ保存する
-  const settings = Object.assign({ se: 0.7, autoAim: true, numbers: true, rotate: true }, (() => {
+  const settings = Object.assign({ se: 0.7, autoAim: true, numbers: true, rotate: true, lang: RG.lang }, (() => {
     try {
       return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
     } catch (e) {
       return {};
     }
   })());
+  RG.setLang(settings.lang);
   const saveSettings = () => {
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -1155,7 +1159,7 @@
         const t = tiles[idx(x, y)];
         const px = x * TILE + SX;
         const py = y * TILE + SY;
-        if (t === T.WALL || t === T.FEATURE) shg.fillRect(px, py, TILE, TILE);
+        if (t === T.WALL) shg.fillRect(px, py, TILE, TILE);
         else if (t === T.TREE) {
           shg.beginPath();
           shg.ellipse(px + 11, py + 8, 12, 9, 0, 0, TAU);
@@ -1167,10 +1171,31 @@
         } else if (t === T.FENCE || t === T.REED) shg.fillRect(px + 2, py + 8, TILE - 4, 6);
       }
     }
+    // 家・風車の影は、壁と屋根 (風車は塔) の形どおりに落とす
     for (const f of def.features) {
       if (f.type === 'water') continue;
       const [x, y, rw, rh] = f.rect;
-      shg.fillRect(x * TILE + SX * 1.6, y * TILE + SY * 1.6, rw * TILE, rh * TILE);
+      const px = x * TILE + SX;
+      const py = y * TILE + SY;
+      const pw = rw * TILE;
+      const ph = rh * TILE;
+      shg.beginPath();
+      if (f.type === 'windmill') {
+        shg.moveTo(px + 10, py + ph);
+        shg.lineTo(px + pw / 2 - 8, py + 8);
+        shg.lineTo(px + pw / 2 + 8, py + 8);
+        shg.lineTo(px + pw - 10, py + ph);
+      } else {
+        shg.moveTo(px - 4, py + ph * 0.5);
+        shg.lineTo(px + pw / 2, py - 3);
+        shg.lineTo(px + pw + 4, py + ph * 0.5);
+        shg.lineTo(px + pw, py + ph * 0.5);
+        shg.lineTo(px + pw, py + ph);
+        shg.lineTo(px, py + ph);
+        shg.lineTo(px, py + ph * 0.5);
+      }
+      shg.closePath();
+      shg.fill();
     }
     g.save();
     g.setTransform(1, 0, 0, 1, 0, 0);
@@ -1661,7 +1686,7 @@
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
     touchMode = false;
     if (k === 'KeyR') manualReload();
-    else if (k === 'Space') dodge();
+    else if (k === 'Space' || k === 'ShiftLeft' || k === 'ShiftRight') dodge();
     else if (k === 'KeyE') doInteract();
     else if (k === 'KeyF') usePotion();
     else if (k === 'KeyM') showStageMap('view');
@@ -1739,6 +1764,8 @@
     });
   };
   bindBtn('t-dodge', () => dodge());
+  const dodgeBtn = document.getElementById('t-dodge');
+  const potionBtn = document.getElementById('t-potion');
   bindBtn('t-reload', () => manualReload());
   bindBtn('t-potion', () => usePotion());
   bindBtn('t-interact', () => doInteract());
@@ -1965,7 +1992,7 @@
     if (!P || G.dead || hero.potions <= 0) return;
     const m = maxHp();
     if (P.hp >= m) {
-      toast('体力は満タンです', 1.2);
+      toast(tr('体力は満タンです'), 1.2);
       return;
     }
     hero.potions--;
@@ -2094,7 +2121,7 @@
         const lv0 = a.def.lv[0] + D.lv;
         const lv1 = Math.min(99, a.def.lv[1] + D.lv);
         const danger = lv1 - powerLv() >= 10 && !a.free;
-        showBanner(a.def.name, `推奨 Lv${lv0}〜${lv1}${a.free ? '  ・  解放済み' : ''}`, danger ? '危険!' : '');
+        showBanner(a.def.name, `${tr('推奨 Lv{a}〜{b}', { a: lv0, b: lv1 })}${a.free ? `  ・  ${tr('解放済み')}` : ''}`, danger ? tr('危険!') : '');
       }
     }
     updateInteract();
@@ -2952,7 +2979,7 @@
     const a = n.area;
     const left = a.nests.filter((x) => !x.dead).length;
     if (left === 0) liberate(a);
-    else toast(`魔巣を破壊した!  のこり ${left}`, 1.6);
+    else toast(tr('魔巣を破壊した!  のこり {n}', { n: left }), 1.6);
   }
 
   function liberate(area) {
@@ -2970,14 +2997,14 @@
       const gold = Math.round(40 * lvMul.gold(lv) * a.nests.length * D.reward);
       gainExp(exp);
       hero.gold += gold;
-      sub = `解放のごほうび  +${fmt(exp)} EXP  ・  +${fmt(gold)} G`;
-      if (a.town) sub += '\n町に人が戻り、武器屋が開いた!  黄色い矢印の先へ';
+      sub = tr('解放のごほうび  +{exp} EXP  ・  +{gold} G', { exp: fmt(exp), gold: fmt(gold) });
+      if (a.town) sub += `\n${tr('町に人が戻り、武器屋が開いた!  黄色い矢印の先へ')}`;
     } else {
-      sub = '残党を一掃した';
+      sub = tr('残党を一掃した');
     }
     area.reinvaded = false;
     if (!prog.travel.includes(a.id)) prog.travel.push(a.id);
-    showBanner(`${a.name} 解放!`, sub, '', 4, '#7dffb0');
+    showBanner(tr('{name} 解放!', { name: a.name }), sub, '', 4, '#7dffb0');
     sfx('liberate');
     for (let i = 0; i < 80; i++) {
       const t = randomAreaTile(G.map, area.i);
@@ -3074,12 +3101,12 @@
         const dp = dist(P.x, P.y, b.cx, b.cy);
         if (!G.dead && !G.lock && dp < b.R + 50 && dp >= b.R - 4 && !(b.warnT > G.t)) {
           b.warnT = G.t + 8;
-          toast(`この先は ${b.def.name}（Lv${b.lv}）の決闘場\n入ると、倒すか力尽きるまでこのエリアから出られない`, 2.6);
+          toast(tr('この先は {name}（Lv{lv}）の決闘場\n入ると、倒すか力尽きるまでこのエリアから出られない', { name: b.def.name, lv: b.lv }), 2.6);
         }
         if (!G.dead && !G.lock && dp < b.R - 4) {
           b.state = 'fight';
           G.lock = b;
-          showBanner(b.def.name, `Lv${b.lv}  ・  エリアの出口に結界が張られた!`, lvColor(b.lv - powerLv()) === '#ff5a5a' ? '危険!' : '', 3, '#ff8aa8');
+          showBanner(b.def.name, `Lv${b.lv}  ・  ${tr('エリアの出口に結界が張られた!')}`, lvColor(b.lv - powerLv()) === '#ff5a5a' ? tr('危険!') : '', 3, '#ff8aa8');
           sfx('boss');
           G.shake = 6;
         }
@@ -3088,7 +3115,7 @@
       b.t += dt;
       if (!b.phase2 && bossHp(b) < b.total * 0.5) {
         b.phase2 = true;
-        toast(`${b.def.name} が怒り狂っている!`, 2);
+        toast(tr('{name} が怒り狂っている!', { name: b.def.name }), 2);
       }
       if (b.id === 'G1') updateBlob(b, dt);
       else if (b.id === 'G2') updateGolem(b, dt);
@@ -3446,7 +3473,7 @@
     p.dead = true;
     if (p.clone) {
       for (let i = 0; i < 14; i++) addPart({ x: p.x, y: p.y, vx: rnd(-60, 60), vy: rnd(-60, 60), life: 0.5, color: '#dff4ff', size: 3 });
-      addText(p.x, p.y - 20, '分身', '#bfe8ff', 9);
+      addText(p.x, p.y - 20, tr('分身'), '#bfe8ff', 9);
       return;
     }
     if (b.id === 'G3') for (const c of b.parts) c.dead = true;
@@ -3484,12 +3511,12 @@
       if (gt.boss !== b.id) continue;
       const [x, y, rw, rh] = gt.rect;
       for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) G.tiles[G.map.idx(i, j)] = T.FLOOR;
-      sub += `\n${stageDef(gt.to).name}への門が開いた`;
+      sub += `\n${tr('{name}への門が開いた', { name: stageDef(gt.to).name })}`;
     }
     if (b.lair.travel && !prog.travel.includes(b.lair.travel)) prog.travel.push(b.lair.travel);
     // 門の向こう側 (隣のステージ) の転移碑も起動する
     for (const st of STAGES) for (const en of st.entries || []) if (en.boss === b.id && !prog.travel.includes(en.id)) prog.travel.push(en.id);
-    showBanner(`${b.def.name} 撃破!`, sub, '', 4.5, '#ffd84a');
+    showBanner(tr('{name} 撃破!', { name: b.def.name }), sub, '', 4.5, '#ffd84a');
     sfx('liberate');
     for (let i = 0; i < 60; i++) addPart({ x: b.cx + rnd(-b.R, b.R), y: b.cy + rnd(-b.R, b.R), vx: 0, vy: rnd(-50, -10), life: rnd(0.8, 1.8), color: pick(['#ffd84a', '#fff3b0']), size: rnd(1.5, 3), glow: true });
     collectAllMats();
@@ -3537,7 +3564,7 @@
 
   function gainMat(id) {
     hero.materials[id] = (hero.materials[id] || 0) + 1;
-    G.matLog.push({ text: `${MATERIALS[id]} を手に入れた`, t: 2.5 });
+    G.matLog.push({ text: tr('{name} を手に入れた', { name: MATERIALS[id] }), t: 2.5 });
     if (G.matLog.length > 3) G.matLog.shift();
     sfx('pick');
   }
@@ -3610,7 +3637,7 @@
     hero.lastTravel = { difficulty: diffId, stage: to.id, point: gt.entry };
     selStage = to.id;
     G.gateMsgT = 3;
-    showBanner(`ステージ${to.id} ${to.name}`, to.desc, '', 3);
+    showBanner(tr('ステージ{id} {name}', { id: to.id, name: to.name }), to.desc, '', 3);
     sfx('pick');
   }
 
@@ -3621,7 +3648,7 @@
       const d = dist2(P.x, P.y, s.x, s.y + 8);
       if (d < best) {
         best = d;
-        G.interact = { type: 'stone', s, label: stoneActive(s) ? '転移碑を調べる' : '転移碑（未起動）' };
+        G.interact = { type: 'stone', s, label: stoneActive(s) ? tr('転移碑を調べる') : tr('転移碑（未起動）') };
       }
     }
     for (const f of G.def.features) {
@@ -3631,7 +3658,7 @@
       const d = dist2(P.x, P.y, x, y);
       if (d < best) {
         best = d;
-        G.interact = { type: 'shop', f, label: '武器屋に入る' };
+        G.interact = { type: 'shop', f, label: tr('武器屋に入る') };
       }
     }
     // 開いた門
@@ -3648,7 +3675,7 @@
           return;
         }
         G.gateMsgT = 3;
-        toast(`この先は ステージ${to.id} ${to.name}\n（このバージョンでは準備中です）`, 2.6);
+        toast(tr('この先は ステージ{id} {name}\n（このバージョンでは準備中です）', { id: to.id, name: to.name }), 2.6);
       }
     }
     const btn = document.getElementById('t-interact');
@@ -3663,13 +3690,13 @@
     if (!it) return;
     if (it.type === 'stone') {
       if (!stoneActive(it.s)) {
-        toast(it.s.kind === 'gate' ? '守護者を倒すと起動する' : 'このエリアを解放すると起動する', 1.8);
+        toast(it.s.kind === 'gate' ? tr('守護者を倒すと起動する') : tr('このエリアを解放すると起動する'), 1.8);
         return;
       }
       useStone(it.s);
     } else if (it.type === 'shop') {
       if (!shopOpen(it.f)) {
-        toast('武器屋は悪魔に占拠されている\n（町を解放すると開く）', 2);
+        toast(tr('武器屋は悪魔に占拠されている\n（町を解放すると開く）'), 2);
         return;
       }
       hero.shopSeen = Object.assign({}, hero.shopSeen, { [it.f.shop]: true });
@@ -3714,7 +3741,7 @@
     area.free = false;
     area.reinvaded = true;
     spawnNests(area);
-    toast(`${area.def.name} に魔巣が戻ってきた…`, 2);
+    toast(tr('{name} に魔巣が戻ってきた…', { name: area.def.name }), 2);
   }
 
   function purify(area) {
@@ -3771,7 +3798,7 @@
     G.curArea = -1;
     G.fade = 1;
     updateFlow();
-    toast(lost > 0 ? `力尽きた…\n所持金 −${fmt(lost)} G` : '力尽きた…', 2.6);
+    toast(lost > 0 ? tr('力尽きた…\n所持金 −{g} G', { g: fmt(lost) }) : tr('力尽きた…'), 2.6);
     writeSave();
   }
 
@@ -3823,16 +3850,19 @@
     G.cam.x += (tx - G.cam.x) * Math.min(1, dt * 6);
     G.cam.y += (ty - G.cam.y) * Math.min(1, dt * 6);
     document.getElementById('t-potion-n').textContent = hero.potions;
+    // 回避ボタンは、使えるまでの残りを影で見せる
+    const cd = P.dodgeCd > 0 ? P.dodgeCd / (heroDef.dodgeCd * (1 - 0.03 * rank('dodge'))) : 0;
+    dodgeBtn.style.setProperty('--cd', `${Math.round(cd * 360)}deg`);
+    dodgeBtn.classList.toggle('cooling', cd > 0);
+    potionBtn.classList.toggle('empty', hero.potions <= 0);
   }
 
   // ===================================================================
   // 描画
   // ===================================================================
   // 画面の文字 (ダークファンタジー風の明朝体)。weight に 'display' を渡すと、見出し用の古風な文字にする
-  const FONT_UI = '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif';
-  const FONT_DISPLAY = '"Zen Antique", "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif';
-  function txt(s, x, y, size = 9, color = '#fff', align = 'left', weight = 700) {
-    ctx.font = weight === 'display' ? `400 ${size}px ${FONT_DISPLAY}` : `${Math.max(500, Math.min(800, weight))} ${size}px ${FONT_UI}`;
+    function txt(s, x, y, size = 9, color = '#fff', align = 'left', weight = 700) {
+    ctx.font = weight === 'display' ? `400 ${size}px ${RG.FONTS.display}` : `${Math.max(500, Math.min(800, weight))} ${size}px ${RG.FONTS.ui}`;
     ctx.textAlign = align;
     ctx.textBaseline = 'middle';
     ctx.lineWidth = Math.max(2, size / 4);
@@ -4042,7 +4072,7 @@
       const k = clamp(1 - G.dead / 2.2, 0, 1);
       ctx.fillStyle = `rgba(30,0,10,${k * 0.8})`;
       ctx.fillRect(0, 0, VW, VH);
-      txt('力尽きた…', VW / 2, VH / 2, 24, '#ff8a9a', 'center', 900);
+      txt(tr('力尽きた…'), VW / 2, VH / 2, 24, '#ff8a9a', 'center', 900);
     }
   }
 
@@ -4116,7 +4146,7 @@
       ctx.fillStyle = open ? '#ffd84a' : '#6a6570';
       ctx.fillRect(cx - sw / 2 + 7, sy + 8, 12, 4);
       ctx.fillRect(cx - sw / 2 + 8, sy + 11, 4, 6);
-      txt('武器屋', cx + 7, sy + sh / 2 + 0.5, 12, open ? '#ffe9a8' : '#8a8590', 'center', 900);
+      txt(tr('武器屋'), cx + 7, sy + sh / 2 + 0.5, tr('武器屋').length > 4 ? 8.5 : 12, open ? '#ffe9a8' : '#8a8590', 'center', 900);
       if (!open) {
         // 占拠されている間は板で打ちつけてある
         ctx.strokeStyle = '#7a1f3a';
@@ -4139,7 +4169,7 @@
         ctx.closePath();
         ctx.stroke();
         ctx.fill();
-        txt('入口', dx, dy - 42 - b, 8, '#ffe9a8', 'center', 800);
+        txt(tr('入口'), dx, dy - 42 - b, 8, '#ffe9a8', 'center', 800);
       }
       ctx.restore();
     }
@@ -4174,7 +4204,7 @@
       ctx.stroke();
       ctx.fill();
       ctx.restore();
-      txt('武器屋', px - Math.cos(a) * 20, py - Math.sin(a) * 16, 9, '#ffe9a8', 'center', 900);
+      txt(tr('武器屋'), px - Math.cos(a) * 20, py - Math.sin(a) * 16, 9, '#ffe9a8', 'center', 900);
     }
   }
 
@@ -4356,16 +4386,63 @@
     const [c0, c1, c2] = n.nd.colors;
     ctx.save();
     ctx.translate(n.x, n.y);
-    // 根 (種類ごとに形を変える)
-    ctx.strokeStyle = c0;
-    ctx.lineWidth = 2.5;
+    const sd = (n.x * 0.37 + n.y * 0.71) % 7;
+    // 地面がけがれた染み
+    {
+      const g = ctx.createRadialGradient(0, r * 0.3, r * 0.4, 0, r * 0.3, r * 2.6);
+      g.addColorStop(0, 'rgba(20,4,12,0.55)');
+      g.addColorStop(0.6, 'rgba(30,6,20,0.25)');
+      g.addColorStop(1, 'rgba(30,6,20,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(0, r * 0.3, r * 2.6, r * 1.9, 0, 0, TAU);
+      ctx.fill();
+    }
+    drawSoftShadow(ctx, 0, r * 0.55, r * 1.25, r * 0.55);
+    // 触手の根 (先へいくほど細く、ゆらゆら動く)
     const roots = n.type === 'brood' ? 9 : 7;
     for (let i = 0; i < roots; i++) {
-      const a = (i / roots) * TAU + Math.sin(n.ph + i) * 0.2;
+      const a = (i / roots) * TAU + sd + Math.sin(n.ph * 0.7 + i) * 0.12;
+      const len = r * (1.7 + ((i * 37 + sd * 10) % 7) / 10);
+      const sw = Math.sin(n.ph * 1.3 + i * 1.7) * 0.35;
+      const steps = 7;
+      const pts = [];
+      for (let k = 0; k <= steps; k++) {
+        const f = k / steps;
+        const aa = a + sw * f * f + Math.sin(f * 5 + i) * 0.15;
+        pts.push([Math.cos(aa) * (r * 0.6 + len * f), Math.sin(aa) * (r * 0.6 + len * f) * 0.85, (1 - f) * 4 + 0.6]);
+      }
+      // 太さが変わる線を、折れ線の多角形で描く
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(Math.cos(a + 0.4) * r * 1.4, Math.sin(a + 0.4) * r * 1.4, Math.cos(a) * r * 2, Math.sin(a) * r * 2);
+      for (let k = 0; k <= steps; k++) {
+        const [x, y, w] = pts[k];
+        const [nx, ny] = pts[Math.min(steps, k + 1)];
+        const [px, py] = pts[Math.max(0, k - 1)];
+        const t = Math.atan2(ny - py, nx - px) + Math.PI / 2;
+        const X = x + Math.cos(t) * w, Y = y + Math.sin(t) * w;
+        k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
+      }
+      for (let k = steps; k >= 0; k--) {
+        const [x, y, w] = pts[k];
+        const [nx, ny] = pts[Math.min(steps, k + 1)];
+        const [px, py] = pts[Math.max(0, k - 1)];
+        const t = Math.atan2(ny - py, nx - px) - Math.PI / 2;
+        ctx.lineTo(x + Math.cos(t) * w, y + Math.sin(t) * w);
+      }
+      ctx.closePath();
+      ctx.fillStyle = mix(c0, '#000000');
+      ctx.fill();
+      ctx.strokeStyle = c1;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = 0.8;
       ctx.stroke();
+      ctx.globalAlpha = 1;
+      // 先っぽがほのかに光る
+      const [tx, ty] = pts[steps];
+      ctx.fillStyle = c2;
+      ctx.globalAlpha = 0.5 + Math.sin(n.ph * 3 + i) * 0.3;
+      circle(ctx, tx, ty, 1.2);
+      ctx.globalAlpha = 1;
     }
     if (n.type === 'bone') {
       // 骨の杭が突き出ている
@@ -4410,14 +4487,48 @@
       }
       ctx.globalAlpha = 1;
     }
-    const g = ctx.createRadialGradient(0, 0, 2, 0, 0, r);
-    g.addColorStop(0, n.hitFlash > 0 ? '#ffffff' : c2);
-    g.addColorStop(0.5, c1);
-    g.addColorStop(1, c0);
-    drawGlow(ctx, 0, 0, r * 2.4, c2, 0.25 + Math.sin(n.ph * 3) * 0.08);
-    ctx.fillStyle = g;
-    circle(ctx, 0, 0, r);
-    drawShade(ctx, 0, 0, r, 0.7);
+    drawGlow(ctx, 0, 0, r * 2.4, c2, 0.22 + Math.sin(n.ph * 3) * 0.08);
+    // 本体: いくつものふくらみが重なった肉のかたまり
+    const lobes = 6;
+    const flash = n.hitFlash > 0;
+    const blob = (rr, wob) => {
+      ctx.beginPath();
+      for (let k = 0; k <= 36; k++) {
+        const a = (k / 36) * TAU;
+        const d = rr * (1 + Math.sin(a * lobes + sd) * 0.09 + Math.sin(a * 3 - n.ph * 1.5 + sd) * wob);
+        const x = Math.cos(a) * d, y = Math.sin(a) * d * 0.9;
+        k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.closePath();
+    };
+    {
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r * 1.1);
+      g.addColorStop(0, flash ? '#ffffff' : mix(c1, c2));
+      g.addColorStop(0.55, flash ? '#ffffff' : c1);
+      g.addColorStop(1, mix(c0, '#000000'));
+      ctx.fillStyle = g;
+      blob(r, 0.05);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // 脈うつ血管
+    ctx.save();
+    blob(r * 0.98, 0.05);
+    ctx.clip();
+    ctx.strokeStyle = c2;
+    ctx.lineWidth = 0.9;
+    ctx.globalAlpha = 0.35 + Math.sin(n.ph * 3) * 0.2;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * TAU + sd * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.25, Math.sin(a) * r * 0.25);
+      ctx.quadraticCurveTo(Math.cos(a + 0.5) * r * 0.6, Math.sin(a + 0.5) * r * 0.6, Math.cos(a + 0.2) * r, Math.sin(a + 0.2) * r);
+      ctx.stroke();
+    }
+    ctx.restore();
+    drawShade(ctx, 0, 0, r, 0.55);
     if (n.type === 'eye') {
       // 主人公を見つめる大きな目
       const a = Math.atan2(P.y - n.y, P.x - n.x);
@@ -4430,8 +4541,26 @@
       ctx.fillStyle = '#1a0a10';
       circle(ctx, Math.cos(a) * r * 0.26, Math.sin(a) * r * 0.18, r * 0.12);
     } else {
-      ctx.fillStyle = 'rgba(255,230,240,0.6)';
-      circle(ctx, -r * 0.3, -r * 0.3, r * 0.18);
+      // まん中の裂け目から、魔物が生まれる光がもれる
+      const open = 0.25 + Math.max(0, Math.sin(n.ph * 2)) * 0.25;
+      drawGlow(ctx, 0, 0, r * 0.9, c2, 0.5);
+      ctx.fillStyle = '#12040a';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.5, r * open, 0, 0, TAU);
+      ctx.fill();
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.45);
+      g.addColorStop(0, '#fff4d8');
+      g.addColorStop(0.4, c2);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.42, r * open * 0.75, 0, 0, TAU);
+      ctx.fill();
+      // つやの光
+      ctx.fillStyle = 'rgba(255,235,240,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.38, -r * 0.48, r * 0.22, r * 0.1, -0.5, 0, TAU);
+      ctx.fill();
     }
     ctx.restore();
     const w = n.r * 2.2;
@@ -4933,6 +5062,23 @@
     // 持っている武器を全部描く (2 丁目は反対の手)。それぞれ、ねらっている向きを向く
     const guns = equippedIds().map((id) => ({ id, aim: ensureWs(id).aim != null ? ensureWs(id).aim : P.aim }));
     drawHeroSprite(ctx, P.x, P.y, heroDef, P.aim, 1, P.walk, P.rollT > 0, P.hurtT > 0, guns);
+    // 足もとの体力 (いつも出す)
+    {
+      const m = maxHp();
+      const f = clamp(P.hp / m, 0, 1);
+      const w = 22;
+      const x = P.x - w / 2;
+      const y = P.y + 11;
+      ctx.fillStyle = 'rgba(10,4,4,0.85)';
+      ctx.fillRect(x - 1, y - 1, w + 2, 4.5);
+      ctx.fillStyle = 'rgba(255,230,200,0.45)';
+      ctx.fillRect(x, y, w * clamp(P.shownHp / m, 0, 1), 2.5);
+      ctx.fillStyle = f > 0.6 ? '#e04a3a' : f > 0.3 ? '#e8a030' : Math.floor(G.t * 4) % 2 ? '#ff5a4a' : '#a01a1a';
+      ctx.fillRect(x, y, w * f, 2.5);
+      ctx.strokeStyle = 'rgba(200,160,90,0.8)';
+      ctx.lineWidth = 0.6;
+      ctx.strokeRect(x - 1, y - 1, w + 2, 4.5);
+    }
     // 回避のクールダウン
     if (P.dodgeCd > 0) {
       ctx.strokeStyle = 'rgba(255,255,255,0.6)';
@@ -4963,25 +5109,23 @@
     c.scale(s, s);
     drawSoftShadow(c, 1, 7.5, 9, 4);
     if (rolling) c.rotate(walk * 3);
+    // 武器は専用の絵で持たせる (art.js)。左を向くときは上下を返して、にぎりが下になるようにする
     const drawGun = (g, i) => {
+      if (!g.id) return;
       c.save();
-      // 3 丁目からは背中に背負う (小さく、斜めに)
       if (i >= 2) {
+        // 3 丁目からは背中に背負う (小さく、斜めに)
         c.translate((i % 2 ? -1 : 1) * 3, -1);
         c.rotate(-Math.PI / 2 + (i % 2 ? -0.5 : 0.5));
-        c.scale(0.7, 0.7);
+        c.scale(0.36, 0.36);
       } else {
         c.translate(0, i ? 2 : 0);
         c.rotate(g.aim);
+        c.translate(4.5, 1);
+        if (Math.cos(g.aim) < 0) c.scale(1, -1);
+        c.scale(0.5, 0.5);
       }
-      const w = g.id ? WEAPON[g.id] : null;
-      const len = !w ? 9 : w.cat === 'heavy' ? 15 : w.cat === 'prec' ? 16 : w.cat === 'shot' ? 13 : w.cat === 'magic' ? 14 : 10;
-      c.fillStyle = w && w.cat === 'magic' ? '#8a5a2a' : '#2a2a30';
-      c.fillRect(3, -1.5, len, w && w.cat === 'heavy' ? 4.5 : 3);
-      if (w && w.cat === 'magic') {
-        c.fillStyle = ELEMS[w.elem] ? ELEMS[w.elem].color : '#fff';
-        circle(c, 3 + len, 0, 2.5);
-      }
+      RG.drawWeapon(c, g.id);
       c.restore();
     };
     const behind = (g, i) => i >= 2 || Math.sin(g.aim) < -0.2;
@@ -5162,7 +5306,6 @@
 
 
   const CAT_COLORS = { hand: '#6fb0ff', shot: '#ff9a5a', heavy: '#ff6a6a', prec: '#7dffb0', magic: '#c88aff', special: '#ffd84a' };
-  const CAT_ICON = { hand: '拳', shot: '散', heavy: '重', prec: '狙', magic: '魔', special: '★' };
 
   function drawHud() {
     const m = maxHp();
@@ -5187,14 +5330,14 @@
     ctx.strokeRect(11.5, 11.5, 141, 10);
     txt(`HP ${Math.ceil(P.hp)}/${m}`, 15, 16.5, 7, '#fff0d8');
     const pl = powerLv();
-    txt(`戦力 Lv${pl}`, 12, 30, 9, '#f0d890');
+    txt(tr('戦力 Lv{n}', { n: pl }), 12, 30, 9, '#f0d890');
     txt(`EXP ${fmt(hero.exp)}`, 70, 30, 8, '#d8c0a0');
     if (G.expPop > 0) {
       ctx.globalAlpha = Math.min(1, G.expPopT);
       txt(`+${fmt(G.expPop)}`, 66, 40, 7, '#e8d8ff');
       ctx.globalAlpha = 1;
     }
-    txt(`回復薬 ${hero.potions}`, 12, 40.5, 7, '#9ad8a0');
+    txt(tr('回復薬 {n}', { n: hero.potions }), 12, 40.5, 7, '#9ad8a0');
 
     // いるエリア
     const area = G.areas[G.curArea];
@@ -5202,9 +5345,9 @@
       const lv0 = area.def.lv[0] + D.lv;
       const lv1 = Math.min(99, area.def.lv[1] + D.lv);
       const left = area.nests.filter((n) => !n.dead).length;
-      const status = area.free ? '解放済み ✓' : `魔巣 ${left}/${area.def.nests.length}`;
+      const status = area.free ? tr('解放済み ✓') : tr('魔巣 {a}/{b}', { a: left, b: area.def.nests.length });
       txt(area.def.name, VW / 2, 12, 11, '#f0d890', 'center', 'display');
-      txt(`推奨 Lv${lv0}〜${lv1}  ・  ${status}`, VW / 2, 24, 7.5, area.free ? '#7dffb0' : lvColor(lv1 - pl), 'center');
+      txt(`${tr('推奨 Lv{a}〜{b}', { a: lv0, b: lv1 })}  ・  ${status}`, VW / 2, 24, 7.5, area.free ? '#7dffb0' : lvColor(lv1 - pl), 'center');
     }
 
     // ボスの体力
@@ -5249,7 +5392,12 @@
       if (!r.id) return;
       const w = WEAPON[r.id];
       const st = ensureWs(r.id);
-      txt(CAT_ICON[w.cat], r.x + r.w / 2, r.y + 11, 11, CAT_COLORS[w.cat], 'center', 900);
+      ctx.save();
+      ctx.translate(r.x + r.w / 2 - 5, r.y + 12);
+      ctx.rotate(-0.35);
+      ctx.scale(0.62, 0.62);
+      RG.drawWeapon(ctx, r.id);
+      ctx.restore();
       const lv = hero.weapons[r.id] || 0;
       if (lv) txt(`+${lv}`, r.x + r.w - 2, r.y + 5, 6, '#ffe45c', 'right');
       txt(String(i + 1), r.x + 3, r.y + 5, 6, '#aaa', 'left');
@@ -5271,7 +5419,7 @@
         ctx.stroke();
       }
     });
-    if (rects.length) txt(settings.autoAim ? '自動でねらって撃つ' : 'ねらって撃つ', VW / 2, rects[0].y - 7, 7, 'rgba(232,212,168,0.75)', 'center');
+    if (rects.length) txt(settings.autoAim ? tr('自動でねらって撃つ') : tr('ねらって撃つ'), VW / 2, rects[0].y - 7, 7, 'rgba(232,212,168,0.75)', 'center');
 
     // 調べる
     if (G.interact && !touchMode) {
@@ -5357,7 +5505,7 @@
       ctx.lineWidth = 1;
       ctx.fillRect(sx - 3, sy - 3, 6, 6);
       ctx.strokeRect(sx - 3, sy - 3, 6, 6);
-      txt('店', sx, sy - 7, 6, shopOpen(f) ? '#ffe9a8' : '#aaa', 'center', 900);
+      txt(tr('店'), sx, sy - 7, 6, shopOpen(f) ? '#ffe9a8' : '#aaa', 'center', 900);
     }
     for (const b of G.bosses) {
       ctx.strokeStyle = '#ff5a5a';
@@ -5447,7 +5595,7 @@
 
   const head = (title, stat = '', back = true) => `
     <div class="panel-head">
-      ${back ? '<button class="btn small back-btn" data-act="back">‹ 戻る</button>' : ''}
+      ${back ? `<button class="btn small back-btn" data-act="back">${tr('‹ 戻る')}</button>` : ''}
       <h2>${title}</h2>
       ${stat ? `<span class="stat">${stat}</span>` : ''}
     </div>`;
@@ -5461,19 +5609,20 @@
     const t = () => `
       <div class="overlay"><div class="panel narrow title-screen">
         <p class="title-sub">DEMON RECLAIM</p>
-        <h1 class="title-logo">魔境奪還<br>ガンナーズ</h1>
-        <p class="muted">悪魔に侵略されたヴェルデ地方を取り戻せ</p>
+        <h1 class="title-logo">${tr(`魔境奪還<br>ガンナーズ`)}</h1>
+        <p class="muted">${tr('悪魔に侵略されたヴェルデ地方を取り戻せ')}</p>
         <div class="btn-col">
-          <button class="btn primary" data-act="start">はじめる</button>
-          <button class="btn" data-act="settings">設定</button>
+          <button class="btn primary" data-act="start">${tr('はじめる')}</button>
+          <button class="btn" data-act="settings">${tr('設定')}</button>
         </div>
+        ${langBtns()}
         <p class="muted" style="margin-top:10px;font-size:0.82em">${HEROES.map((h) => {
           const hh = save.heroes[h.id];
           const n = hh.progress.normal ? hh.progress.normal.areas.length : 0;
-          return `${h.name} 解放 ${n} エリア`;
-        }).join(' ・ ')}</p>
-        ${saveOk ? '' : '<p class="danger">この環境ではセーブできません</p>'}
-        <p class="muted" style="font-size:0.75em">開発中のバージョンです（ステージ1 まで遊べます）</p>
+          return tr('{name} 解放 {n} エリア', { name: h.name, n });
+        }).join(tr(' ・ '))}</p>
+        ${saveOk ? '' : `<p class="danger">${tr('この環境ではセーブできません')}</p>`}
+        <p class="muted" style="font-size:0.75em">${tr('開発中のバージョンです（ステージ2 まで遊べます）')}</p>
       </div></div>`;
     uiShow(t);
   }
@@ -5489,7 +5638,7 @@
       const cats = Object.keys(CATS).filter((c) => c !== 'special').map((c) => `<span class="tag ${h.cats.includes(c) ? '' : 'ng'}">${CATS[c].name}</span>`).join('');
       return `
       <div class="overlay"><div class="panel">
-        ${head('主人公を選ぶ')}
+        ${head(tr('主人公を選ぶ'))}
         <div class="cards">
           ${HEROES.map((x) => `<button class="card ${x.id === selHero ? 'sel' : ''}" data-act="pickHero" data-id="${x.id}">
             <canvas width="72" height="72" data-hero="${x.id}"></canvas>
@@ -5498,12 +5647,12 @@
         </div>
         <div class="detail">
           <p><b>${h.name}</b>  <span class="muted">${h.desc}</span></p>
-          <p class="muted">体力 ${h.hp} ・ 移動速度 ${h.speed} ・ 回避: ${h.dodgeName}（${h.dodgeDesc}）</p>
+          <p class="muted">${tr('体力 {hp} ・ 移動速度 {spd} ・ 回避: {dn}（{dd}）', { hp: h.hp, spd: h.speed, dn: h.dodgeName, dd: h.dodgeDesc })}</p>
           <div class="cats">${cats}</div>
-          <p>特性: ${h.trait}</p>
-          <p class="muted">解放したエリア ${hh.progress.normal.areas.length} ・ 所持金 ${fmt(hh.gold)} G ・ EXP ${fmt(hh.exp)}</p>
+          <p>${tr('特性: {v}', { v: h.trait })}</p>
+          <p class="muted">${tr('解放したエリア {a} ・ 所持金 {g} G ・ EXP {e}', { a: hh.progress.normal.areas.length, g: fmt(hh.gold), e: fmt(hh.exp) })}</p>
         </div>
-        <div class="btn-row"><button class="btn primary" data-act="heroOk">${h.name} で始める</button></div>
+        <div class="btn-row"><button class="btn primary" data-act="heroOk">${tr('{name} で始める', { name: h.name })}</button></div>
       </div></div>`;
     };
     fn.after = () => {
@@ -5535,16 +5684,16 @@
   function showDifficulty() {
     uiShow(() => `
       <div class="overlay"><div class="panel narrow">
-        ${head(`難易度（${heroDef.name}）`)}
+        ${head(tr('難易度（{name}）', { name: heroDef.name }))}
         <div class="diffs">
           ${DIFF_IDS.map((id) => {
             const d = DIFFS[id];
             const open = diffOpen(id);
             const p = hero.progress[id];
-            const cond = id === 'hard' ? 'ノーマルで魔王を倒すと開く' : id === 'extreme' ? 'ハードで魔王を倒すと開く' : '';
+            const cond = id === 'hard' ? tr('ノーマルで魔王を倒すと開く') : id === 'extreme' ? tr('ハードで魔王を倒すと開く') : '';
             return `<button class="diff" data-act="pickDiff" data-id="${id}" ${open ? '' : 'disabled'}>
               <b style="color:${d.color}">${open ? '' : '🔒 '}${d.name}</b>
-              <span class="muted">${open ? `敵 Lv +${d.lv} ・ 湧く量 ×${d.cap}${p ? ` ・ 解放 ${p.areas.length}` : ''}` : cond}</span>
+              <span class="muted">${open ? `${tr('敵 Lv +{lv} ・ 湧く量 ×{cap}', { lv: d.lv, cap: d.cap })}${p ? ` ・ ${tr('解放 {n}', { n: p.areas.length })}` : ''}` : cond}</span>
             </button>`;
           }).join('')}
         </div>
@@ -5588,7 +5737,7 @@
   function worldPlate(st, [x, y], sel) {
     const p = stageProgress(st);
     const reach = stageReachable(st.id);
-    const status = !st.ready ? '準備中' : !reach ? '🔒 守護者を倒すと開く' : `解放 ${p.pct}%`;
+    const status = !st.ready ? tr('準備中') : !reach ? tr('🔒 守護者を倒すと開く') : tr('解放 {n}%', { n: p.pct });
     const col = !st.ready ? '#b8a890' : !reach ? '#ff9a8a' : p.pct >= 100 ? '#7dffb0' : '#ffe9a8';
     const w = 176;
     const h = 48;
@@ -5623,13 +5772,13 @@
       return `
       <div class="overlay"><div class="panel full world-panel">
         <div class="panel-head">
-          <button class="btn small back-btn" data-act="toTitle">‹ タイトル</button>
-          <h2>ヴェルデ地方</h2>
+          <button class="btn small back-btn" data-act="toTitle">${tr('‹ タイトル')}</button>
+          <h2>${tr('ヴェルデ地方')}</h2>
           <span class="stat">${heroDef.name} ・ <span style="color:${D.color}">${D.name}</span> ・ <span class="gold">${fmt(hero.gold)} G</span> ・ EXP ${fmt(hero.exp)}</span>
         </div>
         <div class="world">
           <img src="assets/worldmap.jpg" width="${WORLD_W}" height="${WORLD_H}" alt="">
-          <svg viewBox="0 0 ${WORLD_W} ${WORLD_H}" role="img" aria-label="全体図">
+          <svg viewBox="0 0 ${WORLD_W} ${WORLD_H}" role="img" aria-label="${tr('全体図')}">
             <defs>
               <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a3018"/><stop offset="1" stop-color="#24160a"/></linearGradient>
             </defs>
@@ -5637,22 +5786,22 @@
             <!-- 左上の題字と、右下の目標 (絵の文字の上にかぶせる) -->
             <g pointer-events="none">
               <rect x="24" y="20" width="324" height="92" rx="10" fill="url(#plate)" stroke="#c8a45a" stroke-width="1.6"/>
-              <text x="186" y="62" text-anchor="middle" font-size="30" font-weight="900" fill="#fff3d0" stroke="#1a0e06" stroke-width="3" paint-order="stroke">ヴェルデ地方</text>
-              <text x="186" y="94" text-anchor="middle" font-size="16" font-weight="700" fill="#d8c090">魔境奪還ガンナーズ</text>
+              <text x="186" y="62" text-anchor="middle" font-size="30" font-weight="900" fill="#fff3d0" stroke="#1a0e06" stroke-width="3" paint-order="stroke">${tr('ヴェルデ地方')}</text>
+              <text x="186" y="94" text-anchor="middle" font-size="16" font-weight="700" fill="#d8c090">${tr('魔境奪還ガンナーズ')}</text>
               <rect x="800" y="468" width="196" height="80" rx="9" fill="url(#plate)" stroke="#c8a45a" stroke-width="1.6"/>
-              <text x="898" y="494" text-anchor="middle" font-size="15" font-weight="800" fill="#ffd84a">目標</text>
-              <text x="898" y="516" text-anchor="middle" font-size="13" font-weight="700" fill="#f0e6d0">魔王ベリアルを倒し</text>
-              <text x="898" y="535" text-anchor="middle" font-size="13" font-weight="700" fill="#f0e6d0">ヴェルデ地方を取り戻す</text>
+              <text x="898" y="494" text-anchor="middle" font-size="15" font-weight="800" fill="#ffd84a">${tr('目標')}</text>
+              <text x="898" y="516" text-anchor="middle" font-size="13" font-weight="700" fill="#f0e6d0">${tr('魔王ベリアルを倒し')}</text>
+              <text x="898" y="535" text-anchor="middle" font-size="13" font-weight="700" fill="#f0e6d0">${tr('ヴェルデ地方を取り戻す')}</text>
             </g>
             ${plates}
           </svg>
         </div>
         <div class="region-info">
-          <div class="grow"><b>${s.id}. ${s.name}</b> <span class="muted"><span class="desc">${s.desc} ・ </span>推奨 Lv${s.lv[0] + D.lv}〜${Math.min(99, s.lv[1] + D.lv)}</span>
-            ${sp ? `<span class="muted"> ・ 解放 ${sp.n}/${sp.total} エリア</span>` : ''}</div>
-          <button class="btn small" data-act="openBoard">能力ボード</button>
-          <button class="btn small" data-act="openEquip">装備</button>
-          <button class="btn primary" data-act="goStage" ${s.ready && reach ? '' : 'disabled'}>${!s.ready ? '準備中' : reach ? 'このステージへ' : '守護者を倒すと開く'}</button>
+          <div class="grow"><b>${s.id}. ${s.name}</b> <span class="muted"><span class="desc">${s.desc} ・ </span>${tr('推奨 Lv{a}〜{b}', { a: s.lv[0] + D.lv, b: Math.min(99, s.lv[1] + D.lv) })}</span>
+            ${sp ? `<span class="muted"> ・ ${tr('解放 {a}/{b} エリア', { a: sp.n, b: sp.total })}</span>` : ''}</div>
+          <button class="btn small" data-act="openBoard">${tr('能力ボード')}</button>
+          <button class="btn small" data-act="openEquip">${tr('装備')}</button>
+          <button class="btn primary" data-act="goStage" ${s.ready && reach ? '' : 'disabled'}>${!s.ready ? tr('準備中') : reach ? tr('このステージへ') : tr('守護者を倒すと開く')}</button>
         </div>
       </div></div>`;
     };
@@ -5665,7 +5814,7 @@
   };
   actions.goStage = () => showStageMap('select', selStage);
   actions.toTitle = () => {
-    showConfirm('タイトルに戻りますか？\n最後のセーブ以降の進み具合は失われます。', () => {
+    showConfirm(tr('タイトルに戻りますか？\n最後のセーブ以降の進み具合は失われます。'), () => {
       save = loadSave();
       showTitle();
     });
@@ -5684,11 +5833,11 @@
       const a = selArea ? def.areas.find((x) => x.id === selArea) : null;
       const points = [];
       for (const ar of def.areas) if (prog.travel.includes(ar.id)) points.push({ id: ar.id, name: ar.name });
-      for (const l of def.lairs) if (l.travel && prog.travel.includes(l.travel)) points.push({ id: l.travel, name: `${l.name}（守護者の決闘場）` });
-      for (const en of def.entries || []) if (prog.travel.includes(en.id)) points.push({ id: en.id, name: `${en.name}（${stageDef(def.gates.find((g) => g.boss === en.boss).to).name}から）` });
+      for (const l of def.lairs) if (l.travel && prog.travel.includes(l.travel)) points.push({ id: l.travel, name: tr('{name}（守護者の決闘場）', { name: l.name }) });
+      for (const en of def.entries || []) if (prog.travel.includes(en.id)) points.push({ id: en.id, name: tr('{name}（{from}から）', { name: en.name, from: stageDef(def.gates.find((g) => g.boss === en.boss).to).name }) });
       // 最初のエリア (始まりの村) からは、いつでも始められる
       const canStart = (ar) => prog.travel.includes(ar.id) || !!ar.start;
-      let info = '<span class="muted">エリアを押すと、くわしく出ます</span>';
+      let info = `<span class="muted">${tr('エリアを押すと、くわしく出ます')}</span>`;
       if (a) {
         const lv0 = a.lv[0] + D.lv;
         const lv1 = Math.min(99, a.lv[1] + D.lv);
@@ -5696,22 +5845,22 @@
         const boss = def.lairs.filter((l) => {
           const ai = map.areaOf[l.y * map.w + l.x];
           return def.areas[ai] === a && BOSSES[l.boss].impl;
-        }).map((l) => `${BOSSES[l.boss].name}${prog.bosses.includes(l.boss) ? '（撃破）' : ''}`);
+        }).map((l) => `${BOSSES[l.boss].name}${prog.bosses.includes(l.boss) ? tr('（撃破）') : ''}`);
         const shop = def.features.some((f) => f.shop && map.areaOf[f.door[1] * map.w + f.door[0]] === def.areas.indexOf(a));
         const btn = mode === 'view' ? '' : mode === 'select'
-          ? `<button class="btn primary" data-act="startAt" data-id="${a.id}" ${canStart(a) ? '' : 'disabled'}>${canStart(a) ? (prog.travel.length ? 'ここへ転移' : 'ここから始める') : '未解放（歩いて向かう）'}</button>`
-          : `<button class="btn primary" data-act="travel" data-id="${a.id}" ${prog.travel.includes(a.id) ? '' : 'disabled'}>${prog.travel.includes(a.id) ? 'ここへ転移' : '転移碑が未起動'}</button>`;
-        info = `<div class="grow"><b>${a.name}</b>${a.strong ? ' <span class="danger">★強いエリア</span>' : ''}${a.town ? ' <span class="tag">町</span>' : ''}<br>
-          <span class="muted">推奨 Lv${lv0}〜${lv1} ・ 魔巣 ${a.nests.length} ・ ${isFree ? '<span class="mint">解放済み</span>' : '未解放'}${shop ? ' ・ 武器屋' : ''}${boss.length ? ` ・ ボス: ${boss.join('、')}` : ''}</span></div>${btn}`;
+          ? `<button class="btn primary" data-act="startAt" data-id="${a.id}" ${canStart(a) ? '' : 'disabled'}>${canStart(a) ? (prog.travel.length ? tr('ここへ転移') : tr('ここから始める')) : tr('未解放（歩いて向かう）')}</button>`
+          : `<button class="btn primary" data-act="travel" data-id="${a.id}" ${prog.travel.includes(a.id) ? '' : 'disabled'}>${prog.travel.includes(a.id) ? tr('ここへ転移') : tr('転移碑が未起動')}</button>`;
+        info = `<div class="grow"><b>${a.name}</b>${a.strong ? ` <span class="danger">${tr('★強いエリア')}</span>` : ''}${a.town ? ` <span class="tag">${tr('町')}</span>` : ''}<br>
+          <span class="muted">${tr('推奨 Lv{a}〜{b}', { a: lv0, b: lv1 })} ・ ${tr('魔巣 {n}', { n: a.nests.length })} ・ ${isFree ? `<span class="mint">${tr('解放済み')}</span>` : tr('未解放')}${shop ? ` ・ ${tr('武器屋')}` : ''}${boss.length ? ` ・ ${tr('ボス: {v}', { v: boss.join(tr('、')) })}` : ''}</span></div>${btn}`;
       }
-      const gateBtns = mode === 'view' ? '' : points.filter((p) => p.id.startsWith('g')).map((p) => `<button class="btn small" data-act="${mode === 'select' ? 'startAt' : 'travel'}" data-id="${p.id}">${p.name}へ</button>`).join('');
+      const gateBtns = mode === 'view' ? '' : points.filter((p) => p.id.startsWith('g')).map((p) => `<button class="btn small" data-act="${mode === 'select' ? 'startAt' : 'travel'}" data-id="${p.id}">${tr('{name}へ', { name: p.name })}</button>`).join('');
       return `
       <div class="overlay"><div class="panel full">
-        ${head(`${def.id}. ${def.name}`, mode === 'travel' ? '転移先を選ぶ' : mode === 'view' ? 'マップ' : 'エリアを選ぶ')}
+        ${head(`${def.id}. ${def.name}`, mode === 'travel' ? tr('転移先を選ぶ') : mode === 'view' ? tr('マップ') : tr('エリアを選ぶ'))}
         <div class="stage-map"><canvas id="stage-canvas" width="${map.w * 8}" height="${map.h * 8}"></canvas></div>
         <div class="region-info">${info}</div>
         ${gateBtns ? `<div class="btn-row">${gateBtns}</div>` : ''}
-        ${mode === 'travel' ? '<div class="btn-row"><button class="btn" data-act="toWorld">全体図へ戻る</button></div>' : ''}
+        ${mode === 'travel' ? `<div class="btn-row"><button class="btn" data-act="toWorld">${tr('全体図へ戻る')}</button></div>` : ''}
       </div></div>`;
     };
     fn.after = () => drawStageCanvas(def, map, mode);
@@ -5739,7 +5888,7 @@
       const ctr = map.centers[ai];
       const x = ctr.x * 8 + 4;
       const y = ctr.y * 8 + 4;
-      g.font = `400 24px ${FONT_DISPLAY}`;
+      g.font = `400 24px ${RG.FONTS.display}`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.lineWidth = 5;
@@ -5748,7 +5897,7 @@
       const label = `${a.name}${a.strong ? ' ★' : ''}`;
       g.strokeText(label, x, y - 12);
       g.fillText(label, x, y - 12);
-      g.font = `700 16px ${FONT_UI}`;
+      g.font = `700 16px ${RG.FONTS.ui}`;
       const sub = `Lv${a.lv[0] + D.lv}〜${Math.min(99, a.lv[1] + D.lv)}`;
       g.fillStyle = free(a) ? '#7dffb0' : lvColor(a.lv[1] + D.lv - powerLv());
       g.strokeText(sub, x, y + 12);
@@ -5797,11 +5946,11 @@
     for (const f of def.features) {
       if (!f.shop) continue;
       g.fillStyle = '#ffd84a';
-      g.font = `800 14px ${FONT_UI}`;
+      g.font = `800 14px ${RG.FONTS.ui}`;
       g.strokeStyle = '#000';
       g.lineWidth = 4;
-      g.strokeText('武器屋', f.door[0] * 8 + 4, f.door[1] * 8 + 14);
-      g.fillText('武器屋', f.door[0] * 8 + 4, f.door[1] * 8 + 14);
+      g.strokeText(tr('武器屋'), f.door[0] * 8 + 4, f.door[1] * 8 + 14);
+      g.fillText(tr('武器屋'), f.door[0] * 8 + 4, f.door[1] * 8 + 14);
     }
     if (G && G.def === def) {
       g.fillStyle = '#fff';
@@ -5858,25 +6007,25 @@
       const canLeave = (area && area.free && !G.lock) || nearStone;
       return `
       <div class="overlay"><div class="panel narrow">
-        <div class="panel-head"><h2>メニュー</h2><span class="stat">${heroDef.name} ・ ${D.name}</span></div>
+        <div class="panel-head"><h2>${tr('メニュー')}</h2><span class="stat">${heroDef.name} ・ ${D.name}</span></div>
         <div class="btn-col">
-          <button class="btn primary" data-act="close">再開</button>
-          <button class="btn" data-act="openEquip">装備</button>
-          <button class="btn" data-act="openBoard">能力ボード</button>
-          <button class="btn" data-act="openMap">マップ</button>
-          <button class="btn" data-act="openMats">素材</button>
-          <button class="btn" data-act="settings">設定</button>
-          <button class="btn" data-act="pauseWorld" ${canLeave ? '' : 'disabled'}>全体図へ戻る</button>
+          <button class="btn primary" data-act="close">${tr('再開')}</button>
+          <button class="btn" data-act="openEquip">${tr('装備')}</button>
+          <button class="btn" data-act="openBoard">${tr('能力ボード')}</button>
+          <button class="btn" data-act="openMap">${tr('マップ')}</button>
+          <button class="btn" data-act="openMats">${tr('素材')}</button>
+          <button class="btn" data-act="settings">${tr('設定')}</button>
+          <button class="btn" data-act="pauseWorld" ${canLeave ? '' : 'disabled'}>${tr('全体図へ戻る')}</button>
         </div>
-        ${canLeave ? '' : '<p class="muted" style="text-align:center;font-size:0.85em">全体図へ戻れるのは、解放済みのエリアか、転移碑のそばにいるときだけ</p>'}
-        <p class="muted" style="text-align:center;font-size:0.85em">${saveOk ? 'セーブはエリアの解放・ボスの撃破・力尽きたときに自動で行われます' : 'この環境ではセーブできません'}</p>
+        ${canLeave ? '' : `<p class="muted" style="text-align:center;font-size:0.85em">${tr('全体図へ戻れるのは、解放済みのエリアか、転移碑のそばにいるときだけ')}</p>`}
+        <p class="muted" style="text-align:center;font-size:0.85em">${saveOk ? tr('セーブはエリアの解放・ボスの撃破・力尽きたときに自動で行われます') : tr('この環境ではセーブできません')}</p>
       </div></div>`;
     };
     uiShow(fn);
   }
   actions.openMap = () => showStageMap('view');
   actions.pauseWorld = () => {
-    showConfirm('全体図へ戻りますか？\n（最後のセーブ以降の進み具合は保存されていません。ページを閉じると失われます）', () => leaveToWorld());
+    showConfirm(tr('全体図へ戻りますか？\n（最後のセーブ以降の進み具合は保存されていません。ページを閉じると失われます）'), () => leaveToWorld());
   };
   actions.openMats = () => showMats();
 
@@ -5888,7 +6037,7 @@
     uiShow(() => `
       <div class="overlay"><div class="panel narrow" style="text-align:center">
         <p style="white-space:pre-line">${esc(text)}</p>
-        <div class="btn-row"><button class="btn" data-act="back">やめる</button><button class="btn primary" data-act="confirmYes">はい</button></div>
+        <div class="btn-row"><button class="btn" data-act="back">${tr('やめる')}</button><button class="btn primary" data-act="confirmYes">${tr('はい')}</button></div>
       </div></div>`);
   }
 
@@ -5899,18 +6048,18 @@
       const canRe = area && area.free && !area.def.town;
       return `
       <div class="overlay"><div class="panel narrow">
-        ${head('転移碑', s.name)}
-        <p class="mint" style="text-align:center">体力と回復薬が全回復した</p>
+        ${head(tr('転移碑'), s.name)}
+        <p class="mint" style="text-align:center">${tr('体力と回復薬が全回復した')}</p>
         <div class="btn-col">
-          <button class="btn primary" data-act="stoneTravel">転移する</button>
-          <button class="btn" data-act="openBoard">能力ボード</button>
-          <button class="btn" data-act="openEquip">装備</button>
-          ${canRe ? '<button class="btn" data-act="reinvade">再侵攻（残党狩り）</button>' : ''}
-          ${area && area.reinvaded ? '<button class="btn" data-act="purify">浄化する（残党狩りをやめる）</button>' : ''}
-          <button class="btn" data-act="toWorld">全体図へ戻る</button>
-          <button class="btn" data-act="close">閉じる</button>
+          <button class="btn primary" data-act="stoneTravel">${tr('転移する')}</button>
+          <button class="btn" data-act="openBoard">${tr('能力ボード')}</button>
+          <button class="btn" data-act="openEquip">${tr('装備')}</button>
+          ${canRe ? `<button class="btn" data-act="reinvade">${tr('再侵攻（残党狩り）')}</button>` : ''}
+          ${area && area.reinvaded ? `<button class="btn" data-act="purify">${tr('浄化する（残党狩りをやめる）')}</button>` : ''}
+          <button class="btn" data-act="toWorld">${tr('全体図へ戻る')}</button>
+          <button class="btn" data-act="close">${tr('閉じる')}</button>
         </div>
-        ${canRe ? '<p class="muted" style="font-size:0.82em">再侵攻: このエリアの魔巣を元に戻して戦い直す（解放のごほうびはない）</p>' : ''}
+        ${canRe ? `<p class="muted" style="font-size:0.82em">${tr('再侵攻: このエリアの魔巣を元に戻して戦い直す（解放のごほうびはない）')}</p>` : ''}
       </div></div>`;
     };
     actions.stoneTravel = () => showStageMap('travel');
@@ -5936,22 +6085,22 @@
         return `<div class="row ${done ? 'dim' : ''}">
           <div><div class="t">${b.name} <span class="muted">${r}/${max}</span></div>
           <div class="s">${b.fx(r, heroDef.id)}${done ? '' : ` → ${b.fx(r + 1, heroDef.id)}`}</div></div>
-          <button class="btn small ${!done && hero.exp >= cost ? 'primary' : ''}" data-act="rankUp" data-id="${b.id}" ${!done && hero.exp >= cost ? '' : 'disabled'}>${done ? '最大' : `${fmt(cost)} EXP`}</button>
+          <button class="btn small ${!done && hero.exp >= cost ? 'primary' : ''}" data-act="rankUp" data-id="${b.id}" ${!done && hero.exp >= cost ? '' : 'disabled'}>${done ? tr('最大') : `${fmt(cost)} EXP`}</button>
         </div>`;
       }).join('');
       const next = SLOTS[hero.slots];
-      let slotRow = '<div class="row dim"><div><div class="t">武器スロット</div><div class="s">最大の 6 つまで開いた</div></div></div>';
+      let slotRow = `<div class="row dim"><div><div class="t">${tr('武器スロット')}</div><div class="s">${tr('最大の 6 つまで開いた')}</div></div></div>`;
       if (next) {
         const condOk = !next.cond || (next.cond.gates ? gatesBeaten() >= next.cond.gates : nushiBeaten() >= next.cond.nushi);
         const ok = condOk && hero.exp >= next.exp;
-        slotRow = `<div class="row"><div><div class="t">武器スロット ${slotCount()} → ${slotCount() + 1}</div>
-          <div class="s">${next.condText ? `条件: ${next.condText}${condOk ? ' ✓' : ''}` : '武器を持てる数が増える'}</div></div>
+        slotRow = `<div class="row"><div><div class="t">${tr('武器スロット')} ${slotCount()} → ${slotCount() + 1}</div>
+          <div class="s">${next.condText ? `${tr('条件: {v}', { v: next.condText })}${condOk ? ' ✓' : ''}` : tr('武器を持てる数が増える')}</div></div>
           <button class="btn small ${ok ? 'primary' : ''}" data-act="slotUp" ${ok ? '' : 'disabled'}>${fmt(next.exp)} EXP</button></div>`;
       }
       return `
       <div class="overlay"><div class="panel">
-        ${head('能力ボード', `${heroDef.name} ・ 戦力 Lv${powerLv()} ・ <span style="color:#c8b8ff">${fmt(hero.exp)} EXP</span>`)}
-        <p class="muted" style="font-size:0.85em">経験値を使って能力を 1 ランクずつ解放する。使った経験値は戻らない。</p>
+        ${head(tr('能力ボード'), `${heroDef.name} ・ ${tr('戦力 Lv{n}', { n: powerLv() })} ・ <span style="color:#c8b8ff">${fmt(hero.exp)} EXP</span>`)}
+        <p class="muted" style="font-size:0.85em">${tr('経験値を使って能力を 1 ランクずつ解放する。使った経験値は戻らない。')}</p>
         <div class="list">${slotRow}${rows}</div>
       </div></div>`;
     };
@@ -5993,25 +6142,25 @@
         const id = hero.equipped[i];
         const locked = i >= hero.equipped.length;
         slots.push(`<button class="slot ${id ? 'filled' : ''} ${i === selSlot && !locked ? 'sel' : ''} ${locked ? 'locked' : ''}" data-act="${locked ? '' : 'pickSlot'}" data-i="${i}">
-          ${locked ? '🔒' : id ? `<b style="color:${CAT_COLORS[WEAPON[id].cat]}">${CAT_ICON[WEAPON[id].cat]}</b> ${WEAPON[id].name}${hero.weapons[id] ? ` +${hero.weapons[id]}` : ''}` : '<span class="muted">空き</span>'}</button>`);
+          ${locked ? '🔒' : id ? `<img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><span class="sn">${WEAPON[id].name}${hero.weapons[id] ? ` +${hero.weapons[id]}` : ''}</span>` : `<span class="muted">${tr('空き')}</span>`}</button>`);
       }
       const owned = WEAPONS.filter((w) => hero.weapons[w.id] != null);
       const rows = owned.map((w) => {
         const lv = hero.weapons[w.id];
         const inSlot = hero.equipped.indexOf(w.id);
-        return `<div class="row ${canEquip(w) ? '' : 'dim'}"><div>
-          <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name}${lv ? ` +${lv}` : ''} ${inSlot >= 0 ? `<span class="tag">スロット${inSlot + 1}</span>` : ''}</div>
+        return `<div class="row wrow ${canEquip(w) ? '' : 'dim'}"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
+          <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name}${lv ? ` +${lv}` : ''} ${inSlot >= 0 ? `<span class="tag">${tr('スロット{n}', { n: inSlot + 1 })}</span>` : ''}</div>
           <div class="s">${weaponStats(w, lv)} ・ ${w.desc}</div></div>
-          ${canEquip(w) ? `<button class="btn small" data-act="equip" data-id="${w.id}" ${hero.equipped[selSlot] === w.id ? 'disabled' : ''}>スロット${selSlot + 1}へ</button>` : '<span class="muted">使えない</span>'}
+          ${canEquip(w) ? `<button class="btn small" data-act="equip" data-id="${w.id}" ${hero.equipped[selSlot] === w.id ? 'disabled' : ''}>${tr('スロット{n}へ', { n: selSlot + 1 })}</button>` : `<span class="muted">${tr('使えない')}</span>`}
         </div>`;
       }).join('');
       const count = hero.equipped.filter(Boolean).length;
       return `
       <div class="overlay"><div class="panel">
-        ${head('装備', `武器スロット ${hero.equipped.length}/6`)}
+        ${head(tr('装備'), tr('武器スロット {a}/6', { a: hero.equipped.length }))}
         <div class="slots">${slots.join('')}</div>
-        <div class="btn-row" style="margin:0 0 6px;justify-content:flex-end"><button class="btn small" data-act="unequip" ${hero.equipped[selSlot] && count > 1 ? '' : 'disabled'}>スロット${selSlot + 1}を外す</button></div>
-        <h3>武器庫</h3>
+        <div class="btn-row" style="margin:0 0 6px;justify-content:flex-end"><button class="btn small" data-act="unequip" ${hero.equipped[selSlot] && count > 1 ? '' : 'disabled'}>${tr('スロット{n}を外す', { n: selSlot + 1 })}</button></div>
+        <h3>${tr('武器庫')}</h3>
         <div class="list">${rows}</div>
       </div></div>`;
     };
@@ -6041,11 +6190,11 @@
 
   function weaponStats(w, lv) {
     const dmg = Math.round(w.dmg * upgMul(lv));
-    const parts = [`威力 ${dmg}${w.pellets ? `×${w.pellets}` : ''}`, `連射 ${w.rate}/秒`];
-    if (w.mag) parts.push(`装弾 ${weaponMag(w, lv)}`);
-    if (w.mana) parts.push(`魔力 ${w.mana[0]}`);
-    parts.push(ELEMS[w.elem] ? ELEMS[w.elem].name : '全属性');
-    return parts.join(' ・ ');
+    const parts = [`${tr('威力 {v}', { v: dmg })}${w.pellets ? `×${w.pellets}` : ''}`, tr('連射 {v}/秒', { v: w.rate })];
+    if (w.mag) parts.push(tr('装弾 {v}', { v: weaponMag(w, lv) }));
+    if (w.mana) parts.push(tr('魔力 {v}', { v: w.mana[0] }));
+    parts.push(ELEMS[w.elem] ? ELEMS[w.elem].name : tr('全属性'));
+    return parts.join(tr(' ・ '));
   }
 
   // ---------- お店 ----------
@@ -6071,14 +6220,14 @@
           const owned = hero.weapons[id] != null;
           const can = canEquip(w);
           const ok = !owned && can && hero.gold >= w.price;
-          return `<div class="row ${can ? '' : 'dim'}"><div>
+          return `<div class="row wrow ${can ? '' : 'dim'}"><img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><div>
             <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name} <span class="muted">T${w.tier}</span></div>
             <div class="s">${weaponStats(w, 0)} ・ ${w.desc}</div></div>
-            <button class="btn small ${ok ? 'primary' : ''}" data-act="buyW" data-id="${id}" ${ok ? '' : 'disabled'}>${owned ? '所持' : !can ? 'この主人公は使えない' : `${fmt(w.price)} G`}</button>
+            <button class="btn small ${ok ? 'primary' : ''}" data-act="buyW" data-id="${id}" ${ok ? '' : 'disabled'}>${owned ? tr('所持') : !can ? tr('この主人公は使えない') : `${fmt(w.price)} G`}</button>
           </div>`;
         }).join('');
-        const nextHint = phase === 1 ? 'ステージのエリアを半分解放すると、品ぞろえが増える' : phase === 2 ? 'ステージを全部解放してヌシを倒すと、目玉の品が並ぶ' : '品ぞろえは最大';
-        body += `<p class="muted" style="font-size:0.85em">品ぞろえ 第${phase}段階 ・ ${nextHint}</p>`;
+        const nextHint = phase === 1 ? tr('ステージのエリアを半分解放すると、品ぞろえが増える') : phase === 2 ? tr('ステージを全部解放してヌシを倒すと、目玉の品が並ぶ') : tr('品ぞろえは最大');
+        body += `<p class="muted" style="font-size:0.85em">${tr('品ぞろえ 第{n}段階 ・ {hint}', { n: phase, hint: nextHint })}</p>`;
       } else if (shopTab === 'up') {
         const owned = WEAPONS.filter((w) => hero.weapons[w.id] != null && canEquip(w));
         body = owned.map((w) => {
@@ -6086,29 +6235,29 @@
           const done = lv >= max;
           const cost = upgradeCost(w, lv);
           const ok = !done && hero.gold >= cost;
-          return `<div class="row"><div>
+          return `<div class="row wrow"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
             <div class="t">${w.name} <span class="gold">+${lv}</span>${done ? '' : ` → <span class="gold">+${lv + 1}</span>`}</div>
-            <div class="s">威力 ${Math.round(w.dmg * upgMul(lv))}${done ? '' : ` → ${Math.round(w.dmg * upgMul(lv + 1))}`}${!done && weaponMag(w, lv + 1) > weaponMag(w, lv) ? ` ・ 装弾 +${weaponMag(w, lv + 1) - weaponMag(w, lv)}` : ''}</div></div>
-            <button class="btn small ${ok ? 'primary' : ''}" data-act="upW" data-id="${w.id}" ${ok ? '' : 'disabled'}>${done ? `この店では +${max} まで` : `${fmt(cost)} G`}</button>
+            <div class="s">${tr('威力 {v}', { v: Math.round(w.dmg * upgMul(lv)) })}${done ? '' : ` → ${Math.round(w.dmg * upgMul(lv + 1))}`}${!done && weaponMag(w, lv + 1) > weaponMag(w, lv) ? ` ・ ${tr('装弾 +{v}', { v: weaponMag(w, lv + 1) - weaponMag(w, lv) })}` : ''}</div></div>
+            <button class="btn small ${ok ? 'primary' : ''}" data-act="upW" data-id="${w.id}" ${ok ? '' : 'disabled'}>${done ? tr('この店では +{n} まで', { n: max }) : `${fmt(cost)} G`}</button>
           </div>`;
-        }).join('') || '<p class="muted">強化できる武器がない</p>';
-        body += `<p class="muted" style="font-size:0.85em">この店で強化できるのは +${max} まで（お店の格による）</p>`;
+        }).join('') || `<p class="muted">${tr('強化できる武器がない')}</p>`;
+        body += `<p class="muted" style="font-size:0.85em">${tr('この店で強化できるのは +{n} まで（お店の格による）', { n: max })}</p>`;
       } else {
         body = shop.items.map((id) => {
           const it = ITEMS[id];
           const full = hero.potions >= maxPotions();
           const ok = !full && hero.gold >= it.price;
-          return `<div class="row"><div><div class="t">${it.name} <span class="muted">${hero.potions}/${maxPotions()}</span></div><div class="s">${it.desc}（転移碑を使うと全回復する）</div></div>
-            <button class="btn small ${ok ? 'primary' : ''}" data-act="buyItem" data-id="${id}" ${ok ? '' : 'disabled'}>${full ? '満タン' : `${fmt(it.price)} G`}</button></div>`;
+          return `<div class="row"><div><div class="t">${it.name} <span class="muted">${hero.potions}/${maxPotions()}</span></div><div class="s">${tr('{desc}（転移碑を使うと全回復する）', { desc: it.desc })}</div></div>
+            <button class="btn small ${ok ? 'primary' : ''}" data-act="buyItem" data-id="${id}" ${ok ? '' : 'disabled'}>${full ? tr('満タン') : `${fmt(it.price)} G`}</button></div>`;
         }).join('');
       }
       return `
       <div class="overlay"><div class="panel">
         ${head(shop.name, `<span class="gold">${fmt(hero.gold)} G</span>`)}
         <div class="tabs">
-          <button class="btn small ${shopTab === 'buy' ? 'on' : ''}" data-act="shopTab" data-id="buy">武器を買う</button>
-          <button class="btn small ${shopTab === 'up' ? 'on' : ''}" data-act="shopTab" data-id="up">強化</button>
-          <button class="btn small ${shopTab === 'item' ? 'on' : ''}" data-act="shopTab" data-id="item">道具</button>
+          <button class="btn small ${shopTab === 'buy' ? 'on' : ''}" data-act="shopTab" data-id="buy">${tr('武器を買う')}</button>
+          <button class="btn small ${shopTab === 'up' ? 'on' : ''}" data-act="shopTab" data-id="up">${tr('強化')}</button>
+          <button class="btn small ${shopTab === 'item' ? 'on' : ''}" data-act="shopTab" data-id="item">${tr('道具')}</button>
         </div>
         <div class="list">${body}</div>
       </div></div>`;
@@ -6128,7 +6277,7 @@
     if (empty >= 0) hero.equipped[empty] = w.id;
     if (P) ensureWs(w.id);
     sfx('buy');
-    toast(`${w.name} を手に入れた${empty >= 0 ? `（スロット${empty + 1}に装備）` : '（装備から入れ替えられます）'}`, 2);
+    toast(tr('{name} を手に入れた', { name: w.name }) + (empty >= 0 ? tr('（スロット{n}に装備）', { n: empty + 1 }) : tr('（装備から入れ替えられます）')), 2);
     rerender();
   };
   actions.upW = (d) => {
@@ -6156,9 +6305,9 @@
       const ids = Object.keys(hero.materials).filter((id) => hero.materials[id] > 0);
       return `
       <div class="overlay"><div class="panel narrow">
-        ${head('素材')}
-        <p class="muted" style="font-size:0.85em">素材は、魔法屋で必殺技を買うときに使う（魔法屋はステージ2 の町から）</p>
-        <div class="list">${ids.length ? ids.map((id) => `<div class="row"><div class="t">${MATERIALS[id]}</div><b>×${hero.materials[id]}</b></div>`).join('') : '<p class="muted">まだ持っていない</p>'}</div>
+        ${head(tr('素材'))}
+        <p class="muted" style="font-size:0.85em">${tr('素材は、魔法屋で必殺技を買うときに使う（魔法屋はステージ2 の町から）')}</p>
+        <div class="list">${ids.length ? ids.map((id) => `<div class="row"><div class="t">${MATERIALS[id]}</div><b>×${hero.materials[id]}</b></div>`).join('') : `<p class="muted">${tr('まだ持っていない')}</p>`}</div>
       </div></div>`;
     });
   }
@@ -6167,15 +6316,25 @@
   function showSettings() {
     uiShow(() => `
       <div class="overlay"><div class="panel narrow">
-        ${head('設定')}
+        ${head(tr('設定'))}
         <div class="list">
-          <div class="row"><div class="t">効果音</div><input type="range" min="0" max="1" step="0.1" value="${settings.se}" data-set="se"></div>
-          <div class="row"><div><div class="t">自動でねらって撃つ</div><div class="s">近くの敵へ武器が自動でねらいを向けて撃つ。OFF のときは、マウスを押している間（スマホは右側をなぞっている間）だけ撃つ</div></div><button class="btn small" data-act="toggleSet" data-id="autoAim">${settings.autoAim ? 'ON' : 'OFF'}</button></div>
-          <div class="row"><div class="t">ダメージの数字</div><button class="btn small" data-act="toggleSet" data-id="numbers">${settings.numbers ? 'ON' : 'OFF'}</button></div>
-          <div class="row"><div><div class="t">縦持ちのとき横向きに回す（スマホ）</div><div class="s">画面が自動で回らないときに、ゲームを 90° 回して横向きで遊ぶ</div></div><button class="btn small" data-act="toggleSet" data-id="rotate">${settings.rotate ? 'ON' : 'OFF'}</button></div>
+          <div class="row"><div class="t">🌐 Language</div>${langBtns()}</div>
+          <div class="row"><div class="t">${tr('効果音')}</div><input type="range" min="0" max="1" step="0.1" value="${settings.se}" data-set="se"></div>
+          <div class="row"><div><div class="t">${tr('自動でねらって撃つ')}</div><div class="s">${tr('近くの敵へ武器が自動でねらいを向けて撃つ。OFF のときは、マウスを押している間（スマホは右側をなぞっている間）だけ撃つ')}</div></div><button class="btn small" data-act="toggleSet" data-id="autoAim">${settings.autoAim ? 'ON' : 'OFF'}</button></div>
+          <div class="row"><div class="t">${tr('ダメージの数字')}</div><button class="btn small" data-act="toggleSet" data-id="numbers">${settings.numbers ? 'ON' : 'OFF'}</button></div>
+          <div class="row"><div><div class="t">${tr('縦持ちのとき横向きに回す（スマホ）')}</div><div class="s">${tr('画面が自動で回らないときに、ゲームを 90° 回して横向きで遊ぶ')}</div></div><button class="btn small" data-act="toggleSet" data-id="rotate">${settings.rotate ? 'ON' : 'OFF'}</button></div>
         </div>
       </div></div>`);
   }
+  // 言葉を選ぶボタン (タイトルと設定)
+  const langBtns = () => `<div class="langs">${Object.entries(RG.LANGS).map(([id, name]) =>
+    `<button class="btn small ${settings.lang === id ? 'on' : ''}" data-act="setLang" data-id="${id}" lang="${id}">${name}</button>`).join('')}</div>`;
+  actions.setLang = (d) => {
+    settings.lang = d.id;
+    saveSettings();
+    RG.setLang(d.id);
+    rerender();
+  };
   actions.toggleSet = (d) => {
     settings[d.id] = !settings[d.id];
     saveSettings();

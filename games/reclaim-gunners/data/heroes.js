@@ -67,16 +67,16 @@ RG.HEROES = [
 // max はヒーローごとに上書きできる (maxBy)
 RG.BOARD = [
   { id: 'hp', name: '最大体力', max: 40, base: 20, fx: (r, h) => `+${r * (h === 'gald' ? 12 : 8)}` },
-  { id: 'atk', name: '攻撃力', max: 40, base: 25, fx: (r) => `与えるダメージ +${r * 4}%` },
-  { id: 'def', name: '防御', max: 30, base: 25, fx: (r) => `受けるダメージ −${(r * 1.5).toFixed(1)}%` },
+  { id: 'atk', name: '攻撃力', max: 40, base: 25, fx: (r) => RG.t('与えるダメージ +{v}%', { v: r * 4 }) },
+  { id: 'def', name: '防御', max: 30, base: 25, fx: (r) => RG.t('受けるダメージ −{v}%', { v: (r * 1.5).toFixed(1) }) },
   { id: 'spd', name: '移動速度', max: 20, maxBy: { gald: 15 }, base: 30, fx: (r) => `+${(r * 1.5).toFixed(1)}%` },
-  { id: 'rel', name: 'リロード速度', max: 20, base: 20, fx: (r) => `リロード時間 −${(r * 2.5).toFixed(1)}%` },
+  { id: 'rel', name: 'リロード速度', max: 20, base: 20, fx: (r) => RG.t('リロード時間 −{v}%', { v: (r * 2.5).toFixed(1) }) },
   { id: 'crit', name: '会心率', max: 30, base: 30, fx: (r) => `+${r}%` },
   { id: 'critd', name: '会心ダメージ', max: 30, base: 30, fx: (r) => `×${(1.5 + r * 0.05).toFixed(2)}` },
   { id: 'dodge', name: '回避クールダウン', max: 15, base: 30, fx: (r) => `−${r * 3}%` },
-  { id: 'gold', name: '金運', max: 25, base: 25, fx: (r) => `獲得するお金 +${r * 3}%` },
-  { id: 'mat', name: '素材運', max: 25, base: 25, fx: (r) => `素材のドロップ率 +${r * 3}%` },
-  { id: 'pot', name: '回復薬の所持数', max: 3, base: 400, fx: (r) => `${3 + r} 個` },
+  { id: 'gold', name: '金運', max: 25, base: 25, fx: (r) => RG.t('獲得するお金 +{v}%', { v: r * 3 }) },
+  { id: 'mat', name: '素材運', max: 25, base: 25, fx: (r) => RG.t('素材のドロップ率 +{v}%', { v: r * 3 }) },
+  { id: 'pot', name: '回復薬の所持数', max: 3, base: 400, fx: (r) => RG.t('{v} 個', { v: 3 + r }) },
 ];
 
 // 武器スロット (最初は 2 つ。4 回開けて最大 6 つ)
