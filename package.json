@@ -1,0 +1,12 @@
+{
+  "name": "tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:pub": "node scripts/build-pub.mjs"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.2.2",
+    "vite": "^6.4.5"
+  }
+}

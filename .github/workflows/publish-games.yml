@@ -1,0 +1,106 @@
+# main に push されたゲームを Vite でビルド・難読化して、公開用リポジトリ (MakotoPrana/tools-pub) の main に push する。
+# 変わったゲームだけを作り直す。共通ファイル (origami-intro.js・assets/・ビルドの仕組み) が変わったときは全ゲームを作り直す。
+#
+# 必要な設定 (1回だけ):
+#   1. ssh-keygen -t ed25519 -f pub_deploy_key -N "" で鍵を作る
+#   2. tools-pub の Settings → Deploy keys に pub_deploy_key.pub を「Allow write access」つきで登録する
+#   3. tools の Settings → Secrets and variables → Actions に、pub_deploy_key の中身を PUB_DEPLOY_KEY という名前で登録する
+name: Publish games to tools-pub
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'games/**'
+      - 'assets/**'
+      - 'scripts/build-pub.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/publish-games.yml'
+  workflow_dispatch:
+    inputs:
+      games:
+        description: '作り直すゲーム (空白区切り。空なら全部)'
+        required: false
+        default: ''
+
+# 続けて push されても、tools-pub への push が順番に1つずつ行われるようにする
+concurrency:
+  group: publish-games
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: src
+
+      - name: Decide which games to build
+        id: games
+        working-directory: src
+        env:
+          BEFORE: ${{ github.event.before }}
+          INPUT_GAMES: ${{ github.event.inputs.games }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "list=$INPUT_GAMES" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "list=" >> "$GITHUB_OUTPUT"   # 前のコミットが分からないときは全部
+            exit 0
+          fi
+          changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+          echo "$changed"
+          if echo "$changed" | grep -qE '^(games/origami-intro\.js|assets/|scripts/build-pub\.mjs|package(-lock)?\.json|\.github/workflows/publish-games\.yml)'; then
+            echo "list=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          list=$(echo "$changed" | sed -nE 's#^games/([^/]+)/.*#\1#p' | sort -u | tr '\n' ' ')
+          if [ -z "$list" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"   # ゲームに関係ない変更 (games/index.html など) だけ
+          fi
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.games.outputs.skip != 'true'
+        with:
+          repository: MakotoPrana/tools-pub
+          ref: main
+          ssh-key: ${{ secrets.PUB_DEPLOY_KEY }}
+          path: pub
+
+      - uses: actions/setup-node@v4
+        if: steps.games.outputs.skip != 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+
+      - name: Build and obfuscate
+        if: steps.games.outputs.skip != 'true'
+        working-directory: src
+        env:
+          GAMES: ${{ steps.games.outputs.list }}
+        run: |
+          npm ci
+          node scripts/build-pub.mjs --out ../pub $GAMES
+
+      - name: Push to tools-pub
+        if: steps.games.outputs.skip != 'true'
+        working-directory: pub
+        env:
+          GAMES: ${{ steps.games.outputs.list }}
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "変更なし"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Build ${GAMES:-all games} from MakotoPrana/tools@${GITHUB_SHA::7}"
+          git push origin HEAD:main
