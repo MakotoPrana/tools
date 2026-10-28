@@ -6,11 +6,11 @@
  *   ・相手がボールなら重く、ピン同士なら高く乾いた音、床なら木の床の「ドン」、壁なら鈍い音
  *   ・強く当たるほど大きく、高い成分も多く鳴る
  *   ・ピンの左右の位置で、音も左右に振る
- *   ・1フレームの間に物理は何ステップも進むので、当たった時刻 (物理の時計) どおりにずらして鳴らす。
- *     ストライクの「ガラガラ」は、細かい当たりの間合いで決まるため
+ *   ・当たった時刻 (物理の時計) どおりにずらして鳴らす。ストライクの「ガラガラ」は、細かい当たりの間合いで決まるため
  */
-import { clamp, rand } from './util.js';
-import { audioOut } from './audio.js';
+import { clamp, rand } from '../util.js';
+import { audioOut } from './output.js';
+import { tone, noise, voiceInput, audioTime } from './synth.js';
 
 // 細長い棒が両端自由で曲がって振動するときの、高さの比と、鳴り続ける長さ (秒)。
 // 木は振動をすぐ吸うので短い (長いと金属の「キーン」になる)
@@ -36,54 +36,11 @@ const KINDS = {
 
 let voices = 0;
 const lastHit = new WeakMap();
-let anchor = null; // 物理の時計と音の時計の対応 { world, audio }
-
-// 物理の時刻を、音を鳴らす時刻に直す。遅れすぎたり先に進みすぎたりしたら、今に合わせ直す
-function audioTime(ctx, worldTime) {
-  const now = ctx.currentTime;
-  let at = anchor ? anchor.audio + (worldTime - anchor.world) : -1;
-  if (at < now || at > now + 0.08) {
-    anchor = { world: worldTime, audio: now + 0.02 };
-    at = anchor.audio;
-  }
-  return at;
-}
 
 // ピンの番号から、そのピンの高さを決める (いつも同じ値になるように)。
 // 木目や傷みで1本ずつ違うので、上の固有振動の比も少しずらす
 const toneOf = (index) => 1 + (((index * 7919) % 13) / 12 - 0.5) * 0.12;
 const ratioOf = (index, mode) => 1 + ((((index + 3) * (mode + 1) * 104729) % 17) / 16 - 0.5) * 0.06 * mode;
-
-function envelope(ctx, at, peak, attack, decay) {
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(0.0001, at);
-  g.gain.exponentialRampToValueAtTime(peak, at + attack);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + attack + decay * 6.9);
-  return g;
-}
-
-function tone(ctx, out, at, hz, peak, decay, toHz) {
-  const o = ctx.createOscillator();
-  o.frequency.setValueAtTime(hz, at);
-  if (toHz) o.frequency.exponentialRampToValueAtTime(toHz, at + decay * 2);
-  const g = envelope(ctx, at, peak, 0.0015, decay);
-  o.connect(g).connect(out);
-  o.start(at);
-  o.stop(at + decay * 7 + 0.01);
-  return o;
-}
-
-// 雑音をフィルターに通して、短く鳴らす
-function noise(ctx, out, at, type, hz, q, peak, decay) {
-  const src = ctx.createBufferSource();
-  src.buffer = ctx.noise;
-  const f = ctx.createBiquadFilter();
-  f.type = type;
-  f.frequency.value = hz;
-  f.Q.value = q;
-  src.connect(f).connect(envelope(ctx, at, peak, 0.0008, decay)).connect(out);
-  src.start(at, rand(0, 1.5), 0.0008 + decay * 7);
-}
 
 /*
  * ピンが何かに当たった音を鳴らす
@@ -105,19 +62,8 @@ export function pinHit(kind, speed, index, x, key, worldTime) {
   // 強く当たるほど、高い成分まで鳴る
   const bright = k.bright * (0.35 + 0.65 * hit);
 
-  const voice = ctx.createGain();
-  voice.gain.value = level * 0.5;
-  let node = voice;
-  if (ctx.createStereoPanner) {
-    const pan = ctx.createStereoPanner();
-    pan.pan.value = clamp(x / 0.9, -1, 1) * 0.7;
-    voice.connect(pan);
-    node = pan;
-  }
-  node.connect(out.dry);
-  const send = ctx.createGain();
-  send.gain.value = 0.5 + 0.5 * hit; // 大きな音ほど場内に響く
-  node.connect(send).connect(out.wet);
+  // 大きな音ほど場内に響く
+  const voice = voiceInput(out, level * 0.5, clamp(x / 0.9, -1, 1) * 0.7, 0.5 + 0.5 * hit);
 
   // ピンの木の鳴り
   const f0 = BASE_HZ * toneOf(index) * rand(0.985, 1.015);

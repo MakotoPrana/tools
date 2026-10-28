@@ -8,7 +8,7 @@ import { $, clamp } from '../util.js';
 import { on } from '../events.js';
 import { game, isMenu } from '../state.js';
 import { startAim, throwBall, retryStage } from '../game.js';
-import { initAudio } from '../audio.js';
+import { initAudio } from '../audio/output.js';
 import { setThrowInfo, describeAim } from '../ui/hud.js';
 import { openSelect } from '../ui/screens.js';
 

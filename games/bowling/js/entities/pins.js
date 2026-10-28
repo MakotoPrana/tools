@@ -4,18 +4,27 @@ import { scene } from '../render/renderer.js';
 import { pinGeo, pinMat } from '../render/models.js';
 import { world, M, toY } from '../physics/world.js';
 
-// ピンは3つの円すい台を重ねた形で近似する
+// ピンは4つの円すい台を重ねた形で近似する。
+// cannon の円柱は角柱で、平らな面は角より内側にある。そのままだと寝たピンの見た目が床にめりこむので、
+// 面が見た目の太さに来るよう、角の半径を少し大きくする。
+// 8角形にしているのは、倒れたピンどうしや床との当たり判定を軽くするため (10角形の約半分の時間)
+const SIDES = 8;
+const FACE_FIX = 1 / Math.cos(Math.PI / SIDES);
 function pinPart(body, rBottom, rTop, yBottom, yTop) {
   const h = yTop - yBottom;
-  body.addShape(new CANNON.Cylinder(rTop, rBottom, h, 10), new CANNON.Vec3(0, (yBottom + yTop) / 2 - PIN_COM, 0), toY);
+  body.addShape(new CANNON.Cylinder(rTop * FACE_FIX, rBottom * FACE_FIX, h, SIDES), new CANNON.Vec3(0, (yBottom + yTop) / 2 - PIN_COM, 0), toY);
 }
 
 export const pins = [];
 for (let i = 0; i < MAX_PINS; i++) {
   const body = new CANNON.Body({ mass: PIN_MASS, material: M.pin });
-  pinPart(body, 0.026, 0.06, 0, 0.115);
-  pinPart(body, 0.06, 0.04, 0.115, 0.22);
-  pinPart(body, 0.03, 0.032, 0.22, 0.381);
+  pinPart(body, 0.0254, 0.0605, 0, 0.1143);
+  pinPart(body, 0.0605, 0.058, 0.1143, 0.16);
+  pinPart(body, 0.058, 0.035, 0.16, 0.22);
+  pinPart(body, 0.028, 0.0325, 0.22, 0.381);
+  // cannon の初期設定では組1とだけぶつかる。レーンの床 (LANE_GROUP) にも乗るようにする。
+  // そうしないと、倒れたピンが床をすり抜けて沈んでしまう
+  body.collisionFilterMask = -1;
   body.sleepSpeedLimit = 0.12;
   body.sleepTimeLimit = 0.4;
   body.linearDamping = 0.05;
@@ -57,6 +66,7 @@ export function rackPins(onlyStanding) {
       b.position.set(b.position.x, p.baseY + PIN_COM + 0.002, b.position.z);
     }
     b.quaternion.set(0, 0, 0, 1);
+    b.collisionFilterMask = -1;
     b.velocity.setZero();
     b.angularVelocity.setZero();
     // 眠っている体は物理が更新しないので、当たり判定の箱と回りにくさを、置いた姿勢で作り直しておく。

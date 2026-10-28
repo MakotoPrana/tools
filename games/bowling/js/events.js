@@ -12,6 +12,7 @@
  *     result      { kind, left, fresh }  ステージが終わった (kind は 'strike' | 'spare' | null)
  *     stopped                        遊んでいる途中でメニューを開いた
  *     recordsChanged                 成績が変わった
+ *     audioReady                     音を鳴らせるようになった (最初の操作のあと、または音をオンにしたとき)
  */
 const listeners = new Map();
 

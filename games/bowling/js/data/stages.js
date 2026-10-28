@@ -152,7 +152,7 @@ export default function buildWorlds(K) {
             { x: -0.14, z: H + 1.1, w: 0.78, d: 0.1, h: 0.32 },
             { x: 0.43, z: H + 0.45, w: 0.36, d: 0.05, h: 0.3, rotY: -Math.PI / 4, bouncy: true },
           ],
-          treasure: TR('goldPin', -0.47, 0.15, H + 0.6),
+          treasure: TR('goldPin', -0.63, 0.11, H + 0.95),
         },
         {
           name: T('グランドフィナーレ', 'Grand Finale', '终极挑战', '그랜드 피날레'),
@@ -677,7 +677,7 @@ export default function buildWorlds(K) {
           goal: T('逆回りの2本のバー。どちらにも当たらずに', 'Two bars spinning opposite ways. Miss them both.', '两根反向旋转的杆。两根都别碰', '반대로 도는 막대 두 개. 둘 다 피하자'),
           pins: tight(0, H, 3),
           spinners: [{ x: -0.2, z: -9, len: 0.5, speed: 2.2 }, { x: 0.2, z: -13, len: 0.5, speed: -2.2 }],
-          treasure: TR('neonStar', 0.3, 0.16, -10),
+          treasure: TR('neonStar', -0.1, 0.16, -10.09),
         },
         {
           name: T('ピンボール台', 'Pinball Table', '弹珠台', '핀볼대'),
@@ -876,7 +876,7 @@ export default function buildWorlds(K) {
           pins: rack(1, 2, 3, 4, 5, 6),
           movers: [{ x: 0, z: -9, w: 0.45, d: 0.3, h: 0.35, range: 0.3, period: 2 }],
           conveyors: [{ x: 0, z: -13, w: LANE_W, d: 2, fx: 0, fz: 30 }],
-          treasure: TR('gear', 0, 0.16, -11),
+          treasure: TR('gear', 0.16, 0.16, -11.21),
         },
         {
           name: T('組み立てライン', 'Assembly Line', '装配线', '조립 라인'),

@@ -9,7 +9,7 @@ import { stage } from '../stage/builder.js';
 import { WORLDS, nextStageOf } from '../worlds.js';
 import { peek, isUnlocked, worldUnlocked, lastPlayableWorld, tally, overallProgress } from '../records.js';
 import { loadStage, retryStage, currentStage, stopPlay, setMenuMode } from '../game.js';
-import { initAudio } from '../audio.js';
+import { initAudio } from '../audio/output.js';
 import { renderStageBar, updateHud, setRetryEnabled } from './hud.js';
 
 const overlay = $('overlay');

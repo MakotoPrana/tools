@@ -15,7 +15,8 @@ import { stage, buildStage, addTreasure, floorTopAt, setMovers } from './stage/b
 import './stage/interactions.js';
 import { WORLDS, getStage } from './worlds.js';
 import { peek, recordThrow, recordClear } from './records.js';
-import { initAudio, chime, setRumble } from './audio.js';
+import { initAudio } from './audio/output.js';
+import { chime, setRumble } from './audio/effects.js';
 
 let nextTimer = 0;
 let builtTheme = null;

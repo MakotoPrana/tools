@@ -1,6 +1,7 @@
 /*
  * ボールと仕掛けのやりとり (物理の1ステップごと)
- *   落とし穴、ワープゲート、ベルトコンベア、宝物、ガター、カーブ、バンパー、跳ね返ったあとの回転、当たった音
+ *   落とし穴 (ボールと倒れたピン)、ワープゲート、ベルトコンベア、宝物、ガター、カーブ、バンパー、跳ね返ったあとの回転、
+ *   当たった音 (ピン、ボールと壁や床)
  *   力は1ステップごとに消えるので、カーブやコンベアの力も毎回かける
  */
 import {
@@ -14,8 +15,9 @@ import { ballBody, rollWithVelocity } from '../entities/ball.js';
 import { pins } from '../entities/pins.js';
 import { env } from '../world/environment.js';
 import { stage, setMovers, inHole } from './builder.js';
-import { bumperSound, warpSound } from '../audio.js';
-import { pinHit } from '../pinSound.js';
+import { bumperSound, warpSound } from '../audio/effects.js';
+import { pinHit } from '../audio/pinSound.js';
+import { ballHit } from '../audio/ballSound.js';
 
 const force = new CANNON.Vec3();
 
@@ -34,6 +36,18 @@ function checkHoles(bp, onGround) {
     // 穴の底。見えないところで止めておく
     bp.y = -0.8;
     ballBody.velocity.setZero();
+  }
+}
+
+// 倒れて転がったピンも、穴の上に来たら落ちる (立っているピンは、穴のふちの台に乗っているので落ちない)
+function checkPinHoles() {
+  if (!stage.holes.length) return;
+  for (const p of pins) {
+    const b = p.body;
+    if (!p.active || b.sleepState === CANNON.Body.SLEEPING || !(b.collisionFilterMask & LANE_GROUP)) continue;
+    if (b.position.y < 0.12 && stage.holes.some((h) => inHole(h, b.position.x, b.position.z))) {
+      b.collisionFilterMask = -1 & ~LANE_GROUP;
+    }
   }
 }
 
@@ -97,6 +111,7 @@ world.addEventListener('preStep', () => {
   const bp = ballBody.position;
   const onGround = bp.y < BALL_R + 0.02 && bp.y > BALL_R - 0.05;
   checkHoles(bp, onGround);
+  checkPinHoles();
   checkPortals(bp);
   applyConveyors(bp, onGround);
   checkTreasure(bp);
@@ -112,12 +127,23 @@ world.addEventListener('postStep', () => {
   rollWithVelocity();
 });
 
+// ボールが当たった音の種類 (ピンの音は下のピンの側で鳴らす)。ピットの奥は幕なので鈍い音
+const BALL_HIT = new Map([[M.lane, 'ground'], [M.wall, 'wall'], [M.rail, 'rail'], [M.tire, 'tire']]);
+
 ballBody.addEventListener('collide', (e) => {
   const m = e.body.material;
   if (m === M.rail || m === M.tire) reroll = true;
   // バンパーに当たったら、外向きにはじく
   const kick = stage.bumpers.get(e.body);
-  if (!kick) return;
+  if (!kick) {
+    let what = BALL_HIT.get(m);
+    if (what === 'wall' && ballBody.position.z < DECK_END) what = 'cushion';
+    if (what) {
+      const speed = Math.abs(e.contact.getImpactVelocityAlongNormal());
+      ballHit(what, env.theme.surface, speed, ballBody.position.x, e.body, world.time);
+    }
+    return;
+  }
   const dx = ballBody.position.x - e.body.position.x;
   const dz = ballBody.position.z - e.body.position.z;
   const l = Math.hypot(dx, dz) || 1;
