@@ -8,8 +8,9 @@
   'use strict';
 
   const PM = window.PaperPlaneModel;
+  const I18N = window.PAPER_PLANE_I18N;
   const $ = (id) => document.getElementById(id);
-  if (!window.THREE || !PM) {
+  if (!window.THREE || !PM || !I18N) {
     $('load-error').hidden = false;
     $('start-btn').disabled = true;
     $('free-btn').disabled = true;
@@ -63,6 +64,7 @@
   const againBtn = $('again-btn');
   const refoldBtn = $('refold-btn');
   const shareBtn = $('share-btn');
+  const langSelect = $('lang-select');
   const panelEl = $('panel');
   const hudEl = $('hud');
   const progressEl = $('progress');
@@ -76,6 +78,27 @@
     get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
     set(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* 保存できなくても遊べる */ } },
   };
+  // ---- 言語 ----
+  function pickLang() {
+    const saved = store.get('paper-plane-lang');
+    if (saved && I18N.ui[saved]) return saved;
+    for (const l of navigator.languages || [navigator.language || 'ja']) {
+      const code = String(l).toLowerCase();
+      if (code.startsWith('ja')) return 'ja';
+      if (code.startsWith('zh')) return 'zh';
+      if (code.startsWith('ko')) return 'ko';
+      if (code.startsWith('en')) return 'en';
+    }
+    return 'en';
+  }
+  let lang = pickLang();
+  // t('key', { n: 3 }) → 選んだ言語の文。{n} を差しこむ
+  function t(key, vars) {
+    let s = (I18N.ui[lang] && I18N.ui[lang][key]) ?? I18N.ui.ja[key] ?? key;
+    if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(v);
+    return s;
+  }
+
   const trackEvent = (name, params) => {
     if (typeof window.gtag === 'function') window.gtag('event', name, params);
   };
@@ -558,8 +581,8 @@
 
   function showBest() {
     const b = records.best;
-    hudBest.textContent = b ? `ベスト ${fmtM(b.d)}` : '';
-    titleBest.textContent = b ? `ベスト記録 ${fmtM(b.d)}` : '';
+    hudBest.textContent = b ? t('best', { d: fmtM(b.d) }) : '';
+    titleBest.textContent = b ? t('bestRecord', { d: fmtM(b.d) }) : '';
     if (b) {
       bestFlag.g.position.set(b.x, 0, b.z);
       bestFlag.setText(`BEST ${b.d.toFixed(1)}m`);
@@ -577,16 +600,20 @@
     wind = { x: Math.cos(a) * s, z: Math.sin(a) * s };
     showWind();
   }
-  function windLabel() {
-    const s = Math.hypot(wind.x, wind.z);
-    if (s < 0.3) return '風なし';
-    const along = wind.x / s;
-    let kind;
-    if (along > 0.7) kind = '追い風';
-    else if (along < -0.7) kind = '向かい風';
-    else kind = wind.z > 0 ? '左からの横風' : '右からの横風';
-    return `${kind} ${s.toFixed(1)}m/s`;
+  // w は { x, z } (m/s)。省略したらいまの風
+  function windLabel(w) {
+    const v = w || wind;
+    const s = Math.hypot(v.x, v.z);
+    if (s < 0.3) return t('windNone');
+    const along = v.x / s;
+    let key;
+    if (along > 0.7) key = 'windTail';
+    else if (along < -0.7) key = 'windHead';
+    else key = v.z > 0 ? 'windFromLeft' : 'windFromRight';
+    return t(key, { s: s.toFixed(1) });
   }
+  // 記録に残した風の文 (前の版は日本語の文そのものを残していた)
+  const recordWind = (r) => (typeof r.wx === 'number' ? windLabel({ x: r.wx, z: r.wz }) : r.wind || '');
   function showWind() {
     const s = Math.hypot(wind.x, wind.z);
     windArrow.style.transform = `rotate(${(Math.atan2(wind.z, wind.x) * 180) / Math.PI}deg)`;
@@ -599,19 +626,17 @@
   // 折る
   // =====================================================================
   const GUIDED_STEPS = [
-    { kind: 'flat', flat: 0, title: '左上の角を折る', text: 'オレンジの角をドラッグして、青い点 (まん中の折り筋) まで運ぼう。ぴったり合わせるほど、まっすぐ飛ぶ' },
-    { kind: 'flat', flat: 1, title: '右上の角を折る', text: '右上の角も、まん中の折り筋まで運ぼう' },
-    { kind: 'flat', flat: 2, title: '左のふちを折る', text: 'ななめのふちを、まん中の折り筋に合わせて折ろう' },
-    { kind: 'flat', flat: 3, title: '右のふちを折る', text: '右のふちも、まん中の折り筋に合わせて折ろう' },
-    { kind: 'half', title: '半分に折る', text: '左のはしを右へドラッグして、まん中の折り筋で半分に折ろう' },
-    { kind: 'line', title: '翼の線を決める', text: '左右にドラッグして、翼を折る線を動かそう。線より外側が翼になる' },
-    { kind: 'wing', side: 1, title: '右の翼を折る', text: '翼のはしを外へ倒すようにドラッグしよう' },
-    { kind: 'wing', side: -1, title: '左の翼を折る', text: '反対側の翼も、同じように外へ倒そう' },
+    { kind: 'flat', flat: 0, key: 's1' },
+    { kind: 'flat', flat: 1, key: 's2' },
+    { kind: 'flat', flat: 2, key: 's3' },
+    { kind: 'flat', flat: 3, key: 's4' },
+    { kind: 'half', key: 's5' },
+    { kind: 'line', key: 's6' },
+    { kind: 'wing', side: 1, key: 's7' },
+    { kind: 'wing', side: -1, key: 's8' },
   ];
   // 自由に折る: 平らに好きなだけ折ってから、半分に折る・翼の線・翼 (お手本の5手順目から) で仕上げる
-  const FREE_STEPS = [
-    { kind: 'free', title: '自由に折る', text: '角やふちをドラッグして、好きなところに重ねて折ろう。左右対称が ON なら、反対側も同じように折れる。できたら「半分に折る」へ' },
-  ].concat(GUIDED_STEPS.slice(4));
+  const FREE_STEPS = [{ kind: 'free', key: 'free' }].concat(GUIDED_STEPS.slice(4));
   let mode = 'guided';       // guided (お手本どおり) / free (自由に折る)
   let STEPS = GUIDED_STEPS;
   let mirror = store.get('paper-plane-mirror') !== 'off';
@@ -820,8 +845,8 @@
   }
 
   function praise(miss) {
-    if (miss <= 0) callout('ぴったり!');
-    else callout(`ずれ ${(miss * 100).toFixed(1)}cm`, true);
+    if (miss <= 0) callout(t('perfect'));
+    else callout(t('miss', { cm: (miss * 100).toFixed(1) }), true);
   }
 
   // ---- 半分に折る・翼を折る (画面の上で、つまんだ点から目標の点へ向かうドラッグの割合で角度を決める) ----
@@ -906,10 +931,10 @@
     const body = fold.k * 100;
     const wing = (HW - fold.k) * 100;
     let type;
-    if (fold.k < 0.02) type = '翼が広い: ゆっくり長く飛ぶ。追い風に強く、向かい風に弱い';
-    else if (fold.k > 0.038) type = '翼がせまい: 速くまっすぐ飛ぶ。向かい風に強い';
-    else type = 'ふつう: 速さと飛びのバランスがいい';
-    guideStats.textContent = `胴の高さ ${body.toFixed(1)}cm ・ 翼のはば ${wing.toFixed(1)}cm\n${type}`;
+    if (fold.k < 0.02) type = t('lineWide');
+    else if (fold.k > 0.038) type = t('lineNarrow');
+    else type = t('lineMid');
+    guideStats.textContent = `${t('lineStats', { body: body.toFixed(1), wing: wing.toFixed(1) })}\n${type}`;
   }
   function confirmLine() {
     if (busy) return;
@@ -936,10 +961,10 @@
   function enterStep() {
     const st = STEPS[fold.step];
     setProgress(fold.step / STEPS.length);
-    if (mode === 'free') hudStep.textContent = st.kind === 'free' ? `自由に折る (${fold.count}回)` : `仕上げ ${fold.step} / ${STEPS.length - 1}`;
-    else hudStep.textContent = `手順 ${fold.step + 1} / ${STEPS.length}`;
-    guideTitle.textContent = st.title;
-    guideText.textContent = st.text;
+    if (mode === 'free') hudStep.textContent = st.kind === 'free' ? t('hudFree', { n: fold.count }) : t('hudFinish', { i: fold.step, n: STEPS.length - 1 });
+    else hudStep.textContent = t('hudStep', { i: fold.step + 1, n: STEPS.length });
+    guideTitle.textContent = t(`${st.key}Title`);
+    guideText.textContent = t(`${st.key}Text`);
     guideStats.textContent = '';
     guideLine.visible = false;
     if (st.kind === 'free') {
@@ -947,12 +972,12 @@
       fold.pose = null;
       dirty = true;
       setCamGoal('top');
-      guideStats.textContent = `折った回数 ${fold.count}回 ・ 左右対称 ${mirror ? 'ON' : 'OFF'}`;
+      guideStats.textContent = t('freeStats', { n: fold.count, m: t(mirror ? 'on' : 'off') });
       setActions([
-        { label: '半分に折る', onClick: () => { if (!busy && !drag) nextStep(); }, primary: true },
-        { label: mirror ? '左右対称 ON' : '左右対称 OFF', onClick: toggleMirror },
-        { label: 'ひとつ戻る', onClick: undo, disabled: !fold.history.length },
-        { label: '最初から', onClick: () => startFold(mode) },
+        { label: t('toHalf'), onClick: () => { if (!busy && !drag) nextStep(); }, primary: true },
+        { label: t(mirror ? 'mirrorOn' : 'mirrorOff'), onClick: toggleMirror },
+        { label: t('undo'), onClick: undo, disabled: !fold.history.length },
+        { label: t('restart'), onClick: () => startFold(mode) },
       ]);
       return;
     }
@@ -967,11 +992,11 @@
     }
     setCamGoal(st.kind === 'wing' ? 'wing' : st.kind === 'line' ? 'line' : 'top');
     const acts = [
-      { label: 'おまかせで折る', onClick: autoStep },
-      { label: 'ひとつ戻る', onClick: undo, disabled: !fold.history.length },
+      { label: t('auto'), onClick: autoStep },
+      { label: t('undo'), onClick: undo, disabled: !fold.history.length },
     ];
-    if (mode === 'free' && fold.step === 1) acts[1] = { label: '自由に折るへ戻る', onClick: () => { if (!busy && !drag) { fold.step = 0; enterStep(); } } };
-    if (st.kind === 'line') acts.unshift({ label: 'この線で折る', onClick: confirmLine, primary: true });
+    if (mode === 'free' && fold.step === 1) acts[1] = { label: t('backToFree'), onClick: () => { if (!busy && !drag) { fold.step = 0; enterStep(); } } };
+    if (st.kind === 'line') acts.unshift({ label: t('foldHere'), onClick: confirmLine, primary: true });
     setActions(acts);
   }
 
@@ -1007,10 +1032,10 @@
   }
 
   function finishFold() {
-    hudStep.textContent = '完成';
+    hudStep.textContent = t('hudDone');
     setProgress(1);
-    guideTitle.textContent = '完成!';
-    guideText.textContent = '胴を少し開いて、翼をととのえています…';
+    guideTitle.textContent = t('doneTitle');
+    guideText.textContent = t('doneOpening');
     guideStats.textContent = '';
     setActions([]);
     const p = fold.pose;
@@ -1030,27 +1055,28 @@
 
   function planeType(d) {
     const fp = PM.flightParams(d);
-    if (fp.vGlide < 4.6) return 'ゆっくり長く飛ぶグライダー型 (追い風に強い)';
-    if (fp.vGlide > 6.2) return '速くまっすぐ飛ぶダーツ型 (向かい風に強い)';
-    return '速さと飛びのバランス型';
+    if (fp.vGlide < 4.6) return t('typeGlider');
+    if (fp.vGlide > 6.2) return t('typeDart');
+    return t('typeBalanced');
   }
 
   function showDesign() {
     const d = design;
     const fp = PM.flightParams(d);
     const totalMiss = fold.misses.reduce((s, m) => s + m, 0);
-    guideTitle.textContent = '完成!';
+    hudStep.textContent = t('hudDone');
+    guideTitle.textContent = t('doneTitle');
     guideText.textContent = planeType(d);
     const lines = [
-      `翼の面積 ${(d.wing * 1e4).toFixed(0)}cm² ・ 左右のそろい ${(d.sym * 100).toFixed(1)}%`,
-      mode === 'free' ? `自由に折った回数 ${fold.count}回`
-        : totalMiss <= 0 ? '折りのずれ なし (ぴったり!)' : `折りのずれ 合計 ${(totalMiss * 100).toFixed(1)}cm`,
+      t('statsArea', { a: (d.wing * 1e4).toFixed(0), s: (d.sym * 100).toFixed(1) }),
+      mode === 'free' ? t('statsFolds', { n: fold.count })
+        : totalMiss <= 0 ? t('statsNoMiss') : t('statsMiss', { cm: (totalMiss * 100).toFixed(1) }),
     ];
-    if (Math.abs(fp.rollBias) > 0.6) lines.push(`左右がずれているので、${fp.rollBias > 0 ? '左' : '右'}へ曲がりやすい`);
+    if (Math.abs(fp.rollBias) > 0.6) lines.push(t(fp.rollBias > 0 ? 'turnsLeft' : 'turnsRight'));
     guideStats.textContent = lines.join('\n');
     setActions([
-      { label: '窓から飛ばす', onClick: goLaunch, primary: true },
-      { label: '折りなおす', onClick: () => startFold(mode) },
+      { label: t('toWindow'), onClick: goLaunch, primary: true },
+      { label: t('refoldShort'), onClick: () => startFold(mode) },
     ]);
   }
 
@@ -1127,7 +1153,7 @@
       if (fold.preview && moved > 0.02 && miss < MAX_MISS) commitFlat(d.G, d.Q, miss);
       else {
         cancelFlat();
-        if (moved > 0.02) callout('青い点の近くで離そう', true);
+        if (moved > 0.02) callout(t('releaseNear'), true);
       }
     } else if (d.kind === 'free') {
       const moved = Math.hypot(d.Q[0] - d.G[0], d.Q[1] - d.G[1]);
@@ -1290,7 +1316,6 @@
     flight = null;
     fast = false;
     hudFlight.textContent = '';
-    hudStep.textContent = '窓から飛ばす';
     trail.visible = false;
     blob.visible = false;
     landFlag.g.visible = false;
@@ -1310,18 +1335,23 @@
       if (fromDesk) root.position.y += Math.sin(k * Math.PI) * 0.25;
       root.quaternion.copy(fromQ).slerp(launchQuat(launchAngle()), k);
     }, () => updateAim());
-    guideTitle.textContent = '窓から飛ばそう';
-    guideText.textContent = '角度と力を決めて「投げる」。風の向きと強さも見ておこう';
-    guideStats.textContent = `${planeType(design)}`;
-    setActions([{ label: '折りなおす', onClick: () => startFold(mode) }]);
     launchEl.hidden = false;
+    launchTexts();
+  }
+
+  function launchTexts() {
+    hudStep.textContent = t('hudLaunch');
+    guideTitle.textContent = t('launchTitle');
+    guideText.textContent = t('launchText');
+    guideStats.textContent = planeType(design);
+    setActions([{ label: t('refoldShort'), onClick: () => startFold(mode) }]);
     updateLaunchLabels();
   }
 
   function updateLaunchLabels() {
     const a = launchAngle();
-    angleVal.textContent = `${a > 0 ? '上 ' : a < 0 ? '下 ' : ''}${Math.abs(a)}°`;
-    powerVal.textContent = `${launchPower()}% (${(launchSpeed() * 3.6).toFixed(0)}km/h)`;
+    angleVal.textContent = t(a > 0 ? 'angleUp' : a < 0 ? 'angleDown' : 'angleFlat', { n: Math.abs(a) });
+    powerVal.textContent = t('powerVal', { p: launchPower(), kmh: (launchSpeed() * 3.6).toFixed(0) });
   }
 
   function updateAim() {
@@ -1350,17 +1380,21 @@
     blob.visible = true;
     camMode = 'chase';
     chaseDir.set(1, 0, 0);
-    hudStep.textContent = '';
-    guideTitle.textContent = '飛んでいる!';
-    guideText.textContent = 'あとは風と紙ひこうきにおまかせ';
-    guideStats.textContent = '';
-    setActions([{ label: '早送り', onClick: toggleFast }]);
+    flightTexts();
     store.set('paper-plane-launch', JSON.stringify({ a: launchAngle(), p: launchPower() }));
+  }
+
+  function flightTexts() {
+    hudStep.textContent = '';
+    guideTitle.textContent = t('flyingTitle');
+    guideText.textContent = t('flyingText');
+    guideStats.textContent = '';
+    setActions([{ label: t(fast ? 'normalSpeed' : 'fast'), onClick: toggleFast }]);
   }
 
   function toggleFast() {
     fast = !fast;
-    setActions([{ label: fast ? 'ふつうの速さ' : '早送り', onClick: toggleFast }]);
+    setActions([{ label: t(fast ? 'normalSpeed' : 'fast'), onClick: toggleFast }]);
   }
 
   function syncPlane() {
@@ -1380,7 +1414,7 @@
 
   function updateFlightHud() {
     const d = PM.distanceOf(flight);
-    hudFlight.innerHTML = `<span class="meter-d">${d.toFixed(1)}<small>m</small></span><span class="meter-sub">高さ ${flight.p.y.toFixed(1)} m ・ ${(flight.speed * 3.6).toFixed(0)} km/h</span>`;
+    hudFlight.innerHTML = `<span class="meter-d">${d.toFixed(1)}<small>m</small></span><span class="meter-sub">${t('meterSub', { h: flight.p.y.toFixed(1), kmh: (flight.speed * 3.6).toFixed(0) })}</span>`;
   }
 
   function onLanded() {
@@ -1403,13 +1437,13 @@
     landFlag.g.position.set(flight.p.x + 0.4, flight.p.x < -BLD.wallT ? BLD.floorY : 0, flight.p.z);
     landFlag.setText(`${dist.toFixed(2)}m`);
     landFlag.g.visible = dist > 0;
-    callout(flight.hitWall && dist < 2 ? '壁にぶつかった…' : fmtM(dist), false, 1600);
+    callout(flight.hitWall && dist < 2 ? t('hitWall') : fmtM(dist), false, 1600);
     setActions([]);
-    guideTitle.textContent = '着地!';
+    guideTitle.textContent = t('landed');
     guideText.textContent = '';
 
     records.throws = (records.throws || 0) + 1;
-    const entry = { d: Math.round(dist * 100) / 100, x: flight.p.x, z: flight.p.z, k: fold.k, mode, wind: windLabel(), t: Date.now() };
+    const entry = { d: Math.round(dist * 100) / 100, x: flight.p.x, z: flight.p.z, k: fold.k, mode, wx: wind.x, wz: wind.z, t: Date.now() };
     const prevBest = records.best ? records.best.d : 0;
     const isBest = entry.d > prevBest;
     if (isBest) records.best = entry;
@@ -1422,25 +1456,31 @@
     setTimeout(() => showResult(entry, isBest, prevBest), 1700);
   }
 
+  let lastResult = null;
   function showResult(entry, isBest, prevBest) {
     phase = 'result';
+    lastResult = [entry, isBest, prevBest];
     hudFlight.textContent = '';
+    renderResult(entry, isBest, prevBest);
+    showOverlay(screenResult);
+    showBest();
+    prepareShare(entry, isBest);
+  }
+
+  function renderResult(entry, isBest, prevBest) {
     resultDist.textContent = fmtM(entry.d);
-    if (isBest && prevBest > 0) resultNote.textContent = `ベスト更新! (これまで ${fmtM(prevBest)})`;
-    else if (isBest) resultNote.textContent = 'はじめての記録!';
-    else resultNote.textContent = `ベスト ${fmtM(records.best.d)} まで あと ${(records.best.d - entry.d).toFixed(2)} m`;
+    if (isBest && prevBest > 0) resultNote.textContent = t('newBest', { d: fmtM(prevBest) });
+    else if (isBest) resultNote.textContent = t('firstRecord');
+    else resultNote.textContent = t('toBest', { best: fmtM(records.best.d), diff: (records.best.d - entry.d).toFixed(2) });
     resultNote.classList.toggle('is-best', isBest);
     resultTop.innerHTML = '';
     records.top.forEach((r, i) => {
       const li = document.createElement('li');
       const date = new Date(r.t);
-      li.innerHTML = `<span class="rank">${i + 1}</span><span class="d">${fmtM(r.d)}</span><span class="meta">${r.mode === 'free' ? '自由 ・ ' : ''}翼 ${((HW - r.k) * 100).toFixed(1)}cm ・ ${r.wind} ・ ${date.getMonth() + 1}/${date.getDate()}</span>`;
+      li.innerHTML = `<span class="rank">${i + 1}</span><span class="d">${fmtM(r.d)}</span><span class="meta">${r.mode === 'free' ? `${t('rowFree')} · ` : ''}${t('rowWing', { cm: ((HW - r.k) * 100).toFixed(1) })} · ${recordWind(r)} · ${date.getMonth() + 1}/${date.getDate()}</span>`;
       if (r.t === entry.t) li.classList.add('is-now');
       resultTop.appendChild(li);
     });
-    showOverlay(screenResult);
-    showBest();
-    prepareShare(entry, isBest);
   }
 
   // =====================================================================
@@ -1455,8 +1495,13 @@
   let share = null;          // { blob, file, text }
 
   function shareText(entry, isBest) {
-    const how = entry.mode === 'free' ? '自由に折った' : 'お手本どおりに折った';
-    return `${how}紙ひこうきが、3階の窓から ${fmtM(entry.d)} 飛んだ!${isBest ? ' (自己ベスト)' : ''}\n翼 ${((HW - entry.k) * 100).toFixed(1)}cm ・ ${entry.wind}\n#窓から紙ひこうき`;
+    return t('shareText', {
+      how: t(entry.mode === 'free' ? 'shareHowFree' : 'shareHowGuided'),
+      d: fmtM(entry.d),
+      best: isBest ? t('shareBest') : '',
+      wing: ((HW - entry.k) * 100).toFixed(1),
+      wind: recordWind(entry),
+    });
   }
 
   // 結果の画像: 着地した場面の 3D の絵に、飛距離と横から見た飛んだ道すじを重ねる
@@ -1475,18 +1520,18 @@
     g.fillStyle = shade;
     g.fillRect(0, 0, SHARE_W, SHARE_H);
 
-    const font = (w, px) => `${w} ${px}px system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif`;
+    const font = (w, px) => `${w} ${px}px system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", "PingFang SC", "Microsoft YaHei", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif`;
     g.textBaseline = 'alphabetic';
     g.fillStyle = '#ffffff';
     g.font = font(800, 40);
-    g.fillText('窓から紙ひこうき', 48, 76);
+    g.fillText(t('title'), 48, 76);
     g.font = font(600, 24);
     g.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    g.fillText(entry.mode === 'free' ? '自由に折った紙ひこうき' : 'お手本どおりに折った紙ひこうき', 48, 114);
+    g.fillText(t(entry.mode === 'free' ? 'imgSubFree' : 'imgSubGuided'), 48, 114);
 
     g.font = font(700, 30);
     g.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    g.fillText('飛距離', 48, SHARE_H - 196);
+    g.fillText(t('distance'), 48, SHARE_H - 196);
     g.font = font(900, 120);
     g.fillStyle = '#ffffff';
     g.fillText(entry.d.toFixed(2), 44, SHARE_H - 88);
@@ -1495,17 +1540,18 @@
     g.fillText('m', 56 + numW, SHARE_H - 88);
     if (isBest) {
       const bx = 56 + numW + g.measureText('m').width + 28;
+      g.font = font(800, 28);
+      const bw = g.measureText(t('imgBest')).width + 44;
       g.fillStyle = '#ff8a3d';
       g.beginPath();
-      if (g.roundRect) g.roundRect(bx, SHARE_H - 160, 190, 52, 26); else g.rect(bx, SHARE_H - 160, 190, 52);
+      if (g.roundRect) g.roundRect(bx, SHARE_H - 160, bw, 52, 26); else g.rect(bx, SHARE_H - 160, bw, 52);
       g.fill();
       g.fillStyle = '#ffffff';
-      g.font = font(800, 28);
-      g.fillText('自己ベスト!', bx + 22, SHARE_H - 124);
+      g.fillText(t('imgBest'), bx + 22, SHARE_H - 124);
     }
     g.font = font(600, 26);
     g.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    g.fillText(`翼 ${((HW - entry.k) * 100).toFixed(1)}cm ・ ${entry.wind}`, 48, SHARE_H - 44);
+    g.fillText(t('imgWing', { cm: ((HW - entry.k) * 100).toFixed(1), wind: recordWind(entry) }), 48, SHARE_H - 44);
 
     drawProfile(g, SHARE_W - 48 - 420, SHARE_H - 48 - 190, 420, 190, entry);
 
@@ -1661,10 +1707,10 @@
       ? navigator.clipboard.write([new ClipboardItem({ 'image/png': share.blob })])
       : Promise.reject(new Error('no clipboard'));
     copied.then(() => {
-      shareNote.textContent = '画像をコピーしました。X の投稿画面に貼り付けて (Ctrl+V / ⌘V) 投稿してください';
+      shareNote.textContent = t('copied');
     }).catch(() => {
       try { saveImage(); } catch (err) { /* 保存もできない */ }
-      shareNote.textContent = '画像を保存しました。X の投稿画面で画像を添付してください';
+      shareNote.textContent = t('saved');
     });
   });
 
@@ -1732,6 +1778,31 @@
   helpEl.addEventListener('click', (e) => { if (e.target === helpEl) setHelp(false); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !helpEl.hidden) setHelp(false); });
 
+  // 言語を切りかえる: 決まった文言を置きかえ、いまの場面の文を作りなおす
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.title = t('title');
+    langSelect.value = lang;
+    for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+    for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t(el.dataset.i18nLabel));
+    for (const el of document.querySelectorAll('[data-i18n-title]')) el.setAttribute('title', t(el.dataset.i18nTitle));
+    for (const el of document.querySelectorAll('[data-i18n-alt]')) el.setAttribute('alt', t(el.dataset.i18nAlt));
+    for (const el of document.querySelectorAll('.help-body')) el.hidden = el.dataset.lang !== lang;
+    for (const el of colorRow.children) el.setAttribute('aria-label', t('colorLabel', { c: el.dataset.color }));
+    showWind();
+    showBest();
+    if (phase === 'fold' && !busy && !drag) enterStep();
+    else if (phase === 'done') showDesign();
+    else if (phase === 'launch') launchTexts();
+    else if (phase === 'flight') flightTexts();
+    else if (phase === 'result' && lastResult) {
+      renderResult(...lastResult);
+      prepareShare(lastResult[0], lastResult[1]);
+    }
+    // 見出しの書体が変わると下のパネルの高さが変わるので、カメラも合わせなおす
+    measureView();
+  }
+
   // m: 'guided' (お手本どおり) / 'free' (自由に折る)。省略したらいまのまま
   function startFold(m) {
     if (busy) return;
@@ -1756,7 +1827,8 @@
     b.type = 'button';
     b.className = 'color-chip';
     b.style.background = c;
-    b.setAttribute('aria-label', `紙の色 ${c}`);
+    b.dataset.color = c;
+    b.setAttribute('aria-label', t('colorLabel', { c }));
     b.setAttribute('aria-pressed', String(c === paperColor));
     b.addEventListener('click', () => {
       setPaperColor(c);
@@ -1898,8 +1970,20 @@
   resetFold();
   newWind();
   showBest();
+  // 言語の選択肢
+  for (const [code, name] of I18N.langs) {
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = name;
+    langSelect.append(opt);
+  }
+  langSelect.addEventListener('change', () => {
+    lang = langSelect.value;
+    store.set('paper-plane-lang', lang);
+    applyLang();
+    langSelect.blur();
+  });
+  applyLang();
   showOverlay(screenTitle);
-  guideTitle.textContent = 'ようこそ';
-  guideText.textContent = '紙の色を選んで「折りはじめる」を押そう';
   requestAnimationFrame(frame);
 })();

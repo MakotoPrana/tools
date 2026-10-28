@@ -26,6 +26,16 @@
   color-scheme: light;
 }
 
+/* 中国語・韓国語: 見出しの文字に、その言語の字がそろった書体を使う */
+:root[lang="zh"] {
+  --font-display: "ZCOOL KuaiLe", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+}
+:root[lang="ko"] {
+  --font-display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-body: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+}
+
 * { box-sizing: border-box; }
 
 /* display を指定した要素でも hidden 属性で確実に隠す */
@@ -67,7 +77,7 @@ body {
   position: absolute;
   inset: 0 0 auto;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: calc(8px + var(--safe-t)) max(12px, var(--safe-r)) 0 max(12px, var(--safe-l));
@@ -82,9 +92,25 @@ body {
   letter-spacing: 0.06em;
   color: var(--paper);
   text-shadow: 0 2px 0 var(--sky-deep), 0 0 14px rgba(15, 111, 214, 0.55);
+  text-align: center;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.top .round-btn { justify-self: end; }
+/* せまい画面では、ゲーム名はタイトルのカードにまかせて、上の帯には出さない */
+@media (max-width: 479px) {
+  .brand { visibility: hidden; }
+}
+.top-right { justify-self: end; display: flex; align-items: center; gap: 6px; }
+.lang-select {
+  height: 30px;
+  max-width: 7.2em;
+  padding: 0 8px;
+  border: 0;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+.lang-select:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
 
 .chip {
   display: inline-flex;
@@ -440,7 +466,7 @@ input[type="range"]:focus-visible { outline: 3px solid var(--sky); outline-offse
   background-clip: text;
   color: transparent;
 }
-.lead { margin: 0 0 14px; font-size: 0.86rem; color: var(--ink-soft); }
+.lead { white-space: pre-line; margin: 0 0 14px; font-size: 0.86rem; color: var(--ink-soft); }
 .color-row { display: flex; justify-content: center; gap: 10px; }
 .color-chip {
   width: 30px;
