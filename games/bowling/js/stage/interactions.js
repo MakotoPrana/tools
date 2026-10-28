@@ -4,7 +4,7 @@
  *   力は1ステップごとに消えるので、カーブやコンベアの力も毎回かける
  */
 import {
-  BALL_R, LANE_HALF, HEAD_Z, HOOK_START_Z, HOOK_RAMP, HOOK_FORCE, TREASURE_REACH, LANE_GROUP, STEP,
+  BALL_R, LANE_HALF, HEAD_Z, DECK_END, HOOK_START_Z, HOOK_RAMP, HOOK_FORCE, TREASURE_REACH, LANE_GROUP, STEP,
 } from '../config.js';
 import { clamp } from '../util.js';
 import { emit } from '../events.js';
@@ -14,7 +14,8 @@ import { ballBody, rollWithVelocity } from '../entities/ball.js';
 import { pins } from '../entities/pins.js';
 import { env } from '../world/environment.js';
 import { stage, setMovers, inHole } from './builder.js';
-import { clack, warpSound } from '../audio.js';
+import { bumperSound, warpSound } from '../audio.js';
+import { pinHit } from '../pinSound.js';
 
 const force = new CANNON.Vec3();
 
@@ -113,7 +114,6 @@ world.addEventListener('postStep', () => {
 
 ballBody.addEventListener('collide', (e) => {
   const m = e.body.material;
-  if (m === M.pin) clack(Math.abs(e.contact.getImpactVelocityAlongNormal()), 1500);
   if (m === M.rail || m === M.tire) reroll = true;
   // バンパーに当たったら、外向きにはじく
   const kick = stage.bumpers.get(e.body);
@@ -123,11 +123,17 @@ ballBody.addEventListener('collide', (e) => {
   const l = Math.hypot(dx, dz) || 1;
   ballBody.velocity.x += (dx / l) * kick;
   ballBody.velocity.z += (dz / l) * kick;
-  clack(4, 900);
+  bumperSound();
 });
 
-for (const p of pins) {
+// ピンが当たった音。相手で鳴り方を変える (ピン同士は、両方のピンがそれぞれ鳴る)
+// ピンデッキより奥 (ピット) は、床も壁もクッションなので鈍い音にする
+const HIT_KIND = new Map([[M.ball, 'ball'], [M.pin, 'pin'], [M.lane, 'floor'], [M.wall, 'wall'], [M.rail, 'wall'], [M.tire, 'soft']]);
+pins.forEach((p, i) => {
   p.body.addEventListener('collide', (e) => {
-    if (e.body.material === M.pin) clack(Math.abs(e.contact.getImpactVelocityAlongNormal()), 2400);
+    let kind = HIT_KIND.get(e.body.material);
+    if (!kind) return;
+    if (kind === 'wall' && p.body.position.z < DECK_END) kind = 'soft';
+    pinHit(kind, Math.abs(e.contact.getImpactVelocityAlongNormal()), i, p.body.position.x, p.body, world.time);
   });
-}
+});
