@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>窓から紙ひこうき</title>
+  <meta name="description" content="机の上で紙ひこうきを折って、3階の窓から飛ばす3Dゲーム。折り方のずれ、翼の幅、角度と力、その日の風で飛び方が変わる。飛距離の自己ベストをめざそう。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;700;800&family=ZCOOL+KuaiLe&display=swap" />
+  <link rel="stylesheet" href="style.css?v=5" />
+</head>
+<body>
+  <main class="game" id="board-wrap">
+    <canvas id="board" data-i18n-label="canvasLabel" aria-label="紙ひこうきを折って飛ばす画面"></canvas>
+
+    <header class="top">
+      <a class="chip back" href="../" data-i18n="gamesList">‹ ゲーム</a>
+      <h1 class="brand" data-i18n="title">窓から紙ひこうき</h1>
+      <div class="top-right">
+        <select id="lang-select" class="chip lang-select" data-i18n-label="language" aria-label="言語"></select>
+        <button type="button" class="round-btn" id="help-btn" data-i18n-label="help" aria-label="遊び方" aria-expanded="false" aria-controls="help">?</button>
+      </div>
+    </header>
+
+    <div class="hud" id="hud">
+      <p class="chip hud-step" id="hud-step"></p>
+      <p class="chip hud-wind" data-i18n-title="windTitle" title="いまの風 (矢印の上が窓の外)"><span class="wind-arrow" id="wind-arrow" aria-hidden="true">↑</span><span id="wind-text"></span></p>
+      <p class="chip hud-best" id="hud-best"></p>
+    </div>
+    <div class="meter" id="hud-flight" aria-live="off"></div>
+    <p class="callout" id="callout" aria-live="polite"></p>
+
+    <section class="panel" id="panel" aria-live="polite">
+      <div class="progress" id="progress" aria-hidden="true"><span id="progress-fill"></span></div>
+      <h2 class="guide-title" id="guide-title"></h2>
+      <p class="guide-text" id="guide-text"></p>
+      <p class="guide-stats" id="guide-stats"></p>
+      <div class="launch" id="launch" hidden>
+        <div class="sliders">
+          <label class="slider" for="angle">
+            <span class="slider-name" data-i18n="angle">角度</span>
+            <input type="range" id="angle" min="-20" max="45" step="1" value="5" />
+            <span class="slider-val" id="angle-val"></span>
+          </label>
+          <label class="slider" for="power">
+            <span class="slider-name" data-i18n="power">力</span>
+            <input type="range" id="power" min="0" max="100" step="1" value="60" />
+            <span class="slider-val" id="power-val"></span>
+          </label>
+        </div>
+        <button type="button" class="throw-btn" id="throw-btn"><span class="throw-icon" aria-hidden="true"></span><span data-i18n="throw">投げる</span></button>
+      </div>
+      <div class="actions" id="actions"></div>
+    </section>
+
+    <div class="overlay" id="overlay">
+      <div class="card title-card" id="screen-title">
+        <svg class="logo-plane" viewBox="0 0 120 60" aria-hidden="true">
+          <path class="logo-trail" d="M2 52 Q30 50 48 34" fill="none" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7" />
+          <path d="M118 8 L44 30 L60 34 Z" fill="#ffffff" />
+          <path d="M118 8 L60 34 L58 50 Z" fill="#ff8a3d" />
+          <path d="M118 8 L58 50 L52 38 Z" fill="#e0612a" />
+        </svg>
+        <p class="logo"><span class="logo-small" data-i18n="logoSmall">窓から</span><span class="logo-big" data-i18n="logoBig">紙ひこうき</span></p>
+        <p class="lead" data-i18n="lead">机で折って、3階の窓から飛ばそう。
+風に乗せて、どこまでも。</p>
+        <p class="label" data-i18n="paperColor">紙の色</p>
+        <div class="color-row" id="color-row"></div>
+        <div class="card-actions">
+          <button type="button" class="btn is-primary" id="start-btn" data-i18n="startGuided">お手本どおりに折る</button>
+          <button type="button" class="btn" id="free-btn" data-i18n="startFree">自由に折る</button>
+        </div>
+        <p class="title-best" id="title-best"></p>
+      </div>
+
+      <div class="card result-card" id="screen-result" hidden>
+        <p class="label" data-i18n="distance">飛距離</p>
+        <p class="result-dist" id="result-dist"></p>
+        <p class="result-note" id="result-note"></p>
+        <img class="share-preview" id="share-preview" data-i18n-alt="sharePreviewAlt" alt="投稿する結果の画像" width="1200" height="675" />
+        <a class="btn share-btn" id="share-btn" href="https://x.com/intent/post" target="_blank" rel="noopener" data-i18n="shareBtn">𝕏 結果を画像つきで投稿</a>
+        <p class="share-note" id="share-note" aria-live="polite"></p>
+        <ol class="result-top" id="result-top"></ol>
+        <div class="card-actions">
+          <button type="button" class="btn is-primary" id="again-btn" data-i18n="again">もう一度投げる</button>
+          <button type="button" class="btn" id="refold-btn" data-i18n="refold">新しく折る</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="help" id="help" hidden>
+      <div class="help-inner">
+        <button type="button" class="round-btn help-close" id="help-close" data-i18n-label="helpClose" aria-label="遊び方を閉じる">×</button>
+        <div class="help-body" data-lang="ja">
+        <h2>遊び方</h2>
+        <p>机の上の紙を、手順にそって折って紙ひこうき (ダーツ型) を作ります。できたら3階の窓から飛ばして、飛距離 (窓の下の壁ぎわからの距離) を競います。投げたあとは、風と紙ひこうきの形まかせ。物理の計算で飛び方が決まります。</p>
+
+        <h3>折る</h3>
+        <table>
+          <tbody>
+            <tr><th>角・ふちを折る</th><td>オレンジの角をドラッグして、青い点まで運びます。指を動かすと、その位置に角が重なるように紙が折れます。青い点の近く (6mm 以内) で離すと、ぴったりに吸いつきます</td></tr>
+            <tr><th>半分に折る</th><td>左のはしを右へドラッグします</td></tr>
+            <tr><th>翼の線</th><td>左右にドラッグして、翼を折る線を決めます。線より外側が翼になります</td></tr>
+            <tr><th>翼を折る</th><td>翼のはしを外へ倒すようにドラッグします</td></tr>
+            <tr><th>ボタン</th><td>「おまかせで折る」でその手順をぴったりに折り、「ひとつ戻る」で前の手順へ戻れます</td></tr>
+          </tbody>
+        </table>
+
+        <h3>自由に折る</h3>
+        <p>タイトルで「自由に折る」を選ぶと、お手本なしで好きなように折れます。紙の角やふち (どこでも) をドラッグすると、指の位置に重なるように折れます。何回でも折れて、紙の頂点やまん中の折り筋の近くでは吸いつきます。「左右対称」が ON なら、反対側も鏡に映したように同じだけ折れます。</p>
+        <p>折り終えたら「半分に折る」を押して、あとはお手本と同じように、半分に折る・翼の線を決める・翼を折るで仕上げます。機首を何回も折り返して重くしたり、翼の先を切り落としたように折ったり、いろいろな形を試してみましょう。形に合わせて重心や翼の面積が変わり、飛び方も変わります。</p>
+
+        <h3>形と飛び方</h3>
+        <ul>
+          <li>折りがずれて左右の形がそろわないと、片方の翼の揚力が大きくなって曲がっていきます</li>
+          <li>翼が広い (線が中心に近い) と、ゆっくり長く飛びます。追い風に強いかわりに、向かい風や横風に流されやすくなります</li>
+          <li>翼がせまいと速く飛びます。向かい風でも進めますが、ふつうの日は落ちるのが早めです</li>
+          <li>強く投げすぎると、手ぶれでふらつきます。上へ向けすぎると、失速してしまいます</li>
+        </ul>
+
+        <h3>投げる</h3>
+        <table>
+          <tbody>
+            <tr><th>角度・力</th><td>スライダーで決めて「投げる」。キーボードでは ↑↓ で角度、←→ で力、スペースで投げる</td></tr>
+            <tr><th>風</th><td>画面上の矢印 (上が窓の外) と、原っぱの旗で見られます。投げるたびに変わります</td></tr>
+            <tr><th>飛んでいる間</th><td>「早送り」(スペース) で3倍の速さにできます</td></tr>
+          </tbody>
+        </table>
+        <p>記録は、この端末のブラウザに上位5つまで残ります。</p>
+        <p>結果の画面の「結果を画像つきで投稿」で、飛距離と飛んだ道すじの画像を X に投稿できます。スマホでは共有の画面が開くので X を選びます。パソコンでは X の投稿画面が開き、画像がコピーされるので、投稿画面に貼り付けて (Ctrl+V / ⌘V) 投稿します。</p>
+        </div>
+        <div class="help-body" data-lang="en" hidden>
+        <h2>How to play</h2>
+        <p>Fold the sheet of paper on the desk into a paper plane (a dart), then launch it from a 3rd-floor window and see how far it flies. Distance is measured from the foot of the wall below the window. Once it leaves your hand, the wind and the shape of your plane decide the rest: the flight is simulated with physics.</p>
+
+        <h3>Folding</h3>
+        <table>
+          <tbody>
+            <tr><th>Corners and edges</th><td>Drag the orange corner to the blue dot. The paper folds so the corner lands under your finger. Release within 6 mm of the blue dot and it snaps into place</td></tr>
+            <tr><th>Fold in half</th><td>Drag the left side over to the right</td></tr>
+            <tr><th>Wing line</th><td>Drag left or right to choose the wing fold line. Everything outside the line becomes wing</td></tr>
+            <tr><th>Wings</th><td>Drag the wing tip outward and down</td></tr>
+            <tr><th>Buttons</th><td>"Fold it for me" makes a perfect fold for that step. "Undo" goes back one step</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Freestyle</h3>
+        <p>Choose "Fold freestyle" on the title screen to fold however you like. Drag any corner or any point on the paper and it folds so that point lands under your finger. Fold as many times as you want; drops snap to corners of the paper and to the center crease. With mirror ON, the other side folds the same way, like a reflection.</p>
+        <p>When you are done, tap "Fold in half" and finish like the classic dart: fold in half, choose the wing line, and fold the wings. Try folding the nose back several times to make it heavy, or folding off the wing tips. The shape changes the center of gravity and the wing area, and so the way it flies.</p>
+
+        <h3>Shape and flight</h3>
+        <ul>
+          <li>If your folds are off and the two sides do not match, one wing makes more lift and the plane turns</li>
+          <li>Wide wings (line close to the center) glide slowly and far. They love a tailwind but get pushed around by headwinds and crosswinds</li>
+          <li>Narrow wings fly fast. They push through a headwind, but on a calm day they come down sooner</li>
+          <li>Throw too hard and your hand shakes, so the plane wobbles. Aim too high and it stalls</li>
+        </ul>
+
+        <h3>Throwing</h3>
+        <table>
+          <tbody>
+            <tr><th>Angle and power</th><td>Set them with the sliders and tap "Throw". On a keyboard: ↑↓ for angle, ←→ for power, Space to throw</td></tr>
+            <tr><th>Wind</th><td>Shown by the arrow at the top (up is out the window) and by the flags in the field. It changes every throw</td></tr>
+            <tr><th>In flight</th><td>"Fast forward" (Space) plays at 3× speed</td></tr>
+          </tbody>
+        </table>
+        <p>Your top 5 distances are saved in this browser.</p>
+        <p>On the result screen, "Post result with image" shares an image of your distance and flight path on X. On a phone, the share sheet opens: choose X. On a computer, the X post page opens and the image is copied, so paste it into the post (Ctrl+V / ⌘V).</p>
+        </div>
+        <div class="help-body" data-lang="zh" hidden>
+        <h2>玩法</h2>
+        <p>把书桌上的纸折成纸飞机 (飞镖型)，再从三楼的窗口投出去，比一比能飞多远。距离从窗户正下方的墙根开始算。投出之后，就交给风和纸飞机的形状了：飞行由物理计算决定。</p>
+
+        <h3>折纸</h3>
+        <table>
+          <tbody>
+            <tr><th>折角和边</th><td>把橙色的角拖到蓝点。纸会折过去，让角正好落在手指的位置。在蓝点附近 (6mm 以内) 松开就会自动对准</td></tr>
+            <tr><th>对折</th><td>把左边拖到右边</td></tr>
+            <tr><th>机翼的线</th><td>左右拖动，决定折机翼的线。线的外侧就是机翼</td></tr>
+            <tr><th>折机翼</th><td>把翼尖向外往下拖</td></tr>
+            <tr><th>按钮</th><td>「自动折」会把这一步折得刚刚好，「撤销一步」回到上一步</td></tr>
+          </tbody>
+        </table>
+
+        <h3>自由折</h3>
+        <p>在标题画面选「自由折」，就能不看示范随意折。拖动纸的任意角或任意位置，纸会折过去让那一点落在手指下。可以折很多次，靠近纸的顶点或中间折痕时会自动对准。「左右对称」为 ON 时，另一侧会像镜子一样同样折过去。</p>
+        <p>折好后点「对折」，然后和示范一样：对折、决定机翼的线、折机翼。试试把机头往回折好几次让它变重，或者把翼尖折掉。形状会改变重心和机翼面积，飞法也会跟着变。</p>
+
+        <h3>形状与飞法</h3>
+        <ul>
+          <li>折歪了、左右形状不一样时，一边机翼的升力更大，飞机就会转弯</li>
+          <li>机翼宽 (线靠近中间) 时飞得慢而远。顺风时很强，但容易被逆风和横风吹走</li>
+          <li>机翼窄时飞得快。逆风也能前进，但平常会比较早落地</li>
+          <li>投得太用力手会抖，飞机会摇晃。角度太高会失速</li>
+        </ul>
+
+        <h3>投出</h3>
+        <table>
+          <tbody>
+            <tr><th>角度和力度</th><td>用滑块决定后点「投出」。键盘：↑↓ 角度，←→ 力度，空格键投出</td></tr>
+            <tr><th>风</th><td>看画面上方的箭头 (朝上是窗外) 和草地上的旗子。每次投出都会变</td></tr>
+            <tr><th>飞行中</th><td>「快进」(空格键) 以 3 倍速播放</td></tr>
+          </tbody>
+        </table>
+        <p>前 5 名的纪录会保存在这个浏览器里。</p>
+        <p>在结果画面点「带图发布结果」，可以把飞行距离和飞行轨迹的图片发到 X。手机会打开分享画面，请选 X。电脑会打开 X 的发帖画面并复制图片，请粘贴到发帖画面 (Ctrl+V / ⌘V) 后发布。</p>
+        </div>
+        <div class="help-body" data-lang="ko" hidden>
+        <h2>플레이 방법</h2>
+        <p>책상 위의 종이를 접어 종이비행기 (다트형)를 만들고, 3층 창문에서 날려서 비행 거리를 겨룹니다. 거리는 창문 바로 아래 벽에서부터 잽니다. 손을 떠난 뒤에는 바람과 비행기 모양에 맡겨요. 비행은 물리 계산으로 정해집니다.</p>
+
+        <h3>접기</h3>
+        <table>
+          <tbody>
+            <tr><th>모서리·가장자리</th><td>주황색 모서리를 파란 점까지 끄세요. 손가락 위치에 모서리가 오도록 종이가 접힙니다. 파란 점 근처 (6mm 이내)에서 놓으면 딱 맞게 붙어요</td></tr>
+            <tr><th>반으로 접기</th><td>왼쪽 끝을 오른쪽으로 끄세요</td></tr>
+            <tr><th>날개 선</th><td>좌우로 끌어서 날개를 접을 선을 정하세요. 선 바깥쪽이 날개가 됩니다</td></tr>
+            <tr><th>날개 접기</th><td>날개 끝을 바깥으로 눕히듯이 끄세요</td></tr>
+            <tr><th>버튼</th><td>「자동으로 접기」는 그 단계를 딱 맞게 접고, 「한 단계 뒤로」는 앞 단계로 돌아갑니다</td></tr>
+          </tbody>
+        </table>
+
+        <h3>자유롭게 접기</h3>
+        <p>타이틀에서 「자유롭게 접기」를 고르면 견본 없이 마음대로 접을 수 있어요. 종이의 아무 모서리나 아무 곳을 끌면, 그 점이 손가락 아래로 오도록 접힙니다. 몇 번이든 접을 수 있고, 종이의 꼭짓점이나 가운데 접은 선 근처에서는 딱 붙어요. 「좌우 대칭」이 ON이면 반대쪽도 거울처럼 똑같이 접힙니다.</p>
+        <p>다 접었으면 「반으로 접기」를 누르고, 견본과 똑같이 반으로 접기·날개 선 정하기·날개 접기로 마무리합니다. 기수를 여러 번 접어 무겁게 하거나 날개 끝을 잘라 낸 것처럼 접어 보세요. 모양에 따라 무게 중심과 날개 면적이 바뀌고 나는 방식도 달라져요.</p>
+
+        <h3>모양과 비행</h3>
+        <ul>
+          <li>접은 것이 어긋나 좌우 모양이 다르면, 한쪽 날개의 양력이 커져서 휘어 갑니다</li>
+          <li>날개가 넓으면 (선이 가운데에 가까우면) 천천히 오래 날아요. 뒷바람에 강하지만 맞바람과 옆바람에 밀리기 쉬워요</li>
+          <li>날개가 좁으면 빨리 날아요. 맞바람에도 나아가지만, 보통 날에는 일찍 떨어져요</li>
+          <li>너무 세게 던지면 손이 흔들려 비행기가 휘청거려요. 너무 위로 던지면 실속해요</li>
+        </ul>
+
+        <h3>던지기</h3>
+        <table>
+          <tbody>
+            <tr><th>각도·힘</th><td>슬라이더로 정하고 「던지기」. 키보드는 ↑↓ 각도, ←→ 힘, 스페이스로 던지기</td></tr>
+            <tr><th>바람</th><td>화면 위의 화살표 (위쪽이 창밖)와 들판의 깃발로 볼 수 있어요. 던질 때마다 바뀝니다</td></tr>
+            <tr><th>나는 동안</th><td>「빨리 감기」(스페이스)로 3배 속도로 볼 수 있어요</td></tr>
+          </tbody>
+        </table>
+        <p>기록은 이 브라우저에 상위 5개까지 저장됩니다.</p>
+        <p>결과 화면의 「결과를 이미지와 함께 게시」로 비행 거리와 비행 경로 이미지를 X에 올릴 수 있어요. 스마트폰에서는 공유 화면이 열리니 X를 고르세요. 컴퓨터에서는 X 게시 화면이 열리고 이미지가 복사되니, 게시 화면에 붙여넣고 (Ctrl+V / ⌘V) 게시하세요.</p>
+        </div>
+      </div>
+    </section>
+
+    <p class="load-error" id="load-error" data-i18n="loadError" hidden>3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。</p>
+  </main>
+
+  <script src="../origami-intro.js"></script>
+  <script>OrigamiIntro.play();</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="i18n.js?v=1"></script>
+  <script src="model.js?v=2"></script>
+  <script src="script.js?v=5"></script>
+</body>
+</html>
