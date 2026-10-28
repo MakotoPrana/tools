@@ -231,6 +231,36 @@ body {
 .result-top .d { font-weight: 800; font-variant-numeric: tabular-nums; }
 .result-top .meta { color: #6b7785; font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.share-preview {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  margin: 0 0 8px;
+  border-radius: 8px;
+  background: #d7e3ec;
+  object-fit: cover;
+}
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: #0f1419;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+.share-btn:hover { background: #272c30; }
+.share-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.share-note { margin: 6px 0 4px; font-size: 0.75rem; color: #4a5866; }
+.share-note:empty { display: none; }
+.result-top { margin-top: 10px !important; }
+
 .load-error {
   position: absolute;
   inset: auto 12px 12px;

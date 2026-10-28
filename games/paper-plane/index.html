@@ -17,7 +17,7 @@
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
   <main class="app">
@@ -55,6 +55,9 @@
           <p class="result-label">飛距離</p>
           <p class="result-dist" id="result-dist"></p>
           <p class="result-note" id="result-note"></p>
+          <img class="share-preview" id="share-preview" alt="投稿する結果の画像" width="1200" height="675" />
+          <a class="share-btn" id="share-btn" href="https://x.com/intent/post" target="_blank" rel="noopener">𝕏 結果を画像つきで投稿</a>
+          <p class="share-note" id="share-note" aria-live="polite"></p>
           <ol class="result-top" id="result-top"></ol>
           <div class="overlay-actions">
             <button type="button" class="start-btn" id="again-btn">もう一度投げる</button>
@@ -122,6 +125,7 @@
         </tbody>
       </table>
       <p>記録は、この端末のブラウザに上位5つまで残ります。</p>
+      <p>結果の画面の「結果を画像つきで投稿」で、飛距離と飛んだ道すじの画像を X に投稿できます。スマホでは共有の画面が開くので X を選びます。パソコンでは X の投稿画面が開き、画像がコピーされるので、投稿画面に貼り付けて (Ctrl+V / ⌘V) 投稿します。</p>
     </section>
   </main>
 
@@ -129,6 +133,6 @@
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="model.js?v=2"></script>
-  <script src="script.js?v=2"></script>
+  <script src="script.js?v=3"></script>
 </body>
 </html>

@@ -62,6 +62,9 @@
   const resultTop = $('result-top');
   const againBtn = $('again-btn');
   const refoldBtn = $('refold-btn');
+  const shareBtn = $('share-btn');
+  const sharePreview = $('share-preview');
+  const shareNote = $('share-note');
 
   const store = {
     get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
@@ -1426,7 +1429,233 @@
     });
     showOverlay(screenResult);
     showBest();
+    prepareShare(entry, isBest);
   }
+
+  // =====================================================================
+  // 結果を X に投稿する
+  //   X の投稿画面 (x.com/intent/post) には文と URL しか渡せないので、画像は
+  //   ・スマホなど共有シートでファイルを渡せる端末: 共有シートに画像と文を渡す (X を選ぶと画像つきで投稿できる)
+  //   ・それ以外: 投稿画面を開き、画像をクリップボードにコピーする (できなければ保存する)。投稿画面で貼り付けてもらう
+  // =====================================================================
+  const GAME_URL = 'https://tools.e-seventh.com/games/paper-plane/';
+  const SHARE_W = 1200;
+  const SHARE_H = 675;
+  let share = null;          // { blob, file, text }
+
+  function shareText(entry, isBest) {
+    const how = entry.mode === 'free' ? '自由に折った' : 'お手本どおりに折った';
+    return `${how}紙ひこうきが、3階の窓から ${fmtM(entry.d)} 飛んだ!${isBest ? ' (自己ベスト)' : ''}\n翼 ${((HW - entry.k) * 100).toFixed(1)}cm ・ ${entry.wind}\n#窓から紙ひこうき`;
+  }
+
+  // 結果の画像: 着地した場面の 3D の絵に、飛距離と横から見た飛んだ道すじを重ねる
+  function drawShareImage(entry, isBest) {
+    const c = document.createElement('canvas');
+    c.width = SHARE_W;
+    c.height = SHARE_H;
+    const g = c.getContext('2d');
+    g.drawImage(renderShareScene(), 0, 0, SHARE_W, SHARE_H);
+
+    const shade = g.createLinearGradient(0, 0, 0, SHARE_H);
+    shade.addColorStop(0, 'rgba(10, 24, 38, 0.55)');
+    shade.addColorStop(0.35, 'rgba(10, 24, 38, 0)');
+    shade.addColorStop(0.55, 'rgba(10, 24, 38, 0)');
+    shade.addColorStop(1, 'rgba(10, 24, 38, 0.8)');
+    g.fillStyle = shade;
+    g.fillRect(0, 0, SHARE_W, SHARE_H);
+
+    const font = (w, px) => `${w} ${px}px system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif`;
+    g.textBaseline = 'alphabetic';
+    g.fillStyle = '#ffffff';
+    g.font = font(800, 40);
+    g.fillText('窓から紙ひこうき', 48, 76);
+    g.font = font(600, 24);
+    g.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    g.fillText(entry.mode === 'free' ? '自由に折った紙ひこうき' : 'お手本どおりに折った紙ひこうき', 48, 114);
+
+    g.font = font(700, 30);
+    g.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    g.fillText('飛距離', 48, SHARE_H - 196);
+    g.font = font(900, 120);
+    g.fillStyle = '#ffffff';
+    g.fillText(entry.d.toFixed(2), 44, SHARE_H - 88);
+    const numW = g.measureText(entry.d.toFixed(2)).width;
+    g.font = font(800, 56);
+    g.fillText('m', 56 + numW, SHARE_H - 88);
+    if (isBest) {
+      const bx = 56 + numW + g.measureText('m').width + 28;
+      g.fillStyle = '#ff8a3d';
+      g.beginPath();
+      if (g.roundRect) g.roundRect(bx, SHARE_H - 160, 190, 52, 26); else g.rect(bx, SHARE_H - 160, 190, 52);
+      g.fill();
+      g.fillStyle = '#ffffff';
+      g.font = font(800, 28);
+      g.fillText('自己ベスト!', bx + 22, SHARE_H - 124);
+    }
+    g.font = font(600, 26);
+    g.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    g.fillText(`翼 ${((HW - entry.k) * 100).toFixed(1)}cm ・ ${entry.wind}`, 48, SHARE_H - 44);
+
+    drawProfile(g, SHARE_W - 48 - 420, SHARE_H - 48 - 190, 420, 190, entry);
+
+    g.font = font(600, 22);
+    g.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    g.textAlign = 'right';
+    g.fillText('tools.e-seventh.com', SHARE_W - 48, 76);
+    g.textAlign = 'left';
+    return c;
+  }
+
+  // 画像用に、着地点をうしろ斜め上から見た絵を、画面とは別に 16:9・2倍の大きさで描く (縮めてなめらかにする)
+  function renderShareScene() {
+    const w = SHARE_W * 2;
+    const h = SHARE_H * 2;
+    const target = new THREE.WebGLRenderTarget(w, h);
+    const cam = new THREE.PerspectiveCamera(42, w / h, 0.05, 1200);
+    const land = root.position.clone();
+    const dir = chaseDir.clone();
+    const side = new THREE.Vector3(-dir.z, 0, dir.x);
+    // 紙ひこうきが、文字のない画面の中ほど (少し上) に来るように、着地点より下・横を見る
+    cam.position.copy(land).addScaledVector(dir, -1.7).addScaledVector(side, 0.75);
+    cam.position.y = land.y + 0.95;
+    cam.lookAt(land.clone().addScaledVector(dir, 0.3).addScaledVector(side, -0.2).add(new THREE.Vector3(0, -0.28, 0)));
+    // 着地点の旗は近すぎて画面からはみ出すので隠す。ベストの旗も、着地点と重なっていたら隠す
+    const bestShown = bestFlag.g.visible;
+    const landShown = landFlag.g.visible;
+    if (bestFlag.g.position.distanceTo(landFlag.g.position) < 1.5) bestFlag.g.visible = false;
+    landFlag.g.visible = false;
+    renderer.setRenderTarget(target);
+    renderer.render(scene, cam);
+    const px = new Uint8Array(w * h * 4);
+    renderer.readRenderTargetPixels(target, 0, 0, w, h, px);
+    renderer.setRenderTarget(null);
+    target.dispose();
+    bestFlag.g.visible = bestShown;
+    landFlag.g.visible = landShown;
+    // WebGL は下の行から並ぶので、上下を入れかえる
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const img = c.getContext('2d').createImageData(w, h);
+    const row = w * 4;
+    for (let y = 0; y < h; y++) img.data.set(px.subarray((h - 1 - y) * row, (h - y) * row), y * row);
+    c.getContext('2d').putImageData(img, 0, 0);
+    return c;
+  }
+
+  // 横から見た飛んだ道すじ (窓のある建物から着地点まで)
+  function drawProfile(g, x0, y0, w, h, entry) {
+    g.fillStyle = 'rgba(10, 24, 38, 0.6)';
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x0, y0, w, h, 16); else g.rect(x0, y0, w, h);
+    g.fill();
+    const pad = 22;
+    let maxD = Math.max(entry.d, 10);
+    let maxY = 12.6;
+    for (let i = 0; i < trailCount; i++) {
+      maxD = Math.max(maxD, Math.hypot(trailPos[i * 3], trailPos[i * 3 + 2]));
+      maxY = Math.max(maxY, trailPos[i * 3 + 1]);
+    }
+    const wallW = 14;
+    const sx = (w - pad * 2 - wallW) / (maxD * 1.05);
+    const sy = (h - pad * 2) / maxY;
+    const s = Math.min(sx, sy * 3);   // 横に長いので、たては3倍まで引きのばす
+    const px = (d) => x0 + pad + wallW + d * s;
+    const py = (y) => y0 + h - pad - y * Math.min(sy, s * 3);
+    // 地面
+    g.strokeStyle = 'rgba(160, 220, 120, 0.9)';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(x0 + pad, py(0));
+    g.lineTo(x0 + w - pad, py(0));
+    g.stroke();
+    // 建物と窓
+    g.fillStyle = '#ece3d3';
+    g.fillRect(x0 + pad, py(12.6), wallW, py(0) - py(12.6));
+    g.fillStyle = '#45647e';
+    g.fillRect(x0 + pad + 3, py(BLD.topY), wallW - 6, py(BLD.sillY) - py(BLD.topY));
+    // 10m ごとの目もり
+    g.fillStyle = 'rgba(255, 255, 255, 0.55)';
+    g.font = '600 15px system-ui, sans-serif';
+    g.textAlign = 'center';
+    for (let d = 10; d <= maxD; d += maxD > 60 ? 20 : 10) {
+      g.fillRect(px(d) - 1, py(0) - 6, 2, 6);
+      g.fillText(`${d}`, px(d), py(0) + 18);
+    }
+    g.textAlign = 'left';
+    // 道すじ
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 3;
+    g.setLineDash([2, 7]);
+    g.lineCap = 'round';
+    g.beginPath();
+    for (let i = 0; i < trailCount; i++) {
+      const x = trailPos[i * 3];
+      const d = x < 0 ? x : Math.hypot(x, trailPos[i * 3 + 2]);
+      const X = px(d);
+      const Y = py(trailPos[i * 3 + 1]);
+      if (i === 0) g.moveTo(X, Y); else g.lineTo(X, Y);
+    }
+    g.stroke();
+    g.setLineDash([]);
+    // 着地点
+    g.fillStyle = '#ff8a3d';
+    g.beginPath();
+    g.arc(px(entry.d), py(0), 7, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  function prepareShare(entry, isBest) {
+    share = null;
+    shareNote.textContent = '';
+    const text = shareText(entry, isBest);
+    const c = drawShareImage(entry, isBest);
+    sharePreview.src = c.toDataURL('image/jpeg', 0.85);
+    shareBtn.href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(GAME_URL)}`;
+    // 押したときにすぐ渡せるよう、先にファイルにしておく (待ってから共有すると、ブラウザが「押した直後」と見なさない)
+    c.toBlob((blob) => {
+      if (!blob) return;
+      let file = null;
+      try { file = new File([blob], `paper-plane-${entry.d.toFixed(2)}m.png`, { type: 'image/png' }); } catch (e) { /* File を作れない古いブラウザ */ }
+      share = { blob, file, text };
+    }, 'image/png');
+  }
+
+  function saveImage() {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(share.blob);
+    a.download = share.file ? share.file.name : 'paper-plane.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  }
+
+  shareBtn.addEventListener('click', (e) => {
+    if (!share) return;   // 画像がまだできていなければ、文だけの投稿画面を開く
+    // 共有シートで画像を渡せる端末 (おもにスマホ)
+    if (share.file && navigator.canShare && navigator.canShare({ files: [share.file] })) {
+      e.preventDefault();
+      navigator.share({ files: [share.file], text: `${share.text}\n${GAME_URL}` })
+        .then(() => trackEvent('paper_plane_share', { method: 'share_sheet' }))
+        .catch((err) => {
+          if (err && err.name === 'AbortError') return;
+          window.open(shareBtn.href, '_blank', 'noopener');
+        });
+      return;
+    }
+    // それ以外: リンクで投稿画面を開きつつ、画像をクリップボードへ (だめなら保存)
+    trackEvent('paper_plane_share', { method: 'intent' });
+    const copied = navigator.clipboard && window.ClipboardItem
+      ? navigator.clipboard.write([new ClipboardItem({ 'image/png': share.blob })])
+      : Promise.reject(new Error('no clipboard'));
+    copied.then(() => {
+      shareNote.textContent = '画像をコピーしました。X の投稿画面に貼り付けて (Ctrl+V / ⌘V) 投稿してください';
+    }).catch(() => {
+      try { saveImage(); } catch (err) { /* 保存もできない */ }
+      shareNote.textContent = '画像を保存しました。X の投稿画面で画像を添付してください';
+    });
+  });
 
   againBtn.addEventListener('click', () => {
     hideOverlay();
