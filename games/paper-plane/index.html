@@ -17,7 +17,7 @@
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <main class="app">
@@ -41,10 +41,13 @@
       <div class="overlay" id="overlay">
         <div class="screen" id="screen-title">
           <p class="game-logo">窓から<br /><span>紙ひこうき</span></p>
-          <p class="overlay-text">机の上で紙ひこうきを折って、3階の窓から飛ばそう。<br />ていねいに折るほど、まっすぐ遠くへ飛ぶ。</p>
+          <p class="overlay-text">机の上で紙ひこうきを折って、3階の窓から飛ばそう。<br />お手本どおりでも、自由な形でも。</p>
           <p class="color-label">紙の色</p>
           <div class="color-row" id="color-row"></div>
-          <button type="button" class="start-btn" id="start-btn">折りはじめる</button>
+          <div class="overlay-actions">
+            <button type="button" class="start-btn" id="start-btn">お手本どおりに折る</button>
+            <button type="button" class="start-btn is-sub" id="free-btn">自由に折る</button>
+          </div>
           <p class="title-best" id="title-best"></p>
         </div>
 
@@ -98,6 +101,10 @@
         </tbody>
       </table>
 
+      <h3>自由に折る</h3>
+      <p>タイトルで「自由に折る」を選ぶと、お手本なしで好きなように折れます。紙の角やふち (どこでも) をドラッグすると、指の位置に重なるように折れます。何回でも折れて、紙の頂点やまん中の折り筋の近くでは吸いつきます。「左右対称」が ON なら、反対側も鏡に映したように同じだけ折れます。</p>
+      <p>折り終えたら「半分に折る」を押して、あとはお手本と同じように、半分に折る・翼の線を決める・翼を折るで仕上げます。機首を何回も折り返して重くしたり、翼の先を切り落としたように折ったり、いろいろな形を試してみましょう。形に合わせて重心や翼の面積が変わり、飛び方も変わります。</p>
+
       <h3>形と飛び方</h3>
       <ul>
         <li>折りがずれて左右の形がそろわないと、片方の翼の揚力が大きくなって曲がっていきます</li>
@@ -121,7 +128,7 @@
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="model.js?v=1"></script>
-  <script src="script.js?v=1"></script>
+  <script src="model.js?v=2"></script>
+  <script src="script.js?v=2"></script>
 </body>
 </html>

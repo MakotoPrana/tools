@@ -12,6 +12,7 @@
   if (!window.THREE || !PM) {
     $('load-error').hidden = false;
     $('start-btn').disabled = true;
+    $('free-btn').disabled = true;
     return;
   }
 
@@ -588,7 +589,7 @@
   // =====================================================================
   // 折る
   // =====================================================================
-  const STEPS = [
+  const GUIDED_STEPS = [
     { kind: 'flat', flat: 0, title: '左上の角を折る', text: 'オレンジの角をドラッグして、青い点 (まん中の折り筋) まで運ぼう。ぴったり合わせるほど、まっすぐ飛ぶ' },
     { kind: 'flat', flat: 1, title: '右上の角を折る', text: '右上の角も、まん中の折り筋まで運ぼう' },
     { kind: 'flat', flat: 2, title: '左のふちを折る', text: 'ななめのふちを、まん中の折り筋に合わせて折ろう' },
@@ -598,6 +599,13 @@
     { kind: 'wing', side: 1, title: '右の翼を折る', text: '翼のはしを外へ倒すようにドラッグしよう' },
     { kind: 'wing', side: -1, title: '左の翼を折る', text: '反対側の翼も、同じように外へ倒そう' },
   ];
+  // 自由に折る: 平らに好きなだけ折ってから、半分に折る・翼の線・翼 (お手本の5手順目から) で仕上げる
+  const FREE_STEPS = [
+    { kind: 'free', title: '自由に折る', text: '角やふちをドラッグして、好きなところに重ねて折ろう。左右対称が ON なら、反対側も同じように折れる。できたら「半分に折る」へ' },
+  ].concat(GUIDED_STEPS.slice(4));
+  let mode = 'guided';       // guided (お手本どおり) / free (自由に折る)
+  let STEPS = GUIDED_STEPS;
+  let mirror = store.get('paper-plane-mirror') !== 'off';
 
   let phase = 'title';       // title / fold / done / launch / flight / landed / result
   const fold = {
@@ -607,6 +615,7 @@
     pose: null,
     k: PM.K_DEFAULT,
     misses: [],
+    count: 0,                // 自由に折った回数
     history: [],
     preview: null,           // 平らに折るドラッグ中: { parts, anim }
   };
@@ -642,6 +651,7 @@
       pose: fold.pose ? Object.assign({}, fold.pose) : null,
       k: fold.k,
       misses: fold.misses.slice(),
+      count: fold.count,
     });
   }
 
@@ -652,6 +662,7 @@
     fold.pose = null;
     fold.k = PM.K_DEFAULT;
     fold.misses = [];
+    fold.count = 0;
     fold.history = [];
     fold.preview = null;
     design = null;
@@ -727,6 +738,78 @@
     const from = fold.preview.anim.theta;
     tween(0.22, (k) => { fold.preview.anim.theta = lerp(from, 0, k); dirty = true; }, () => { fold.preview = null; dirty = true; });
   }
+  // ---- 自由に折る ----
+  const SNAP_FREE = 0.008;
+  const GRAB_REACH = 0.02;     // 頂点からこの距離までなら、頂点をつまむ
+  function freeGrab(P) {
+    let best = null;
+    let bd = GRAB_REACH;
+    for (const p of fold.flat) {
+      for (const v of p.c) {
+        const d = Math.hypot(v[0] - P[0], v[1] - P[1]);
+        if (d < bd) { bd = d; best = v; }
+      }
+    }
+    if (best) return best.slice();
+    return fold.flat.some((p) => PM.inside(p.c, P[0], P[1])) ? P.slice() : null;
+  }
+  // 重ねる先を、紙の頂点や中心線に吸いつける
+  function freeSnap(G, Q) {
+    let best = null;
+    let bd = SNAP_FREE;
+    for (const p of fold.flat) {
+      for (const v of p.c) {
+        if (Math.hypot(v[0] - G[0], v[1] - G[1]) < 1e-6) continue;
+        const d = Math.hypot(v[0] - Q[0], v[1] - Q[1]);
+        if (d < bd) { bd = d; best = v; }
+      }
+    }
+    if (best) return [best.slice(), true];
+    if (Math.abs(Q[0]) < SNAP_FREE) return [[0, Q[1]], true];
+    return [Q, false];
+  }
+  // 折り線で紙が2つに分かれるか (どこも動かない・全部動く線では折れない)
+  const splits = (parts) => parts.some((p) => p.mv) && parts.some((p) => !p.mv);
+
+  // 左右対称にしたときの、反対側の折り線。同じ線になるとき (横の線や中心線) は null
+  function mirrored(fl) {
+    const m = { p0: [-fl.p0[0], fl.p0[1]], n: [-fl.n[0], fl.n[1]] };
+    const same = Math.abs(m.n[0] * fl.n[0] + m.n[1] * fl.n[1]) > 0.9999
+      && Math.abs((m.p0[0] - fl.p0[0]) * fl.n[0] + (m.p0[1] - fl.p0[1]) * fl.n[1]) < 1e-4;
+    return same ? null : m;
+  }
+
+  // 線 fl で折る動きを見せてから、本当に折る
+  function animateFold(fl, from, dur, done) {
+    const parts = PM.splitAll(fold.flat, fl.p0, fl.n);
+    if (!splits(parts)) { done(); return; }
+    fold.preview = { parts, anim: { p0: fl.p0, n: fl.n, theta: from, M: PM.foldTop(parts, fl.p0, fl.n) } };
+    tween(dur, (k) => { fold.preview.anim.theta = lerp(from, Math.PI, k); dirty = true; }, () => {
+      fold.flat = PM.foldFlat(fold.flat, fl.p0, fl.n);
+      fold.preview = null;
+      dirty = true;
+      done();
+    });
+  }
+
+  function commitFree(G, Q) {
+    const fl = PM.foldLineFor(G, Q);
+    const from = fold.preview ? fold.preview.anim.theta : PREVIEW_THETA;
+    snapshot();
+    animateFold(fl, from, 0.16, () => {
+      const m = mirror ? mirrored(fl) : null;
+      const after = () => { fold.count++; enterStep(); };
+      if (m) animateFold(m, 0, 0.35, after);
+      else after();
+    });
+  }
+
+  function toggleMirror() {
+    mirror = !mirror;
+    store.set('paper-plane-mirror', mirror ? 'on' : 'off');
+    enterStep();
+  }
+
   function praise(miss) {
     if (miss <= 0) callout('ぴったり!');
     else callout(`ずれ ${(miss * 100).toFixed(1)}cm`, true);
@@ -737,20 +820,33 @@
     const st = STEPS[fold.step];
     const p = fold.pose;
     if (st.kind === 'half') {
-      const v = [-HW + 0.004, 0.04];
+      const v = edgeVertex(-1, 0) || [-0.05, H / 2];
       return [
         paperToWorld(bodyPoint(-1, false, v, p)),
         paperToWorld(bodyPoint(-1, false, v, Object.assign({}, p, { aL: Math.PI }))),
       ];
     }
     const s = st.side;
-    const v = [s * (HW - 0.004), 0.01];
+    const v = edgeVertex(s, fold.k + 0.004) || [s * (fold.k + 0.01), H / 2];
     const key = s > 0 ? 'wR' : 'wL';
     return [
       paperToWorld(bodyPoint(s, true, v, Object.assign({}, p, { [key]: 0 }))),
       paperToWorld(bodyPoint(s, true, v, Object.assign({}, p, { [key]: WING_FOLD }))),
     ];
   }
+  // 左右どちらか (side) で、中心線からいちばん遠い紙の頂点 (少し内側)。中心線から minU より近ければ null
+  function edgeVertex(side, minU) {
+    let best = null;
+    let bu = minU;
+    for (const p of fold.flat) {
+      for (const v of p.c) {
+        const u = side * v[0];
+        if (u > bu + 1e-6 || (best && Math.abs(u - bu) < 1e-6 && v[1] < best[1])) { bu = u; best = v; }
+      }
+    }
+    return best ? [best[0] - side * 0.004, best[1] + 0.004] : null;
+  }
+
   function sweepKey() {
     const st = STEPS[fold.step];
     if (st.kind === 'half') return ['aL', Math.PI];
@@ -830,11 +926,26 @@
 
   function enterStep() {
     const st = STEPS[fold.step];
-    hudStep.textContent = `手順 ${fold.step + 1} / ${STEPS.length}`;
+    if (mode === 'free') hudStep.textContent = st.kind === 'free' ? `自由に折る (${fold.count}回)` : `仕上げ ${fold.step} / ${STEPS.length - 1}`;
+    else hudStep.textContent = `手順 ${fold.step + 1} / ${STEPS.length}`;
     guideTitle.textContent = st.title;
     guideText.textContent = st.text;
     guideStats.textContent = '';
     guideLine.visible = false;
+    if (st.kind === 'free') {
+      fold.body = null;
+      fold.pose = null;
+      dirty = true;
+      setCamGoal('top');
+      guideStats.textContent = `折った回数 ${fold.count}回 ・ 左右対称 ${mirror ? 'ON' : 'OFF'}`;
+      setActions([
+        { label: '半分に折る', onClick: () => { if (!busy && !drag) nextStep(); }, primary: true },
+        { label: mirror ? '左右対称 ON' : '左右対称 OFF', onClick: toggleMirror },
+        { label: 'ひとつ戻る', onClick: undo, disabled: !fold.history.length },
+        { label: '最初から', onClick: () => startFold(mode) },
+      ]);
+      return;
+    }
     if (st.kind === 'half' && !fold.body) {
       fold.body = PM.tagBody(PM.clonePolys(fold.flat), 0);
       fold.pose = { aL: 0, aR: 0, wL: 0, wR: 0, k: 0, h: PM.hingeHeight(fold.body) };
@@ -849,6 +960,7 @@
       { label: 'おまかせで折る', onClick: autoStep },
       { label: 'ひとつ戻る', onClick: undo, disabled: !fold.history.length },
     ];
+    if (mode === 'free' && fold.step === 1) acts[1] = { label: '自由に折るへ戻る', onClick: () => { if (!busy && !drag) { fold.step = 0; enterStep(); } } };
     if (st.kind === 'line') acts.unshift({ label: 'この線で折る', onClick: confirmLine, primary: true });
     setActions(acts);
   }
@@ -878,6 +990,7 @@
     fold.pose = h.pose;
     fold.k = h.k;
     fold.misses = h.misses;
+    fold.count = h.count;
     fold.preview = null;
     dirty = true;
     enterStep();
@@ -899,7 +1012,7 @@
       design = PM.analyze(PM.splitWings(fold.flat, fold.k), fold.k);
       phase = 'done';
       showDesign();
-      trackEvent('paper_plane_fold', { wing_cm: Math.round((HW - fold.k) * 1000) / 10, symmetry: Math.round(design.sym * 100) });
+      trackEvent('paper_plane_fold', { mode, folds: fold.count, wing_cm: Math.round((HW - fold.k) * 1000) / 10, symmetry: Math.round(design.sym * 100) });
     });
     setCamGoal('show');
   }
@@ -919,13 +1032,14 @@
     guideText.textContent = planeType(d);
     const lines = [
       `翼の面積 ${(d.wing * 1e4).toFixed(0)}cm² ・ 左右のそろい ${(d.sym * 100).toFixed(1)}%`,
-      totalMiss <= 0 ? '折りのずれ なし (ぴったり!)' : `折りのずれ 合計 ${(totalMiss * 100).toFixed(1)}cm`,
+      mode === 'free' ? `自由に折った回数 ${fold.count}回`
+        : totalMiss <= 0 ? '折りのずれ なし (ぴったり!)' : `折りのずれ 合計 ${(totalMiss * 100).toFixed(1)}cm`,
     ];
     if (Math.abs(fp.rollBias) > 0.6) lines.push(`左右がずれているので、${fp.rollBias > 0 ? '左' : '右'}へ曲がりやすい`);
     guideStats.textContent = lines.join('\n');
     setActions([
       { label: '窓から飛ばす', onClick: goLaunch, primary: true },
-      { label: '折りなおす', onClick: startFold },
+      { label: '折りなおす', onClick: () => startFold(mode) },
     ]);
   }
 
@@ -934,6 +1048,14 @@
     if (phase !== 'fold' || busy || drag) return;
     const st = STEPS[fold.step];
     if (!st) return;
+    if (st.kind === 'free') {
+      const P = pointerToPaper(e);
+      const G = P && freeGrab(P);
+      if (!G) return;
+      canvas.setPointerCapture(e.pointerId);
+      drag = { id: e.pointerId, kind: 'free', G, off: [G[0] - P[0], G[1] - P[1]], Q: G.slice(), snapped: false };
+      return;
+    }
     canvas.setPointerCapture(e.pointerId);
     if (st.kind === 'flat') {
       const P = pointerToPaper(e);
@@ -966,6 +1088,14 @@
       if (drag.snapped) Q = drag.T.slice();
       drag.Q = Q;
       setFlatPreview(drag.G, Q, PREVIEW_THETA);
+    } else if (drag.kind === 'free') {
+      const P = pointerToPaper(e);
+      if (!P) return;
+      const raw = [clamp(P[0] + drag.off[0], -0.3, 0.3), clamp(P[1] + drag.off[1], -0.2, H + 0.2)];
+      const [Q, snapped] = freeSnap(drag.G, raw);
+      drag.Q = Q;
+      drag.snapped = snapped;
+      setFlatPreview(drag.G, Q, PREVIEW_THETA);
     } else if (drag.kind === 'line') {
       moveLine(e);
     } else {
@@ -988,6 +1118,10 @@
         cancelFlat();
         if (moved > 0.02) callout('青い点の近くで離そう', true);
       }
+    } else if (d.kind === 'free') {
+      const moved = Math.hypot(d.Q[0] - d.G[0], d.Q[1] - d.G[1]);
+      if (fold.preview && moved > 0.01 && splits(fold.preview.parts)) commitFree(d.G, d.Q);
+      else cancelFlat();
     } else if (d.kind === 'sweep') {
       finishSweep(d.t);
     }
@@ -1002,6 +1136,15 @@
     markerTarget.visible = false;
     markerTargetRing.visible = false;
     if (!st || st.kind === 'line') return;
+    if (st.kind === 'free') {
+      if (!drag || drag.kind !== 'free') return;
+      markerGrab.position.copy(paperToWorld([drag.Q[0], drag.Q[1], 0.003]));
+      markerGrab.scale.setScalar(0.8);
+      markerGrab.quaternion.copy(camera.quaternion);
+      markerGrab.material.color.set(drag.snapped ? '#3fae6a' : '#ff8a3d');
+      markerGrab.visible = true;
+      return;
+    }
     let g;
     let t;
     if (st.kind === 'flat') {
@@ -1157,7 +1300,7 @@
     guideTitle.textContent = '窓から飛ばそう';
     guideText.textContent = '角度と力を決めて「投げる」。風の向きと強さも見ておこう';
     guideStats.textContent = `${planeType(design)}`;
-    setActions([{ label: '折りなおす', onClick: startFold }]);
+    setActions([{ label: '折りなおす', onClick: () => startFold(mode) }]);
     launchEl.hidden = false;
     updateLaunchLabels();
   }
@@ -1253,7 +1396,7 @@
     guideText.textContent = '';
 
     records.throws = (records.throws || 0) + 1;
-    const entry = { d: Math.round(dist * 100) / 100, x: flight.p.x, z: flight.p.z, k: fold.k, wind: windLabel(), t: Date.now() };
+    const entry = { d: Math.round(dist * 100) / 100, x: flight.p.x, z: flight.p.z, k: fold.k, mode, wind: windLabel(), t: Date.now() };
     const prevBest = records.best ? records.best.d : 0;
     const isBest = entry.d > prevBest;
     if (isBest) records.best = entry;
@@ -1277,7 +1420,7 @@
     records.top.forEach((r, i) => {
       const li = document.createElement('li');
       const date = new Date(r.t);
-      li.innerHTML = `<span class="rank">${i + 1}</span><span class="d">${fmtM(r.d)}</span><span class="meta">翼 ${((HW - r.k) * 100).toFixed(1)}cm ・ ${r.wind} ・ ${date.getMonth() + 1}/${date.getDate()}</span>`;
+      li.innerHTML = `<span class="rank">${i + 1}</span><span class="d">${fmtM(r.d)}</span><span class="meta">${r.mode === 'free' ? '自由 ・ ' : ''}翼 ${((HW - r.k) * 100).toFixed(1)}cm ・ ${r.wind} ・ ${date.getMonth() + 1}/${date.getDate()}</span>`;
       if (r.t === entry.t) li.classList.add('is-now');
       resultTop.appendChild(li);
     });
@@ -1293,7 +1436,7 @@
   refoldBtn.addEventListener('click', () => {
     hideOverlay();
     newWind();
-    startFold();
+    startFold(mode);
   });
 
   // =====================================================================
@@ -1327,8 +1470,11 @@
   }
   function hideOverlay() { overlay.hidden = true; }
 
-  function startFold() {
+  // m: 'guided' (お手本どおり) / 'free' (自由に折る)。省略したらいまのまま
+  function startFold(m) {
     if (busy) return;
+    if (m === 'guided' || m === 'free') mode = m;
+    STEPS = mode === 'free' ? FREE_STEPS : GUIDED_STEPS;
     hideOverlay();
     phase = 'fold';
     launchEl.hidden = true;
@@ -1357,7 +1503,8 @@
     });
     colorRow.appendChild(b);
   });
-  startBtn.addEventListener('click', startFold);
+  startBtn.addEventListener('click', () => startFold('guided'));
+  $('free-btn').addEventListener('click', () => startFold('free'));
 
   // キーボード: 投げるときは ↑↓ で角度、←→ で力、スペースで投げる。飛んでいる間はスペースで早送り
   window.addEventListener('keydown', (e) => {
