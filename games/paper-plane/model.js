@@ -458,7 +458,9 @@
   const LAUNCH = { x: -0.32, y: 9.55, z: 0 };
 
   // wind = { x, z } (m/s)、throwInfo = { speed, angle } (m/s, rad)
-  function createFlight(design, throwInfo, wind, seed) {
+  // env = { ground(x, z), boxes, thermals } (ステージの地面・じゃま物・上昇気流。省略したら平らな原っぱ)
+  //   thermals: [{ x, z, r, v, top }] 中心 (x, z)、半径 r (m)、中心の上向きの風 v (m/s)、高さ top (m) より上では弱まる
+  function createFlight(design, throwInfo, wind, seed, env) {
     const r = rng(seed);
     const fp = flightParams(design);
     const yaw = quatAxis(0, 1, 0, -Math.PI / 2);   // 機首 (-Z) を +X (窓の外) に向ける
@@ -480,6 +482,10 @@
       wind: v3(wind.x, 0, wind.z),
       gust,
       gustAmp: 0.25 + windSpeed * 0.35,
+      env: env || { ground: () => 0, boxes: [], thermals: [] },
+      thermal: 0,        // いま受けている上昇気流の強さ (0〜1、中心で1)
+      thermalHit: -1,    // 最後に入った上昇気流の番号 (入ったときの合図用)
+      onRoof: false,
       landed: false,
       hitWall: false,
       maxY: LAUNCH.y,
@@ -494,10 +500,57 @@
       const k = Math.sin(s.t * g.f * Math.PI * 2 + g.p) * s.gustAmp;
       w.x += g.ax * k; w.y += g.ay * k; w.z += g.az * k;
     }
+    // 上昇気流: 柱の中心ほど強く、まわりは釣り鐘の形に弱まる
+    let best = 0;
+    let idx = -1;
+    s.env.thermals.forEach((th, i) => {
+      const dx = s.p.x - th.x;
+      const dz = s.p.z - th.z;
+      const k = Math.exp(-(dx * dx + dz * dz) / (th.r * th.r));
+      if (k < 0.01) return;
+      const fade = s.p.y > th.top ? Math.exp(-(s.p.y - th.top) / 8) : 1;
+      w.y += th.v * k * fade;
+      if (k * fade > best) { best = k * fade; idx = i; }
+    });
+    s.thermal = best;
+    if (best > 0.5) s.thermalHit = idx;
     return w;
   }
 
-  const groundY = (s) => (s.p.x < -BUILDING.wallT ? BUILDING.floorY : 0);
+  const groundY = (s) => (s.p.x < -BUILDING.wallT ? BUILDING.floorY : s.env.ground(s.p.x, s.p.z));
+
+  // じゃま物の箱: 中に入ったら、いちばん浅い面から押し出す。上の面からなら屋上に着地、横からならはね返って落ちる
+  const BOX_MARGIN = 0.04;
+  function hitBoxes(s, prevY) {
+    const p = s.p;
+    for (const b of s.env.boxes) {
+      if (p.x < b.x0 - BOX_MARGIN || p.x > b.x1 + BOX_MARGIN || p.y < b.y0 - BOX_MARGIN || p.y > b.y1 + BOX_MARGIN
+        || p.z < b.z0 - BOX_MARGIN || p.z > b.z1 + BOX_MARGIN) continue;
+      const pen = [
+        ['x0', p.x - (b.x0 - BOX_MARGIN)], ['x1', b.x1 + BOX_MARGIN - p.x],
+        ['y0', p.y - (b.y0 - BOX_MARGIN)], ['y1', b.y1 + BOX_MARGIN - p.y],
+        ['z0', p.z - (b.z0 - BOX_MARGIN)], ['z1', b.z1 + BOX_MARGIN - p.z],
+      ].sort((a, c) => a[1] - c[1]);
+      let face = pen[0][0];
+      if (prevY >= b.y1 && s.v.y <= 0) face = 'y1';   // 上から入ってきたら屋上
+      if (face === 'y1') {
+        p.y = b.y1 + 0.01;
+        s.landed = true;
+        s.onRoof = true;
+        return;
+      }
+      if (face === 'x0') { p.x = b.x0 - BOX_MARGIN - 0.01; s.v.x = -Math.abs(s.v.x) * 0.2; }
+      else if (face === 'x1') { p.x = b.x1 + BOX_MARGIN + 0.01; s.v.x = Math.abs(s.v.x) * 0.2; }
+      else if (face === 'z0') { p.z = b.z0 - BOX_MARGIN - 0.01; s.v.z = -Math.abs(s.v.z) * 0.2; }
+      else if (face === 'z1') { p.z = b.z1 + BOX_MARGIN + 0.01; s.v.z = Math.abs(s.v.z) * 0.2; }
+      else { p.y = b.y0 - BOX_MARGIN - 0.01; s.v.y = -Math.abs(s.v.y) * 0.2; }
+      if (face[0] !== 'x') s.v.x *= 0.4;
+      if (face[0] !== 'y') s.v.y *= 0.4;
+      if (face[0] !== 'z') s.v.z *= 0.4;
+      s.w.x *= 0.2; s.w.y *= 0.2; s.w.z *= 0.2;
+      s.hitWall = true;
+    }
+  }
 
   function stepFlight(s, dt) {
     if (s.landed) return;
@@ -536,6 +589,7 @@
     s.v.y += (F.y / MASS) * dt;
     s.v.z += (F.z / MASS) * dt;
     const px = s.p.x;
+    const py = s.p.y;
     s.p.x += s.v.x * dt;
     s.p.y += s.v.y * dt;
     s.p.z += s.v.z * dt;
@@ -568,8 +622,14 @@
       s.hitWall = true;
     }
 
-    if (s.p.y <= groundY(s) + 0.01) {
-      s.p.y = groundY(s) + 0.01;
+    if (s.env.boxes.length) {
+      hitBoxes(s, py);
+      if (s.landed) return;
+    }
+
+    const gy = groundY(s);
+    if (s.p.y <= gy + 0.01) {
+      s.p.y = gy + 0.01;
       s.landed = true;
     }
   }

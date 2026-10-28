@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;700;800&family=ZCOOL+KuaiLe&display=swap" />
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
   <main class="game" id="board-wrap">
@@ -79,7 +79,11 @@
 風に乗せて、どこまでも。</p>
         <p class="label" data-i18n="paperColor">紙の色</p>
         <div class="color-row" id="color-row"></div>
+        <p class="label stage-label" data-i18n="stageLabel">ステージ</p>
+        <div class="stage-row" id="stage-row"></div>
+        <p class="stage-desc" id="stage-desc"></p>
         <div class="card-actions">
+          <button type="button" class="btn is-primary" id="replay-btn" data-i18n="playThisPlane" hidden>いまの紙ひこうきで投げる</button>
           <button type="button" class="btn is-primary" id="start-btn" data-i18n="startGuided">お手本どおりに折る</button>
           <button type="button" class="btn" id="free-btn" data-i18n="startFree">自由に折る</button>
         </div>
@@ -97,6 +101,7 @@
         <div class="card-actions">
           <button type="button" class="btn is-primary" id="again-btn" data-i18n="again">もう一度投げる</button>
           <button type="button" class="btn" id="refold-btn" data-i18n="refold">新しく折る</button>
+          <button type="button" class="btn" id="stage-btn" data-i18n="changeStage">ステージを選ぶ</button>
         </div>
       </div>
     </div>
@@ -122,6 +127,10 @@
         <h3>自由に折る</h3>
         <p>タイトルで「自由に折る」を選ぶと、お手本なしで好きなように折れます。紙の角やふち (どこでも) をドラッグすると、指の位置に重なるように折れます。何回でも折れて、紙の頂点やまん中の折り筋の近くでは吸いつきます。「左右対称」が ON なら、反対側も鏡に映したように同じだけ折れます。</p>
         <p>折り終えたら「半分に折る」を押して、あとはお手本と同じように、半分に折る・翼の線を決める・翼を折るで仕上げます。機首を何回も折り返して重くしたり、翼の先を切り落としたように折ったり、いろいろな形を試してみましょう。形に合わせて重心や翼の面積が変わり、飛び方も変わります。</p>
+
+        <h3>ステージと上昇気流</h3>
+        <p>タイトルで5つのステージから選べます。原っぱ、ずっと下っていく坂道の町、ビルにはさまれた街なか、崖の下に海が広がる海辺、地上50mの高層ビル。街なかと高層ビルでは、建物にぶつかると落ちてしまいますが、屋上に着地すれば記録になります。記録はステージごとに残ります。</p>
+        <p>きらきらした粒が上っていく柱は上昇気流です。投げるたびに場所が変わります。中を通ると押し上げられて、ぐんと遠くまで飛びます。一度折った紙ひこうきは、「ステージを選ぶ」から「いまの紙ひこうきで投げる」で、ほかのステージでも投げられます。</p>
 
         <h3>形と飛び方</h3>
         <ul>
@@ -161,6 +170,10 @@
         <p>Choose "Fold freestyle" on the title screen to fold however you like. Drag any corner or any point on the paper and it folds so that point lands under your finger. Fold as many times as you want; drops snap to corners of the paper and to the center crease. With mirror ON, the other side folds the same way, like a reflection.</p>
         <p>When you are done, tap "Fold in half" and finish like the classic dart: fold in half, choose the wing line, and fold the wings. Try folding the nose back several times to make it heavy, or folding off the wing tips. The shape changes the center of gravity and the wing area, and so the way it flies.</p>
 
+        <h3>Stages and updrafts</h3>
+        <p>Pick one of five stages on the title screen: the Field, a Downhill Town where the road keeps dropping away, Downtown between tall buildings, a Seaside Cliff with the sea far below, and a High-rise 50 m up. Downtown and on the High-rise, hitting a building knocks your plane down, but landing on a roof still counts. Records are kept per stage.</p>
+        <p>Columns of rising sparkles are updrafts. They move every throw. Fly through one and it lifts your plane so it goes much farther. Once you have folded a plane, use "Choose stage" and then "Throw this plane" to fly it on other stages.</p>
+
         <h3>Shape and flight</h3>
         <ul>
           <li>If your folds are off and the two sides do not match, one wing makes more lift and the plane turns</li>
@@ -198,6 +211,10 @@
         <h3>自由折</h3>
         <p>在标题画面选「自由折」，就能不看示范随意折。拖动纸的任意角或任意位置，纸会折过去让那一点落在手指下。可以折很多次，靠近纸的顶点或中间折痕时会自动对准。「左右对称」为 ON 时，另一侧会像镜子一样同样折过去。</p>
         <p>折好后点「对折」，然后和示范一样：对折、决定机翼的线、折机翼。试试把机头往回折好几次让它变重，或者把翼尖折掉。形状会改变重心和机翼面积，飞法也会跟着变。</p>
+
+        <h3>关卡与上升气流</h3>
+        <p>在标题画面可以从 5 个关卡中选择：草地、一路下坡的小镇、高楼之间的市中心、悬崖下是大海的海边，以及 50 米高的高楼。在市中心和高楼关卡，撞到建筑就会掉下去，但降落在屋顶上也算纪录。纪录按关卡分别保存。</p>
+        <p>闪闪发光的粒子不断上升的光柱就是上升气流。每次投出位置都会变。飞进去会被往上推，能飞得更远。折好的纸飞机可以通过「选择关卡」→「用现在的纸飞机投」在其他关卡继续投。</p>
 
         <h3>形状与飞法</h3>
         <ul>
@@ -237,6 +254,10 @@
         <p>타이틀에서 「자유롭게 접기」를 고르면 견본 없이 마음대로 접을 수 있어요. 종이의 아무 모서리나 아무 곳을 끌면, 그 점이 손가락 아래로 오도록 접힙니다. 몇 번이든 접을 수 있고, 종이의 꼭짓점이나 가운데 접은 선 근처에서는 딱 붙어요. 「좌우 대칭」이 ON이면 반대쪽도 거울처럼 똑같이 접힙니다.</p>
         <p>다 접었으면 「반으로 접기」를 누르고, 견본과 똑같이 반으로 접기·날개 선 정하기·날개 접기로 마무리합니다. 기수를 여러 번 접어 무겁게 하거나 날개 끝을 잘라 낸 것처럼 접어 보세요. 모양에 따라 무게 중심과 날개 면적이 바뀌고 나는 방식도 달라져요.</p>
 
+        <h3>스테이지와 상승 기류</h3>
+        <p>타이틀에서 5개의 스테이지 중에서 고를 수 있어요. 들판, 계속 내려가는 비탈길 마을, 빌딩 사이의 도심, 절벽 아래로 바다가 펼쳐진 바닷가, 지상 50m의 고층 빌딩. 도심과 고층 빌딩에서는 건물에 부딪히면 떨어지지만, 옥상에 착지하면 기록이 돼요. 기록은 스테이지마다 남아요.</p>
+        <p>반짝이는 알갱이가 올라가는 기둥이 상승 기류예요. 던질 때마다 위치가 바뀌어요. 안을 지나가면 밀어 올려져서 훨씬 멀리 날아가요. 한 번 접은 종이비행기는 「스테이지 선택」에서 「지금 종이비행기로 던지기」로 다른 스테이지에서도 던질 수 있어요.</p>
+
         <h3>모양과 비행</h3>
         <ul>
           <li>접은 것이 어긋나 좌우 모양이 다르면, 한쪽 날개의 양력이 커져서 휘어 갑니다</li>
@@ -265,8 +286,9 @@
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="i18n.js?v=1"></script>
-  <script src="model.js?v=2"></script>
-  <script src="script.js?v=6"></script>
+  <script src="i18n.js?v=2"></script>
+  <script src="stages.js?v=1"></script>
+  <script src="model.js?v=3"></script>
+  <script src="script.js?v=7"></script>
 </body>
 </html>

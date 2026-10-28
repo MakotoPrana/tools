@@ -445,6 +445,7 @@ input[type="range"]:focus-visible { outline: 3px solid var(--sky); outline-offse
 .label { margin: 0 0 4px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; color: var(--ink-soft); }
 .card-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 14px; }
 .card-actions .btn { flex: 1 1 140px; min-height: 46px; font-size: 0.95rem; }
+.result-card .card-actions #stage-btn { flex-basis: 100%; min-height: 38px; font-size: 0.85rem; }
 .title-card .card-actions { flex-direction: column; gap: 8px; }
 .title-card .card-actions .btn { flex: none; width: 100%; }
 
@@ -479,6 +480,29 @@ input[type="range"]:focus-visible { outline: 3px solid var(--sky); outline-offse
   transition: transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1), box-shadow 0.15s;
 }
 .color-chip[aria-pressed="true"] { transform: rotate(45deg) scale(1.05); box-shadow: 0 0 0 3px var(--sky-deep); }
+.stage-label { margin-top: 12px; }
+.stage-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.stage-btn {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 6px 2px 5px;
+  border: 2px solid var(--sky-tint);
+  border-radius: 12px;
+  background: var(--sky-tint);
+  color: var(--ink);
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.stage-btn:hover { border-color: var(--sky-light); }
+.stage-btn[aria-pressed="true"] { border-color: var(--sky); background: var(--paper); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(8, 60, 120, 0.15); }
+.stage-btn:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+.stage-no { font-family: var(--font-display); font-size: 0.95rem; line-height: 1.1; color: var(--sky); }
+.stage-name { max-width: 100%; font-size: 0.62rem; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+.stage-best { font-size: 0.6rem; font-weight: 800; color: var(--sun-deep); font-variant-numeric: tabular-nums; }
+.stage-desc { min-height: 2.6em; margin: 6px 0 0; font-size: 0.75rem; color: var(--ink-soft); }
 .title-best { margin: 12px 0 0; font-size: 0.85rem; font-weight: 800; color: var(--sun-deep); }
 .title-best:empty { display: none; }
 
@@ -521,6 +545,13 @@ input[type="range"]:focus-visible { outline: 3px solid var(--sky); outline-offse
 .result-top .rank { font-family: var(--font-display); color: var(--sky); }
 .result-top .d { font-weight: 800; font-variant-numeric: tabular-nums; }
 .result-top .meta { color: var(--ink-soft); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 背の低い画面: タイトルのカードは、紙ひこうきの絵と説明を外して、ステージえらびを入れる */
+@media (max-height: 760px) {
+  .title-card .logo-plane, .title-card .lead { display: none; }
+  .title-card .logo { margin-top: 0; }
+  .title-card .card-actions { margin-top: 10px; }
+}
 
 /* 背の低い画面: 結果のカードをつめる */
 @media (max-height: 700px) {
