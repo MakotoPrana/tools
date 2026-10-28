@@ -574,7 +574,7 @@
       const r = JSON.parse(store.get(REC_KEY));
       if (r && Array.isArray(r.top)) return r;
     } catch (e) { /* 壊れていたら作り直す */ }
-    return { best: null, top: [], throws: 0 };
+    return { best: null, top: [], throws: 0, plays: 0 };
   }
   let records = loadRecords();
   const saveRecords = () => store.set(REC_KEY, JSON.stringify(records));
@@ -1451,7 +1451,16 @@
     records.top.sort((a, b) => b.d - a.d);
     records.top = records.top.slice(0, 5);
     saveRecords();
-    trackEvent('paper_plane_throw', { distance: entry.d, angle: launchAngle(), power: launchPower() });
+    trackEvent('paper_plane_throw', {
+      distance: entry.d,
+      angle: launchAngle(),
+      power: launchPower(),
+      mode,
+      lang,
+      wind_ms: Math.round(Math.hypot(wind.x, wind.z) * 10) / 10,
+      is_best: isBest,
+      throw_count: records.throws,
+    });
 
     setTimeout(() => showResult(entry, isBest, prevBest), 1700);
   }
@@ -1689,7 +1698,10 @@
   }
 
   shareBtn.addEventListener('click', (e) => {
-    if (!share) return;   // 画像がまだできていなければ、文だけの投稿画面を開く
+    if (!share) {   // 画像がまだできていなければ、文だけの投稿画面を開く
+      trackEvent('paper_plane_share', { method: 'intent_text_only' });
+      return;
+    }
     // 共有シートで画像を渡せる端末 (おもにスマホ)
     if (share.file && navigator.canShare && navigator.canShare({ files: [share.file] })) {
       e.preventDefault();
@@ -1810,6 +1822,10 @@
     STEPS = mode === 'free' ? FREE_STEPS : GUIDED_STEPS;
     hideOverlay();
     phase = 'fold';
+    // プレイした回数: 折りはじめるたびに1回 (折りなおし・最初からも数える)
+    records.plays = (records.plays || 0) + 1;
+    saveRecords();
+    trackEvent('paper_plane_start', { mode, lang, play_count: records.plays });
     launchEl.hidden = true;
     aimArrow.visible = false;
     trail.visible = false;
