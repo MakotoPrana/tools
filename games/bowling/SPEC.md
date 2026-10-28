@@ -13,12 +13,43 @@
 
 ## ファイル
 
-| ファイル | 中身 |
+ゲームは `js/` の ES モジュールに、役割ごとに分けてある。three.js と cannon.js は `index.html` の `<script>` で読み、グローバルの `THREE`、`CANNON` として使う。ビルドはいらない (ブラウザがモジュールをそのまま読む)。
+
+| ファイル | 役割 |
 | --- | --- |
-| `script.js` | ゲームの本体 (描画、物理、仕掛け、進行、成績、入力) |
-| `stages.js` | ワールドとステージのデータ。仕掛けの書き方は冒頭のコメント |
-| `i18n.js` | 画面の文言と宝物の名前 (4言語) |
+| `js/main.js` | 入口。three.js と cannon.js が読めたか確かめてから `app.js` を読む (読めなければ案内を出す) |
+| `js/app.js` | つなぎ込み。ボタン、画面の大きさ、毎フレームの処理の順番 |
+| `js/config.js` | 寸法と調整値 (レーン、ボール、ピン、投げ方、物理の1ステップ) |
+| `js/util.js` | 小さな道具 (clamp、localStorage など) |
+| `js/events.js` | モジュールどうしの知らせ (ゲームの進行は画面に直接さわらず、出来事を知らせる) |
+| `js/state.js` | 遊んでいるあいだの状態 (モード、何投目か、投げる位置、1投ごとの状態) |
+| `js/i18n.js` | 言語の選択と、選んだ言語の文の取り出し |
+| `js/data/i18n-data.js` | 4言語の文言と宝物の名前 |
+| `js/data/stages.js` | ワールドとステージのデータ。仕掛けの書き方は冒頭のコメント |
+| `js/worlds.js` | ワールドとステージの一覧 (データに寸法を渡して作る) |
+| `js/records.js` | 成績の保存と集計、遊べるステージの判定 |
+| `js/game.js` | 進行。ステージの読みこみ、投球、倒れた本数の判定、クリア |
+| `js/audio.js` | 効果音 |
+| `js/render/renderer.js` | three.js の土台 (レンダラー、シーン、カメラ、ライト) |
+| `js/render/textures.js` | canvas で描くテクスチャ (床、ボール、看板、縞模様) |
+| `js/render/themes.js` | ワールドごとの見た目と物理の設定 |
+| `js/render/materials.js` | 使い回す材質と、捨てる処理 |
+| `js/render/models.js` | ピンと宝物の形 |
+| `js/physics/world.js` | cannon.js の世界 (重力、摩擦と反発の組み合わせ) |
+| `js/entities/ball.js` | ボール (物理と見た目) |
+| `js/entities/pins.js` | ピン (物理と見た目、並べる、立っているかの判定) |
+| `js/world/environment.js` | ワールドの舞台 (レーンや床、まわりの景色と、その物理) |
+| `js/stage/builder.js` | ステージの仕掛けを作る |
+| `js/stage/interactions.js` | ボールと仕掛けのやりとり (物理の1ステップごと) |
+| `js/ui/hud.js` | ゲーム画面に重ねる表示 (ステージ名、何投目か、宝物、案内、大きな文字) |
+| `js/ui/screens.js` | メニュー (タイトル、ステージ選択、成績、結果、達成率、言語) |
+| `js/input/swipe.js` | スワイプで投げる (なぞった線の表示も) |
+| `js/input/keyboard.js` | キーボードで遊ぶ |
+| `js/view/camera.js` | カメラとライトの動き |
+| `js/view/aimLine.js` | 狙いの点線 |
 | `index.html` | 画面の骨組みと、4言語の遊び方 |
+
+- 依存の向き: データと設定 ← 描画・物理 ← 物と舞台 ← ステージ ← 進行 ← 表示・入力 ← つなぎ込み。進行 (`game.js`) から表示へは、`events.js` の知らせで伝える
 
 ## 画面の流れ
 

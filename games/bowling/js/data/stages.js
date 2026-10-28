@@ -1,6 +1,6 @@
 /*
  * STRIKE LANE のワールドとステージ
- *   script.js が寸法 (K) を渡して呼ぶ。返すのは 10 ワールド × 10 ステージ
+ *   ../worlds.js が寸法 (K) を渡して呼ぶ。返すのは 10 ワールド × 10 ステージ
  *
  * 座標: x は右が +、z はファウルラインが 0 で奥が - (1番ピンは z = -18.29、床は z = -19.16 で終わる)
  * ステージに置けるもの (どれも省略できる):
@@ -18,9 +18,9 @@
  *   spinners:  回るバー { x, z, len, speed (rad/s), phase? }
  *   portals:   ワープゲート { a: [x, z], b: [x, z], r?, dir? (出る向き、度。0 が奥、+ が右) }
  *   conveyors: ベルトコンベア { x, z, w, d, fx, fz } (上を転がるボールを押す力 N)
- *   treasure:  宝物 { kind, x, y, z } (kind は script.js の TREASURE_KINDS)
+ *   treasure:  宝物 { kind, x, y, z } (kind は ../render/models.js の TREASURE_KINDS)
  */
-window.STRIKE_LANE_WORLDS = function (K) {
+export default function buildWorlds(K) {
   const { HEAD_Z: H, DECK_END: END, LANE_W, WALL_X, PIN_SPACING: SP, ROW_DZ: RD, rack } = K;
   const T = (ja, en, zh, ko) => ({ ja, en, zh, ko });
   const TR = (kind, x, y, z) => ({ kind, x, y, z });
@@ -35,10 +35,6 @@ window.STRIKE_LANE_WORLDS = function (K) {
   };
   // 間をつめた三角形 (24cm 間隔)。まっすぐ当てても倒れやすい。細い道の先などに使う
   const tight = (x, z, rows, y) => tri(x, z, rows, y, 0.24);
-  // 奥へ一列に並べたピン
-  const line = (x, z, n, dz = 0.36, y) => Array.from({ length: n }, (_, i) => ({ x, z: z - i * dz, y }));
-  // 横に一列に並べたピン
-  const across = (x, z, n, dx = 0.22, y) => Array.from({ length: n }, (_, i) => ({ x: x + (i - (n - 1) / 2) * dx, z, y }));
   // ひし形の4本
   const diamond = (x, z, s = 0.3, y) => [{ x, z, y }, { x: x - s / 2, z: z - s * 0.85, y }, { x: x + s / 2, z: z - s * 0.85, y }, { x, z: z - s * 1.7, y }];
 
@@ -406,7 +402,7 @@ window.STRIKE_LANE_WORLDS = function (K) {
           floors: [pad(0, -2.8, 1.1, 4.4), ...stairs(0, -5, 1.5, 3, -0.1, -0.1, 1.1), pad(0, -12.75, 1.1, 6.5, -0.3), pad(0, -17.6, 1.1, 3.2, 0.05)],
           ramps: [{ x: 0, z: -14.03, w: 0.5, len: 2.0, angle: 10.1, y0: -0.3 }],
           walls: sideWalls(0, 1.1, -0.6, END, -1.0, 1.4),
-          treasure: TR('crown', -0.38, -0.14, -12.5),
+          treasure: TR('crown', -0.33, -0.14, -12.18),
         },
         {
           name: T('狭い参道', 'Narrow Path', '窄参道', '좁은 참배길'),
@@ -421,7 +417,7 @@ window.STRIKE_LANE_WORLDS = function (K) {
           pins: tri(-0.2, H + 0.4, 3),
           floors: [pad(0, -3.8, 1.1, 6.4), pad(0.27, -8.5, 0.56, 3.0), pad(0, -11.0, 1.1, 2.0), pad(-0.27, -13.5, 0.56, 3.0), pad(0, -17.0, 1.1, 4.4)],
           walls: sideWalls(0, 1.1, -0.6, END, -1.0, 1.3),
-          treasure: TR('onyx', 0.3, 0.16, -9),
+          treasure: TR('onyx', 0.07, 0.16, -9.01),
         },
         {
           name: T('柱の間', 'Hall of Pillars', '柱廊', '기둥의 방'),
@@ -548,7 +544,7 @@ window.STRIKE_LANE_WORLDS = function (K) {
           goal: T('正面に大きなクレーター。角度とカーブで回りこもう', 'A huge crater dead ahead. Go around with angle and hook.', '正前方有个大坑。用角度和弧线绕过去', '정면에 큰 크레이터. 각도와 커브로 돌아가자'),
           pins: tri(0, H, 3),
           holes: [{ x: -0.1, z: -10, r: 0.45 }],
-          treasure: TR('comet', -0.53, 0.16, -9.92),
+          treasure: TR('comet', 0.36, 0.16, -9.78),
         },
         {
           name: T('月面ジャンプ', 'Lunar Leap', '月面飞跃', '달 점프'),
@@ -579,7 +575,7 @@ window.STRIKE_LANE_WORLDS = function (K) {
           pins: tight(0, H, 4),
           ramps: [{ x: 0, z: -4, w: 1.2, len: 0.8, angle: 8 }, { x: 0, z: -11, w: 1.2, len: 1.0, angle: 12 }],
           holes: [{ x: 0, z: -7.2, w: 1.6, d: 2.0 }, { x: 0, z: -14.5, w: 1.6, d: 2.0 }],
-          treasure: TR('star', 0.03, 0.78, -13.44),
+          treasure: TR('star', -0.06, 0.72, -13.39),
         },
         {
           name: T('探査車', 'Moon Rovers', '月球车', '탐사차'),
@@ -996,4 +992,4 @@ window.STRIKE_LANE_WORLDS = function (K) {
       ],
     },
   ];
-};
+}

@@ -3,8 +3,9 @@
  *   ui: 画面の文。{n} などは script.js が差しこむ
  *   treasures: 宝物の名前 (形と色は script.js の TREASURE_KINDS)
  *   ステージの名前と説明は stages.js にある
+ *   言語の選び方と文の取り出しは ../i18n.js
  */
-window.STRIKE_LANE_I18N = {
+export default {
   langs: [['ja', '日本語'], ['en', 'English'], ['zh', '简体中文'], ['ko', '한국어']],
   ui: {
     ja: {
