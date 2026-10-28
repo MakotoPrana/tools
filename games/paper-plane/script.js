@@ -63,6 +63,12 @@
   const againBtn = $('again-btn');
   const refoldBtn = $('refold-btn');
   const shareBtn = $('share-btn');
+  const panelEl = $('panel');
+  const hudEl = $('hud');
+  const progressEl = $('progress');
+  const progressFill = $('progress-fill');
+  const helpEl = $('help');
+  const helpBtn = $('help-btn');
   const sharePreview = $('share-preview');
   const shareNote = $('share-note');
 
@@ -929,6 +935,7 @@
 
   function enterStep() {
     const st = STEPS[fold.step];
+    setProgress(fold.step / STEPS.length);
     if (mode === 'free') hudStep.textContent = st.kind === 'free' ? `自由に折る (${fold.count}回)` : `仕上げ ${fold.step} / ${STEPS.length - 1}`;
     else hudStep.textContent = `手順 ${fold.step + 1} / ${STEPS.length}`;
     guideTitle.textContent = st.title;
@@ -1001,6 +1008,7 @@
 
   function finishFold() {
     hudStep.textContent = '完成';
+    setProgress(1);
     guideTitle.textContent = '完成!';
     guideText.textContent = '胴を少し開いて、翼をととのえています…';
     guideStats.textContent = '';
@@ -1187,7 +1195,8 @@
     const tanV = Math.tan((camera.fov * Math.PI) / 360);
     const asp = camera.aspect;
     const c = new THREE.Vector3(DESK_X, DESK_TOP, 0);
-    const fit = (v, h) => Math.max(v / 2 / tanV, h / 2 / (tanV * asp));
+    // 上のチップと下のパネルのあいだに見える高さで合わせる
+    const fit = (v, h) => Math.max(v / 2 / (tanV * view.frac), h / 2 / (tanV * asp));
     camGoal.rate = 4;
     if (mode === 'room') {
       camGoal.pos.set(-2.7, 9.95, -1.3);
@@ -1205,9 +1214,9 @@
       camGoal.pos.set(c.x - dist * 0.62, c.y + dist * 0.78, c.z);
       camGoal.look.set(c.x - 0.01, c.y + 0.03, c.z);
     } else if (mode === 'show') {
-      const dist = fit(0.42, 0.46);
+      const dist = fit(0.5, 0.56);
       camGoal.pos.set(c.x - dist * 0.62, c.y + dist * 0.55, c.z + dist * 0.55);
-      camGoal.look.set(c.x + 0.02, c.y + 0.02, c.z);
+      camGoal.look.set(c.x - 0.02, c.y + 0.02, c.z);
     } else if (mode === 'launch') {
       // 部屋の中から、窓わくごしに外を見る
       const L = PM.LAUNCH;
@@ -1277,6 +1286,7 @@
 
   function readyLaunch(fromDesk) {
     phase = 'launch';
+    setProgress(null);
     flight = null;
     fast = false;
     hudFlight.textContent = '';
@@ -1370,7 +1380,7 @@
 
   function updateFlightHud() {
     const d = PM.distanceOf(flight);
-    hudFlight.textContent = `${d.toFixed(1)} m ・ 高さ ${flight.p.y.toFixed(1)} m ・ ${(flight.speed * 3.6).toFixed(0)} km/h`;
+    hudFlight.innerHTML = `<span class="meter-d">${d.toFixed(1)}<small>m</small></span><span class="meter-sub">高さ ${flight.p.y.toFixed(1)} m ・ ${(flight.speed * 3.6).toFixed(0)} km/h</span>`;
   }
 
   function onLanded() {
@@ -1414,6 +1424,7 @@
 
   function showResult(entry, isBest, prevBest) {
     phase = 'result';
+    hudFlight.textContent = '';
     resultDist.textContent = fmtM(entry.d);
     if (isBest && prevBest > 0) resultNote.textContent = `ベスト更新! (これまで ${fmtM(prevBest)})`;
     else if (isBest) resultNote.textContent = 'はじめての記録!';
@@ -1695,9 +1706,31 @@
 
   function showOverlay(screen) {
     overlay.hidden = false;
+    wrap.classList.add('has-overlay');
     for (const s of [screenTitle, screenResult]) s.hidden = s !== screen;
   }
-  function hideOverlay() { overlay.hidden = true; }
+  function hideOverlay() {
+    overlay.hidden = true;
+    wrap.classList.remove('has-overlay');
+  }
+
+  // 手順の進み具合 (frac が null なら隠す)
+  function setProgress(frac) {
+    progressEl.classList.toggle('is-off', frac === null);
+    if (frac !== null) progressFill.style.width = `${Math.round(clamp(frac, 0, 1) * 100)}%`;
+  }
+
+  // 遊び方
+  function setHelp(open) {
+    helpEl.hidden = !open;
+    helpBtn.setAttribute('aria-expanded', String(open));
+    if (open) $('help-close').focus();
+    else helpBtn.focus();
+  }
+  helpBtn.addEventListener('click', () => setHelp(helpEl.hidden));
+  $('help-close').addEventListener('click', () => setHelp(false));
+  helpEl.addEventListener('click', (e) => { if (e.target === helpEl) setHelp(false); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !helpEl.hidden) setHelp(false); });
 
   // m: 'guided' (お手本どおり) / 'free' (自由に折る)。省略したらいまのまま
   function startFold(m) {
@@ -1769,16 +1802,41 @@
   // =====================================================================
   // ループ
   // =====================================================================
+  // 3D の見える場所: 上のチップの下から、下のパネルの上まで。カメラの中心をそこへずらす
+  const view = { frac: 1, target: 0, off: 0 };
+  function measureView() {
+    const h = wrap.clientHeight || 1;
+    const wr = wrap.getBoundingClientRect();
+    const top = Math.max(0, hudEl.getBoundingClientRect().bottom - wr.top) + 8;
+    let bottom = h;
+    if (panelEl.offsetParent) bottom = panelEl.getBoundingClientRect().top - wr.top - 8;
+    view.frac = clamp((bottom - top) / h, 0.3, 1);
+    view.target = (h - bottom - top) / 2;
+  }
+  function applyView(dt) {
+    const k = dt === undefined ? 1 : 1 - Math.exp(-dt * 6);
+    const next = view.off + (view.target - view.off) * k;
+    if (Math.abs(next - view.off) < 0.05 && dt !== undefined) return;
+    view.off = next;
+    camera.setViewOffset(wrap.clientWidth, wrap.clientHeight, 0, view.off, wrap.clientWidth, wrap.clientHeight);
+  }
+
   function resize() {
     const w = wrap.clientWidth;
     const h = wrap.clientHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.fov = w / h < 0.8 ? 55 : 45;
+    measureView();
+    applyView();
     camera.updateProjectionMatrix();
     if (camMode !== 'chase') setCamGoal(camMode);
   }
   new ResizeObserver(resize).observe(wrap);
+  new ResizeObserver(() => {
+    measureView();
+    if (camMode !== 'chase') setCamGoal(camMode);
+  }).observe(panelEl);
   resize();
 
   let last = performance.now();
@@ -1789,6 +1847,7 @@
     last = now;
     const time = now / 1000;
     runTweens(dt);
+    applyView(dt);
 
     if (phase === 'flight') {
       acc += dt * (fast ? 3 : 1);

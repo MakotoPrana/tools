@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
   <script>
@@ -17,122 +17,135 @@
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" />
+  <link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
-  <main class="app">
+  <main class="game" id="board-wrap">
+    <canvas id="board" aria-label="紙ひこうきを折って飛ばす画面"></canvas>
+
     <header class="top">
-      <a class="back" href="../">‹ ゲーム一覧</a>
-      <h1>窓から紙ひこうき</h1>
-      <span class="top-space" aria-hidden="true"></span>
+      <a class="chip back" href="../">‹ ゲーム</a>
+      <h1 class="brand">窓から紙ひこうき</h1>
+      <button type="button" class="round-btn" id="help-btn" aria-label="遊び方" aria-expanded="false" aria-controls="help">?</button>
     </header>
 
-    <div class="board-wrap" id="board-wrap">
-      <canvas id="board" aria-label="紙ひこうきを折って飛ばす画面"></canvas>
-
-      <div class="hud">
-        <p class="hud-step" id="hud-step"></p>
-        <p class="hud-wind" title="いまの風"><span class="wind-arrow" id="wind-arrow" aria-hidden="true">↑</span><span id="wind-text"></span></p>
-        <p class="hud-best" id="hud-best"></p>
-      </div>
-      <p class="hud-flight" id="hud-flight" aria-live="off"></p>
-      <p class="callout" id="callout" aria-live="polite"></p>
-
-      <div class="overlay" id="overlay">
-        <div class="screen" id="screen-title">
-          <p class="game-logo">窓から<br /><span>紙ひこうき</span></p>
-          <p class="overlay-text">机の上で紙ひこうきを折って、3階の窓から飛ばそう。<br />お手本どおりでも、自由な形でも。</p>
-          <p class="color-label">紙の色</p>
-          <div class="color-row" id="color-row"></div>
-          <div class="overlay-actions">
-            <button type="button" class="start-btn" id="start-btn">お手本どおりに折る</button>
-            <button type="button" class="start-btn is-sub" id="free-btn">自由に折る</button>
-          </div>
-          <p class="title-best" id="title-best"></p>
-        </div>
-
-        <div class="screen" id="screen-result" hidden>
-          <p class="result-label">飛距離</p>
-          <p class="result-dist" id="result-dist"></p>
-          <p class="result-note" id="result-note"></p>
-          <img class="share-preview" id="share-preview" alt="投稿する結果の画像" width="1200" height="675" />
-          <a class="share-btn" id="share-btn" href="https://x.com/intent/post" target="_blank" rel="noopener">𝕏 結果を画像つきで投稿</a>
-          <p class="share-note" id="share-note" aria-live="polite"></p>
-          <ol class="result-top" id="result-top"></ol>
-          <div class="overlay-actions">
-            <button type="button" class="start-btn" id="again-btn">もう一度投げる</button>
-            <button type="button" class="start-btn is-sub" id="refold-btn">新しく折る</button>
-          </div>
-        </div>
-      </div>
-
-      <p class="load-error" id="load-error" hidden>3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。</p>
+    <div class="hud" id="hud">
+      <p class="chip hud-step" id="hud-step"></p>
+      <p class="chip hud-wind" title="いまの風 (矢印の上が窓の外)"><span class="wind-arrow" id="wind-arrow" aria-hidden="true">↑</span><span id="wind-text"></span></p>
+      <p class="chip hud-best" id="hud-best"></p>
     </div>
+    <div class="meter" id="hud-flight" aria-live="off"></div>
+    <p class="callout" id="callout" aria-live="polite"></p>
 
-    <section class="panel" aria-live="polite">
+    <section class="panel" id="panel" aria-live="polite">
+      <div class="progress" id="progress" aria-hidden="true"><span id="progress-fill"></span></div>
       <h2 class="guide-title" id="guide-title"></h2>
       <p class="guide-text" id="guide-text"></p>
       <p class="guide-stats" id="guide-stats"></p>
       <div class="launch" id="launch" hidden>
-        <label class="slider">
-          <span class="slider-name">角度</span>
-          <input type="range" id="angle" min="-20" max="45" step="1" value="5" />
-          <span class="slider-val" id="angle-val"></span>
-        </label>
-        <label class="slider">
-          <span class="slider-name">力</span>
-          <input type="range" id="power" min="0" max="100" step="1" value="60" />
-          <span class="slider-val" id="power-val"></span>
-        </label>
-        <button type="button" class="throw-btn" id="throw-btn">投げる!</button>
+        <div class="sliders">
+          <label class="slider" for="angle">
+            <span class="slider-name">角度</span>
+            <input type="range" id="angle" min="-20" max="45" step="1" value="5" />
+            <span class="slider-val" id="angle-val"></span>
+          </label>
+          <label class="slider" for="power">
+            <span class="slider-name">力</span>
+            <input type="range" id="power" min="0" max="100" step="1" value="60" />
+            <span class="slider-val" id="power-val"></span>
+          </label>
+        </div>
+        <button type="button" class="throw-btn" id="throw-btn"><span class="throw-icon" aria-hidden="true"></span>投げる</button>
       </div>
       <div class="actions" id="actions"></div>
     </section>
 
-    <section class="help">
-      <h2>遊び方</h2>
-      <p>机の上の紙を、手順にそって折って紙ひこうき (ダーツ型) を作ります。できたら3階の窓から飛ばして、飛距離 (窓の下の壁ぎわからの距離) を競います。投げたあとは、風と紙ひこうきの形まかせ。物理の計算で飛び方が決まります。</p>
+    <div class="overlay" id="overlay">
+      <div class="card title-card" id="screen-title">
+        <svg class="logo-plane" viewBox="0 0 120 60" aria-hidden="true">
+          <path class="logo-trail" d="M2 52 Q30 50 48 34" fill="none" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7" />
+          <path d="M118 8 L44 30 L60 34 Z" fill="#ffffff" />
+          <path d="M118 8 L60 34 L58 50 Z" fill="#ff8a3d" />
+          <path d="M118 8 L58 50 L52 38 Z" fill="#e0612a" />
+        </svg>
+        <p class="logo"><span class="logo-small">窓から</span><span class="logo-big">紙ひこうき</span></p>
+        <p class="lead">机で折って、3階の窓から飛ばそう。<br />風に乗せて、どこまでも。</p>
+        <p class="label">紙の色</p>
+        <div class="color-row" id="color-row"></div>
+        <div class="card-actions">
+          <button type="button" class="btn is-primary" id="start-btn">お手本どおりに折る</button>
+          <button type="button" class="btn" id="free-btn">自由に折る</button>
+        </div>
+        <p class="title-best" id="title-best"></p>
+      </div>
 
-      <h3>折る</h3>
-      <table>
-        <tbody>
-          <tr><th>角・ふちを折る</th><td>オレンジの角をドラッグして、青い点まで運びます。指を動かすと、その位置に角が重なるように紙が折れます。青い点の近く (6mm 以内) で離すと、ぴったりに吸いつきます</td></tr>
-          <tr><th>半分に折る</th><td>左のはしを右へドラッグします</td></tr>
-          <tr><th>翼の線</th><td>左右にドラッグして、翼を折る線を決めます。線より外側が翼になります</td></tr>
-          <tr><th>翼を折る</th><td>翼のはしを外へ倒すようにドラッグします</td></tr>
-          <tr><th>ボタン</th><td>「おまかせで折る」でその手順をぴったりに折り、「ひとつ戻る」で前の手順へ戻れます</td></tr>
-        </tbody>
-      </table>
+      <div class="card result-card" id="screen-result" hidden>
+        <p class="label">飛距離</p>
+        <p class="result-dist" id="result-dist"></p>
+        <p class="result-note" id="result-note"></p>
+        <img class="share-preview" id="share-preview" alt="投稿する結果の画像" width="1200" height="675" />
+        <a class="btn share-btn" id="share-btn" href="https://x.com/intent/post" target="_blank" rel="noopener">𝕏 結果を画像つきで投稿</a>
+        <p class="share-note" id="share-note" aria-live="polite"></p>
+        <ol class="result-top" id="result-top"></ol>
+        <div class="card-actions">
+          <button type="button" class="btn is-primary" id="again-btn">もう一度投げる</button>
+          <button type="button" class="btn" id="refold-btn">新しく折る</button>
+        </div>
+      </div>
+    </div>
 
-      <h3>自由に折る</h3>
-      <p>タイトルで「自由に折る」を選ぶと、お手本なしで好きなように折れます。紙の角やふち (どこでも) をドラッグすると、指の位置に重なるように折れます。何回でも折れて、紙の頂点やまん中の折り筋の近くでは吸いつきます。「左右対称」が ON なら、反対側も鏡に映したように同じだけ折れます。</p>
-      <p>折り終えたら「半分に折る」を押して、あとはお手本と同じように、半分に折る・翼の線を決める・翼を折るで仕上げます。機首を何回も折り返して重くしたり、翼の先を切り落としたように折ったり、いろいろな形を試してみましょう。形に合わせて重心や翼の面積が変わり、飛び方も変わります。</p>
+    <section class="help" id="help" hidden>
+      <div class="help-inner">
+        <button type="button" class="round-btn help-close" id="help-close" aria-label="遊び方を閉じる">×</button>
+        <h2>遊び方</h2>
+        <p>机の上の紙を、手順にそって折って紙ひこうき (ダーツ型) を作ります。できたら3階の窓から飛ばして、飛距離 (窓の下の壁ぎわからの距離) を競います。投げたあとは、風と紙ひこうきの形まかせ。物理の計算で飛び方が決まります。</p>
 
-      <h3>形と飛び方</h3>
-      <ul>
-        <li>折りがずれて左右の形がそろわないと、片方の翼の揚力が大きくなって曲がっていきます</li>
-        <li>翼が広い (線が中心に近い) と、ゆっくり長く飛びます。追い風に強いかわりに、向かい風や横風に流されやすくなります</li>
-        <li>翼がせまいと速く飛びます。向かい風でも進めますが、ふつうの日は落ちるのが早めです</li>
-        <li>強く投げすぎると、手ぶれでふらつきます。上へ向けすぎると、失速してしまいます</li>
-      </ul>
+        <h3>折る</h3>
+        <table>
+          <tbody>
+            <tr><th>角・ふちを折る</th><td>オレンジの角をドラッグして、青い点まで運びます。指を動かすと、その位置に角が重なるように紙が折れます。青い点の近く (6mm 以内) で離すと、ぴったりに吸いつきます</td></tr>
+            <tr><th>半分に折る</th><td>左のはしを右へドラッグします</td></tr>
+            <tr><th>翼の線</th><td>左右にドラッグして、翼を折る線を決めます。線より外側が翼になります</td></tr>
+            <tr><th>翼を折る</th><td>翼のはしを外へ倒すようにドラッグします</td></tr>
+            <tr><th>ボタン</th><td>「おまかせで折る」でその手順をぴったりに折り、「ひとつ戻る」で前の手順へ戻れます</td></tr>
+          </tbody>
+        </table>
 
-      <h3>投げる</h3>
-      <table>
-        <tbody>
-          <tr><th>角度・力</th><td>スライダーで決めて「投げる!」。キーボードでは ↑↓ で角度、←→ で力、スペースで投げる</td></tr>
-          <tr><th>風</th><td>画面上の矢印 (上が窓の外) と、原っぱの旗で見られます。投げるたびに変わります</td></tr>
-          <tr><th>飛んでいる間</th><td>「早送り」(スペース) で3倍の速さにできます</td></tr>
-        </tbody>
-      </table>
-      <p>記録は、この端末のブラウザに上位5つまで残ります。</p>
-      <p>結果の画面の「結果を画像つきで投稿」で、飛距離と飛んだ道すじの画像を X に投稿できます。スマホでは共有の画面が開くので X を選びます。パソコンでは X の投稿画面が開き、画像がコピーされるので、投稿画面に貼り付けて (Ctrl+V / ⌘V) 投稿します。</p>
+        <h3>自由に折る</h3>
+        <p>タイトルで「自由に折る」を選ぶと、お手本なしで好きなように折れます。紙の角やふち (どこでも) をドラッグすると、指の位置に重なるように折れます。何回でも折れて、紙の頂点やまん中の折り筋の近くでは吸いつきます。「左右対称」が ON なら、反対側も鏡に映したように同じだけ折れます。</p>
+        <p>折り終えたら「半分に折る」を押して、あとはお手本と同じように、半分に折る・翼の線を決める・翼を折るで仕上げます。機首を何回も折り返して重くしたり、翼の先を切り落としたように折ったり、いろいろな形を試してみましょう。形に合わせて重心や翼の面積が変わり、飛び方も変わります。</p>
+
+        <h3>形と飛び方</h3>
+        <ul>
+          <li>折りがずれて左右の形がそろわないと、片方の翼の揚力が大きくなって曲がっていきます</li>
+          <li>翼が広い (線が中心に近い) と、ゆっくり長く飛びます。追い風に強いかわりに、向かい風や横風に流されやすくなります</li>
+          <li>翼がせまいと速く飛びます。向かい風でも進めますが、ふつうの日は落ちるのが早めです</li>
+          <li>強く投げすぎると、手ぶれでふらつきます。上へ向けすぎると、失速してしまいます</li>
+        </ul>
+
+        <h3>投げる</h3>
+        <table>
+          <tbody>
+            <tr><th>角度・力</th><td>スライダーで決めて「投げる!」。キーボードでは ↑↓ で角度、←→ で力、スペースで投げる</td></tr>
+            <tr><th>風</th><td>画面上の矢印 (上が窓の外) と、原っぱの旗で見られます。投げるたびに変わります</td></tr>
+            <tr><th>飛んでいる間</th><td>「早送り」(スペース) で3倍の速さにできます</td></tr>
+          </tbody>
+        </table>
+        <p>記録は、この端末のブラウザに上位5つまで残ります。</p>
+        <p>結果の画面の「結果を画像つきで投稿」で、飛距離と飛んだ道すじの画像を X に投稿できます。スマホでは共有の画面が開くので X を選びます。パソコンでは X の投稿画面が開き、画像がコピーされるので、投稿画面に貼り付けて (Ctrl+V / ⌘V) 投稿します。</p>
+    </div>
     </section>
+
+    <p class="load-error" id="load-error" hidden>3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。</p>
   </main>
 
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="model.js?v=2"></script>
-  <script src="script.js?v=3"></script>
+  <script src="script.js?v=4"></script>
 </body>
 </html>
