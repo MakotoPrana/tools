@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>NIGHT RAID</title>
+  <meta name="description" content="マフラーをなびかせて夜の工業地帯を駆け抜ける、横スクロールのランアンドガン。ドローンや砲台を撃ち落として、最奥の戦闘メカを倒そう。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../">‹ ゲーム一覧</a>
+      <h1>NIGHT RAID</h1>
+      <div class="top-btns">
+        <button type="button" id="sound-btn" class="icon-btn" aria-label="効果音" aria-pressed="true" tabindex="-1">♪</button>
+        <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止" tabindex="-1">Ⅱ</button>
+      </div>
+    </header>
+
+    <div class="stage-wrap" id="stage-wrap">
+      <canvas id="game" width="480" height="270"></canvas>
+
+      <div class="overlay" id="overlay">
+        <p class="ov-title" id="ov-title">NIGHT RAID</p>
+        <p class="ov-text" id="ov-text">夜の工業地帯を突破し、最奥の戦闘メカを倒せ</p>
+        <button type="button" class="btn" id="ov-btn">START</button>
+        <p class="ov-keys" id="ov-keys">← → 移動 ／ Z・Space・↑ ジャンプ ／ X 射撃（長押しで連射） ／ P 一時停止</p>
+      </div>
+    </div>
+
+    <!-- スマホ用の操作ボタン -->
+    <div class="pad" id="pad">
+      <div class="pad-dir">
+        <button type="button" data-key="left" aria-label="左">◀</button>
+        <button type="button" data-key="right" aria-label="右">▶</button>
+      </div>
+      <div class="pad-act">
+        <button type="button" data-key="shoot" class="shoot">SHOT</button>
+        <button type="button" data-key="jump" class="jump">JUMP</button>
+      </div>
+    </div>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>

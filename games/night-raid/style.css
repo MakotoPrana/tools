@@ -1,0 +1,159 @@
+:root {
+  --bg: #f4f6f8;
+  --text: #1f2933;
+  --muted: #6b7785;
+  --border: #dde2e8;
+  --accent: #f08a24;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15191e;
+    --text: #e6eaef;
+    --muted: #9aa5b1;
+    --border: #333c46;
+    --accent: #f5a04a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  line-height: 1.6;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.top h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+
+.back { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
+.back:hover { color: var(--accent); }
+
+.top-btns { display: flex; gap: 6px; }
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.icon-btn[aria-pressed="false"] { opacity: 0.4; }
+
+.stage-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0b0d16;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: rgba(6, 8, 16, 0.72);
+  color: #f2f4f8;
+  text-align: center;
+}
+
+.ov-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 6vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  text-shadow: 0 3px 0 #000;
+}
+
+.ov-text { margin: 0; font-size: 0.95rem; white-space: pre-line; }
+.ov-keys { margin: 4px 0 0; font-size: 0.75rem; color: #a9b1c2; }
+
+.btn {
+  margin-top: 6px;
+  padding: 8px 28px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #1a1206;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+/* 操作ボタンはタッチ端末でだけ出す */
+.pad {
+  display: none;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (pointer: coarse) {
+  .pad { display: flex; }
+  .ov-keys { display: none; }
+}
+
+.pad-dir, .pad-act { display: flex; gap: 8px; }
+
+.pad button {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: rgba(127, 127, 127, 0.12);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  touch-action: none;
+}
+
+.pad button.shoot, .pad button.jump { font-size: 0.8rem; width: 72px; height: 72px; }
+.pad button.shoot { border-color: var(--accent); color: var(--accent); }
+.pad button.on { background: rgba(240, 138, 36, 0.3); }
