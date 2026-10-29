@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>ボクセル解体ボンバー</title>
+  <meta name="description" content="ボクセルでできた家に手榴弾を投げて壊す3Dゲーム。木の小屋からレンガの家、石のお城まで全5ステージ。家の80%以上を壊せばステージクリア。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="game" id="board-wrap">
+    <canvas id="board" aria-label="ボクセルの家に手榴弾を投げる画面"></canvas>
+
+    <header class="top">
+      <a class="chip back" href="../">‹ ゲーム</a>
+      <h1 class="brand">ボクセル解体ボンバー</h1>
+      <button type="button" class="round-btn" id="sound-btn" aria-label="効果音" aria-pressed="true">♪</button>
+    </header>
+
+    <div class="hud" id="hud" hidden>
+      <div class="hud-row">
+        <p class="chip hud-stage" id="hud-stage"></p>
+        <p class="chip hud-bombs" id="hud-bombs" aria-label="のこりの手榴弾"></p>
+      </div>
+      <div class="meter" aria-label="こわした割合">
+        <div class="meter-fill" id="meter-fill"></div>
+        <div class="meter-goal" aria-hidden="true"><span>80%</span></div>
+        <p class="meter-text" id="meter-text">0%</p>
+      </div>
+    </div>
+
+    <p class="hint" id="hint" hidden>ドラッグで視点を回す ・ タップで手榴弾を投げる</p>
+    <p class="callout" id="callout" aria-live="polite"></p>
+
+    <div class="hud-actions" id="hud-actions" hidden>
+      <button type="button" class="chip action" id="retry-btn">やり直す</button>
+      <button type="button" class="chip action" id="menu-btn">ステージ選択</button>
+    </div>
+
+    <section class="overlay" id="menu">
+      <div class="panel">
+        <h2 class="panel-title">ステージを選ぶ</h2>
+        <p class="panel-text">手榴弾を投げて、ボクセルの家を<strong>80%以上</strong>こわせばクリア。<br />柱や壁の根元をこわすと、上の部分がまとめてくずれ落ちます。</p>
+        <ol class="stages" id="stage-list"></ol>
+      </div>
+    </section>
+
+    <section class="overlay" id="result" hidden>
+      <div class="panel">
+        <h2 class="panel-title" id="result-title"></h2>
+        <p class="result-stars" id="result-stars" aria-hidden="true"></p>
+        <p class="panel-text" id="result-text"></p>
+        <div class="result-actions">
+          <button type="button" class="big-btn" id="next-btn">次のステージへ</button>
+          <button type="button" class="big-btn sub" id="again-btn">もう一度</button>
+          <button type="button" class="big-btn sub" id="result-menu-btn">ステージ選択</button>
+        </div>
+      </div>
+    </section>
+
+    <p class="load-error" id="load-error" hidden>3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。</p>
+  </main>
+
+  <script src="../origami-intro.js"></script>
+  <script>OrigamiIntro.play();</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="stages.js?v=1"></script>
+  <script src="world.js?v=1"></script>
+  <script src="script.js?v=1"></script>
+</body>
+</html>
