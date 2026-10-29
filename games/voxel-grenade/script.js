@@ -14,11 +14,12 @@
 
   const { STAGES, MATERIALS, MATERIAL_NAMES } = window.VoxelStages;
   const World = window.VoxelWorld;
+  const CELL = World.CELL; // ボクセル1つの大きさ
 
   const GOAL = 0.8; // こわせばクリアになる割合
   const GRAVITY = 22;
   const GRENADE_R = 0.22;
-  const DEBRIS_MAX = 2600;
+  const DEBRIS_MAX = 4000;
   const STARS_KEY = 'voxel-grenade-stars';
   const SOUND_KEY = 'voxel-grenade-sound';
 
@@ -62,7 +63,8 @@
   sun.position.set(-30, 45, 22);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.bias = -0.0008;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.04; // 小さなボクセルの階段に出る影のぎざぎざをおさえる
   scene.add(sun);
   scene.add(sun.target);
 
@@ -219,7 +221,7 @@
   let world = null;
   let house = null; // InstancedMesh
   let cellToInstance = null; // マスの番号 → インスタンスの番号
-  let ox = 0, oz = 0; // マス目の (0, 0, 0) の角の、ワールド座標
+  let ox = 0, oz = 0; // ボクセル (0, 0, 0) の角の、ワールド座標
 
   function buildHouse() {
     if (house) {
@@ -231,14 +233,14 @@
     house.receiveShadow = true;
     house.frustumCulled = false;
     cellToInstance = new Int32Array(world.cells.length).fill(-1);
-    ox = -world.w / 2;
-    oz = -world.d / 2;
+    ox = (-world.w * CELL) / 2;
+    oz = (-world.d * CELL) / 2;
     let n = 0;
     for (let i = 0; i < world.cells.length; i++) {
       const m = world.cells[i];
       if (!m) continue;
       const [x, y, z] = World.coords(world, i);
-      tmpMat.makeTranslation(ox + x + 0.5, y + 0.5, oz + z + 0.5);
+      tmpMat.makeScale(CELL, CELL, CELL).setPosition(ox + (x + 0.5) * CELL, (y + 0.5) * CELL, oz + (z + 0.5) * CELL);
       house.setMatrixAt(n, tmpMat);
       // 同じ材料でも少しずつ明るさを変えて、ボクセルらしくする
       const k = 0.9 + Math.random() * 0.14;
@@ -263,7 +265,7 @@
 
   function solidAtWorld(x, y, z) {
     if (!world) return false;
-    return World.solid(world, Math.floor(x - ox), Math.floor(y), Math.floor(z - oz));
+    return World.solid(world, Math.floor((x - ox) / CELL), Math.floor(y / CELL), Math.floor((z - oz) / CELL));
   }
 
   // ---------- 視点 ----------
@@ -271,7 +273,7 @@
   const view = { theta: 0.7, phi: 0.5, dist: 30, target: new THREE.Vector3(), shake: 0 };
 
   function frameStage() {
-    const size = Math.max(world.w, world.d, world.h);
+    const size = Math.max(world.w, world.d, world.h) * CELL;
     // 縦長の画面では、家が横にはみ出さないように少し離れる
     const far = camera.aspect < 1 ? 1 / Math.pow(camera.aspect, 0.4) : 1;
     view.dist = (size * 1.55 + 12) * far;
@@ -279,8 +281,8 @@
     view.maxDist = (size * 2.6 + 20) * far;
     view.theta = 0.7;
     view.phi = 0.42;
-    view.target.set(0, world.h * 0.32, 0);
-    const s = Math.max(world.w, world.d) * 0.9 + 8;
+    view.target.set(0, world.h * CELL * 0.32, 0);
+    const s = Math.max(world.w, world.d) * CELL * 0.9 + 8;
     Object.assign(sun.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 140 });
     sun.shadow.camera.updateProjectionMatrix();
   }
@@ -327,8 +329,9 @@
       const t = -o.y / dir.y;
       if (t < 160) best = { t, normal: new THREE.Vector3(0, 1, 0) };
     }
-    const hit = traceGrid(o.x - ox, o.y, o.z - oz, dir.x, dir.y, dir.z, best ? best.t : 160);
-    if (hit) best = hit;
+    // マス目はボクセル単位で数えるので、たどる距離もボクセル単位にして、戻す
+    const hit = traceGrid((o.x - ox) / CELL, o.y / CELL, (o.z - oz) / CELL, dir.x, dir.y, dir.z, (best ? best.t : 160) / CELL);
+    if (hit) best = { t: hit.t * CELL, normal: hit.normal };
     if (!best) return null;
     const point = o.clone().addScaledVector(dir, best.t);
     return { point, normal: best.normal };
@@ -553,30 +556,35 @@
 
   function explodeAt(pos) {
     lastBoom = clock;
-    const gx = pos.x - ox, gy = pos.y, gz = pos.z - oz;
+    const gx = (pos.x - ox) / CELL, gy = pos.y / CELL, gz = (pos.z - oz) / CELL;
     const { removed, fallen } = World.explode(world, gx, gy, gz);
 
+    // 破片が多すぎると重くなるので、こわれたボクセルが多いときは一部だけ破片にする
+    const chance = Math.min(1, 450 / Math.max(1, removed.length));
     for (const r of removed) {
       hideCell(r.i);
+      if (Math.random() > chance) continue;
       // こわれたブロックは、小さな破片になって外へ飛ぶ
-      const wx = ox + r.x + 0.5, wy = r.y + 0.5, wz = oz + r.z + 0.5;
+      const wx = ox + (r.x + 0.5) * CELL, wy = (r.y + 0.5) * CELL, wz = oz + (r.z + 0.5) * CELL;
       const dx = wx - pos.x, dy = wy - pos.y, dz = wz - pos.z;
       const len = Math.hypot(dx, dy, dz) || 1;
       const sp = (World.RADIUS - r.dist) * 3.2 + Math.random() * 4;
       const color = cellColor(r.i, r.mat);
-      spawnDebris(wx, wy, wz, (dx / len) * sp, (dy / len) * sp + 4 + Math.random() * 4, (dz / len) * sp, 0.55, color, 2.2 + Math.random() * 1.5);
-      if (Math.random() < 0.5) {
-        spawnDebris(wx, wy, wz, (dx / len) * sp * 1.2 + (Math.random() - 0.5) * 3, (dy / len) * sp + 6, (dz / len) * sp * 1.2 + (Math.random() - 0.5) * 3, 0.3, color, 1.8 + Math.random());
-      }
+      spawnDebris(wx, wy, wz, (dx / len) * sp, (dy / len) * sp + 4 + Math.random() * 4, (dz / len) * sp, CELL * (0.5 + Math.random() * 0.5), color, 2.2 + Math.random() * 1.5);
     }
+    // 支えを失ったブロックは、2 × 2 × 2 ボクセルずつのかたまりになってくずれ落ちる
+    const chunks = new Map();
     for (const f of fallen) {
       hideCell(f.i);
-      // 支えを失ったブロックは、そのままの大きさでくずれ落ちる
-      const wx = ox + f.x + 0.5, wy = f.y + 0.5, wz = oz + f.z + 0.5;
+      const key = (f.x >> 1) + ',' + (f.y >> 1) + ',' + (f.z >> 1);
+      if (!chunks.has(key)) chunks.set(key, f);
+    }
+    for (const f of chunks.values()) {
+      const wx = ox + ((f.x >> 1) * 2 + 1) * CELL, wy = ((f.y >> 1) * 2 + 1) * CELL, wz = oz + ((f.z >> 1) * 2 + 1) * CELL;
       const dx = wx - pos.x, dz = wz - pos.z;
       const len = Math.hypot(dx, dz) || 1;
       const push = Math.max(0, 6 - len) * 0.5;
-      spawnDebris(wx, wy, wz, (dx / len) * push + (Math.random() - 0.5) * 1.5, Math.random() * 1.5, (dz / len) * push + (Math.random() - 0.5) * 1.5, 0.92, cellColor(f.i, f.mat), 4 + Math.random() * 3);
+      spawnDebris(wx, wy, wz, (dx / len) * push + (Math.random() - 0.5) * 1.5, Math.random() * 1.5, (dz / len) * push + (Math.random() - 0.5) * 1.5, CELL * 1.9, cellColor(f.i, f.mat), 4 + Math.random() * 3);
     }
     house.instanceMatrix.needsUpdate = true;
     pushDebris(pos.x, pos.y, pos.z, 14);
@@ -608,24 +616,26 @@
       });
     }
     // 落ちたブロックが多いと、土ぼこりも立てる
-    const dust = Math.min(14, Math.floor(fallen.length / 25));
+    const dust = Math.min(14, Math.floor(chunks.size / 25));
     for (let k = 0; k < dust; k++) {
       const f = fallen[Math.floor(Math.random() * fallen.length)];
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0xcbb89a, transparent: true, opacity: 0.6, depthWrite: false }));
-      sp.position.set(ox + f.x + 0.5, 0.8, oz + f.z + 0.5);
+      sp.position.set(ox + (f.x + 0.5) * CELL, 0.8, oz + (f.z + 0.5) * CELL);
       sp.scale.setScalar(2);
       scene.add(sp);
       smokes.push({ sprite: sp, t: -0.3 - Math.random() * 0.4, life: 2.5, vel: new THREE.Vector3((Math.random() - 0.5) * 2, 0.8, (Math.random() - 0.5) * 2), grow: 4 });
     }
 
+    // 音やゆれの大きさは、以前の1マス (ボクセル8つ) を単位にして決める
+    const fallenUnits = fallen.length / 8, removedUnits = removed.length / 8;
     const camDist = camera.position.distanceTo(pos);
-    view.shake = Math.min(1.2, 0.5 + fallen.length / 300) * Math.min(1, 30 / camDist);
-    sound.boom(Math.min(1, 0.6 + fallen.length / 400));
-    if (fallen.length > 30) sound.crumble(Math.min(1, fallen.length / 300));
+    view.shake = Math.min(1.2, 0.5 + fallenUnits / 300) * Math.min(1, 30 / camDist);
+    sound.boom(Math.min(1, 0.6 + fallenUnits / 400));
+    if (fallenUnits > 30) sound.crumble(Math.min(1, fallenUnits / 300));
 
-    if (fallen.length > 150) callout('大崩壊!');
-    else if (fallen.length > 40) callout('ガラガラ!');
-    else if (removed.length > 25) callout('ドカーン!');
+    if (fallenUnits > 150) callout('大崩壊!');
+    else if (fallenUnits > 40) callout('ガラガラ!');
+    else if (removedUnits > 25) callout('ドカーン!');
     updateMeter();
   }
 

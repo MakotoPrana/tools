@@ -7,7 +7,8 @@
 
   const Stages = typeof module !== 'undefined' && module.exports ? require('./stages.js') : window.VoxelStages;
 
-  const RADIUS = 4.0; // 爆発がとどくきょり (マス)
+  const CELL = Stages.CELL; // ボクセル1つの大きさ
+  const RADIUS = 4.0; // 爆発がとどくきょり (ワールドの単位。ボクセルなら RADIUS / CELL 個ぶん)
   const POWER = 3.4; // 爆心でのダメージ。はなれるほど直線で弱くなる
   // ひとかたまりの建物は、地面に接するブロックの割合がはじめの COLLAPSE 倍より少なくなると、重さに負けてくずれる
   const COLLAPSE = 0.55;
@@ -48,10 +49,10 @@
     return world.cells[x + world.w * (y + world.h * z)] !== 0;
   }
 
-  // マス目の座標 (cx, cy, cz) で爆発させる。こわれたマスと、支えを失って落ちるマスを返す
+  // ボクセルの座標 (cx, cy, cz) で爆発させる。dist はワールドの単位。こわれたマスと、支えを失って落ちるマスを返す
   function explode(world, cx, cy, cz, rng = Math.random) {
     const removed = [];
-    const r = Math.ceil(RADIUS);
+    const r = Math.ceil(RADIUS / CELL);
     const x0 = Math.max(0, Math.floor(cx) - r), x1 = Math.min(world.w - 1, Math.floor(cx) + r);
     const y0 = Math.max(0, Math.floor(cy) - r), y1 = Math.min(world.h - 1, Math.floor(cy) + r);
     const z0 = Math.max(0, Math.floor(cz) - r), z1 = Math.min(world.d - 1, Math.floor(cz) + r);
@@ -60,7 +61,7 @@
         for (let x = x0; x <= x1; x++) {
           const i = index(world, x, y, z);
           if (!world.cells[i]) continue;
-          const dist = Math.hypot(x + 0.5 - cx, y + 0.5 - cy, z + 0.5 - cz);
+          const dist = Math.hypot(x + 0.5 - cx, y + 0.5 - cy, z + 0.5 - cz) * CELL;
           if (dist >= RADIUS) continue;
           const dmg = POWER * (1 - dist / RADIUS) + (rng() - 0.5) * JITTER;
           if (dmg <= 0) continue;
@@ -118,7 +119,7 @@
   function detach(world) {
     const fallen = [];
     for (const comp of components(world)) {
-      const weak = comp.base < 3 || comp.base / comp.cells.length < world.baseRatio[comp.cells[0]] * COLLAPSE;
+      const weak = comp.base < 8 || comp.base / comp.cells.length < world.baseRatio[comp.cells[0]] * COLLAPSE;
       if (comp.base > 0 && !weak) continue;
       for (const i of comp.cells) {
         const [x, y, z] = coords(world, i);
@@ -134,7 +135,7 @@
     return 1 - world.alive / world.total;
   }
 
-  const api = { RADIUS, POWER, COLLAPSE, createWorld, index, coords, solid, explode, destroyedRatio };
+  const api = { CELL, RADIUS, POWER, COLLAPSE, createWorld, index, coords, solid, explode, destroyedRatio };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.VoxelWorld = api;
 })();

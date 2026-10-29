@@ -22,20 +22,30 @@
   };
   const MATERIAL_NAMES = Object.keys(MATERIALS);
 
+  // 1マスを RES × RES × RES のボクセルに分ける (家の形は1マス単位で書き、屋根の斜面だけボクセル単位でなめらかにする)
+  const RES = 2;
+  const CELL = 1 / RES; // ボクセル1つの大きさ (ワールドの単位)
+
   class Builder {
     constructor(w, h, d) {
-      this.w = w;
-      this.h = h;
-      this.d = d;
-      this.cells = new Uint8Array(w * h * d); // 0 は空、1 から MATERIAL_NAMES の順
+      this.w = w * RES;
+      this.h = h * RES;
+      this.d = d * RES;
+      this.cells = new Uint8Array(this.w * this.h * this.d); // 0 は空、1 から MATERIAL_NAMES の順
     }
 
-    set(x, y, z, mat) {
+    // ボクセル1つ
+    setFine(x, y, z, mat) {
       if (x < 0 || y < 0 || z < 0 || x >= this.w || y >= this.h || z >= this.d) return;
       this.cells[x + this.w * (y + this.h * z)] = mat ? MATERIAL_NAMES.indexOf(mat) + 1 : 0;
     }
 
-    // 箱をうめる (両端をふくむ)
+    // 1マス (RES × RES × RES のボクセル)
+    set(x, y, z, mat) {
+      for (let i = 0; i < RES; i++) for (let j = 0; j < RES; j++) for (let k = 0; k < RES; k++) this.setFine(x * RES + i, y * RES + j, z * RES + k, mat);
+    }
+
+    // 箱をうめる (両端のマスをふくむ)
     fill(x0, y0, z0, x1, y1, z1, mat) {
       for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) this.set(x, y, z, mat);
     }
@@ -48,40 +58,44 @@
       this.fill(x1, y0, z0, x1, y1, z1, mat);
     }
 
-    // 切妻屋根。棟は z の向き。屋根は2マスの厚みの階段で、軒が1マス出る。妻側の三角は wallMat でうめる
+    // 切妻屋根。棟は z の向き。ボクセル1段ずつの斜面で、厚みは3ボクセル、軒が1マス出る。妻側の三角は wallMat でうめる
     gable(x0, z0, x1, z1, y, mat, wallMat) {
+      const T = 3;
+      const fx0 = x0 * RES - RES, fx1 = (x1 + 1) * RES - 1 + RES;
+      const fz0 = (z0 - 1) * RES, fz1 = (z1 + 2) * RES - 1;
+      const wz0 = z0 * RES, wz1 = (z1 + 1) * RES - 1;
       for (let k = 0; ; k++) {
-        const left = x0 - 1 + k;
-        const right = x1 + 1 - k;
+        const left = fx0 + k, right = fx1 - k;
         if (left > right) break;
-        const yy = y + k;
-        for (let z = z0 - 1; z <= z1 + 1; z++) {
-          this.set(left, yy, z, mat);
-          this.set(right, yy, z, mat);
-          if (left + 1 <= right) {
-            this.set(left + 1, yy, z, mat);
-            this.set(right - 1, yy, z, mat);
+        const yy = y * RES + k;
+        for (let z = fz0; z <= fz1; z++) {
+          for (let t = 0; t < T && left + t <= right - t; t++) {
+            this.setFine(left + t, yy, z, mat);
+            this.setFine(right - t, yy, z, mat);
           }
         }
-        for (let x = left + 2; x <= right - 2; x++) {
-          this.set(x, yy, z0, wallMat);
-          this.set(x, yy, z1, wallMat);
+        for (let x = left + T; x <= right - T; x++) {
+          for (let r = 0; r < RES; r++) {
+            this.setFine(x, yy, wz0 + r, wallMat);
+            this.setFine(x, yy, wz1 - r, wallMat);
+          }
         }
       }
     }
 
-    // 寄棟 (四角すい) の屋根。2マスの厚みの輪を1段ずつ小さくする
+    // 寄棟 (四角すい) の屋根。厚み3ボクセルの輪を1段ずつ小さくする
     pyramid(x0, z0, x1, z1, y, mat) {
+      const T = 3;
       for (let k = 0; ; k++) {
-        const ax = x0 - 1 + k, bx = x1 + 1 - k, az = z0 - 1 + k, bz = z1 + 1 - k;
+        const ax = (x0 - 1) * RES + k, bx = (x1 + 2) * RES - 1 - k;
+        const az = (z0 - 1) * RES + k, bz = (z1 + 2) * RES - 1 - k;
         if (ax > bx || az > bz) break;
-        for (let t = 0; t < 2; t++) {
-          const cx0 = ax + t, cx1 = bx - t, cz0 = az + t, cz1 = bz - t;
-          if (cx0 > cx1 || cz0 > cz1) {
-            this.fill(ax, y + k, az, bx, y + k, bz, mat);
-            break;
+        const yy = y * RES + k;
+        for (let x = ax; x <= bx; x++) {
+          for (let z = az; z <= bz; z++) {
+            const edge = Math.min(x - ax, bx - x, z - az, bz - z);
+            if (edge < T) this.setFine(x, yy, z, mat);
           }
-          this.walls(cx0, cz0, cx1, cz1, y + k, y + k, mat);
         }
       }
     }
@@ -224,7 +238,7 @@
     { name: '石のお城', sub: '城壁と4つの塔と天守', grenades: 18, build: castle },
   ];
 
-  const api = { MATERIALS, MATERIAL_NAMES, STAGES, Builder };
+  const api = { MATERIALS, MATERIAL_NAMES, STAGES, Builder, CELL };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.VoxelStages = api;
 })();
