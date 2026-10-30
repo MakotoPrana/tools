@@ -1,5 +1,6 @@
 // 調べる: 転移碑・お店・門
 import { sfx } from '../audio/sound.js';
+import { areaTrack } from '../core/analytics.js';
 import { TILE, tr } from '../core/config.js';
 import { dist, dist2, rnd, tc } from '../core/util.js';
 import { addPart, showBanner } from './fx.js';
@@ -126,10 +127,13 @@ export function reinvade(area) {
   area.free = false;
   area.reinvaded = true;
   spawnNests(area);
+  // 解放したエリアを戦い直す。この遊びの中で解放したばかりなら、成功リトライになる
+  areaTrack.start(area.def.id, { difficulty: diffId, reinvade: true });
   toast(tr('{name} に魔巣が戻ってきた…', { name: area.def.name }), 2);
 }
 
 export function purify(area) {
+  if (areaTrack.stage === area.def.id) areaTrack.quit();
   for (const n of area.nests) n.dead = true;
   G.nests = G.nests.filter((n) => n.area !== area);
   for (const e of G.enemies) if (e.area === area && e.home) e.crumble = rnd(0.2, 1);

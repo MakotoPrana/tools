@@ -6,7 +6,8 @@ import { dist, lerp, rnd } from '../core/util.js';
 import { hitsTiles, lineClear, lockArea, moveCircle, tileAt } from './collision.js';
 import { damageTarget, forTargets } from './damage.js';
 import { addPart, addText, showBanner } from './fx.js';
-import { D, hero, heroDef, maxHp, moveSpeed, powerLv, rank, recvMul } from './hero.js';
+import { areaTrack } from '../core/analytics.js';
+import { D, diffId, hero, heroDef, maxHp, moveSpeed, powerLv, rank, recvMul } from './hero.js';
 import { updateInteract } from './interact.js';
 import { G, P, ensureWs } from './stage.js';
 import { effW } from './weapon-mods.js';
@@ -197,6 +198,8 @@ export function updatePlayer(dt) {
   if (ai >= 0 && ai !== G.curArea) {
     G.curArea = ai;
     const a = G.areas[ai];
+    // まだ解放していないエリアに入ったら、そのエリアの解放への挑戦が始まる (出入りしても同じ挑戦のまま)
+    if (!a.free && areaTrack.stage !== a.def.id) areaTrack.start(a.def.id, { difficulty: diffId, hero: heroDef.id, player_lv: powerLv() });
     if (!G.bannerSeen[ai] || G.t - G.bannerSeen[ai] > 8) {
       G.bannerSeen[ai] = G.t;
       const lv0 = a.def.lv[0] + D.lv;

@@ -58,3 +58,4 @@
 ## 計測
 
 - Google アナリティクスのイベント `voxel_grenade_start` (stage)、`voxel_grenade_clear` (stage, stars, grenades)
+- ステージの開始・結末・リトライも、全ゲーム共通のイベント (`stage_start` / `stage_end` / `stage_retry_fail` など) で送る。中身は [games/ANALYTICS.md](../ANALYTICS.md)

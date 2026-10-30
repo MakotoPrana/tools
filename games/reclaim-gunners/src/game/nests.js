@@ -8,6 +8,7 @@ import { addPoison, enemyShot, ring } from './bullets.js';
 import { hitsTiles, lineClear, lockArea, moveCircle } from './collision.js';
 import { dropGold, gainExp, spawnEnemy, spawnFromNest } from './enemies.js';
 import { addPart, showBanner } from './fx.js';
+import { areaTrack } from '../core/analytics.js';
 import { D, hero, prog, rank } from './hero.js';
 import { collectAllMats } from './pickups.js';
 import { G, P } from './stage.js';
@@ -114,6 +115,7 @@ export function liberate(area) {
   G.nests = G.nests.filter((n) => n.area !== area);
   area.nests = [];
   const first = !prog.areas.includes(a.id);
+  if (areaTrack.stage === a.id) areaTrack.clear({ reinvade: area.reinvaded });
   let sub = '';
   if (first && !area.reinvaded) {
     prog.areas.push(a.id);

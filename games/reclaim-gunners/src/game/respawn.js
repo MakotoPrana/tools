@@ -1,4 +1,5 @@
 // 力尽きたとき
+import { areaTrack, bossTrack } from '../core/analytics.js';
 import { tr } from '../core/config.js';
 import { goldAtSave, writeSave } from '../core/save.js';
 import { fmt } from '../core/util.js';
@@ -12,8 +13,11 @@ import { toast } from '../ui/toast.js';
 export function respawn() {
   const lost = Math.max(0, Math.floor((hero.gold - goldAtSave) * 0.5));
   hero.gold -= lost;
-  // いたエリアの魔巣は元に戻る
   const area = G.areas[G.curArea];
+  // いたエリアの解放と、戦っていたボス戦は失敗で終わり。もう一度エリアに入ると失敗リトライになる
+  if (G.lock) bossTrack.fail();
+  if (area && !area.free && areaTrack.stage === area.def.id) areaTrack.fail();
+  // いたエリアの魔巣は元に戻る
   if (area && !area.free) {
     for (const n of area.nests) {
       n.dead = false;
