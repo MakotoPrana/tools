@@ -2351,10 +2351,22 @@
     e.currentTarget.blur();
     camState.mode = (camState.mode + 1) % CAM_MODES.length;
   });
-  $('quit-btn').addEventListener('click', () => {
+  // 荷物を積んだあとは、もう一度押したらやめる (ペナルティを払う)
+  let quitArmed = 0;
+  $('quit-btn').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    btn.blur();
     if (!job || job.done) return;
     if (job.loaded) {
-      if (!window.confirm(`荷物を積んだあとなので、やめるとペナルティ ${yen(job.def.penalty)} を払います。やめますか?`)) return;
+      if (performance.now() - quitArmed > 3000) {
+        quitArmed = performance.now();
+        btn.textContent = `もう一度押すとやめる (${yen(-job.def.penalty)})`;
+        setTimeout(() => {
+          btn.textContent = '仕事をやめる';
+        }, 3000);
+        return;
+      }
+      btn.textContent = '仕事をやめる';
       finishFail('quit');
     } else {
       job.done = true;
