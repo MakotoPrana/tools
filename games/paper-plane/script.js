@@ -62,6 +62,7 @@
   const aimVal = $('aim-val');
   const throwBtn = $('throw-btn');
   const resultDist = $('result-dist');
+  const resultCrash = $('result-crash');
   const resultNote = $('result-note');
   const resultTop = $('result-top');
   const againBtn = $('again-btn');
@@ -1593,10 +1594,13 @@
       camGoal.pos.set(c.x - dist * 0.62, c.y + dist * 0.55, c.z + dist * 0.55);
       camGoal.look.set(c.x - 0.02, c.y + 0.02, c.z);
     } else if (mode === 'launch') {
-      // 部屋の中から、窓わくごしに外を見る
+      // 紙ひこうきをうしろ斜め上から見て、見える場所 (上のチップと下のパネルのあいだ) の真ん中に置く。
+      // 窓わくと外の景色はその先に見える。翼が見えるように、少し右に回りこむ
       const L = PM.LAUNCH;
-      camGoal.pos.set(L.x - 1.05, L.y + 0.3, L.z + 0.1);
-      camGoal.look.set(L.x + 4, L.y - 0.35, L.z);
+      const dist = Math.max(0.75, fit(0.62, 0.62));
+      const dir = new THREE.Vector3(-0.82, 0.36, 0.44).normalize();
+      camGoal.pos.set(L.x + dir.x * dist, L.y + dir.y * dist, L.z + dir.z * dist);
+      camGoal.look.set(L.x + 0.12, L.y + 0.02, L.z);
     }
   }
 
@@ -1789,20 +1793,25 @@
     const fromQ = root.quaternion.clone();
     const fromY = root.position.y;
     const restY = flight.p.y - 0.01 + design.cgLocal[1] + 0.004;
-    tween(0.35, (k) => {
-      root.quaternion.copy(fromQ).slerp(restQ, k);
-      root.position.y = lerp(fromY, restY, k);
-    });
-    landFlag.g.position.set(flight.p.x + 0.4, flight.p.y - 0.01, flight.p.z);
+    if (!flight.crashed) {
+      tween(0.35, (k) => {
+        root.quaternion.copy(fromQ).slerp(restQ, k);
+        root.position.y = lerp(fromY, restY, k);
+      });
+    }
+    // 突っこんだときは、旗はぶつかった真下の地面に立てる
+    const flagY = flight.crashed ? PS.surfaceY(stage, flight.p.x, flight.p.z) : flight.p.y - 0.01;
+    landFlag.g.position.set(flight.p.x + 0.4, flagY, flight.p.z);
     landFlag.setText(`${dist.toFixed(2)}m`);
     landFlag.g.visible = dist > 0;
-    callout(flight.hitWall && dist < 2 ? t('hitWall') : fmtM(dist), false, 1600);
+    if (flight.crashed) callout(t('crashed'), true, 1600);
+    else callout(fmtM(dist), false, 1600);
     setActions([]);
-    guideTitle.textContent = t(flight.onRoof ? 'landedRoof' : 'landed');
+    guideTitle.textContent = t(flight.crashed ? 'crashedTitle' : flight.onRoof ? 'landedRoof' : 'landed');
     guideText.textContent = '';
 
     records.throws = (records.throws || 0) + 1;
-    const entry = { d: Math.round(dist * 100) / 100, x: flight.p.x, y: flight.p.y - 0.01, z: flight.p.z, k: fold.k, mode, stage: stage.id, wx: wind.x, wz: wind.z, t: Date.now() };
+    const entry = { d: Math.round(dist * 100) / 100, x: flight.p.x, y: flagY, z: flight.p.z, k: fold.k, mode, stage: stage.id, crash: flight.crashed, wx: wind.x, wz: wind.z, t: Date.now() };
     const rec = stageRec();
     const prevBest = rec.best ? rec.best.d : 0;
     const isBest = entry.d > prevBest;
@@ -1820,12 +1829,13 @@
       lang,
       stage: stage.id,
       updraft: flight.thermalHit >= 0,
+      crashed: flight.crashed,
       wind_ms: Math.round(Math.hypot(wind.x, wind.z) * 10) / 10,
       is_best: isBest,
       throw_count: records.throws,
     });
 
-    setTimeout(() => showResult(entry, isBest, prevBest), 1700);
+    setTimeout(() => showResult(entry, isBest, prevBest), flight.crashed ? 1100 : 1700);
   }
 
   let lastResult = null;
@@ -1841,6 +1851,7 @@
 
   function renderResult(entry, isBest, prevBest) {
     resultDist.textContent = fmtM(entry.d);
+    resultCrash.hidden = !entry.crash;
     if (isBest && prevBest > 0) resultNote.textContent = t('newBest', { d: fmtM(prevBest) });
     else if (isBest) resultNote.textContent = t('firstRecord');
     else resultNote.textContent = t('toBest', { best: fmtM(stageRec().best.d), diff: (stageRec().best.d - entry.d).toFixed(2) });

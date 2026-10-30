@@ -500,6 +500,7 @@
       thermal: 0,        // いま受けている上昇気流の強さ (0〜1、中心で1)
       thermalHit: -1,    // 最後に入った上昇気流の番号 (入ったときの合図用)
       onRoof: false,
+      crashed: false,    // 建物に突っこんで終わった
       landed: false,
       hitWall: false,
       maxY: LAUNCH.y,
@@ -533,8 +534,15 @@
 
   const groundY = (s) => (s.p.x < -BUILDING.wallT ? BUILDING.floorY : s.env.ground(s.p.x, s.p.z));
 
-  // じゃま物の箱: 中に入ったら、いちばん浅い面から押し出す。上の面からなら屋上に着地、横からならはね返って落ちる
+  // じゃま物の箱: 中に入ったら、いちばん浅い面から押し出す。上の面からなら屋上に着地、横や下からなら突っこんでその場で終わり
   const BOX_MARGIN = 0.04;
+  function crash(s) {
+    s.v.x = 0; s.v.y = 0; s.v.z = 0;
+    s.w.x = 0; s.w.y = 0; s.w.z = 0;
+    s.hitWall = true;
+    s.crashed = true;
+    s.landed = true;
+  }
   function hitBoxes(s, prevY) {
     const p = s.p;
     for (const b of s.env.boxes) {
@@ -553,16 +561,14 @@
         s.onRoof = true;
         return;
       }
-      if (face === 'x0') { p.x = b.x0 - BOX_MARGIN - 0.01; s.v.x = -Math.abs(s.v.x) * 0.2; }
-      else if (face === 'x1') { p.x = b.x1 + BOX_MARGIN + 0.01; s.v.x = Math.abs(s.v.x) * 0.2; }
-      else if (face === 'z0') { p.z = b.z0 - BOX_MARGIN - 0.01; s.v.z = -Math.abs(s.v.z) * 0.2; }
-      else if (face === 'z1') { p.z = b.z1 + BOX_MARGIN + 0.01; s.v.z = Math.abs(s.v.z) * 0.2; }
-      else { p.y = b.y0 - BOX_MARGIN - 0.01; s.v.y = -Math.abs(s.v.y) * 0.2; }
-      if (face[0] !== 'x') s.v.x *= 0.4;
-      if (face[0] !== 'y') s.v.y *= 0.4;
-      if (face[0] !== 'z') s.v.z *= 0.4;
-      s.w.x *= 0.2; s.w.y *= 0.2; s.w.z *= 0.2;
-      s.hitWall = true;
+      // 壁の面のすぐ外に止める (機首が壁に刺さった形)
+      if (face === 'x0') p.x = b.x0 - BOX_MARGIN;
+      else if (face === 'x1') p.x = b.x1 + BOX_MARGIN;
+      else if (face === 'z0') p.z = b.z0 - BOX_MARGIN;
+      else if (face === 'z1') p.z = b.z1 + BOX_MARGIN;
+      else p.y = b.y0 - BOX_MARGIN;
+      crash(s);
+      return;
     }
   }
 
@@ -626,14 +632,13 @@
     s.speed = speed;
     s.maxY = Math.max(s.maxY, s.p.y);
 
-    // 建物の壁: 窓の穴の外で壁を通りぬけようとしたら、はね返って落ちる
+    // 建物の壁: 窓の穴の外で壁を通りぬけようとしたら、突っこんでその場で終わり
     const crossing = (px >= 0 && s.p.x < 0) || (px <= -BUILDING.wallT && s.p.x > -BUILDING.wallT);
     const inWindow = s.p.y > BUILDING.sillY && s.p.y < BUILDING.topY && Math.abs(s.p.z) < BUILDING.halfZ;
     if (crossing && !inWindow) {
       s.p.x = px >= 0 ? 0.01 : -BUILDING.wallT - 0.01;
-      s.v.x *= -0.2; s.v.y *= 0.4; s.v.z *= 0.4;
-      s.w.x *= 0.2; s.w.y *= 0.2; s.w.z *= 0.2;
-      s.hitWall = true;
+      crash(s);
+      return;
     }
 
     if (s.env.boxes.length) {

@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;700;800&family=ZCOOL+KuaiLe&display=swap" />
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
 </head>
 <body>
   <main class="game" id="board-wrap">
@@ -98,6 +98,7 @@
       <div class="card result-card" id="screen-result" hidden>
         <p class="label" data-i18n="distance">飛距離</p>
         <p class="result-dist" id="result-dist"></p>
+        <p class="result-crash" id="result-crash" data-i18n="crashNote" hidden>建物にぶつかったところまでの距離</p>
         <p class="result-note" id="result-note"></p>
         <img class="share-preview" id="share-preview" data-i18n-alt="sharePreviewAlt" alt="投稿する結果の画像" width="1200" height="675" />
         <a class="btn share-btn" id="share-btn" href="https://x.com/intent/post" target="_blank" rel="noopener" data-i18n="shareBtn">𝕏 結果を画像つきで投稿</a>
@@ -295,9 +296,9 @@
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="i18n.js?v=3"></script>
+  <script src="i18n.js?v=4"></script>
   <script src="stages.js?v=1"></script>
-  <script src="model.js?v=4"></script>
-  <script src="script.js?v=8"></script>
+  <script src="model.js?v=5"></script>
+  <script src="script.js?v=9"></script>
 </body>
 </html>

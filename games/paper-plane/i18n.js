@@ -48,6 +48,9 @@ window.PAPER_PLANE_I18N = {
       aimRight: '右 {n}°',
       aimStraight: 'まっすぐ',
       flip: '裏返す',
+      crashed: 'ガシャン! 建物にぶつかった',
+      crashedTitle: '建物にぶつかった',
+      crashNote: '建物にぶつかったところまでの距離',
       loadError: '3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。',
 
       best: 'ベスト {d}',
@@ -126,7 +129,6 @@ window.PAPER_PLANE_I18N = {
       fast: '早送り',
       normalSpeed: 'ふつうの速さ',
       meterSub: '高さ {h} m ・ {kmh} km/h',
-      hitWall: '壁にぶつかった…',
       landed: '着地!',
 
       newBest: 'ベスト更新! (これまで {d})',
@@ -190,6 +192,9 @@ window.PAPER_PLANE_I18N = {
       aimRight: 'Right {n}°',
       aimStraight: 'Straight',
       flip: 'Flip over',
+      crashed: 'Crash! Hit a building',
+      crashedTitle: 'Hit a building',
+      crashNote: 'Distance to where it hit the building',
       loadError: 'Could not load the 3D parts. Check your connection and reload the page.',
 
       best: 'Best {d}',
@@ -268,7 +273,6 @@ window.PAPER_PLANE_I18N = {
       fast: 'Fast forward',
       normalSpeed: 'Normal speed',
       meterSub: 'Height {h} m · {kmh} km/h',
-      hitWall: 'Hit the wall…',
       landed: 'Landed!',
 
       newBest: 'New best! (was {d})',
@@ -332,6 +336,9 @@ window.PAPER_PLANE_I18N = {
       aimRight: '向右 {n}°',
       aimStraight: '正前方',
       flip: '翻面',
+      crashed: '砰！撞到建筑了',
+      crashedTitle: '撞到建筑了',
+      crashNote: '到撞上建筑处的距离',
       loadError: '无法加载 3D 组件。请检查网络后重新加载页面。',
 
       best: '最佳 {d}',
@@ -410,7 +417,6 @@ window.PAPER_PLANE_I18N = {
       fast: '快进',
       normalSpeed: '正常速度',
       meterSub: '高度 {h} m · {kmh} km/h',
-      hitWall: '撞到墙了…',
       landed: '着陆！',
 
       newBest: '刷新最佳！(之前 {d})',
@@ -474,6 +480,9 @@ window.PAPER_PLANE_I18N = {
       aimRight: '오른쪽 {n}°',
       aimStraight: '정면',
       flip: '뒤집기',
+      crashed: '쾅! 건물에 부딪혔다',
+      crashedTitle: '건물에 부딪혔다',
+      crashNote: '건물에 부딪힌 곳까지의 거리',
       loadError: '3D 부품을 불러오지 못했습니다. 통신 상태를 확인하고 페이지를 새로고침하세요.',
 
       best: '최고 {d}',
@@ -552,7 +561,6 @@ window.PAPER_PLANE_I18N = {
       fast: '빨리 감기',
       normalSpeed: '보통 속도',
       meterSub: '높이 {h} m · {kmh} km/h',
-      hitWall: '벽에 부딪혔다…',
       landed: '착지!',
 
       newBest: '최고 기록 갱신! (이전 {d})',
