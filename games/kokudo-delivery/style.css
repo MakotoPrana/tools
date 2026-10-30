@@ -1,0 +1,553 @@
+/*
+ * 酷道デリバリー: 画面いっぱいの 3D の上に、仕事の札・荷物のキズ・残り時間・地図・運転ボタンを置く。
+ * 空の水色に、キャンディの桃色と黄色。明るい1つの見た目に決めている (ダークモードでも同じ)
+ */
+:root {
+  --sky: #9fe3ff;
+  --ink: #1d2340;
+  --ink-soft: #545b7a;
+  --glass: rgba(255, 255, 255, 0.9);
+  --pink: #ff5c8a;
+  --pink-deep: #e23a6c;
+  --yellow: #ffd23f;
+  --mint: #2ec4b6;
+  --good: #22b573;
+  --warn: #ff9f1c;
+  --bad: #ef233c;
+  --line: rgba(29, 35, 64, 0.16);
+  --shadow: 0 10px 30px rgba(20, 40, 90, 0.25);
+  --font-display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --font-body: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+/* display を指定した要素でも hidden 属性で確実に隠す */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--sky);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 500;
+  line-height: 1.55;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.game {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#board {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+/* 上の帯 */
+.top {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  left: calc(12px + var(--safe-l));
+  right: calc(12px + var(--safe-r));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.top > * { pointer-events: auto; }
+
+.chip {
+  margin: 0;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--glass);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(20, 40, 90, 0.12);
+}
+.back:hover { background: #fff; }
+
+.brand {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1rem, 4vw, 1.35rem);
+  color: #fff;
+  text-shadow: 0 2px 0 var(--pink-deep), 0 0 12px rgba(30, 60, 120, 0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.money { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.02em; }
+.money.minus { color: var(--bad); }
+
+.round-btn {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(20, 40, 90, 0.12);
+}
+.round-btn[aria-pressed="false"] { color: var(--ink-soft); text-decoration: line-through; }
+
+/* 仕事の札と、荷物のキズ */
+.hud {
+  position: absolute;
+  top: calc(56px + var(--safe-t));
+  left: calc(12px + var(--safe-l));
+  width: min(300px, calc(100% - 180px - var(--safe-l) - var(--safe-r)));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.job-card {
+  padding: 8px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--glass);
+  box-shadow: 0 3px 0 var(--ink);
+}
+.job-card p { margin: 0; }
+.job-cargo { font-weight: 800; font-size: 0.9rem; display: flex; gap: 6px; align-items: center; }
+.job-cargo span:first-child { font-size: 1.2rem; }
+.job-goal { font-size: 0.8rem; color: var(--ink-soft); }
+.job-goal b { color: var(--pink-deep); }
+.job-dist { font-family: var(--font-display); font-size: 0.85rem; }
+
+.meter {
+  position: relative;
+  height: 24px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--glass);
+  overflow: hidden;
+  box-shadow: 0 3px 0 var(--ink);
+}
+.meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  background: var(--good);
+  transition: width 0.2s ease-out, background-color 0.3s;
+}
+.meter.hurt { animation: shake 0.35s; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.meter-text {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-shadow: 0 0 4px #fff, 0 0 2px #fff;
+}
+
+/* 残り時間 */
+.timer {
+  position: absolute;
+  top: calc(52px + var(--safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0 14px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--yellow);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  box-shadow: 0 3px 0 var(--ink);
+  pointer-events: none;
+}
+.timer.low { background: var(--bad); color: #fff; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0.65; } }
+
+/* 小さな地図 */
+.minimap {
+  position: absolute;
+  top: calc(56px + var(--safe-t));
+  right: calc(12px + var(--safe-r));
+  width: 150px;
+  height: 150px;
+  padding: 0;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: #4cc9f0;
+  overflow: hidden;
+  cursor: zoom-in;
+  box-shadow: 0 3px 0 var(--ink), var(--shadow);
+}
+.minimap canvas { display: block; width: 100%; height: 100%; }
+
+/* 速さと標高 */
+.gauges {
+  position: absolute;
+  right: calc(16px + var(--safe-r));
+  bottom: calc(16px + var(--safe-b));
+  text-align: right;
+  pointer-events: none;
+}
+.gauges p { margin: 0; }
+.speed {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 3px 0 var(--ink), 0 0 10px rgba(0, 0, 0, 0.25);
+}
+.speed small { font-size: 0.8rem; margin-left: 4px; }
+.alt { font-size: 0.8rem; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+
+/* 積みおろしの進み具合 */
+.zone {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  width: min(320px, 80%);
+  padding: 8px 14px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: var(--glass);
+  text-align: center;
+  box-shadow: 0 3px 0 var(--ink);
+  pointer-events: none;
+}
+.zone-text { margin: 0 0 6px; font-weight: 800; }
+.zone-bar { height: 10px; border-radius: 6px; background: #e3e7f3; overflow: hidden; }
+.zone-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--mint), var(--good)); }
+
+/* 大きな文字 */
+.callout {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%) scale(0.6);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 9vw, 3.4rem);
+  color: var(--yellow);
+  -webkit-text-stroke: 2px var(--ink);
+  text-shadow: 0 4px 0 var(--ink);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+.callout.show { animation: pop 1.6s ease-out forwards; }
+.callout.bad { color: var(--pink); }
+@keyframes pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+  22% { transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1); }
+}
+
+/* ぶつけたときの「-5%」 */
+.hit {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: #fff;
+  -webkit-text-stroke: 1.5px var(--bad);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+.hit.show { animation: rise 0.9s ease-out forwards; }
+@keyframes rise {
+  0% { opacity: 1; transform: translate(-50%, 0) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -50px) scale(1); }
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(112px + var(--safe-b));
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(29, 35, 64, 0.72);
+  color: #fff;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.6s;
+}
+.hint.fade { opacity: 0; }
+
+.side-btns {
+  position: absolute;
+  right: calc(12px + var(--safe-r));
+  top: calc(216px + var(--safe-t));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.action { cursor: pointer; padding: 6px 14px; }
+.action:hover { background: #fff; }
+
+/* スマホの運転ボタン */
+.pads {
+  position: absolute;
+  left: calc(12px + var(--safe-l));
+  right: calc(12px + var(--safe-r));
+  bottom: calc(12px + var(--safe-b));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.pad-group { display: flex; gap: 10px; pointer-events: auto; }
+.pad {
+  width: 74px;
+  height: 74px;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: var(--glass);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.6rem;
+  font-weight: 800;
+  box-shadow: 0 4px 0 var(--ink);
+  touch-action: none;
+}
+.pad.on { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); background: var(--yellow); }
+.pad-gas, .pad-brake { font-size: 0.85rem; height: 92px; }
+.pad-gas { background: #c9f7e4; }
+.pad-brake { background: #ffd6e0; }
+/* 運転ボタンがあるときは、速さを上へよける */
+.has-pads .gauges { bottom: calc(118px + var(--safe-b)); }
+.has-pads .hint { bottom: calc(190px + var(--safe-b)); }
+
+/* 重ねる画面 */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: calc(60px + var(--safe-t)) 16px calc(16px + var(--safe-b));
+  background: rgba(20, 40, 90, 0.3);
+  overflow-y: auto;
+}
+
+.panel {
+  width: min(440px, 100%);
+  padding: 20px 20px 22px;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: #fffdf7;
+  box-shadow: 0 6px 0 var(--ink), var(--shadow);
+  text-align: center;
+}
+.panel.wide { width: min(620px, 100%); }
+
+.panel-title {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.5rem;
+}
+.panel-text { margin: 0 0 14px; color: var(--ink-soft); font-size: 0.9rem; }
+.panel-text strong { color: var(--pink-deep); }
+
+.jobs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+  text-align: left;
+}
+.job-btn {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ink);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.job-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 0 var(--ink); background: #fff8e1; }
+.job-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.job-btn:disabled {
+  background: #eceef5;
+  color: var(--ink-soft);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 3px 0 rgba(29, 35, 64, 0.3);
+  border-color: rgba(29, 35, 64, 0.3);
+}
+.job-icon { grid-row: span 3; font-size: 2rem; line-height: 1; align-self: center; }
+.job-title { font-weight: 800; font-size: 0.95rem; }
+.job-sub { font-size: 0.75rem; color: var(--ink-soft); }
+.job-pay { font-family: var(--font-display); font-size: 0.85rem; color: var(--pink-deep); display: flex; justify-content: space-between; gap: 8px; }
+.job-rank { color: var(--good); }
+
+.howto { margin-top: 14px; text-align: left; font-size: 0.82rem; color: var(--ink-soft); }
+.howto summary { cursor: pointer; font-weight: 800; color: var(--ink); }
+.howto ul { margin: 6px 0 0; padding-left: 1.2em; }
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.brief-icon { margin: 0; font-size: 3rem; line-height: 1.2; }
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #f1f4fb;
+  text-align: left;
+  font-size: 0.88rem;
+}
+.facts dt { color: var(--ink-soft); }
+.facts dd { margin: 0; font-weight: 800; text-align: right; }
+.facts .minus { color: var(--bad); }
+.facts .plus { color: var(--good); }
+.facts .total { font-family: var(--font-display); font-weight: 400; font-size: 1.05rem; border-top: 2px dashed var(--line); padding-top: 4px; }
+
+.result-stamp {
+  display: inline-block;
+  margin: 0 0 6px;
+  padding: 2px 16px;
+  border: 3px solid currentColor;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--good);
+  transform: rotate(-6deg);
+}
+.result-stamp.fail { color: var(--bad); }
+
+.result-actions { display: grid; gap: 8px; }
+
+.big-btn {
+  padding: 12px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--pink);
+  color: #fff;
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ink);
+}
+.big-btn.sub { background: #fff; color: var(--ink); font-family: var(--font-body); font-weight: 800; font-size: 0.95rem; }
+.big-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+
+.map-overlay { background: rgba(20, 40, 90, 0.55); }
+.map-panel { position: relative; width: min(720px, 100%, calc(100vh - 100px)); }
+.map-panel canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: #4cc9f0;
+  box-shadow: 0 6px 0 var(--ink);
+}
+.map-close { position: absolute; top: 10px; right: 10px; }
+
+.loading, .load-error {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 12px 20px;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: #fff;
+  font-weight: 800;
+  text-align: center;
+  box-shadow: 0 3px 0 var(--ink);
+}
+.load-error { width: calc(100% - 32px); }
+
+@media (max-width: 560px) {
+  .brand { display: none; }
+  .top { justify-content: space-between; }
+  .money { margin-left: auto; }
+  .minimap { width: 112px; height: 112px; }
+  .side-btns { top: calc(178px + var(--safe-t)); }
+  .hud { width: calc(100% - 148px - var(--safe-l) - var(--safe-r)); }
+  .timer { top: auto; bottom: calc(118px + var(--safe-b)); font-size: 1.2rem; }
+  .has-pads .gauges { bottom: calc(118px + var(--safe-b)); }
+  .speed { font-size: 1.6rem; }
+  .pad { width: 64px; height: 64px; }
+  .pad-gas, .pad-brake { height: 84px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .callout.show { animation-duration: 0.01s; }
+  .timer.low { animation: none; }
+}

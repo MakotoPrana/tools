@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>酷道デリバリー</title>
+  <meta name="description" content="ポップな島の街でトラックに荷物を積み、山の頂上や崖の上の灯台へ届ける3D配送ゲーム。行き先へは細くて荒れた酷道しかない。制限時間内に、荷物を傷つけずに届けよう。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="game" id="game">
+    <canvas id="board" aria-label="トラックで荷物を運ぶ画面"></canvas>
+
+    <header class="top">
+      <a class="chip back" href="../">‹ ゲーム</a>
+      <h1 class="brand">酷道デリバリー</h1>
+      <p class="chip money" id="money" aria-label="所持金"></p>
+      <button type="button" class="round-btn" id="sound-btn" aria-label="音" aria-pressed="true">♪</button>
+    </header>
+
+    <div class="hud" id="hud" hidden>
+      <div class="job-card">
+        <p class="job-cargo"><span id="hud-icon" aria-hidden="true"></span><span id="hud-cargo"></span></p>
+        <p class="job-goal" id="hud-goal"></p>
+        <p class="job-dist" id="hud-dist"></p>
+      </div>
+      <div class="meter" aria-label="荷物のキズ">
+        <div class="meter-fill" id="dmg-fill"></div>
+        <p class="meter-text" id="dmg-text">荷物のキズ 0%</p>
+      </div>
+    </div>
+
+    <p class="timer" id="timer" hidden></p>
+
+    <button type="button" class="minimap" id="minimap-btn" aria-label="地図を大きく見る" hidden>
+      <canvas id="minimap" width="200" height="200"></canvas>
+    </button>
+
+    <div class="gauges" id="gauges" hidden>
+      <p class="speed"><span id="speed">0</span><small>km/h</small></p>
+      <p class="alt" id="alt"></p>
+    </div>
+
+    <div class="zone" id="zone" hidden>
+      <p class="zone-text" id="zone-text"></p>
+      <div class="zone-bar"><div class="zone-fill" id="zone-fill"></div></div>
+    </div>
+
+    <p class="callout" id="callout" aria-live="polite"></p>
+    <p class="hit" id="hit" aria-hidden="true"></p>
+    <p class="hint" id="hint" hidden></p>
+
+    <div class="side-btns" id="side-btns" hidden>
+      <button type="button" class="chip action" id="reset-btn" title="R">道にもどす</button>
+      <button type="button" class="chip action" id="cam-btn" title="C">視点</button>
+      <button type="button" class="chip action" id="quit-btn">仕事をやめる</button>
+    </div>
+
+    <div class="pads" id="pads" hidden>
+      <div class="pad-group">
+        <button type="button" class="pad" data-key="left" aria-label="左">◀</button>
+        <button type="button" class="pad" data-key="right" aria-label="右">▶</button>
+      </div>
+      <div class="pad-group">
+        <button type="button" class="pad pad-brake" data-key="brake" aria-label="ブレーキ・バック">ブレーキ</button>
+        <button type="button" class="pad pad-gas" data-key="gas" aria-label="アクセル">アクセル</button>
+      </div>
+    </div>
+
+    <section class="overlay" id="menu" hidden>
+      <div class="panel wide">
+        <h2 class="panel-title">今日の仕事</h2>
+        <p class="panel-text">お店で荷物を受け取り、行き先まで運ぶ。<strong>制限時間内</strong>に届ければ報酬。<br />荷物のキズが <strong>100%</strong> になったら仕事は終わりで、ペナルティを払う。</p>
+        <ol class="jobs" id="job-list"></ol>
+        <details class="howto">
+          <summary>操作のしかた</summary>
+          <ul>
+            <li><kbd>↑</kbd><kbd>W</kbd> アクセル　<kbd>↓</kbd><kbd>S</kbd> ブレーキ・バック　<kbd>←</kbd><kbd>→</kbd> ハンドル</li>
+            <li><kbd>Space</kbd> 急ブレーキ　<kbd>R</kbd> 道にもどす　<kbd>C</kbd> 視点　<kbd>M</kbd> 地図　<kbd>H</kbd> クラクション</li>
+            <li>画面をドラッグすると、まわりを見回せる</li>
+            <li>スマホは画面下のボタンで運転する</li>
+            <li>行き先の光の柱の中でとまると、荷物を積む・おろす</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <section class="overlay" id="brief" hidden>
+      <div class="panel">
+        <p class="brief-icon" id="brief-icon" aria-hidden="true"></p>
+        <h2 class="panel-title" id="brief-title"></h2>
+        <p class="panel-text" id="brief-note"></p>
+        <dl class="facts" id="brief-facts"></dl>
+        <div class="result-actions">
+          <button type="button" class="big-btn" id="go-btn">出発する</button>
+          <button type="button" class="big-btn sub" id="brief-back">もどる</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="overlay" id="result" hidden>
+      <div class="panel">
+        <p class="result-stamp" id="result-stamp"></p>
+        <h2 class="panel-title" id="result-title"></h2>
+        <p class="panel-text" id="result-text"></p>
+        <dl class="facts" id="result-facts"></dl>
+        <div class="result-actions">
+          <button type="button" class="big-btn" id="next-btn">次の仕事へ</button>
+          <button type="button" class="big-btn sub" id="again-btn">もう一度</button>
+          <button type="button" class="big-btn sub" id="result-menu-btn">仕事えらび</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="overlay map-overlay" id="bigmap" hidden>
+      <div class="map-panel">
+        <canvas id="bigmap-canvas" width="720" height="720"></canvas>
+        <button type="button" class="chip action map-close" id="bigmap-close">とじる</button>
+      </div>
+    </section>
+
+    <p class="loading" id="loading">島をつくっています…</p>
+    <p class="load-error" id="load-error" hidden>3D の部品を読み込めませんでした。通信状態を確かめて、ページを再読み込みしてください。</p>
+  </main>
+
+  <script src="../origami-intro.js"></script>
+  <script>OrigamiIntro.play();</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="world.js?v=1"></script>
+  <script src="jobs.js?v=1"></script>
+  <script src="script.js?v=1"></script>
+</body>
+</html>
