@@ -424,13 +424,16 @@
         const rx = -dz;
         const rz = dx;
         const y = r.hs[k] + 0.05 + ri * 0.004;
+        // 傾いた路面: 右が +cam × 幅の半分だけ高い
+        const yl = y - r.cam[k] * r.hw;
+        const yr = y + r.cam[k] * r.hw;
         const lx = r.xs[k] - rx * r.hw;
         const lz = r.zs[k] - rz * r.hw;
         const qx = r.xs[k] + rx * r.hw;
         const qz = r.zs[k] + rz * r.hw;
-        top.push(lx, y, lz, qx, y, qz);
+        top.push(lx, yl, lz, qx, yr, qz);
         uv.push(0, r.ss[k] / 16, 1, r.ss[k] / 16);
-        sk.push(lx, y - 0.03, lz, lx - rx * 4, y - 6, lz - rz * 4, qx, y - 0.03, qz, qx + rx * 4, y - 6, qz + rz * 4);
+        sk.push(lx, yl - 0.03, lz, lx - rx * 4, yl - 6, lz - rz * 4, qx, yr - 0.03, qz, qx + rx * 4, yr - 6, qz + rz * 4);
       }
       const idx = [];
       const sidx = [];
@@ -779,7 +782,7 @@
       for (let k = rl.k0; k <= rl.k1; k++) {
         const gap = W.railGap(rl, k);
         const p = W.offsetAt(road, k, rl.side * (road.hw + 0.35));
-        const y = road.hs[k];
+        const y = W.roadH(road, k, rl.side * road.hw);
         if (!gap) rails.box(p.x - 0.07, y - 0.5, p.z - 0.07, p.x + 0.07, y + 0.85, p.z + 0.07, 0xdfe3ea);
         if (prev && !gap && !prev.gap) {
           rails.quad([prev.x, prev.y + 0.5, prev.z], [p.x, y + 0.5, p.z], [p.x, y + 0.82, p.z], [prev.x, prev.y + 0.82, prev.z], 0xf4f6fa);
@@ -812,6 +815,9 @@
       else if (sg.kind === 'warn') text = 'この先 酷道\n大型車\n通行困難';
       else if (sg.kind === 'rockfall') text = '落石\n注意';
       else if (sg.kind === 'curve') text = '急カーブ\n連続';
+      else if (sg.kind === 'steep') text = '急勾配\n注意';
+      else if (sg.kind === 'bumpy') text = 'でこぼこ\n注意';
+      else if (sg.kind === 'tilt') text = '谷側へ\n傾斜';
       else {
         text = GUIDE_TEXT[sg.roadId] || sg.road;
         w = 3.6;
@@ -1022,17 +1028,33 @@
     g.font = `30px ${FONT_DISPLAY}`;
     g.fillText('われもの注意', w / 2, h * 0.25);
   });
+  // ぶつけると凹む部品 (細かく分けた箱)
+  const dentParts = [];
+  function dentBox(w, h, d) {
+    const g = new THREE.BoxGeometry(w, h, d, Math.ceil(w / 0.33), Math.ceil(h / 0.33), Math.ceil(d / 0.33)).toNonIndexed();
+    g.computeVertexNormals();
+    return g;
+  }
   {
     const cab = 0x2ec4b6;
     const add = (geo, mat, x, y, z, parent = truckBody) => {
       const m = mesh(geo, mat, x, y, z);
       parent.add(m);
+      if (geo.userData.dent) {
+        m.userData.orig = geo.attributes.position.array.slice();
+        dentParts.push(m);
+      }
       return m;
+    };
+    const dg = (w, h, d) => {
+      const g = dentBox(w, h, d);
+      g.userData.dent = true;
+      return g;
     };
     add(new THREE.BoxGeometry(1.9, 0.35, 5.7), lambert(0x2b2f3a), 0, 0.72, -0.05);
     // 運転席
-    add(new THREE.BoxGeometry(2.25, 1.55, 1.75), lambert(cab), 0, 1.65, 1.95);
-    add(new THREE.BoxGeometry(2.2, 0.75, 1.5), lambert(cab), 0, 1.0, 2.05);
+    add(dg(2.25, 1.55, 1.75), lambert(cab), 0, 1.65, 1.95);
+    add(dg(2.2, 0.75, 1.5), lambert(cab), 0, 1.0, 2.05);
     add(new THREE.BoxGeometry(2.05, 0.75, 0.08), lambert(0x9fe3ff, { emissive: 0x1a3550 }), 0, 1.95, 2.84);
     add(new THREE.BoxGeometry(2.3, 0.6, 1.0), lambert(0x9fe3ff, { emissive: 0x1a3550 }), 0, 1.95, 1.95).scale.set(1, 1, 1);
     add(new THREE.BoxGeometry(2.3, 0.28, 0.25), lambert(0xd8dce6), 0, 0.62, 2.9);
@@ -1044,7 +1066,7 @@
     const plain = lambert(0xffffff, { emissive: 0x333333 });
     const rear = new THREE.MeshLambertMaterial({ map: rearTex, emissive: 0x333333 });
     const boxMats = [side, side, lambert(0xff5c8a), plain, plain, rear];
-    add(new THREE.BoxGeometry(2.4, 2.45, 3.75), boxMats, 0, 2.15, -1.0);
+    add(dg(2.4, 2.45, 3.75), boxMats, 0, 2.15, -1.0);
     add(new THREE.BoxGeometry(0.4, 0.2, 0.06), new THREE.MeshBasicMaterial({ color: 0xff3048 }), -0.9, 0.95, -2.92);
     add(new THREE.BoxGeometry(0.4, 0.2, 0.06), new THREE.MeshBasicMaterial({ color: 0xff3048 }), 0.9, 0.95, -2.92);
     truck.add(truckBody);
@@ -1084,10 +1106,71 @@
     geo.rotateX(-Math.PI / 2);
     geo.translate(0, 0, 0);
     const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0xff5c8a, emissive: 0x7a1030, fog: false }));
+    m.scale.setScalar(0.7);
     m.visible = false;
     scene.add(m);
     return m;
   })();
+
+  // ---------- 凹み ----------
+
+  const _dp = new THREE.Vector3();
+  const _dd = new THREE.Vector3();
+  const _dq = new THREE.Quaternion();
+  // 世界の点 point に、向き dir (トラックの内側へ) から強さ k でぶつかった
+  function dent(point, dir, k) {
+    if (k <= 0.5) return;
+    truck.updateMatrixWorld(true);
+    const radius = Math.min(1.5, 0.55 + k * 0.12);
+    const depth = Math.min(0.45, k * 0.06);
+    for (const m of dentParts) {
+      _dp.copy(point);
+      m.worldToLocal(_dp);
+      m.getWorldQuaternion(_dq).invert();
+      _dd.copy(dir).normalize().applyQuaternion(_dq);
+      const pos = m.geometry.attributes.position;
+      const a = pos.array;
+      const o = m.userData.orig;
+      let changed = false;
+      for (let i = 0; i < a.length; i += 3) {
+        const dx = a[i] - _dp.x;
+        const dy = a[i + 1] - _dp.y;
+        const dz = a[i + 2] - _dp.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist >= radius) continue;
+        const f = (1 - dist / radius) ** 2 * depth;
+        // 同じ場所の頂点は同じだけ動くので、面が割れない。凹みの深さには上限
+        let nx = a[i] + _dd.x * f;
+        let ny = a[i + 1] + _dd.y * f;
+        let nz = a[i + 2] + _dd.z * f;
+        const ox = nx - o[i];
+        const oy = ny - o[i + 1];
+        const oz = nz - o[i + 2];
+        const L = Math.sqrt(ox * ox + oy * oy + oz * oz);
+        if (L > 0.6) {
+          nx = o[i] + (ox / L) * 0.6;
+          ny = o[i + 1] + (oy / L) * 0.6;
+          nz = o[i + 2] + (oz / L) * 0.6;
+        }
+        a[i] = nx;
+        a[i + 1] = ny;
+        a[i + 2] = nz;
+        changed = true;
+      }
+      if (changed) {
+        pos.needsUpdate = true;
+        m.geometry.computeVertexNormals();
+      }
+    }
+  }
+
+  function undent() {
+    for (const m of dentParts) {
+      m.geometry.attributes.position.array.set(m.userData.orig);
+      m.geometry.attributes.position.needsUpdate = true;
+      m.geometry.computeVertexNormals();
+    }
+  }
 
   // ---------- トラックの動き ----------
 
@@ -1109,7 +1192,7 @@
     steer: 0, pitch: 0, roll: 0, latG: 0, lonG: 0, gasLv: 0, brkLv: 0,
     surf: null, ground: 0,
     vis: { pitch: 0, roll: 0, bounce: 0, bv: 0 },
-    spin: 0, tipTime: 0, flip: null, sunk: false,
+    spin: 0, tipTime: 0, airTime: 0, rb: null, sunk: false,
     holeCool: new Map(),
   };
 
@@ -1125,8 +1208,10 @@
     T.vy = 0;
     T.air = false;
     T.steer = 0;
-    T.flip = null;
+    T.rb = null;
     T.tipTime = 0;
+    T.airTime = 0;
+    $('giveup').hidden = true;
     T.sunk = false;
     sample();
     T.y = T.ground;
@@ -1155,7 +1240,11 @@
   }
 
   function physStep(dt) {
-    if (T.flip || T.sunk) return;
+    if (T.sunk) return;
+    if (T.rb) {
+      rbStep(dt);
+      return;
+    }
     const fx = Math.sin(T.yaw);
     const fz = Math.cos(T.yaw);
     const lx = fz;
@@ -1219,6 +1308,7 @@
     T.x += vx * dt;
     T.z += vz * dt;
     collideStep(fx, fz, lx, lz, vx, vz);
+    if (T.rb) return;
 
     // 上下
     const prevGround = T.ground;
@@ -1240,7 +1330,14 @@
     if (T.air) {
       T.vy -= G * dt;
       T.y += T.vy * dt;
+      // 長く落ちつづけたら、崖から落ちた: ころがる
+      T.airTime += dt;
+      if (T.airTime > 0.55 && T.vy < -4) {
+        startTumble(0);
+        return;
+      }
       if (T.y <= T.ground) {
+        T.airTime = 0;
         const gRate = (T.ground - prevGround) / dt;
         const impact = gRate - T.vy;
         if (impact > 3) landing(impact);
@@ -1265,7 +1362,10 @@
       T.tipM = tipM;
       if (tipM > P.tip || Math.abs(T.pitch) > 0.85) T.tipTime += dt;
       else T.tipTime = Math.max(0, T.tipTime - dt * 2);
-      if (T.tipTime > 0.22) startFlip(Math.sign(T.latG * 0.9 + Math.tan(T.roll)) || 1);
+      if (T.tipTime > 0.22) {
+        startTumble(Math.sign(T.latG * 0.9 + Math.tan(T.roll)) || 1);
+        return;
+      }
     }
 
     // 海
@@ -1276,6 +1376,8 @@
     T.spin += (T.v / 0.5) * dt;
   }
 
+  const _cp = new THREE.Vector3();
+  const _cn = new THREE.Vector3();
   function collideStep(fx, fz, lx, lz, vx, vz) {
     let hit = 0;
     for (const off of [-2.0, 0, 2.0]) {
@@ -1288,6 +1390,10 @@
           vx -= 1.25 * vn * h.nx;
           vz -= 1.25 * vn * h.nz;
           hit = Math.max(hit, -vn);
+          if (-vn > 1.4) {
+            _cp.set(T.x + fx * off - h.nx * 1.15, T.y + 0.9 + Math.random() * 1.6, T.z + fz * off - h.nz * 1.15);
+            dent(_cp, _cn.set(h.nx, 0, h.nz), -vn);
+          }
           // 角に当たると、少し向きが変わる
           T.yaw += clamp(off * (h.nx * fz - h.nz * fx) * -vn * 0.01, -0.15, 0.15);
         }
@@ -1345,14 +1451,172 @@
     hurt((sp - 1.4) * 3.4, sp > 8 ? 'ガッシャーン!' : 'ガシャン!');
   }
 
-  function startFlip(dir) {
-    T.flip = { t: 0, dir, startRoll: T.vis.roll };
+  // ---------- 横転したら: 箱の形の剛体として、地面の上をころがる ----------
+
+  const RB_COM = 1.4; // 重心の高さ (トラックの足もとから)
+  // ぶつかりを調べる点: 箱の角と、長い辺のまん中 (重心から見た位置)
+  const RB_PTS = [];
+  for (const x of [-1.15, 1.15]) for (const y of [-RB_COM, 2.0]) for (const z of [-2.9, 0, 2.9]) RB_PTS.push(new THREE.Vector3(x, y, z));
+  const RB_INV_I = new THREE.Vector3(1 / 3.76, 1 / 3.24, 1 / 1.4); // 質量 1 の箱の慣性の逆数
+  const _q = new THREE.Quaternion();
+  const _qi = new THREE.Quaternion();
+  const _r = new THREE.Vector3();
+  const _p = new THREE.Vector3();
+  const _n = new THREE.Vector3();
+  const _v = new THREE.Vector3();
+  const _t = new THREE.Vector3();
+  const _a = new THREE.Vector3();
+  const _b = new THREE.Vector3();
+
+  function invI(v, out) {
+    // 世界の向きのベクトルに、慣性の逆数を掛ける
+    out.copy(v).applyQuaternion(_qi);
+    out.set(out.x * RB_INV_I.x, out.y * RB_INV_I.y, out.z * RB_INV_I.z);
+    return out.applyQuaternion(_q);
+  }
+
+  function groundNormal(x, z, out) {
+    const e = 0.7;
+    const hx = W.surfaceAt(world, x + e, z).h - W.surfaceAt(world, x - e, z).h;
+    const hz = W.surfaceAt(world, x, z + e).h - W.surfaceAt(world, x, z - e).h;
+    return out.set(-hx / (2 * e), 1, -hz / (2 * e)).normalize();
+  }
+
+  function startTumble(dir) {
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-T.pitch, T.yaw, T.roll, 'YXZ'));
+    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+    const left = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+    const pos = new THREE.Vector3(0, RB_COM, 0).applyQuaternion(q).add(new THREE.Vector3(T.x, T.y, T.z));
+    const vel = new THREE.Vector3(Math.sin(T.yaw) * T.v + Math.cos(T.yaw) * T.vl, T.vy, Math.cos(T.yaw) * T.v - Math.sin(T.yaw) * T.vl);
+    // 倒れる向きへ回りはじめる (崖から落ちたときは、前のめりに少し)
+    const w = dir ? fwd.multiplyScalar(1.9 * dir) : left.multiplyScalar(0.6 + Math.random() * 0.6);
+    T.rb = { pos, vel, q, w, settle: 0, stuck: false, soundT: 0, t: 0 };
     T.v = 0;
     T.vl = 0;
-    sound.crash(1);
-    shake(1);
-    callout('横転!', true);
-    hurt(42, null);
+    T.air = false;
+    T.airTime = 0;
+    T.tipTime = 0;
+    sound.crash(0.8);
+    shake(0.8);
+    callout(dir ? '横転!' : '落ちる!', true);
+  }
+
+  function rbStep(dt) {
+    const rb = T.rb;
+    rb.t += dt;
+    rb.soundT -= dt;
+    if (rb.stuck) return;
+    rb.vel.y -= G * dt;
+    rb.vel.multiplyScalar(1 - 0.05 * dt);
+    rb.pos.addScaledVector(rb.vel, dt);
+    // 向きを角速度で回す
+    _a.copy(rb.w).multiplyScalar(dt * 0.5);
+    const dq = new THREE.Quaternion(_a.x, _a.y, _a.z, 0).multiply(rb.q);
+    rb.q.set(rb.q.x + dq.x, rb.q.y + dq.y, rb.q.z + dq.z, rb.q.w + dq.w).normalize();
+    _q.copy(rb.q);
+    _qi.copy(rb.q).invert();
+
+    let maxPen = 0;
+    let impact = 0;
+    let hitAt = null;
+    for (const lp of RB_PTS) {
+      _r.copy(lp).applyQuaternion(_q);
+      _p.copy(rb.pos).add(_r);
+      const h = W.surfaceAt(world, _p.x, _p.z).h;
+      const pen = h - _p.y;
+      if (pen <= 0) continue;
+      groundNormal(_p.x, _p.z, _n);
+      // この点の速さ = 重心の速さ + 角速度 × 重心からの位置
+      _v.copy(rb.w).cross(_r).add(rb.vel);
+      const vn = _v.dot(_n);
+      if (vn < 0) {
+        _a.copy(_r).cross(_n);
+        invI(_a, _b).cross(_r);
+        const j = (-(1 + 0.2) * vn) / (1 + _n.dot(_b));
+        rb.vel.addScaledVector(_n, j);
+        _a.copy(_r).cross(_n).multiplyScalar(j);
+        rb.w.add(invI(_a, _b));
+        // 摩擦
+        _v.copy(rb.w).cross(_r).add(rb.vel);
+        _t.copy(_v).addScaledVector(_n, -_v.dot(_n));
+        const vt = _t.length();
+        if (vt > 1e-4) {
+          _t.divideScalar(vt);
+          _a.copy(_r).cross(_t);
+          invI(_a, _b).cross(_r);
+          const jt = Math.min(vt / (1 + _t.dot(_b)), 0.75 * j);
+          rb.vel.addScaledVector(_t, -jt);
+          _a.copy(_r).cross(_t).multiplyScalar(-jt);
+          rb.w.add(invI(_a, _b));
+        }
+        if (-vn > impact) {
+          impact = -vn;
+          hitAt = { p: _p.clone(), n: _n.clone() };
+        }
+      }
+      if (pen > maxPen) maxPen = pen;
+    }
+    if (maxPen > 0) rb.pos.y += maxPen * 0.8;
+    rb.w.multiplyScalar(1 - 0.4 * dt);
+
+    // 木や岩・建物
+    const hits = W.collide(world, rb.pos.x, rb.pos.z, 1.5, rb.pos.y - RB_COM + 0.4);
+    for (const h of hits) {
+      rb.pos.x += h.nx * h.pen;
+      rb.pos.z += h.nz * h.pen;
+      const vn = rb.vel.x * h.nx + rb.vel.z * h.nz;
+      if (vn < 0) {
+        rb.vel.x -= 1.3 * vn * h.nx;
+        rb.vel.z -= 1.3 * vn * h.nz;
+        if (-vn > impact) {
+          impact = -vn;
+          hitAt = { p: new THREE.Vector3(rb.pos.x - h.nx * 1.4, rb.pos.y, rb.pos.z - h.nz * 1.4), n: new THREE.Vector3(h.nx, 0, h.nz) };
+        }
+      }
+    }
+
+    if (impact > 2.2 && hitAt) {
+      dent(hitAt.p, hitAt.n, impact);
+      hurt((impact - 2.2) * 2.4, impact > 7 ? 'ガッシャーン!' : 'ゴロン!');
+      if (rb.soundT <= 0) {
+        rb.soundT = 0.12;
+        sound.crash(Math.min(1, impact / 10));
+        shake(Math.min(1, impact / 9));
+      }
+    }
+
+    // カメラと地図のために、トラックの足もとの位置を合わせる
+    T.x = rb.pos.x;
+    T.z = rb.pos.z;
+    T.y = rb.pos.y - RB_COM;
+    T.surf = W.surfaceAt(world, T.x, T.z);
+    T.spin += dt * 6;
+
+    if (rb.pos.y < -1.2) {
+      T.sunk = true;
+      onSea();
+      return;
+    }
+    // 止まったら: 立っていれば運転にもどる。ひっくり返っていたらギブアップを待つ
+    if (rb.vel.length() < 0.6 && rb.w.length() < 0.6) rb.settle += dt;
+    else rb.settle = 0;
+    if (rb.settle > 0.8 || rb.t > 25) {
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(rb.q);
+      if (up.y > 0.8) {
+        const f = new THREE.Vector3(0, 0, 1).applyQuaternion(rb.q);
+        placeTruck(T.x, T.z, Math.atan2(f.x, f.z));
+        if (job && !job.done) callout('起き上がった!');
+      } else {
+        rb.stuck = true;
+        if (job && !job.done) $('giveup').hidden = false;
+      }
+    }
+  }
+
+  function giveUp() {
+    $('giveup').hidden = true;
+    if (!job || job.done) return;
+    finishFail('flip');
   }
 
   // ---------- 仕事 ----------
@@ -1490,6 +1754,7 @@
     setDriveUI(true);
     const D = world.places.depot;
     placeTruck(D.x, D.z, Math.PI);
+    undent();
     camState.init = false;
     showMarkerFor();
     updateRoute(true);
@@ -1527,6 +1792,8 @@
     for (const id of ['hud', 'timer', 'minimap-btn', 'gauges', 'side-btns']) $(id).hidden = !on;
     $('pads').hidden = !(on && isTouch);
     $('game').classList.toggle('has-pads', on && isTouch);
+    $('game').classList.toggle('driving', on);
+    if (!on) $('giveup').hidden = true;
     if (!on) {
       $('zone').hidden = true;
       $('hint').hidden = true;
@@ -1549,7 +1816,7 @@
     const t = target();
     const d = Math.hypot(T.x - t.x, T.z - t.z);
     const zoneEl = $('zone');
-    if (d < ZONE_R && !T.flip && !T.air) {
+    if (d < ZONE_R && !T.rb && !T.air) {
       zoneEl.hidden = false;
       const stopped = Math.abs(T.v) < 1.2;
       if (stopped) job.zone += dt;
@@ -1677,10 +1944,17 @@
       timeout: ['時間切れ…', '約束の時間に間にあわなかった。'],
       sea: ['海に落ちた!', 'トラックごと海へ。荷物もびしょぬれ。'],
       quit: ['仕事をやめた', '荷物を積んだあとなので、キャンセル料を払う。'],
+      flip: ['ギブアップ…', 'トラックが横転して、自分では起こせなくなった。'],
     }[reason];
-    if (reason !== 'quit') callout(why[0], true);
+    if (reason !== 'quit' && reason !== 'flip') callout(why[0], true);
     track('kokudo_delivery_fail', { job: j.id, reason });
-    setTimeout(() => {
+    // ころがっている最中なら、止まるまで (長くても 10 秒) 見せてから結果を出す
+    const started = performance.now();
+    const show = () => {
+      if (T.rb && !T.rb.stuck && T.rb.settle < 0.8 && performance.now() - started < 10000) {
+        setTimeout(show, 300);
+        return;
+      }
       showResult(false, {
         stamp: '失敗',
         title: why[0],
@@ -1690,7 +1964,8 @@
           ['所持金', yen(money)],
         ],
       });
-    }, reason === 'quit' ? 0 : 1500);
+    };
+    setTimeout(show, reason === 'quit' || reason === 'flip' ? 0 : 1500);
   }
 
   function showResult(ok, r) {
@@ -2061,21 +2336,16 @@
     T.vis.bv += (-T.vis.bounce * 90 - T.vis.bv * 9) * dt;
     T.vis.bounce += T.vis.bv * dt;
     if (T.surf && T.surf.rough > 0 && !T.air) T.vis.bv += (Math.random() - 0.5) * T.surf.rough * Math.min(1, Math.abs(T.v) / 10) * 1.6;
-    let flipRoll = 0;
-    if (T.flip) {
-      T.flip.t += dt;
-      flipRoll = Math.min(1, T.flip.t / 0.6) * (Math.PI / 2) * T.flip.dir;
-      if (T.flip.t > 2.4) {
-        T.flip = null;
-        resetToRoad();
-        callout('道にもどした');
-      }
+    if (T.rb) {
+      truck.quaternion.copy(T.rb.q);
+      truck.position.copy(T.rb.pos).sub(new THREE.Vector3(0, RB_COM, 0).applyQuaternion(T.rb.q));
+      for (const w of wheels) w.rotation.x = T.spin;
+      return;
     }
     truck.rotation.set(0, 0, 0);
     truck.rotateY(T.yaw);
     truck.rotateX(-T.vis.pitch);
-    truck.rotateZ(T.vis.roll + flipRoll);
-    if (T.flip) truck.position.y += Math.sin(Math.min(1, T.flip.t / 0.6) * Math.PI / 2) * 1.0;
+    truck.rotateZ(T.vis.roll);
     truckBody.position.y = clamp(T.vis.bounce, -0.25, 0.25);
     for (const w of wheels) w.rotation.x = T.spin;
     for (const fw of frontWheels) fw.rotation.y = -T.steer;
@@ -2157,7 +2427,7 @@
   canvas.addEventListener('pointercancel', endDrag);
 
   function doReset() {
-    if (state !== 'drive' || T.flip || T.sunk || T.air) return;
+    if (state !== 'drive' || T.rb || T.sunk || T.air) return;
     resetToRoad();
     callout('道にもどした');
   }
@@ -2374,6 +2644,7 @@
     }
   });
   $('minimap-btn').addEventListener('click', openBigMap);
+  $('giveup-btn').addEventListener('click', giveUp);
   $('bigmap-close').addEventListener('click', () => {
     $('bigmap').hidden = true;
   });
@@ -2477,7 +2748,7 @@
             updateTruckVisual(1 / 60);
           }
         };
-        window.__kokudo = { dbgEvents, dbgSoft, T, world, startJob, JOBS, input, keys, sim, get job() { return job; }, get state() { return state; }, camState };
+        window.__kokudo = { startTumble, dent, dbgEvents, dbgSoft, T, world, startJob, JOBS, input, keys, sim, get job() { return job; }, get state() { return state; }, camState };
       }
     }, 30);
   });

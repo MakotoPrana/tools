@@ -551,3 +551,64 @@ kbd {
   .callout.show { animation-duration: 0.01s; }
   .timer.low { animation: none; }
 }
+
+/* ---------- 運転中は文字を小さくして、前を見やすく ---------- */
+.driving .brand { visibility: hidden; }
+.driving .top .chip { font-size: 0.72rem; padding: 2px 9px; }
+.driving .round-btn { width: 30px; height: 30px; font-size: 0.85rem; }
+.hud { top: calc(48px + var(--safe-t)); width: min(230px, calc(100% - 150px - var(--safe-l) - var(--safe-r))); gap: 5px; }
+.job-card { padding: 4px 9px; border-width: 1.5px; border-radius: 9px; box-shadow: 0 2px 0 var(--ink); background: rgba(255, 255, 255, 0.78); }
+.job-cargo { font-size: 0.74rem; gap: 4px; }
+.job-cargo span:first-child { font-size: 0.9rem; }
+.job-goal { font-size: 0.66rem; line-height: 1.35; }
+.job-dist { font-size: 0.72rem; }
+.meter { height: 16px; border-width: 1.5px; border-radius: 6px; box-shadow: 0 2px 0 var(--ink); }
+.meter-text { font-size: 0.64rem; }
+.timer { top: calc(44px + var(--safe-t)); padding: 0 10px; border-width: 1.5px; border-radius: 9px; font-size: 1.05rem; box-shadow: 0 2px 0 var(--ink); }
+.minimap { top: calc(48px + var(--safe-t)); width: 118px; height: 118px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
+.side-btns { top: calc(174px + var(--safe-t)); gap: 4px; }
+.side-btns .action { font-size: 0.68rem; padding: 3px 9px; opacity: 0.85; }
+.speed { font-size: 1.5rem; text-shadow: 0 2px 0 var(--ink); }
+.speed small { font-size: 0.65rem; }
+.alt { font-size: 0.66rem; }
+.zone { top: 22%; width: min(240px, 70%); padding: 5px 10px 7px; border-width: 1.5px; box-shadow: 0 2px 0 var(--ink); }
+.zone-text { font-size: 0.75rem; margin-bottom: 4px; }
+.zone-bar { height: 7px; }
+.callout { top: 28%; font-size: clamp(1.2rem, 5vw, 2rem); -webkit-text-stroke: 1.5px var(--ink); text-shadow: 0 2px 0 var(--ink); }
+.hit { top: 40%; font-size: 0.95rem; -webkit-text-stroke: 1px var(--bad); }
+.hint { font-size: 0.7rem; padding: 3px 10px; }
+.pad { width: 58px; height: 58px; border-width: 2px; border-radius: 14px; font-size: 1.2rem; background: rgba(255, 255, 255, 0.55); box-shadow: 0 3px 0 var(--ink); }
+.pad-gas, .pad-brake { height: 74px; font-size: 0.72rem; }
+.pad-gas { background: rgba(201, 247, 228, 0.6); }
+.pad-brake { background: rgba(255, 214, 224, 0.6); }
+.has-pads .gauges { bottom: calc(92px + var(--safe-b)); }
+
+/* 横転したときのギブアップ */
+.giveup {
+  position: absolute;
+  left: 50%;
+  bottom: calc(24px + var(--safe-b));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: var(--glass);
+  box-shadow: 0 3px 0 var(--ink);
+  white-space: nowrap;
+}
+.giveup-text { margin: 0; font-weight: 800; font-size: 0.85rem; }
+.giveup .big-btn { padding: 6px 14px; font-size: 0.95rem; }
+
+@media (max-width: 560px) {
+  .minimap { width: 92px; height: 92px; }
+  .side-btns { top: calc(146px + var(--safe-t)); }
+  .hud { width: calc(100% - 120px - var(--safe-l) - var(--safe-r)); }
+  .timer { top: auto; bottom: calc(92px + var(--safe-b)); font-size: 0.95rem; }
+  .has-pads .timer { bottom: calc(96px + var(--safe-b)); }
+  .speed { font-size: 1.25rem; }
+  .pad { width: 54px; height: 54px; }
+  .pad-gas, .pad-brake { height: 68px; }
+}

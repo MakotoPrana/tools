@@ -314,8 +314,34 @@
     const len = ss[n - 1];
     // 分かれ目の近く (はしから FLAT_END m) は平らにして、重なる道路どうしの高さをそろえる
     const FLAT_END = 18;
+    const rough = def.type === 'kokudo' || def.type === 'gravel';
+    const r = rng(def.id.length * 977 + n);
+    // 酷道の難所: 激坂 (steep)、でこぼこ (bumpy) の区間を、ふつうの区間をはさんで並べる
+    const steep = new Uint8Array(n);
+    const bumpy = new Uint8Array(n);
+    const sections = [];
+    if (rough) {
+      let i = Math.ceil(50 / STEP);
+      while (i < n - Math.ceil(50 / STEP)) {
+        const L = Math.round(lerp(50, 110, r()) / STEP);
+        const q = r();
+        const kind = q < 0.35 ? 'steep' : q < 0.75 ? 'bumpy' : null;
+        const end = Math.min(n - Math.ceil(30 / STEP), i + L);
+        if (kind) {
+          sections.push({ kind, k0: i, k1: end });
+          for (let k = i; k < end; k++) (kind === 'steep' ? steep : bumpy)[k] = 1;
+        }
+        i = end + Math.round(lerp(25, 70, r()) / STEP);
+      }
+    }
     if (def.height === 'linear') {
-      for (let i = 0; i < n; i++) hs[i] = lerp(A.h, B.h, clamp((ss[i] - FLAT_END) / (len - FLAT_END * 2), 0, 1));
+      // 激坂の区間は、ほかの区間の 2.6 倍の勾配で登る
+      const wsum = new Float32Array(n);
+      for (let i = 1; i < n; i++) {
+        const inside = ss[i] > FLAT_END && ss[i] < len - FLAT_END;
+        wsum[i] = wsum[i - 1] + (inside ? (ss[i] - ss[i - 1]) * (steep[i] ? 2.6 : 1) : 0);
+      }
+      for (let i = 0; i < n; i++) hs[i] = lerp(A.h, B.h, wsum[i] / wsum[n - 1]);
     } else {
       const raw = new Float32Array(n);
       for (let i = 0; i < n; i++) raw[i] = Math.max(1.2, natural(xs[i], zs[i]));
@@ -363,7 +389,57 @@
       hs[0] = A.h;
       hs[n - 1] = B.h;
     }
+    // でこぼこ: 区間のはしはなめらかに大きくする。速く走ると車が跳ねる
+    const cam = new Float32Array(n);
+    if (rough) {
+      const amp = def.type === 'gravel' ? 0.42 : 0.34;
+      const lam = def.type === 'gravel' ? 8 : 10;
+      for (let i = 0; i < n; i++) {
+        if (ss[i] < FLAT_END + 4 || len - ss[i] < FLAT_END + 4) continue;
+        let env = 0;
+        for (let k = Math.max(0, i - 6); k <= Math.min(n - 1, i + 6); k++) env += bumpy[k];
+        env /= 13;
+        const sw = Math.sin((ss[i] / lam) * Math.PI * 2) * 0.65 + Math.sin((ss[i] / (lam * 0.41)) * Math.PI * 2 + 1.3) * 0.35;
+        hs[i] += amp * env * sw + (r() - 0.5) * 0.06;
+      }
+      // カーブの外側が低い (谷へ傾いた) ところ: 速く曲がると外へ転がる
+      const turn = new Float32Array(n);
+      for (let i = 3; i < n - 3; i++) {
+        const d1x = xs[i] - xs[i - 3];
+        const d1z = zs[i] - zs[i - 3];
+        const d2x = xs[i + 3] - xs[i];
+        const d2z = zs[i + 3] - zs[i];
+        turn[i] = (d1x * d2z - d1z * d2x) / (Math.hypot(d1x, d1z) * Math.hypot(d2x, d2z) + 1e-6);
+      }
+      const raw = new Float32Array(n);
+      let i = 0;
+      while (i < n) {
+        if (Math.abs(turn[i]) < 0.1 || ss[i] < FLAT_END + 10 || len - ss[i] < FLAT_END + 10) {
+          i++;
+          continue;
+        }
+        let j = i;
+        while (j < n && Math.abs(turn[j]) >= 0.1 && Math.sign(turn[j]) === Math.sign(turn[i])) j++;
+        if (r() < 0.6) {
+          const T = Math.sign(turn[i]) * lerp(0.17, 0.27, r());
+          sections.push({ kind: 'tilt', k0: i, k1: j });
+          for (let k = Math.max(0, i - 4); k < Math.min(n, j + 4); k++) raw[k] = T;
+        }
+        i = j;
+      }
+      for (let k = 0; k < n; k++) {
+        let sum = 0;
+        let c = 0;
+        for (let q = Math.max(0, k - 6); q <= Math.min(n - 1, k + 6); q++) {
+          sum += raw[q];
+          c++;
+        }
+        cam[k] = sum / c;
+      }
+    }
     return {
+      cam,
+      sections,
       id: def.id,
       name: def.name,
       type: def.type,
@@ -456,7 +532,8 @@
             const { d, t } = segDist(-HALF + i * CELL, -HALF + j * CELL, ax, az, bx, bz);
             if (d - r.hw > CELL * 1.45) continue;
             const v = j * V + i;
-            heights[v] = Math.min(heights[v], lerp(r.hs[k], r.hs[k + 1], t) - 0.15);
+            const low = lerp(r.hs[k], r.hs[k + 1], t) - Math.abs(lerp(r.cam[k], r.cam[k + 1], t)) * r.hw;
+            heights[v] = Math.min(heights[v], low - 0.15);
           }
         }
       }
@@ -535,7 +612,15 @@
       const k = arr[q + 1];
       const { d, t } = segDist(x, z, r.xs[k], r.zs[k], r.xs[k + 1], r.zs[k + 1]);
       const dd = d - r.hw;
-      if (!best || dd < best.dd) best = { dd, d, road: r, k, t, h: lerp(r.hs[k], r.hs[k + 1], t), s: lerp(r.ss[k], r.ss[k + 1], t) };
+      if (!best || dd < best.dd) {
+        // 道の中心から右へ何 m か (右が +)。傾いた路面の高さに使う
+        const sx = r.xs[k + 1] - r.xs[k];
+        const sz = r.zs[k + 1] - r.zs[k];
+        const L = Math.hypot(sx, sz) || 1;
+        const u = ((x - r.xs[k] - sx * t) * -sz + (z - r.zs[k] - sz * t) * sx) / L;
+        const cam = lerp(r.cam[k], r.cam[k + 1], t);
+        best = { dd, d, road: r, k, t, u, h: lerp(r.hs[k], r.hs[k + 1], t) + u * cam, s: lerp(r.ss[k], r.ss[k + 1], t) };
+      }
     }
     return best;
   }
@@ -793,20 +878,26 @@
       const k0 = Math.min(road.n - 1, 12);
       w.signs.push(signAt(w, road, k0, 1, 'kokudo'));
       w.signs.push(signAt(w, road, Math.min(road.n - 1, 40), -1, 'warn'));
+      // 難所の手前に、その難所の標識
+      for (const sec of road.sections) {
+        const k = Math.max(5, sec.k0 - 8);
+        const side = sec.kind === 'tilt' ? uphillSide(w, road, k) : -uphillSide(w, road, k);
+        w.signs.push(signAt(w, road, k, side, sec.kind));
+      }
       for (let k = 30; k < road.n - 15; k += 1) {
         const s = road.ss[k];
         // 穴ぼこ
-        if (r() < (road.type === 'gravel' ? 0.035 : 0.022)) {
+        if (r() < (road.type === 'gravel' ? 0.05 : 0.036)) {
           const side = (r() - 0.5) * road.hw * 1.2;
           const p = offsetAt(road, k, side);
-          w.potholes.push({ x: p.x, z: p.z, h: road.hs[k], r: lerp(0.55, 0.95, r()), dir: p.dir });
+          w.potholes.push({ x: p.x, z: p.z, h: roadH(road, k, side), r: lerp(0.55, 1.0, r()), dir: p.dir });
         }
         // 落石: 山側のはしに
-        if (k % 20 === 0 && r() < 0.32) {
+        if (k % 20 === 0 && r() < 0.4) {
           const up = uphillSide(w, road, k);
-          const rr = lerp(0.7, 1.25, r());
+          const rr = lerp(0.7, 1.3, r());
           const p = offsetAt(road, k, up * (road.hw + rr * 0.35));
-          w.rocks.push({ x: p.x, z: p.z, h: road.hs[k], r: rr, rot: r() * 6 });
+          w.rocks.push({ x: p.x, z: p.z, h: roadH(road, k, up * road.hw), r: rr, rot: r() * 6 });
           addCollider(w, { x: p.x, z: p.z, r: rr * 0.9, kind: 'rock' });
         }
         // 谷側の、こわれかけのガードレール (ところどころ)
@@ -831,6 +922,11 @@
       if (road.type !== 'road') continue;
       w.signs.push(signAt(w, road, 8, 1, 'guide'));
     }
+  }
+
+  // 道路 road の k 番目の点から、右へ u m のところの路面の高さ
+  function roadH(road, k, u) {
+    return road.hs[k] + clamp(u, -road.hw, road.hw) * road.cam[k];
   }
 
   function railGap(rail, q) {
@@ -858,7 +954,7 @@
 
   function signAt(w, road, k, side, kind) {
     const p = offsetAt(road, k, side * (road.hw + 1.2));
-    const s = { x: p.x, z: p.z, h: road.hs[k], dir: p.dir, kind, road: road.name, roadId: road.id };
+    const s = { x: p.x, z: p.z, h: roadH(road, k, side * road.hw), dir: p.dir, kind, road: road.name, roadId: road.id };
     addCollider(w, { x: p.x, z: p.z, r: 0.2, kind: 'pole' });
     return s;
   }
@@ -1063,7 +1159,7 @@
 
   const api = {
     SIZE, HALF, CELL, N, CITY, SURFACES, STEP,
-    build, natural, terrainHeight, surfaceAt, nearestRoad, slopeAt, collide, route, project, inPaved, rng, fbm, offsetAt, railGap,
+    build, natural, terrainHeight, surfaceAt, nearestRoad, slopeAt, collide, route, project, inPaved, rng, fbm, offsetAt, railGap, roadH,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.KokudoWorld = api;

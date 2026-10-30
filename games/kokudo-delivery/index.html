@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <main class="game" id="game">
@@ -61,6 +61,11 @@
       <div class="zone-bar"><div class="zone-fill" id="zone-fill"></div></div>
     </div>
 
+    <div class="giveup" id="giveup" hidden>
+      <p class="giveup-text">横転して動けない…</p>
+      <button type="button" class="big-btn" id="giveup-btn">ギブアップ</button>
+    </div>
+
     <p class="callout" id="callout" aria-live="polite"></p>
     <p class="hit" id="hit" aria-hidden="true"></p>
     <p class="hint" id="hint" hidden></p>
@@ -91,10 +96,11 @@
           <summary>操作のしかた</summary>
           <ul>
             <li><kbd>↑</kbd><kbd>W</kbd> アクセル　<kbd>↓</kbd><kbd>S</kbd> ブレーキ・バック　<kbd>←</kbd><kbd>→</kbd> ハンドル</li>
-            <li><kbd>Space</kbd> 急ブレーキ　<kbd>R</kbd> 道にもどす　<kbd>C</kbd> 視点　<kbd>M</kbd> 地図　<kbd>H</kbd> クラクション</li>
+            <li><kbd>Space</kbd> 急ブレーキ　<kbd>R</kbd> 道にもどす (立っているとき)　<kbd>C</kbd> 視点　<kbd>M</kbd> 地図　<kbd>H</kbd> クラクション</li>
             <li>画面をドラッグすると、まわりを見回せる</li>
             <li>スマホは画面下のボタンで運転する</li>
             <li>行き先の光の柱の中でとまると、荷物を積む・おろす</li>
+            <li>横転してひっくり返ったら、ギブアップするしかない (ペナルティ)</li>
           </ul>
         </details>
       </div>
@@ -141,8 +147,8 @@
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="world.js?v=1"></script>
+  <script src="world.js?v=2"></script>
   <script src="jobs.js?v=1"></script>
-  <script src="script.js?v=1"></script>
+  <script src="script.js?v=2"></script>
 </body>
 </html>
