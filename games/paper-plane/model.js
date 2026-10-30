@@ -163,6 +163,13 @@
     });
   }
 
+  // 紙を裏返す: 中心線 (x = 0) のまわりに半回転する。左右が入れかわり、重なりの段は上下が逆になる
+  //   (頂点の並びも左右が逆になるので、多角形の表と裏も入れかわる)
+  function flipOver(polys) {
+    const M = maxLayer(polys);
+    return polys.map((p) => ({ o: p.o.map((v) => v.slice()), c: p.c.map((v) => [-v[0], v[1]]), l: M - p.l }));
+  }
+
   // 点 g を点 q へ重ねる折り線 (2点の垂直二等分線)。g の側が動く
   function foldLineFor(g, q) {
     const dx = g[0] - q[0];
@@ -381,6 +388,7 @@
   const KL = 45;    // 上反角の効果 (横すべりした側の翼が持ち上がる)
   const CP = 9;
   const K_ASYM = 60;
+  const LAT_DEADZONE = 0.0004;   // m (揚力の中心の左右のずれが、これより小さければ曲がらない)
   const FLEX = 5;   // 速いほど紙がしなって、つり合いの迎え角が小さくなる
 
   // 機体の性質を決める
@@ -398,7 +406,8 @@
       vGlide,
       kp: KP * clamp(1 + (d.sm - SM_REF) * 4, 0.35, 1.8),
       kn: KN * clamp(d.keel / SK_REF, 0.3, 2.5),
-      rollBias: K_ASYM * clamp(d.lat / Math.max(d.span / 2, 0.02), -0.5, 0.5),
+      // 紙の重なりの厚み (見た目のための値) で生まれる 1mm 未満のずれは、曲がりの原因にしない
+      rollBias: Math.abs(d.lat) < LAT_DEADZONE ? 0 : K_ASYM * clamp(d.lat / Math.max(d.span / 2, 0.02), -0.5, 0.5),
     };
   }
 
@@ -457,13 +466,14 @@
   const BUILDING = { floorY: 8, sillY: 9.0, topY: 10.3, halfZ: 0.75, wallT: 0.25 };
   const LAUNCH = { x: -0.32, y: 9.55, z: 0 };
 
-  // wind = { x, z } (m/s)、throwInfo = { speed, angle } (m/s, rad)
+  // wind = { x, z } (m/s)、throwInfo = { speed, angle, yaw } (m/s, rad, rad。yaw は + で左、- で右へ向ける)
   // env = { ground(x, z), boxes, thermals } (ステージの地面・じゃま物・上昇気流。省略したら平らな原っぱ)
   //   thermals: [{ x, z, r, v, top }] 中心 (x, z)、半径 r (m)、中心の上向きの風 v (m/s)、高さ top (m) より上では弱まる
   function createFlight(design, throwInfo, wind, seed, env) {
     const r = rng(seed);
     const fp = flightParams(design);
-    const yaw = quatAxis(0, 1, 0, -Math.PI / 2);   // 機首 (-Z) を +X (窓の外) に向ける
+    const aim = throwInfo.yaw || 0;
+    const yaw = quatAxis(0, 1, 0, -Math.PI / 2 + aim);   // 機首 (-Z) を +X (窓の外) に向け、左右に aim だけ回す
     const pitch = quatAxis(1, 0, 0, throwInfo.angle);
     const wobble = 0.12 + Math.max(0, throwInfo.speed - 8) ** 2 * 0.1;  // 強く投げすぎると手ぶれが大きい
     const gust = [];
@@ -476,7 +486,11 @@
       fp,
       design,
       p: v3(LAUNCH.x, LAUNCH.y, LAUNCH.z),
-      v: v3(throwInfo.speed * Math.cos(throwInfo.angle), throwInfo.speed * Math.sin(throwInfo.angle), 0),
+      v: v3(
+        throwInfo.speed * Math.cos(throwInfo.angle) * Math.cos(aim),
+        throwInfo.speed * Math.sin(throwInfo.angle),
+        -throwInfo.speed * Math.cos(throwInfo.angle) * Math.sin(aim),
+      ),
       q: quatMul(yaw, pitch),
       w: v3((r() - 0.5) * wobble, (r() - 0.5) * wobble, (r() - 0.5) * wobble * 2),
       wind: v3(wind.x, 0, wind.z),
@@ -643,7 +657,7 @@
   const api = {
     W, H, HW, EPS, MASS, STEP,
     FLAT_STEPS, K_MIN, K_MAX, K_DEFAULT, OPEN, DIHEDRAL, BUILDING, LAUNCH,
-    area, centroid, inside, clonePolys, makeSheet, splitAll, foldTop, foldFlat, foldLineFor, maxLayer,
+    area, centroid, inside, clonePolys, makeSheet, splitAll, foldTop, foldFlat, flipOver, foldLineFor, maxLayer,
     flatVertex, bodyVertex, tagBody, splitWings, hingeHeight, shape, toLocal, nearestVertex,
     finalPose, analyze, flightParams, createFlight, stepFlight, distanceOf, rotate, quatMul, quatAxis,
   };

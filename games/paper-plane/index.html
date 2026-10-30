@@ -60,6 +60,11 @@
             <input type="range" id="power" min="0" max="100" step="1" value="60" />
             <span class="slider-val" id="power-val"></span>
           </label>
+          <label class="slider" for="aim">
+            <span class="slider-name" data-i18n="aim">向き</span>
+            <input type="range" id="aim" min="-25" max="25" step="1" value="0" />
+            <span class="slider-val" id="aim-val"></span>
+          </label>
         </div>
         <button type="button" class="throw-btn" id="throw-btn"><span class="throw-icon" aria-hidden="true"></span><span data-i18n="throw">投げる</span></button>
       </div>
@@ -121,6 +126,7 @@
             <tr><th>翼の線</th><td>左右にドラッグして、翼を折る線を決めます。線より外側が翼になります</td></tr>
             <tr><th>翼を折る</th><td>翼のはしを外へ倒すようにドラッグします</td></tr>
             <tr><th>ボタン</th><td>「おまかせで折る」でその手順をぴったりに折り、「ひとつ戻る」で前の手順へ戻れます</td></tr>
+            <tr><th>裏返す</th><td>平らに折っている間 (角・ふちを折る手順と、自由に折る) は、「裏返す」で紙をひっくり返せます。折ったところを裏側にしてから半分に折ると、胴の外側に出ます</td></tr>
           </tbody>
         </table>
 
@@ -143,7 +149,7 @@
         <h3>投げる</h3>
         <table>
           <tbody>
-            <tr><th>角度・力</th><td>スライダーで決めて「投げる」。キーボードでは ↑↓ で角度、←→ で力、スペースで投げる</td></tr>
+            <tr><th>角度・力・向き</th><td>スライダーで決めて「投げる」。向きは左右に 25° まで (飛距離は窓の下からの距離なので、横へ向けても損はしません。上昇気流をねらったり、ビルや横風をよけたりできます)。キーボードでは ↑↓ で角度、←→ で力、A D で向き、スペースで投げる</td></tr>
             <tr><th>風</th><td>画面上の矢印 (上が窓の外) と、原っぱの旗で見られます。投げるたびに変わります</td></tr>
             <tr><th>飛んでいる間</th><td>「早送り」(スペース) で3倍の速さにできます</td></tr>
           </tbody>
@@ -163,6 +169,7 @@
             <tr><th>Wing line</th><td>Drag left or right to choose the wing fold line. Everything outside the line becomes wing</td></tr>
             <tr><th>Wings</th><td>Drag the wing tip outward and down</td></tr>
             <tr><th>Buttons</th><td>"Fold it for me" makes a perfect fold for that step. "Undo" goes back one step</td></tr>
+            <tr><th>Flip over</th><td>While folding flat (the corner and edge steps, and freestyle), "Flip over" turns the paper over. Flip your folds to the back before folding in half and they end up on the outside of the body</td></tr>
           </tbody>
         </table>
 
@@ -185,7 +192,7 @@
         <h3>Throwing</h3>
         <table>
           <tbody>
-            <tr><th>Angle and power</th><td>Set them with the sliders and tap "Throw". On a keyboard: ↑↓ for angle, ←→ for power, Space to throw</td></tr>
+            <tr><th>Angle, power, aim</th><td>Set them with the sliders and tap "Throw". Aim turns the throw up to 25° left or right. Distance is measured from below the window, so aiming sideways costs nothing: use it to reach an updraft or to dodge buildings and crosswinds. On a keyboard: ↑↓ for angle, ←→ for power, A D for aim, Space to throw</td></tr>
             <tr><th>Wind</th><td>Shown by the arrow at the top (up is out the window) and by the flags in the field. It changes every throw</td></tr>
             <tr><th>In flight</th><td>"Fast forward" (Space) plays at 3× speed</td></tr>
           </tbody>
@@ -205,6 +212,7 @@
             <tr><th>机翼的线</th><td>左右拖动，决定折机翼的线。线的外侧就是机翼</td></tr>
             <tr><th>折机翼</th><td>把翼尖向外往下拖</td></tr>
             <tr><th>按钮</th><td>「自动折」会把这一步折得刚刚好，「撤销一步」回到上一步</td></tr>
+            <tr><th>翻面</th><td>平折期间 (折角和边的步骤，以及自由折) 可以用「翻面」把纸翻过来。把折好的部分翻到背面再对折，它们就会在机身外侧</td></tr>
           </tbody>
         </table>
 
@@ -227,7 +235,7 @@
         <h3>投出</h3>
         <table>
           <tbody>
-            <tr><th>角度和力度</th><td>用滑块决定后点「投出」。键盘：↑↓ 角度，←→ 力度，空格键投出</td></tr>
+            <tr><th>角度、力度、方向</th><td>用滑块决定后点「投出」。方向可以向左右各转 25°。距离从窗户下方算起，所以斜着投也不吃亏：可以瞄准上升气流，或避开大楼和横风。键盘：↑↓ 角度，←→ 力度，A D 方向，空格键投出</td></tr>
             <tr><th>风</th><td>看画面上方的箭头 (朝上是窗外) 和草地上的旗子。每次投出都会变</td></tr>
             <tr><th>飞行中</th><td>「快进」(空格键) 以 3 倍速播放</td></tr>
           </tbody>
@@ -247,6 +255,7 @@
             <tr><th>날개 선</th><td>좌우로 끌어서 날개를 접을 선을 정하세요. 선 바깥쪽이 날개가 됩니다</td></tr>
             <tr><th>날개 접기</th><td>날개 끝을 바깥으로 눕히듯이 끄세요</td></tr>
             <tr><th>버튼</th><td>「자동으로 접기」는 그 단계를 딱 맞게 접고, 「한 단계 뒤로」는 앞 단계로 돌아갑니다</td></tr>
+            <tr><th>뒤집기</th><td>평평하게 접는 동안 (모서리·가장자리 단계와 자유롭게 접기)에는 「뒤집기」로 종이를 뒤집을 수 있어요. 접은 부분을 뒷면으로 돌린 뒤 반으로 접으면 몸통 바깥쪽에 나와요</td></tr>
           </tbody>
         </table>
 
@@ -269,7 +278,7 @@
         <h3>던지기</h3>
         <table>
           <tbody>
-            <tr><th>각도·힘</th><td>슬라이더로 정하고 「던지기」. 키보드는 ↑↓ 각도, ←→ 힘, 스페이스로 던지기</td></tr>
+            <tr><th>각도·힘·방향</th><td>슬라이더로 정하고 「던지기」. 방향은 좌우로 25°까지 돌릴 수 있어요. 거리는 창문 아래에서 재므로 옆으로 던져도 손해가 없어요. 상승 기류를 노리거나 빌딩과 옆바람을 피할 수 있어요. 키보드는 ↑↓ 각도, ←→ 힘, A D 방향, 스페이스로 던지기</td></tr>
             <tr><th>바람</th><td>화면 위의 화살표 (위쪽이 창밖)와 들판의 깃발로 볼 수 있어요. 던질 때마다 바뀝니다</td></tr>
             <tr><th>나는 동안</th><td>「빨리 감기」(스페이스)로 3배 속도로 볼 수 있어요</td></tr>
           </tbody>
@@ -286,9 +295,9 @@
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="i18n.js?v=2"></script>
+  <script src="i18n.js?v=3"></script>
   <script src="stages.js?v=1"></script>
-  <script src="model.js?v=3"></script>
-  <script src="script.js?v=7"></script>
+  <script src="model.js?v=4"></script>
+  <script src="script.js?v=8"></script>
 </body>
 </html>
