@@ -130,6 +130,42 @@
   }
   // { ja: '…', en: '…' } のような文の組から、選んだ言語のものを取り出す
   const L = (obj) => (obj ? obj[lang] ?? obj.en ?? obj.ja ?? '' : '');
+
+  // Google アナリティクスにイベントを送る。タグのないところでは何もしない
+  const track = (name, params) => {
+    if (typeof window.gtag === 'function') window.gtag('event', name, params);
+  };
+
+  // ---------- アクセス解析: ステージの開始・結末・リトライ (全ゲーム共通の形で GA4 に送る) ----------
+  // stage_start / stage_end (result: clear・fail・quit) / stage_retry_fail・stage_retry_clear・stage_retry_quit
+  // 終わったステージをそのまま遊び直したら、直前の結末に合わせたリトライとして送る
+  const stageTrack = (() => {
+    const GAME = 'bowling';
+    const attempts = {};
+    let playing = null; // { stage, at } 遊んでいる途中のステージ
+    let ended = null; // { stage, result } 直前に終わったステージ
+    const send = (name, params) => track(name, { game: GAME, ...params });
+    const end = (result, extra) => {
+      if (!playing) return;
+      send('stage_end', { stage: playing.stage, result, play_sec: Math.round((performance.now() - playing.at) / 1000), ...extra });
+      ended = { stage: playing.stage, result };
+      playing = null;
+    };
+    window.addEventListener('pagehide', () => end('quit'));
+    return {
+      start(stage, extra) {
+        end('quit');
+        if (ended && ended.stage === stage) send(`stage_retry_${ended.result}`, { stage });
+        attempts[stage] = (attempts[stage] || 0) + 1;
+        playing = { stage, at: performance.now() };
+        ended = null;
+        send('stage_start', { stage, attempt: attempts[stage], ...extra });
+      },
+      clear: (extra) => end('clear', extra),
+      fail: (extra) => end('fail', extra),
+      quit: () => end('quit'),
+    };
+  })();
   const treasureName = (kind) => L(I18N.treasures[kind]);
 
   // =====================================================================
@@ -1894,7 +1930,9 @@
     }
   }
 
-  function loadStage(w, s) {
+  // backdrop: タイトル画面の後ろに並べるだけ (遊びはじめたことにしない)
+  function loadStage(w, s, backdrop) {
+    if (!backdrop) stageTrack.start(`${w + 1}-${s + 1}`, { world: w + 1 });
     clearTimeout(nextTimer);
     clearTimeout(throwTimer);
     clearTrail(false);
@@ -2027,6 +2065,7 @@
       return;
     }
     if (roll === 2) {
+      stageTrack.fail({ pins_left: left });
       showCallout('MISS', t('pinsLeft', { n: left }));
       nextTimer = setTimeout(() => {
         hideCallout();
@@ -2058,6 +2097,7 @@
     for (const k of keys) if (k) r[k] = 1;
     r.c = (r.c || 0) + 1;
     saveRecords();
+    stageTrack.clear({ clear_type: kind, treasure: withTreasure });
     showCallout(kind === 'strike' ? 'STRIKE!' : 'SPARE!', 'STAGE CLEAR');
     nextTimer = setTimeout(() => {
       hideCallout();
@@ -2194,6 +2234,7 @@
   }
 
   function openSelect(w) {
+    stageTrack.quit();
     stopPlay();
     selWorld = w ?? worldIndex;
     state = 'select';
@@ -2852,7 +2893,7 @@
     opt.textContent = label;
     langSelect.append(opt);
   }
-  loadStage(0, 0);
+  loadStage(0, 0, true);
   state = 'title';
   hintEl.textContent = '';
   retryBtn.disabled = true;

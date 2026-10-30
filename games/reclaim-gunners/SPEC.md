@@ -785,3 +785,7 @@ LLLLLLLLLLLLLLGGGGGGGGGGGGGGGGGMMMMMMMMMMMMMMMMM
 - 解放したエリアでの経験値かせぎ: 「はぐれ悪魔」と「再侵攻（残党狩り）」で何度でも戦える
 - 力尽きたときのペナルティ: セーブ後に手に入れたお金の 50% を失う
 - 能力ボードの振り直し: 神殿でお金を払って、難易度ごとに 1 回だけ
+
+## アクセス解析
+
+- ステージの開始・結末・リトライを、全ゲーム共通のイベント (`stage_start` / `stage_end` / `stage_retry_fail` など) で送る。中身は [games/ANALYTICS.md](../ANALYTICS.md)

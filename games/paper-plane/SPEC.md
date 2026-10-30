@@ -151,3 +151,4 @@
 | `paper_plane_share` | 投稿ボタンを押したとき | `method` (share_sheet: 共有シート / intent: 投稿画面と画像のコピー / intent_text_only: 画像ができる前に押して、文だけの投稿画面) |
 
 - プレイした回数と投げた回数は、`localStorage` の `paper-plane-records` の `plays` と `throws` に数える
+- ステージの開始・結末・リトライも、全ゲーム共通のイベント (`stage_start` / `stage_end` / `stage_retry_fail` など) で送る。中身は [games/ANALYTICS.md](../ANALYTICS.md)
