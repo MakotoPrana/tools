@@ -30,6 +30,7 @@
   const MAX_SPEED = 14;                  // m/s (力 100%)
   const ANGLE_MIN = -20;
   const ANGLE_MAX = 45;
+  const AIM_MAX = 25;                    // 左右の向き (度)。スライダーは左が - (左)、右が + (右)
   const COLORS = ['#e8473d', '#2c7be5', '#f2b632', '#3fae6a', '#8a5cd1', '#f07fb0'];
 
   // ---- DOM ----
@@ -57,8 +58,11 @@
   const angleVal = $('angle-val');
   const powerInput = $('power');
   const powerVal = $('power-val');
+  const aimInput = $('aim');
+  const aimVal = $('aim-val');
   const throwBtn = $('throw-btn');
   const resultDist = $('result-dist');
+  const resultCrash = $('result-crash');
   const resultNote = $('result-note');
   const resultTop = $('result-top');
   const againBtn = $('again-btn');
@@ -970,6 +974,7 @@
     k: PM.K_DEFAULT,
     misses: [],
     count: 0,                // 自由に折った回数
+    flips: 0,                // 裏返した回数
     history: [],
     preview: null,           // 平らに折るドラッグ中: { parts, anim }
   };
@@ -1006,6 +1011,7 @@
       k: fold.k,
       misses: fold.misses.slice(),
       count: fold.count,
+      flips: fold.flips,
     });
   }
 
@@ -1017,6 +1023,7 @@
     fold.k = PM.K_DEFAULT;
     fold.misses = [];
     fold.count = 0;
+    fold.flips = 0;
     fold.history = [];
     fold.preview = null;
     design = null;
@@ -1158,6 +1165,26 @@
     });
   }
 
+  // 紙を裏返す (平らに折っている間だけ)。中心線のまわりに持ち上げながら半回転してから、紙の向きを入れかえる
+  function flipPaper() {
+    if (busy || drag || fold.body) return;
+    snapshot();
+    const h = (PM.maxLayer(fold.flat) * EPS) / 2;   // 重なりの真ん中の高さを軸にする
+    const lift = 0.12;                              // 机にめりこまないように持ち上げる
+    tween(0.6, (k) => {
+      const a = Math.PI * k;
+      paperObj.rotation.z = a;
+      paperObj.position.set(h * Math.sin(a), h - h * Math.cos(a) + lift * Math.sin(a), 0);
+    }, () => {
+      fold.flat = PM.flipOver(fold.flat);
+      fold.flips++;
+      paperObj.rotation.z = 0;
+      paperObj.position.set(0, 0, 0);
+      dirty = true;
+      enterStep();
+    });
+  }
+
   function toggleMirror() {
     mirror = !mirror;
     store.set('paper-plane-mirror', mirror ? 'on' : 'off');
@@ -1296,6 +1323,7 @@
       setActions([
         { label: t('toHalf'), onClick: () => { if (!busy && !drag) nextStep(); }, primary: true },
         { label: t(mirror ? 'mirrorOn' : 'mirrorOff'), onClick: toggleMirror },
+        { label: t('flip'), onClick: flipPaper },
         { label: t('undo'), onClick: undo, disabled: !fold.history.length },
         { label: t('restart'), onClick: () => startFold(mode) },
       ]);
@@ -1316,6 +1344,7 @@
       { label: t('undo'), onClick: undo, disabled: !fold.history.length },
     ];
     if (mode === 'free' && fold.step === 1) acts[1] = { label: t('backToFree'), onClick: () => { if (!busy && !drag) { fold.step = 0; enterStep(); } } };
+    if (st.kind === 'flat') acts.push({ label: t('flip'), onClick: flipPaper });
     if (st.kind === 'line') acts.unshift({ label: t('foldHere'), onClick: confirmLine, primary: true });
     setActions(acts);
   }
@@ -1346,6 +1375,7 @@
     fold.k = h.k;
     fold.misses = h.misses;
     fold.count = h.count;
+    fold.flips = h.flips || 0;
     fold.preview = null;
     dirty = true;
     enterStep();
@@ -1368,7 +1398,7 @@
       design = PM.analyze(PM.splitWings(fold.flat, fold.k), fold.k);
       phase = 'done';
       showDesign();
-      trackEvent('paper_plane_fold', { mode, folds: fold.count, wing_cm: Math.round((HW - fold.k) * 1000) / 10, symmetry: Math.round(design.sym * 100) });
+      trackEvent('paper_plane_fold', { mode, folds: fold.count, flips: fold.flips, wing_cm: Math.round((HW - fold.k) * 1000) / 10, symmetry: Math.round(design.sym * 100) });
     });
     setCamGoal('show');
   }
@@ -1564,10 +1594,13 @@
       camGoal.pos.set(c.x - dist * 0.62, c.y + dist * 0.55, c.z + dist * 0.55);
       camGoal.look.set(c.x - 0.02, c.y + 0.02, c.z);
     } else if (mode === 'launch') {
-      // 部屋の中から、窓わくごしに外を見る
+      // 紙ひこうきをうしろ斜め上から見て、見える場所 (上のチップと下のパネルのあいだ) の真ん中に置く。
+      // 窓わくと外の景色はその先に見える。翼が見えるように、少し右に回りこむ
       const L = PM.LAUNCH;
-      camGoal.pos.set(L.x - 1.05, L.y + 0.3, L.z + 0.22);
-      camGoal.look.set(L.x + 4, L.y - 0.35, L.z);
+      const dist = Math.max(0.75, fit(0.62, 0.62));
+      const dir = new THREE.Vector3(-0.82, 0.36, 0.44).normalize();
+      camGoal.pos.set(L.x + dir.x * dist, L.y + dir.y * dist, L.z + dir.z * dist);
+      camGoal.look.set(L.x + 0.12, L.y + 0.02, L.z);
     }
   }
 
@@ -1614,10 +1647,13 @@
   let orbit = 0;
 
   function launchQuat(angleDeg) {
-    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2 + launchYaw());
     return q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (angleDeg * Math.PI) / 180));
   }
   const launchAngle = () => Number(angleInput.value);
+  const launchAim = () => Number(aimInput.value);
+  // 機首を回す角度 (rad)。+ で左 (スライダーの値とは向きが逆)
+  const launchYaw = () => (-launchAim() * Math.PI) / 180;
   const launchPower = () => Number(powerInput.value);
   const launchSpeed = () => lerp(MIN_SPEED, MAX_SPEED, launchPower() / 100);
 
@@ -1673,13 +1709,16 @@
     const a = launchAngle();
     angleVal.textContent = t(a > 0 ? 'angleUp' : a < 0 ? 'angleDown' : 'angleFlat', { n: Math.abs(a) });
     powerVal.textContent = t('powerVal', { p: launchPower(), kmh: (launchSpeed() * 3.6).toFixed(0) });
+    const m = launchAim();
+    aimVal.textContent = m === 0 ? t('aimStraight') : t(m < 0 ? 'aimLeft' : 'aimRight', { n: Math.abs(m) });
   }
 
   function updateAim() {
     if (phase !== 'launch') { aimArrow.visible = false; return; }
     const a = (launchAngle() * Math.PI) / 180;
     if (!busy) root.quaternion.copy(launchQuat(launchAngle()));
-    const dir = new THREE.Vector3(Math.cos(a), Math.sin(a), 0);
+    const y = launchYaw();
+    const dir = new THREE.Vector3(Math.cos(a) * Math.cos(y), Math.sin(a), -Math.cos(a) * Math.sin(y));
     aimArrow.position.copy(root.position).addScaledVector(dir, 0.2);
     aimArrow.setDirection(dir);
     aimArrow.setLength(0.15 + launchPower() / 100 * 0.6, 0.07, 0.045);
@@ -1688,11 +1727,12 @@
 
   angleInput.addEventListener('input', () => { updateLaunchLabels(); updateAim(); });
   powerInput.addEventListener('input', () => { updateLaunchLabels(); updateAim(); });
+  aimInput.addEventListener('input', () => { updateLaunchLabels(); updateAim(); });
   throwBtn.addEventListener('click', doThrow);
 
   function doThrow() {
     if (phase !== 'launch' || busy) return;
-    flight = PM.createFlight(design, { speed: launchSpeed(), angle: (launchAngle() * Math.PI) / 180 }, wind, Math.floor(Math.random() * 1e9),
+    flight = PM.createFlight(design, { speed: launchSpeed(), angle: (launchAngle() * Math.PI) / 180, yaw: launchYaw() }, wind, Math.floor(Math.random() * 1e9),
       { ground: stage.ground, boxes: stage.boxes, thermals });
     lastThermal = -1;
     phase = 'flight';
@@ -1702,9 +1742,9 @@
     trail.visible = true;
     blob.visible = true;
     camMode = 'chase';
-    chaseDir.set(1, 0, 0);
+    chaseDir.set(Math.cos(launchYaw()), 0, -Math.sin(launchYaw()));
     flightTexts();
-    store.set('paper-plane-launch', JSON.stringify({ a: launchAngle(), p: launchPower() }));
+    store.set('paper-plane-launch', JSON.stringify({ a: launchAngle(), p: launchPower(), m: launchAim() }));
   }
 
   function flightTexts() {
@@ -1753,20 +1793,25 @@
     const fromQ = root.quaternion.clone();
     const fromY = root.position.y;
     const restY = flight.p.y - 0.01 + design.cgLocal[1] + 0.004;
-    tween(0.35, (k) => {
-      root.quaternion.copy(fromQ).slerp(restQ, k);
-      root.position.y = lerp(fromY, restY, k);
-    });
-    landFlag.g.position.set(flight.p.x + 0.4, flight.p.y - 0.01, flight.p.z);
+    if (!flight.crashed) {
+      tween(0.35, (k) => {
+        root.quaternion.copy(fromQ).slerp(restQ, k);
+        root.position.y = lerp(fromY, restY, k);
+      });
+    }
+    // 突っこんだときは、旗はぶつかった真下の地面に立てる
+    const flagY = flight.crashed ? PS.surfaceY(stage, flight.p.x, flight.p.z) : flight.p.y - 0.01;
+    landFlag.g.position.set(flight.p.x + 0.4, flagY, flight.p.z);
     landFlag.setText(`${dist.toFixed(2)}m`);
     landFlag.g.visible = dist > 0;
-    callout(flight.hitWall && dist < 2 ? t('hitWall') : fmtM(dist), false, 1600);
+    if (flight.crashed) callout(t('crashed'), true, 1600);
+    else callout(fmtM(dist), false, 1600);
     setActions([]);
-    guideTitle.textContent = t(flight.onRoof ? 'landedRoof' : 'landed');
+    guideTitle.textContent = t(flight.crashed ? 'crashedTitle' : flight.onRoof ? 'landedRoof' : 'landed');
     guideText.textContent = '';
 
     records.throws = (records.throws || 0) + 1;
-    const entry = { d: Math.round(dist * 100) / 100, x: flight.p.x, y: flight.p.y - 0.01, z: flight.p.z, k: fold.k, mode, stage: stage.id, wx: wind.x, wz: wind.z, t: Date.now() };
+    const entry = { d: Math.round(dist * 100) / 100, x: flight.p.x, y: flagY, z: flight.p.z, k: fold.k, mode, stage: stage.id, crash: flight.crashed, wx: wind.x, wz: wind.z, t: Date.now() };
     const rec = stageRec();
     const prevBest = rec.best ? rec.best.d : 0;
     const isBest = entry.d > prevBest;
@@ -1779,16 +1824,18 @@
       distance: entry.d,
       angle: launchAngle(),
       power: launchPower(),
+      aim: launchAim(),
       mode,
       lang,
       stage: stage.id,
       updraft: flight.thermalHit >= 0,
+      crashed: flight.crashed,
       wind_ms: Math.round(Math.hypot(wind.x, wind.z) * 10) / 10,
       is_best: isBest,
       throw_count: records.throws,
     });
 
-    setTimeout(() => showResult(entry, isBest, prevBest), 1700);
+    setTimeout(() => showResult(entry, isBest, prevBest), flight.crashed ? 1100 : 1700);
   }
 
   let lastResult = null;
@@ -1804,6 +1851,7 @@
 
   function renderResult(entry, isBest, prevBest) {
     resultDist.textContent = fmtM(entry.d);
+    resultCrash.hidden = !entry.crash;
     if (isBest && prevBest > 0) resultNote.textContent = t('newBest', { d: fmtM(prevBest) });
     else if (isBest) resultNote.textContent = t('firstRecord');
     else resultNote.textContent = t('toBest', { best: fmtM(stageRec().best.d), diff: (stageRec().best.d - entry.d).toFixed(2) });
@@ -2269,7 +2317,7 @@
   startBtn.addEventListener('click', () => startFold('guided'));
   $('free-btn').addEventListener('click', () => startFold('free'));
 
-  // キーボード: 投げるときは ↑↓ で角度、←→ で力、スペースで投げる。飛んでいる間はスペースで早送り
+  // キーボード: 投げるときは ↑↓ で角度、←→ で力、A D で左右の向き、スペースで投げる。飛んでいる間はスペースで早送り
   window.addEventListener('keydown', (e) => {
     const tag = e.target && e.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT') return;
@@ -2279,6 +2327,8 @@
         angleInput.value = String(clamp(launchAngle() + (e.key === 'ArrowUp' ? 1 : -1), ANGLE_MIN, ANGLE_MAX));
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         powerInput.value = String(clamp(launchPower() + (e.key === 'ArrowRight' ? 2 : -2), 0, 100));
+      } else if (e.key === 'a' || e.key === 'A' || e.key === 'd' || e.key === 'D') {
+        aimInput.value = String(clamp(launchAim() + (e.key.toLowerCase() === 'd' ? 1 : -1), -AIM_MAX, AIM_MAX));
       } else if (e.key === ' ' || e.key === 'Enter') {
         doThrow();
       } else return;
@@ -2297,6 +2347,7 @@
     if (last) {
       angleInput.value = String(clamp(Number(last.a) || 5, ANGLE_MIN, ANGLE_MAX));
       powerInput.value = String(clamp(Number(last.p) || 60, 0, 100));
+      aimInput.value = String(clamp(Number(last.m) || 0, -AIM_MAX, AIM_MAX));
     }
   } catch (e) { /* なければ初期値 */ }
 

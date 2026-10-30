@@ -163,6 +163,13 @@
     });
   }
 
+  // 紙を裏返す: 中心線 (x = 0) のまわりに半回転する。左右が入れかわり、重なりの段は上下が逆になる
+  //   (頂点の並びも左右が逆になるので、多角形の表と裏も入れかわる)
+  function flipOver(polys) {
+    const M = maxLayer(polys);
+    return polys.map((p) => ({ o: p.o.map((v) => v.slice()), c: p.c.map((v) => [-v[0], v[1]]), l: M - p.l }));
+  }
+
   // 点 g を点 q へ重ねる折り線 (2点の垂直二等分線)。g の側が動く
   function foldLineFor(g, q) {
     const dx = g[0] - q[0];
@@ -381,6 +388,7 @@
   const KL = 45;    // 上反角の効果 (横すべりした側の翼が持ち上がる)
   const CP = 9;
   const K_ASYM = 60;
+  const LAT_DEADZONE = 0.0004;   // m (揚力の中心の左右のずれが、これより小さければ曲がらない)
   const FLEX = 5;   // 速いほど紙がしなって、つり合いの迎え角が小さくなる
 
   // 機体の性質を決める
@@ -398,7 +406,8 @@
       vGlide,
       kp: KP * clamp(1 + (d.sm - SM_REF) * 4, 0.35, 1.8),
       kn: KN * clamp(d.keel / SK_REF, 0.3, 2.5),
-      rollBias: K_ASYM * clamp(d.lat / Math.max(d.span / 2, 0.02), -0.5, 0.5),
+      // 紙の重なりの厚み (見た目のための値) で生まれる 1mm 未満のずれは、曲がりの原因にしない
+      rollBias: Math.abs(d.lat) < LAT_DEADZONE ? 0 : K_ASYM * clamp(d.lat / Math.max(d.span / 2, 0.02), -0.5, 0.5),
     };
   }
 
@@ -457,13 +466,14 @@
   const BUILDING = { floorY: 8, sillY: 9.0, topY: 10.3, halfZ: 0.75, wallT: 0.25 };
   const LAUNCH = { x: -0.32, y: 9.55, z: 0 };
 
-  // wind = { x, z } (m/s)、throwInfo = { speed, angle } (m/s, rad)
+  // wind = { x, z } (m/s)、throwInfo = { speed, angle, yaw } (m/s, rad, rad。yaw は + で左、- で右へ向ける)
   // env = { ground(x, z), boxes, thermals } (ステージの地面・じゃま物・上昇気流。省略したら平らな原っぱ)
   //   thermals: [{ x, z, r, v, top }] 中心 (x, z)、半径 r (m)、中心の上向きの風 v (m/s)、高さ top (m) より上では弱まる
   function createFlight(design, throwInfo, wind, seed, env) {
     const r = rng(seed);
     const fp = flightParams(design);
-    const yaw = quatAxis(0, 1, 0, -Math.PI / 2);   // 機首 (-Z) を +X (窓の外) に向ける
+    const aim = throwInfo.yaw || 0;
+    const yaw = quatAxis(0, 1, 0, -Math.PI / 2 + aim);   // 機首 (-Z) を +X (窓の外) に向け、左右に aim だけ回す
     const pitch = quatAxis(1, 0, 0, throwInfo.angle);
     const wobble = 0.12 + Math.max(0, throwInfo.speed - 8) ** 2 * 0.1;  // 強く投げすぎると手ぶれが大きい
     const gust = [];
@@ -476,7 +486,11 @@
       fp,
       design,
       p: v3(LAUNCH.x, LAUNCH.y, LAUNCH.z),
-      v: v3(throwInfo.speed * Math.cos(throwInfo.angle), throwInfo.speed * Math.sin(throwInfo.angle), 0),
+      v: v3(
+        throwInfo.speed * Math.cos(throwInfo.angle) * Math.cos(aim),
+        throwInfo.speed * Math.sin(throwInfo.angle),
+        -throwInfo.speed * Math.cos(throwInfo.angle) * Math.sin(aim),
+      ),
       q: quatMul(yaw, pitch),
       w: v3((r() - 0.5) * wobble, (r() - 0.5) * wobble, (r() - 0.5) * wobble * 2),
       wind: v3(wind.x, 0, wind.z),
@@ -486,6 +500,7 @@
       thermal: 0,        // いま受けている上昇気流の強さ (0〜1、中心で1)
       thermalHit: -1,    // 最後に入った上昇気流の番号 (入ったときの合図用)
       onRoof: false,
+      crashed: false,    // 建物に突っこんで終わった
       landed: false,
       hitWall: false,
       maxY: LAUNCH.y,
@@ -519,8 +534,15 @@
 
   const groundY = (s) => (s.p.x < -BUILDING.wallT ? BUILDING.floorY : s.env.ground(s.p.x, s.p.z));
 
-  // じゃま物の箱: 中に入ったら、いちばん浅い面から押し出す。上の面からなら屋上に着地、横からならはね返って落ちる
+  // じゃま物の箱: 中に入ったら、いちばん浅い面から押し出す。上の面からなら屋上に着地、横や下からなら突っこんでその場で終わり
   const BOX_MARGIN = 0.04;
+  function crash(s) {
+    s.v.x = 0; s.v.y = 0; s.v.z = 0;
+    s.w.x = 0; s.w.y = 0; s.w.z = 0;
+    s.hitWall = true;
+    s.crashed = true;
+    s.landed = true;
+  }
   function hitBoxes(s, prevY) {
     const p = s.p;
     for (const b of s.env.boxes) {
@@ -539,16 +561,14 @@
         s.onRoof = true;
         return;
       }
-      if (face === 'x0') { p.x = b.x0 - BOX_MARGIN - 0.01; s.v.x = -Math.abs(s.v.x) * 0.2; }
-      else if (face === 'x1') { p.x = b.x1 + BOX_MARGIN + 0.01; s.v.x = Math.abs(s.v.x) * 0.2; }
-      else if (face === 'z0') { p.z = b.z0 - BOX_MARGIN - 0.01; s.v.z = -Math.abs(s.v.z) * 0.2; }
-      else if (face === 'z1') { p.z = b.z1 + BOX_MARGIN + 0.01; s.v.z = Math.abs(s.v.z) * 0.2; }
-      else { p.y = b.y0 - BOX_MARGIN - 0.01; s.v.y = -Math.abs(s.v.y) * 0.2; }
-      if (face[0] !== 'x') s.v.x *= 0.4;
-      if (face[0] !== 'y') s.v.y *= 0.4;
-      if (face[0] !== 'z') s.v.z *= 0.4;
-      s.w.x *= 0.2; s.w.y *= 0.2; s.w.z *= 0.2;
-      s.hitWall = true;
+      // 壁の面のすぐ外に止める (機首が壁に刺さった形)
+      if (face === 'x0') p.x = b.x0 - BOX_MARGIN;
+      else if (face === 'x1') p.x = b.x1 + BOX_MARGIN;
+      else if (face === 'z0') p.z = b.z0 - BOX_MARGIN;
+      else if (face === 'z1') p.z = b.z1 + BOX_MARGIN;
+      else p.y = b.y0 - BOX_MARGIN;
+      crash(s);
+      return;
     }
   }
 
@@ -612,14 +632,13 @@
     s.speed = speed;
     s.maxY = Math.max(s.maxY, s.p.y);
 
-    // 建物の壁: 窓の穴の外で壁を通りぬけようとしたら、はね返って落ちる
+    // 建物の壁: 窓の穴の外で壁を通りぬけようとしたら、突っこんでその場で終わり
     const crossing = (px >= 0 && s.p.x < 0) || (px <= -BUILDING.wallT && s.p.x > -BUILDING.wallT);
     const inWindow = s.p.y > BUILDING.sillY && s.p.y < BUILDING.topY && Math.abs(s.p.z) < BUILDING.halfZ;
     if (crossing && !inWindow) {
       s.p.x = px >= 0 ? 0.01 : -BUILDING.wallT - 0.01;
-      s.v.x *= -0.2; s.v.y *= 0.4; s.v.z *= 0.4;
-      s.w.x *= 0.2; s.w.y *= 0.2; s.w.z *= 0.2;
-      s.hitWall = true;
+      crash(s);
+      return;
     }
 
     if (s.env.boxes.length) {
@@ -643,7 +662,7 @@
   const api = {
     W, H, HW, EPS, MASS, STEP,
     FLAT_STEPS, K_MIN, K_MAX, K_DEFAULT, OPEN, DIHEDRAL, BUILDING, LAUNCH,
-    area, centroid, inside, clonePolys, makeSheet, splitAll, foldTop, foldFlat, foldLineFor, maxLayer,
+    area, centroid, inside, clonePolys, makeSheet, splitAll, foldTop, foldFlat, flipOver, foldLineFor, maxLayer,
     flatVertex, bodyVertex, tagBody, splitWings, hingeHeight, shape, toLocal, nearestVertex,
     finalPose, analyze, flightParams, createFlight, stepFlight, distanceOf, rotate, quatMul, quatAxis,
   };
