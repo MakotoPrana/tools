@@ -77,6 +77,7 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   place-items: center;
   gap: 8px;
   min-height: 140px;
+  transition: min-height 0.15s;
   margin: 0;
   padding: 16px;
   border: 2px dashed var(--border);
@@ -86,12 +87,25 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
+.drop.loaded { min-height: 0; }
 .drop:hover, .drop.over { border-color: var(--accent); background: var(--bg); }
 .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .drop-text { color: var(--muted); font-size: 0.85rem; }
 .drop-text strong { color: var(--accent); font-size: 1rem; }
-.src-preview { max-width: 100%; max-height: 200px; object-fit: contain; }
+
+/* トリミング */
+.crop-hint { margin: 0 0 12px; color: var(--muted); font-size: 0.85rem; }
+.crop-stage {
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  overflow: hidden;
+  background: repeating-conic-gradient(var(--check-a) 0 25%, var(--check-b) 0 50%) 0 0 / 16px 16px;
+}
+.crop { display: block; max-width: 100%; touch-action: none; cursor: crosshair; }
+.link-button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.9rem; padding: 0; }
+.link-button:hover { text-decoration: underline; }
 .src-info { margin: 8px 0 0; color: var(--muted); font-size: 0.85rem; text-align: center; }
 .src-info:empty { display: none; }
 
@@ -118,7 +132,7 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   background: repeating-conic-gradient(var(--check-a) 0 25%, var(--check-b) 0 50%) 0 0 / 16px 16px;
 }
 .view { display: block; max-width: 100%; image-rendering: pixelated; }
-.view[hidden], .empty[hidden] { display: none; }
+.view[hidden], .empty[hidden], .card[hidden] { display: none; }
 .empty { margin: 0; color: var(--muted); font-size: 0.9rem; text-align: center; }
 .out-info { margin: 8px 0 0; color: var(--muted); font-size: 0.85rem; }
 .out-info:empty { display: none; }

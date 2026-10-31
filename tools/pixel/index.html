@@ -30,10 +30,21 @@
     <section class="card">
       <label id="drop" class="drop" for="file">
         <input type="file" id="file" accept="image/*" />
-        <img id="src-preview" class="src-preview" alt="" hidden />
         <span id="drop-text" class="drop-text"><strong>画像を選ぶ</strong><br />ここにドラッグ、または貼り付け (Ctrl+V) もできます</span>
       </label>
       <p id="src-info" class="src-info"></p>
+    </section>
+
+    <section id="crop-card" class="card" hidden>
+      <div class="result-head">
+        <h2>トリミング</h2>
+        <button type="button" id="crop-reset" class="link-button">全体に戻す</button>
+      </div>
+      <p class="crop-hint">ドラッグで変換する範囲を選びます。枠の中をドラッグすると移動、角をドラッグすると大きさが変わります。</p>
+      <div class="crop-stage">
+        <canvas id="crop" class="crop" aria-label="トリミングの範囲"></canvas>
+      </div>
+      <p id="crop-info" class="out-info"></p>
     </section>
 
     <section class="card settings">
@@ -49,7 +60,7 @@
           <input type="number" id="h" inputmode="numeric" min="1" max="512" value="48" />
         </div>
       </div>
-      <label class="check"><input type="checkbox" id="lock" checked /> 縦横比を元の画像に合わせる</label>
+      <label class="check"><input type="checkbox" id="lock" checked /> 縦横比をトリミングの範囲に合わせる</label>
 
       <label for="colors">色数 <output id="colors-out">16</output></label>
       <input type="range" id="colors" min="2" max="64" value="16" />
@@ -109,6 +120,7 @@
         <h2>使い方</h2>
         <ol class="guide-list">
           <li>画像を選びます (ドラッグや貼り付けでも読みこめます)。</li>
+          <li>必要なら「トリミング」で、変換する範囲をドラッグで選びます。選んだ範囲だけがドット絵になります。</li>
           <li>仕上がりの横と縦のピクセル数を指定します。縦横比を合わせる設定にすると、片方を変えるともう片方が自動で決まります。</li>
           <li>色数・彩度・色の決め方を変えると、すぐに結果が変わります。</li>
           <li>「PNG で保存」で保存します。ゲームのスプライトに使うなら等倍、見せるための画像なら拡大がおすすめです。</li>

@@ -25,7 +25,9 @@ const scaleInput = $("scale");
 const saveBtn = $("save");
 const view = $("view");
 
-let src = null; // { w, h, data: Uint8ClampedArray }
+let full = null; // 読みこんだ画像全体 { w, h, canvas }
+let crop = null; // トリミングの範囲 (full の座標) { x, y, w, h }
+let src = null; // トリミングした画像 { w, h, data: Uint8ClampedArray }
 let srcName = "pixel";
 let result = null; // { w, h, data: ImageData }
 
@@ -42,16 +44,17 @@ function loadFile(file) {
     const cv = document.createElement("canvas");
     cv.width = w;
     cv.height = h;
-    const c = cv.getContext("2d");
+    const c = cv.getContext("2d", { willReadFrequently: true });
     c.drawImage(img, 0, 0, w, h);
-    src = { w, h, data: c.getImageData(0, 0, w, h).data };
+    URL.revokeObjectURL(url);
+    full = { w, h, canvas: cv };
+    crop = { x: 0, y: 0, w, h };
     srcName = (file.name || "pixel").replace(/\.[^.]+$/, "") || "pixel";
-    $("src-preview").src = url;
-    $("src-preview").hidden = false;
+    drop.classList.add("loaded");
     $("drop-text").innerHTML = "<strong>別の画像を選ぶ</strong>";
-    $("src-info").textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
-    if (lockInput.checked) fitHeight();
-    render();
+    $("src-info").textContent = `${file.name ? file.name + "・" : ""}${img.naturalWidth} × ${img.naturalHeight} px`;
+    $("crop-card").hidden = false;
+    applyCrop();
   };
   img.onerror = () => {
     URL.revokeObjectURL(url);
@@ -73,6 +76,135 @@ drop.addEventListener("drop", (e) => {
 document.addEventListener("paste", (e) => {
   const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
   if (item) loadFile(item.getAsFile());
+});
+
+// ---- トリミング ----
+
+const cropCv = $("crop");
+const HANDLE = 14; // 角のつまみの大きさ (CSS ピクセル)
+const MIN_CROP = 4;
+
+// トリミングの範囲を切り出して変換する
+function applyCrop() {
+  const x = Math.round(crop.x);
+  const y = Math.round(crop.y);
+  const w = Math.max(1, Math.round(crop.w));
+  const h = Math.max(1, Math.round(crop.h));
+  src = { w, h, data: full.canvas.getContext("2d", { willReadFrequently: true }).getImageData(x, y, w, h).data };
+  if (lockInput.checked) fitHeight();
+  drawCrop();
+  render();
+}
+
+function drawCrop() {
+  if (!full) return;
+  const dpr = window.devicePixelRatio || 1;
+  // 横は枠いっぱい、縦は 420px まで
+  let cssW = cropCv.parentElement.clientWidth;
+  let cssH = (cssW * full.h) / full.w;
+  if (cssH > 420) {
+    cssH = 420;
+    cssW = (cssH * full.w) / full.h;
+  }
+  cropCv.style.width = `${cssW}px`;
+  cropCv.style.height = `${cssH}px`;
+  cropCv.width = Math.round(cssW * dpr);
+  cropCv.height = Math.round(cssH * dpr);
+  const c = cropCv.getContext("2d");
+  const k = cropCv.width / full.w;
+  c.drawImage(full.canvas, 0, 0, cropCv.width, cropCv.height);
+  const r = [crop.x * k, crop.y * k, crop.w * k, crop.h * k];
+  // 範囲の外を暗くする
+  c.fillStyle = "rgba(0,0,0,0.5)";
+  c.beginPath();
+  c.rect(0, 0, cropCv.width, cropCv.height);
+  c.rect(...r);
+  c.fill("evenodd");
+  c.strokeStyle = "#fff";
+  c.lineWidth = 2 * dpr;
+  c.strokeRect(...r);
+  c.setLineDash([4 * dpr, 4 * dpr]);
+  c.strokeStyle = "#000";
+  c.strokeRect(...r);
+  c.setLineDash([]);
+  const hs = HANDLE * dpr;
+  c.fillStyle = "#fff";
+  c.strokeStyle = "#2f7de1";
+  for (const [px, py] of corners(r[0], r[1], r[2], r[3])) {
+    c.fillRect(px - hs / 2, py - hs / 2, hs, hs);
+    c.strokeRect(px - hs / 2, py - hs / 2, hs, hs);
+  }
+  $("crop-info").textContent = `範囲: ${Math.round(crop.w)} × ${Math.round(crop.h)} px` +
+    (isWhole() ? " (全体)" : "");
+}
+
+const corners = (x, y, w, h) => [[x, y], [x + w, y], [x, y + h], [x + w, y + h]];
+// 範囲が画像全体のときは、枠の中をドラッグしても新しい範囲を選ぶ
+const isWhole = () => crop.w >= full.w && crop.h >= full.h;
+const inCrop = (p) => p.x > crop.x && p.x < crop.x + crop.w && p.y > crop.y && p.y < crop.y + crop.h;
+
+// ポインターの位置を、読みこんだ画像の座標にする
+function toImage(e) {
+  const b = cropCv.getBoundingClientRect();
+  return {
+    x: Math.min(full.w, Math.max(0, ((e.clientX - b.left) / b.width) * full.w)),
+    y: Math.min(full.h, Math.max(0, ((e.clientY - b.top) / b.height) * full.h)),
+    k: full.w / b.width,
+  };
+}
+
+let drag = null;
+cropCv.addEventListener("pointerdown", (e) => {
+  if (!full) return;
+  e.preventDefault();
+  cropCv.setPointerCapture(e.pointerId);
+  const p = toImage(e);
+  const near = HANDLE * p.k;
+  const hit = corners(crop.x, crop.y, crop.w, crop.h).findIndex(([cx, cy]) => Math.abs(p.x - cx) <= near && Math.abs(p.y - cy) <= near);
+  if (hit >= 0) {
+    // 角をつかんだら、反対の角を固定して大きさを変える
+    const [ax, ay] = corners(crop.x, crop.y, crop.w, crop.h)[3 - hit];
+    drag = { mode: "size", ax, ay };
+  } else if (!isWhole() && inCrop(p)) {
+    drag = { mode: "move", dx: p.x - crop.x, dy: p.y - crop.y };
+  } else {
+    drag = { mode: "size", ax: p.x, ay: p.y };
+  }
+});
+cropCv.addEventListener("pointermove", (e) => {
+  if (!full) return;
+  const p = toImage(e);
+  if (!drag) {
+    const near = HANDLE * p.k;
+    const onCorner = corners(crop.x, crop.y, crop.w, crop.h).some(([cx, cy]) => Math.abs(p.x - cx) <= near && Math.abs(p.y - cy) <= near);
+    cropCv.style.cursor = onCorner ? "nwse-resize" : !isWhole() && inCrop(p) ? "move" : "crosshair";
+    return;
+  }
+  if (drag.mode === "move") {
+    crop.x = Math.min(full.w - crop.w, Math.max(0, p.x - drag.dx));
+    crop.y = Math.min(full.h - crop.h, Math.max(0, p.y - drag.dy));
+  } else {
+    crop.x = Math.min(drag.ax, p.x);
+    crop.y = Math.min(drag.ay, p.y);
+    crop.w = Math.abs(p.x - drag.ax);
+    crop.h = Math.abs(p.y - drag.ay);
+  }
+  drawCrop();
+});
+const endDrag = () => {
+  if (!drag) return;
+  drag = null;
+  // 小さすぎる範囲 (クリックしただけなど) は全体に戻す
+  if (crop.w < MIN_CROP || crop.h < MIN_CROP) crop = { x: 0, y: 0, w: full.w, h: full.h };
+  applyCrop();
+};
+cropCv.addEventListener("pointerup", endDrag);
+cropCv.addEventListener("pointercancel", endDrag);
+
+$("crop-reset").addEventListener("click", () => {
+  if (!full) return;
+  crop = { x: 0, y: 0, w: full.w, h: full.h };
+  applyCrop();
 });
 
 // ---- 設定 ----
@@ -402,7 +534,10 @@ function drawView() {
   $("empty").hidden = true;
 }
 
-window.addEventListener("resize", drawView);
+window.addEventListener("resize", () => {
+  drawView();
+  drawCrop();
+});
 
 // ---- 保存 ----
 
