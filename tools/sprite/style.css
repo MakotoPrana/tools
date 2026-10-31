@@ -42,6 +42,37 @@ h1 { text-align: center; margin: 0 0 4px; font-size: 1.8rem; }
 .subtitle { text-align: center; margin: 0 0 20px; color: var(--muted); font-size: 0.9rem; }
 h2 { font-size: 1.1rem; margin: 0 0 12px; }
 
+[hidden] { display: none !important; }
+
+/* 段階の切り替え */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 16px; scroll-margin-top: 8px; }
+.steps button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.steps button b {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.steps button[aria-selected="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
+.steps button[aria-selected="true"] b { background: #fff; color: var(--accent); }
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -116,7 +147,6 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .outline-row { display: flex; align-items: center; gap: 12px; }
 .outline-row .check { margin: 0; }
 .outline-row input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; }
-#tol-wrap[hidden] { display: none; }
 
 /* 結果 */
 .result-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -132,7 +162,6 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   background: repeating-conic-gradient(var(--check-a) 0 25%, var(--check-b) 0 50%) 0 0 / 16px 16px;
 }
 .view { display: block; max-width: 100%; image-rendering: pixelated; }
-.view[hidden], .empty[hidden], .card[hidden] { display: none; }
 .empty { margin: 0; color: var(--muted); font-size: 0.9rem; text-align: center; }
 .out-info { margin: 8px 0 0; color: var(--muted); font-size: 0.85rem; }
 .out-info:empty { display: none; }
@@ -169,7 +198,66 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 }
 .save-row button:hover { filter: brightness(1.1); }
 .save-row button:disabled { opacity: 0.5; cursor: default; filter: none; }
-.to-walk { margin: 12px 0 0; text-align: center; }
+.to-walk, .to-pixel { margin: 12px 0 0; text-align: center; }
+
+/* 背景を切り抜く */
+.hint { margin: 0 0 12px; color: var(--muted); font-size: 0.85rem; }
+.primary {
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.primary:hover { filter: brightness(1.1); }
+.tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+.tool { margin: 0; font-weight: 400; cursor: pointer; }
+.tool input { position: absolute; opacity: 0; pointer-events: none; }
+.tool span {
+  display: block;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.tool input:checked + span { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
+.tool input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 4px 0 12px; }
+.row h2 { margin: 0; }
+.row-left, .row-right { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.row select { width: auto; padding: 6px 8px; font-size: 0.9rem; margin: 0; }
+label.inline { display: inline; margin: 0; font-weight: 400; font-size: 0.85rem; color: var(--muted); }
+.cut-stage { max-height: 70vh; overflow: auto; border-radius: 10px; border: 1px solid var(--border); }
+.cut-stage.checker { background: repeating-conic-gradient(var(--check-a) 0 25%, var(--check-b) 0 50%) 0 0 / 16px 16px; }
+.cut-stage.black { background: #000; }
+.cut-stage.white { background: #fff; }
+.cut-stage.magenta { background: #ff00ff; }
+.cut-stage .view { margin: 0 auto; max-width: none; image-rendering: auto; touch-action: none; cursor: crosshair; }
+
+/* 歩かせる */
+.two { display: flex; gap: 16px; }
+.two > div { flex: 1; min-width: 0; }
+.sheet-wrap {
+  display: grid;
+  place-items: start;
+  padding: 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+  background: repeating-conic-gradient(var(--check-a) 0 25%, var(--check-b) 0 50%) 0 0 / 16px 16px;
+}
+.edit, .anim, .sheet { display: block; image-rendering: pixelated; }
+.edit { max-width: 100%; touch-action: none; cursor: default; }
+.anim { max-width: 100%; }
+.legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 0; padding: 0; font-size: 0.85rem; }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 50%; }
+.speed { margin: 0; font-weight: 400; font-size: 0.85rem; color: var(--muted); }
+#step-walk .out-info { margin-bottom: 16px; }
 
 /* 画面下部の使い方・解説 */
 .container:has(+ .guide) { padding-bottom: 0; }

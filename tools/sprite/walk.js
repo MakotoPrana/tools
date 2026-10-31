@@ -1,9 +1,10 @@
-"use strict";
+// walk
+(() => {
+  "use strict";
+
 
 // 大きい画像は処理が重くなるので、長い辺をこの大きさまで縮める (ドット絵なので近い画素で縮める)
 const MAX_SRC = 256;
-// ピクセルアート変換から絵を受け取るときのキー
-const HANDOFF_KEY = "pixel-to-walk";
 
 // ひじの位置 (肩から手までの線の、肩からの割合)。上腕と前腕は少し重ねて切り分け、曲げたときにすき間ができないようにする
 const ELBOW = 0.5;
@@ -14,7 +15,7 @@ const LIMBS = ["armA", "armB", "legA", "legB"];
 const COLORS = { armA: "#ff8c1a", armB: "#e6c200", legA: "#2f7de1", legB: "#18b5a8" };
 const isArm = (k) => k.startsWith("arm");
 
-const $ = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById("w-" + id);
 const fileInput = $("file");
 const drop = $("drop");
 const dirInput = $("dir");
@@ -91,21 +92,13 @@ drop.addEventListener("drop", (e) => {
   loadFile(e.dataTransfer.files[0]);
 });
 document.addEventListener("paste", (e) => {
+  if (SpriteApp.active !== "walk") return;
   const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
   if (item) loadFile(item.getAsFile());
 });
 
-// ピクセルアート変換から渡された絵があれば読みこむ
-try {
-  const handed = localStorage.getItem(HANDOFF_KEY);
-  if (handed) {
-    localStorage.removeItem(HANDOFF_KEY);
-    const { url, name } = JSON.parse(handed);
-    loadUrl(url, name);
-  }
-} catch (e) {
-  // 保存領域が使えないときは、ふつうに画像を選んでもらう
-}
+// ドット絵にした絵を受け取る
+SpriteApp.register("walk", { load: loadUrl });
 
 // ---- 手足の位置 ----
 
@@ -647,10 +640,8 @@ $("save").addEventListener("click", () => {
   if (!frames.length) return;
   const cv = makeSheet(Number(scaleInput.value));
   cv.toBlob((blob) => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${srcName}-walk-${dirInput.value}-${frames.length}f-${frameW}x${frameH}.png`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    SpriteApp.save(blob, `${srcName}-walk-${dirInput.value}-${frames.length}f-${frameW}x${frameH}.png`);
   }, "image/png");
 });
+
+})();

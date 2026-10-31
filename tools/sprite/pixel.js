@@ -1,4 +1,7 @@
-"use strict";
+// pixel
+(() => {
+  "use strict";
+
 
 // 読みこんだ画像は、処理が重くならないように長い辺をこの大きさまで縮める
 const MAX_SRC = 1200;
@@ -6,7 +9,7 @@ const MAX_OUT = 512;
 // プレビューの大きさの上限 (CSS ピクセル)
 const VIEW_MAX = 480;
 
-const $ = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById("p-" + id);
 const fileInput = $("file");
 const drop = $("drop");
 const wInput = $("w");
@@ -72,17 +75,8 @@ function loadUrl(url, fileName) {
 
 fileInput.addEventListener("change", () => loadFile(fileInput.files[0]));
 
-// 背景切り抜きから渡された絵があれば読みこむ
-try {
-  const handed = localStorage.getItem("cutout-to-pixel");
-  if (handed) {
-    localStorage.removeItem("cutout-to-pixel");
-    const { url, name } = JSON.parse(handed);
-    loadUrl(url, `${name}.png`);
-  }
-} catch (e) {
-  // 保存領域が使えないときは、ふつうに画像を選んでもらう
-}
+// 背景を切り抜いた絵を受け取る
+SpriteApp.register("pixel", { load: loadUrl });
 ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => {
   e.preventDefault();
   drop.classList.add("over");
@@ -93,6 +87,7 @@ drop.addEventListener("drop", (e) => {
   loadFile(e.dataTransfer.files[0]);
 });
 document.addEventListener("paste", (e) => {
+  if (SpriteApp.active !== "pixel") return;
   const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
   if (item) loadFile(item.getAsFile());
 });
@@ -331,7 +326,9 @@ function backgroundMask(w, h, d, tol) {
     bucket.set(key, (bucket.get(key) || 0) + 1);
   }
   const mask = new Uint8Array(w * h);
-  if (!bucket.size) return mask;
+  // ふちの半分以上が透明なら、背景はもう消してある (トリミングで絵にかかったふちの色を、背景と取り違えないように)
+  const opaqueEdge = [...bucket.values()].reduce((sum, n) => sum + n, 0);
+  if (!bucket.size || opaqueEdge * 2 < edge.length) return mask;
   const top = [...bucket].sort((a, b) => b[1] - a[1])[0][0];
   // 一番多いグループの色の平均を背景の色にする
   let sr = 0, sg = 0, sb = 0, n = 0;
@@ -589,7 +586,7 @@ function render() {
   $("erase-info").textContent = erased.length ? `${erased.length} か所を透明にしています` : "";
   view.classList.add("erasable");
   saveBtn.disabled = false;
-  if (toWalk) toWalk.disabled = false;
+  toWalk.disabled = false;
   drawView();
 }
 
@@ -652,26 +649,19 @@ saveBtn.addEventListener("click", () => {
   c.imageSmoothingEnabled = false;
   c.drawImage(tmp, 0, 0, cv.width, cv.height);
   cv.toBlob((blob) => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${srcName}-${result.w}x${result.h}${s > 1 ? `-x${s}` : ""}.png`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    SpriteApp.save(blob, `${srcName}-${result.w}x${result.h}${s > 1 ? `-x${s}` : ""}.png`);
   }, "image/png");
 });
 
-// ---- 歩きアニメ作成へ渡す ----
+// ---- 歩かせる段階へ渡す ----
 
-toWalk?.addEventListener("click", () => {
+toWalk.addEventListener("click", () => {
   if (!result) return;
   const cv = document.createElement("canvas");
   cv.width = result.w;
   cv.height = result.h;
   cv.getContext("2d").putImageData(result.data, 0, 0);
-  try {
-    localStorage.setItem("pixel-to-walk", JSON.stringify({ url: cv.toDataURL("image/png"), name: srcName }));
-  } catch (e) {
-    // 保存領域が使えないときは、保存した PNG を歩きアニメ作成で選んでもらう
-  }
-  location.href = "../walk/";
+  SpriteApp.send("walk", cv.toDataURL("image/png"), srcName);
 });
+
+})();

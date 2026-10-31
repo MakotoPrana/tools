@@ -1,13 +1,15 @@
-"use strict";
+// cutout
+(() => {
+  "use strict";
+
 
 // 処理が重くならないように、長い辺をこの大きさまで縮める
 const MAX_SRC = 1600;
 const MAX_UNDO = 20;
-// ピクセルアート変換へ絵を渡すときのキーと、渡す画像の大きさの上限 (変換側の上限に合わせる)
-const HANDOFF_KEY = "cutout-to-pixel";
+// ドット絵の段階へ渡す画像の大きさの上限 (そちらで読みこむときの上限に合わせる)
 const HANDOFF_MAX = 1200;
 
-const $ = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById("c-" + id);
 const fileInput = $("file");
 const drop = $("drop");
 const tolInput = $("tol");
@@ -79,6 +81,7 @@ drop.addEventListener("drop", (e) => {
   loadFile(e.dataTransfer.files[0]);
 });
 document.addEventListener("paste", (e) => {
+  if (SpriteApp.active !== "cutout") return;
   const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
   if (item) loadFile(item.getAsFile());
 });
@@ -267,7 +270,7 @@ zoomInput.addEventListener("change", () => {
   stage.scrollTop = fy * stage.scrollHeight - stage.clientHeight / 2;
 });
 $("bgview").addEventListener("change", (e) => {
-  stage.className = `stage ${e.target.value}`;
+  stage.className = `cut-stage ${e.target.value}`;
 });
 window.addEventListener("resize", drawView);
 
@@ -373,20 +376,13 @@ function resultCanvas(max = Infinity) {
 $("save").addEventListener("click", () => {
   if (!orig) return;
   resultCanvas().toBlob((blob) => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${srcName}-cutout.png`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    SpriteApp.save(blob, `${srcName}-cutout.png`);
   }, "image/png");
 });
 
-$("to-pixel")?.addEventListener("click", () => {
+$("to-pixel").addEventListener("click", () => {
   if (!orig) return;
-  try {
-    localStorage.setItem(HANDOFF_KEY, JSON.stringify({ url: resultCanvas(HANDOFF_MAX).toDataURL("image/png"), name: srcName }));
-    location.href = "../pixel/";
-  } catch (e) {
-    $("out-info").textContent = "画像が大きすぎて渡せませんでした。「透明な PNG で保存」で保存してから、ピクセルアート変換で選んでください。";
-  }
+  SpriteApp.send("pixel", resultCanvas(HANDOFF_MAX).toDataURL("image/png"), `${srcName}.png`);
 });
+
+})();

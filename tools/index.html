@@ -182,9 +182,7 @@
       font-size: 0.95rem;
     }
     .tool-icon.water { background: #2a9d8f; }
-    .tool-icon.cutout { background: #3a9d5d; }
-    .tool-icon.pixel { background: #8a5cd6; }
-    .tool-icon.walk { background: #d6683a; }
+    .tool-icon.sprite { background: #8a5cd6; }
 
     .tool-body { flex: 1; min-width: 0; }
     .tool-name { display: block; margin: 0; font-weight: 600; font-size: 1.05rem; }
@@ -236,31 +234,11 @@
         </a>
       </li>
       <li>
-        <a class="tool" href="cutout/">
-          <span class="tool-icon cutout" aria-hidden="true">切抜</span>
+        <a class="tool" href="sprite/">
+          <span class="tool-icon sprite" aria-hidden="true">ドット</span>
           <span class="tool-body">
-            <span class="tool-name">背景切り抜き</span>
-            <span class="tool-desc">画像の背景を消して透明な PNG に。自動で消したあと、クリックやブラシで細かく消したり戻したりできます。</span>
-          </span>
-          <span class="tool-arrow" aria-hidden="true">›</span>
-        </a>
-      </li>
-      <li>
-        <a class="tool" href="pixel/">
-          <span class="tool-icon pixel" aria-hidden="true">ドット</span>
-          <span class="tool-body">
-            <span class="tool-name">ピクセルアート変換</span>
-            <span class="tool-desc">画像を縦横のピクセル数と色数を指定してドット絵に変換。背景の透過や輪郭線にも対応し、PNG で保存できます。</span>
-          </span>
-          <span class="tool-arrow" aria-hidden="true">›</span>
-        </a>
-      </li>
-      <li>
-        <a class="tool" href="walk/">
-          <span class="tool-icon walk" aria-hidden="true">歩</span>
-          <span class="tool-body">
-            <span class="tool-name">歩きアニメ作成</span>
-            <span class="tool-desc">人のドット絵1枚から、向きと手足の位置を指定して歩きのスプライトアニメを作成。スプライトシートを PNG で保存できます。</span>
+            <span class="tool-name">スプライト作成</span>
+            <span class="tool-desc">画像の背景を切り抜き、ドット絵にして、歩きのスプライトアニメまで1つの画面で作成。それぞれ PNG で保存できます。</span>
           </span>
           <span class="tool-arrow" aria-hidden="true">›</span>
         </a>
