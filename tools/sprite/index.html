@@ -185,14 +185,32 @@
       <p id="p-out-info" class="out-info"></p>
 
       <div class="erase">
-        <p class="erase-title">クリックした色を透明にする</p>
-        <p class="crop-hint">結果のマス、または下の色見本をクリックすると、その色を透明にします。</p>
-        <div class="erase-row">
-          <label for="p-erase-mode">消す範囲</label>
-          <select id="p-erase-mode">
-            <option value="fill">クリックしたところとつながった同じ色</option>
-            <option value="color">画像の中の同じ色すべて</option>
-          </select>
+        <p class="erase-title">クリックで直す</p>
+        <div class="tools" role="radiogroup" aria-label="結果をクリックしたときにすること">
+          <label class="tool"><input type="radio" name="p-click" value="erase" checked /><span>色を透明にする</span></label>
+          <label class="tool"><input type="radio" name="p-click" value="eye" /><span>目に光を入れる</span></label>
+        </div>
+        <div id="p-erase-opts">
+          <p class="crop-hint">結果のマス、または下の色見本をクリックすると、その色を透明にします。</p>
+          <div class="erase-row">
+            <label for="p-erase-mode">消す範囲</label>
+            <select id="p-erase-mode">
+              <option value="fill">クリックしたところとつながった同じ色</option>
+              <option value="color">画像の中の同じ色すべて</option>
+            </select>
+          </div>
+        </div>
+        <div id="p-eye-opts" hidden>
+          <p class="crop-hint">結果の黒目のマスをクリックすると、黒目の中に光の点を入れます。3 マス以上の大きさの黒目に入れられます。</p>
+          <div class="erase-row">
+            <label for="p-eye-pos">光の位置</label>
+            <select id="p-eye-pos">
+              <option value="left">左上</option>
+              <option value="right">右上</option>
+            </select>
+            <input type="color" id="p-eye-color" value="#ffffff" aria-label="光の色" />
+          </div>
+          <label class="check"><input type="checkbox" id="p-eye-both" checked /> もう片方の目にも同じように入れる</label>
         </div>
         <div class="erase-row">
           <button type="button" id="p-erase-undo" class="link-button" disabled>1つ戻す</button>
@@ -317,7 +335,7 @@
         <h2>使い方</h2>
         <ol class="guide-list">
           <li><b>背景を切り抜く</b>: 画像を選ぶと、背景を自動で消します。消え残りや消えすぎは、クリックやブラシで直します。</li>
-          <li><b>ドット絵にする</b>: 横と縦のピクセル数と色数を決めて、ドット絵にします。必要ならトリミングし、残したくない色はクリックで透明にします。</li>
+          <li><b>ドット絵にする</b>: 横と縦のピクセル数と色数を決めて、ドット絵にします。必要ならトリミングし、残したくない色はクリックで透明にします。「目に光を入れる」を選んで黒目をクリックすると、目に光の点が入ります。</li>
           <li><b>歩かせる</b>: 絵の向きを選び、肩・手・腰・足の丸を手足に合わせると、歩きのコマができます。コマを横に並べたスプライトシートを保存します。</li>
           <li>各段階の下のボタンで、できた絵を次の段階へそのまま渡せます。手持ちの画像から、好きな段階で始めることもできます。</li>
         </ol>
@@ -326,7 +344,7 @@
       <section class="card">
         <h2>しくみ</h2>
         <p><b>背景を切り抜く</b>: 画像のふちに多い色 (市松模様なら2色) を背景とみなし、ふちにつながる部分と、絵に囲まれた大きめの部分を消します。</p>
-        <p><b>ドット絵にする</b>: 画像を指定のマス目に分け、画像全体からよく使われている色を指定の数だけ選び (k-means 法)、それぞれのマスをその中で一番多い色 (または平均の色に一番近い色) で塗ります。</p>
+        <p><b>ドット絵にする</b>: 画像を指定のマス目に分け、画像全体からよく使われている色を指定の数だけ選び (k-means 法)、それぞれのマスをその中で一番多い色 (または平均の色に一番近い色) で塗ります。目の光は、クリックしたマスとつながった同じ色の範囲を黒目とみなし、そのいちばん上の行の端のマスに入れます (黒目が 4 × 4 マス以上なら 2 × 2 マス)。もう片方の目は、同じ色で大きさが近く、高さがそろった範囲を探します。</p>
         <p><b>歩かせる</b>: 肩から手、腰から足までの線の近くを腕と脚として切り分けます。横向きは腕と脚を付け根から前後に振り、ひじから先を前へ曲げます。地面に足が付くように体も上下させます。正面・後ろ向きは片足ずつ持ち上げ、ひじを体の内側へ曲げます。横向きで手足が1本ずつしか見えない絵でも、手前と奥の2本として動かします。</p>
         <p class="guide-note">※ 絵を切り分けて動かすしくみなので、ひざは曲がりません。持っている道具は、手の近くにあるものだけが手と一緒に動きます。画像はこのブラウザの中だけで処理され、どこにも送信されません。</p>
       </section>
