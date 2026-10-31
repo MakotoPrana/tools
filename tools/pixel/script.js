@@ -39,7 +39,10 @@ let erased = [];
 
 function loadFile(file) {
   if (!file || !file.type.startsWith("image/")) return;
-  const url = URL.createObjectURL(file);
+  loadUrl(URL.createObjectURL(file), file.name || "");
+}
+
+function loadUrl(url, fileName) {
   const img = new Image();
   img.onload = () => {
     const k = Math.min(1, MAX_SRC / Math.max(img.naturalWidth, img.naturalHeight));
@@ -53,10 +56,10 @@ function loadFile(file) {
     URL.revokeObjectURL(url);
     full = { w, h, canvas: cv };
     crop = { x: 0, y: 0, w, h };
-    srcName = (file.name || "pixel").replace(/\.[^.]+$/, "") || "pixel";
+    srcName = fileName.replace(/\.[^.]+$/, "") || "pixel";
     drop.classList.add("loaded");
     $("drop-text").innerHTML = "<strong>別の画像を選ぶ</strong>";
-    $("src-info").textContent = `${file.name ? file.name + "・" : ""}${img.naturalWidth} × ${img.naturalHeight} px`;
+    $("src-info").textContent = `${fileName ? fileName + "・" : ""}${img.naturalWidth} × ${img.naturalHeight} px`;
     $("crop-card").hidden = false;
     applyCrop();
   };
@@ -68,6 +71,18 @@ function loadFile(file) {
 }
 
 fileInput.addEventListener("change", () => loadFile(fileInput.files[0]));
+
+// 背景切り抜きから渡された絵があれば読みこむ
+try {
+  const handed = localStorage.getItem("cutout-to-pixel");
+  if (handed) {
+    localStorage.removeItem("cutout-to-pixel");
+    const { url, name } = JSON.parse(handed);
+    loadUrl(url, `${name}.png`);
+  }
+} catch (e) {
+  // 保存領域が使えないときは、ふつうに画像を選んでもらう
+}
 ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => {
   e.preventDefault();
   drop.classList.add("over");
