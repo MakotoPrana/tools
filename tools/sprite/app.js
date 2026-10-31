@@ -19,7 +19,12 @@ const SpriteApp = {
       tab.setAttribute("aria-selected", String(step === name));
       tab.tabIndex = step === name ? 0 : -1;
     }
-    history.replaceState(null, "", `#${name}`);
+    // 段階を URL に残す (再読みこみしても同じ段階を開く)。使えない画面では何もしない
+    try {
+      history.replaceState(null, "", `#${name}`);
+    } catch (e) {
+      // 何もしない
+    }
     // 隠れていたあいだは大きさが測れないので、表示してから描き直してもらう
     window.dispatchEvent(new Event("resize"));
   },
