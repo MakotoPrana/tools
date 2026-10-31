@@ -2057,8 +2057,9 @@
     }
   }
 
-  // 清掃員ハジメのスプライト (hajime.png: 128×144 のコマが横に7つ。下・下歩き・右・右歩き・左・左歩き・上)
-  const HAJIME = { img: new Image(), white: null, ready: false, fw: 128, fh: 144, foot: 140 };
+  // 清掃員ハジメのスプライト (hajime.png: 160×160 のコマが横に7つ。下・下歩き・右・右歩き・左・左歩き・上)
+  // foot: コマの中の足もとの高さ、tall: 絵の中での背の高さ (どちらもピクセル)
+  const HAJIME = { img: new Image(), white: null, ready: false, fw: 160, fh: 160, foot: 156, tall: 140 };
   HAJIME.img.onload = () => {
     // ダメージを受けたときの白いシルエット
     const cv = document.createElement('canvas');
@@ -2093,7 +2094,7 @@
     if (Math.abs(fx) > Math.abs(fy)) frame = (fx > 0 ? 2 : 4) + step;
     else frame = fy < 0 ? 6 : step;
     const h = 32; // 画面での背の高さ
-    const k = h / (HAJIME.foot - 4);
+    const k = h / HAJIME.tall;
     const src = hurt ? HAJIME.white : HAJIME.img;
     c.drawImage(src, frame * HAJIME.fw, 0, HAJIME.fw, HAJIME.fh, (-HAJIME.fw / 2) * k, 13 - HAJIME.foot * k, HAJIME.fw * k, HAJIME.fh * k);
   }
