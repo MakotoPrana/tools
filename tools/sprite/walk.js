@@ -47,7 +47,7 @@ const isSide = () => dirInput.value === "right" || dirInput.value === "left";
 
 // ---- 画像の読みこみ ----
 
-function loadUrl(url, name, opts) {
+function loadUrl(url, name) {
   const im = new Image();
   im.onload = () => {
     const k = Math.min(1, MAX_SRC / Math.max(im.naturalWidth, im.naturalHeight));
@@ -68,11 +68,6 @@ function loadUrl(url, name, opts) {
     $("drop-text").innerHTML = "<strong>別の画像を選ぶ</strong>";
     $("src-info").textContent = `${w} × ${h} px` + (k < 1 ? ` (${im.naturalWidth} × ${im.naturalHeight} px から縮めました)` : "");
     for (const id of ["setup", "motion", "out"]) $(id).hidden = false;
-    // 横向きにする段階から来たときは、その向きにしておく
-    if (opts && opts.dir) {
-      dirInput.value = opts.dir;
-      $("shade-wrap").hidden = $("mirror-wrap").hidden = !isSide();
-    }
     autoPlace();
   };
   im.onerror = () => {
@@ -102,7 +97,7 @@ document.addEventListener("paste", (e) => {
   if (item) loadFile(item.getAsFile());
 });
 
-// ドット絵にした絵・横向きにした絵を受け取る
+// ドット絵にした絵を受け取る
 SpriteApp.register("walk", { load: loadUrl });
 
 // ---- 手足の位置 ----

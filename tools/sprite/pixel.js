@@ -28,7 +28,6 @@ const scaleInput = $("scale");
 const saveBtn = $("save");
 const view = $("view");
 const toWalk = $("to-walk");
-const toTurn = $("to-turn");
 
 let full = null; // 読みこんだ画像全体 { w, h, canvas }
 let crop = null; // トリミングの範囲 (full の座標) { x, y, w, h }
@@ -588,7 +587,6 @@ function render() {
   view.classList.add("erasable");
   saveBtn.disabled = false;
   toWalk.disabled = false;
-  toTurn.disabled = false;
   drawView();
 }
 
@@ -655,17 +653,15 @@ saveBtn.addEventListener("click", () => {
   }, "image/png");
 });
 
-// ---- 横向きにする・歩かせる段階へ渡す ----
+// ---- 歩かせる段階へ渡す ----
 
-function sendTo(step) {
+toWalk.addEventListener("click", () => {
   if (!result) return;
   const cv = document.createElement("canvas");
   cv.width = result.w;
   cv.height = result.h;
   cv.getContext("2d").putImageData(result.data, 0, 0);
-  SpriteApp.send(step, cv.toDataURL("image/png"), srcName);
-}
-toTurn.addEventListener("click", () => sendTo("turn"));
-toWalk.addEventListener("click", () => sendTo("walk"));
+  SpriteApp.send("walk", cv.toDataURL("image/png"), srcName);
+});
 
 })();

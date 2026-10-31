@@ -1,8 +1,8 @@
 "use strict";
 
-// 4つの段階 (背景を切り抜く・ドット絵にする・横向きにする・歩かせる) の切り替えと、段階どうしの受け渡し
+// 3つの段階 (背景を切り抜く・ドット絵にする・歩かせる) の切り替えと、段階どうしの受け渡し
 const SpriteApp = {
-  steps: ["cutout", "pixel", "turn", "walk"],
+  steps: ["cutout", "pixel", "walk"],
   active: "cutout",
   modules: {},
 
@@ -29,11 +29,11 @@ const SpriteApp = {
     window.dispatchEvent(new Event("resize"));
   },
 
-  // 次の段階へ絵を渡す。opts はその段階に伝えたいこと (歩かせる段階なら絵の向き { dir })
-  send(name, url, fileName, opts) {
+  // 次の段階へ絵を渡す
+  send(name, url, fileName) {
     this.show(name);
     document.querySelector(".steps").scrollIntoView({ behavior: "smooth", block: "start" });
-    this.modules[name].load(url, fileName, opts);
+    this.modules[name].load(url, fileName);
   },
 
   // 保存。Claude の画面の中では、ページから直接ダウンロードできないので、保存の確認を出すしくみを使う
