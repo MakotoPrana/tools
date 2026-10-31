@@ -13,7 +13,7 @@
     gtag('config', 'G-4VLZW1VMVC');
   </script>
   <title>スプライト作成</title>
-  <meta name="description" content="画像の背景を切り抜き、ドット絵にして、歩きのスプライトアニメまで作れるツール。3つの段階を1つの画面で進められ、それぞれ PNG で保存できます。" />
+  <meta name="description" content="画像の背景を切り抜き、ドット絵にして、厚みを付けて横向きにし、歩きのスプライトアニメまで作れるツール。4つの段階を1つの画面で進められ、それぞれ PNG で保存できます。" />
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
@@ -25,12 +25,13 @@
   <main class="container">
     <p class="back"><a href="../">‹ ツール一覧</a></p>
     <h1>スプライト作成</h1>
-    <p class="subtitle">背景を切り抜き、ドット絵にして、歩かせるまでを1つの画面で。<br />どの段階からでも始められます。画像はブラウザの外に送られません。</p>
+    <p class="subtitle">背景を切り抜き、ドット絵にして、横向きにして、歩かせるまでを1つの画面で。<br />どの段階からでも始められます。画像はブラウザの外に送られません。</p>
 
     <nav class="steps" role="tablist" aria-label="段階">
       <button type="button" role="tab" id="tab-cutout" aria-controls="step-cutout"><b>1</b>背景を切り抜く</button>
       <button type="button" role="tab" id="tab-pixel" aria-controls="step-pixel"><b>2</b>ドット絵にする</button>
-      <button type="button" role="tab" id="tab-walk" aria-controls="step-walk"><b>3</b>歩かせる</button>
+      <button type="button" role="tab" id="tab-turn" aria-controls="step-turn"><b>3</b>横向きにする</button>
+      <button type="button" role="tab" id="tab-walk" aria-controls="step-walk"><b>4</b>歩かせる</button>
     </nav>
 
     <div class="step" id="step-cutout" role="tabpanel" aria-labelledby="tab-cutout">
@@ -214,9 +215,74 @@
         </select>
         <button type="button" id="p-save" disabled>PNG で保存</button>
       </div>
-      <p class="to-walk"><button type="button" id="p-to-walk" class="link-button" disabled>このドット絵を歩かせる (3. 歩かせるへ) ›</button></p>
+      <p class="to-walk"><button type="button" id="p-to-turn" class="link-button" disabled>このドット絵を横向きにする (3. 横向きにするへ) ›</button></p>
+      <p class="to-walk"><button type="button" id="p-to-walk" class="link-button" disabled>このドット絵を歩かせる (4. 歩かせるへ) ›</button></p>
     </section>
   
+    </div>
+
+    <div class="step" id="step-turn" role="tabpanel" aria-labelledby="tab-turn" hidden>
+
+    <section class="card">
+      <label id="t-drop" class="drop" for="t-file">
+        <input type="file" id="t-file" accept="image/*" />
+        <span id="t-drop-text" class="drop-text"><strong>正面のドット絵を選ぶ</strong><br />背景が透明な PNG がおすすめです。ドラッグや貼り付け (Ctrl+V) もできます</span>
+      </label>
+      <p id="t-src-info" class="src-info"></p>
+    </section>
+
+    <section id="t-setup" class="card" hidden>
+      <h2>厚みの付け方</h2>
+      <p class="hint">正面の絵に前後の厚みを付けて立体 (ボクセル) にします。ふちに近いところほど薄く、内側ほど厚くなります。</p>
+      <label for="t-thick">いちばん厚いところの厚み (px) <output id="t-thick-out">16</output></label>
+      <input type="range" id="t-thick" min="1" max="64" value="16" />
+      <label for="t-round">丸み <output id="t-round-out">70</output>%</label>
+      <input type="range" id="t-round" min="0" max="100" step="5" value="70" />
+      <label for="t-shade">横を向いた面の暗さ <output id="t-shade-out">35</output>%</label>
+      <input type="range" id="t-shade" min="0" max="80" step="5" value="35" />
+      <label class="check" id="t-outline-wrap"><input type="checkbox" id="t-outline" checked /> 輪郭線を引き直す (<span id="t-outline-color"></span>)</label>
+    </section>
+
+    <section id="t-out" class="card" hidden>
+      <div class="row">
+        <h2>結果</h2>
+        <label class="check small"><input type="checkbox" id="t-spin" /> ぐるっと回して見る</label>
+      </div>
+      <label for="t-angle">回す角度 <output id="t-angle-out">90</output>°</label>
+      <input type="range" id="t-angle" min="-180" max="180" step="5" value="90" />
+      <div class="presets" role="group" aria-label="向き">
+        <button type="button" data-angle="0">正面</button>
+        <button type="button" data-angle="90">右向き</button>
+        <button type="button" data-angle="-90">左向き</button>
+        <button type="button" data-angle="180">後ろ</button>
+      </div>
+      <div class="stage">
+        <canvas id="t-view" class="view" aria-label="回した絵"></canvas>
+        <p id="t-status" class="empty">Python を読みこんでいます…</p>
+      </div>
+      <p id="t-out-info" class="out-info"></p>
+
+      <div class="save-row">
+        <label for="t-what">保存する絵</label>
+        <select id="t-what">
+          <option value="1" selected>この角度の 1 枚</option>
+          <option value="4">4 方向 (正面・右・後ろ・左) を横に並べる</option>
+          <option value="8">8 方向を横に並べる</option>
+        </select>
+      </div>
+      <div class="save-row">
+        <label for="t-scale">保存する大きさ</label>
+        <select id="t-scale">
+          <option value="1" selected>等倍</option>
+          <option value="2">2倍</option>
+          <option value="4">4倍</option>
+          <option value="8">8倍</option>
+        </select>
+        <button type="button" id="t-save" disabled>PNG で保存</button>
+      </div>
+      <p class="to-walk"><button type="button" id="t-to-walk" class="link-button" disabled>この角度の絵を歩かせる (4. 歩かせるへ) ›</button></p>
+    </section>
+
     </div>
 
     <div class="step" id="step-walk" role="tabpanel" aria-labelledby="tab-walk" hidden>
@@ -318,6 +384,7 @@
         <ol class="guide-list">
           <li><b>背景を切り抜く</b>: 画像を選ぶと、背景を自動で消します。消え残りや消えすぎは、クリックやブラシで直します。</li>
           <li><b>ドット絵にする</b>: 横と縦のピクセル数と色数を決めて、ドット絵にします。必要ならトリミングし、残したくない色はクリックで透明にします。</li>
+          <li><b>横向きにする</b>: 正面のドット絵に厚みを付けて立体にし、好きな角度に回します。右向き・左向き・後ろ向きの絵や、何方向かを並べた回転シートを保存できます。</li>
           <li><b>歩かせる</b>: 絵の向きを選び、肩・手・腰・足の丸を手足に合わせると、歩きのコマができます。コマを横に並べたスプライトシートを保存します。</li>
           <li>各段階の下のボタンで、できた絵を次の段階へそのまま渡せます。手持ちの画像から、好きな段階で始めることもできます。</li>
         </ol>
@@ -327,8 +394,9 @@
         <h2>しくみ</h2>
         <p><b>背景を切り抜く</b>: 画像のふちに多い色 (市松模様なら2色) を背景とみなし、ふちにつながる部分と、絵に囲まれた大きめの部分を消します。</p>
         <p><b>ドット絵にする</b>: 画像を指定のマス目に分け、画像全体からよく使われている色を指定の数だけ選び (k-means 法)、それぞれのマスをその中で一番多い色 (または平均の色に一番近い色) で塗ります。</p>
+        <p><b>横向きにする</b>: 絵のマスごとに、ふち (透明なところ) までの距離を測り、ふちに近いほど薄く、内側ほど厚い柱を前後対称に立てます (疑似的なボクセル)。この立体を縦の軸のまわりに回し、真横から見ていちばん手前の面の色を塗ります。横を向いた面は少し暗くします。輪郭線のある絵では、線の色が横の面に太く出ないよう、横の面にはとなりの色を使い、できた絵のふちに線を引き直します。計算はブラウザの中の Python (Pyodide) で行います。同じ Python のファイル (<a href="voxel.py">voxel.py</a>) はコマンドラインでも使えます。</p>
         <p><b>歩かせる</b>: 肩から手、腰から足までの線の近くを腕と脚として切り分けます。横向きは腕と脚を付け根から前後に振り、ひじから先を前へ曲げます。地面に足が付くように体も上下させます。正面・後ろ向きは片足ずつ持ち上げ、ひじを体の内側へ曲げます。横向きで手足が1本ずつしか見えない絵でも、手前と奥の2本として動かします。</p>
-        <p class="guide-note">※ 絵を切り分けて動かすしくみなので、ひざは曲がりません。持っている道具は、手の近くにあるものだけが手と一緒に動きます。画像はこのブラウザの中だけで処理され、どこにも送信されません。</p>
+        <p class="guide-note">※ 横向きにする段階では、見えていない裏側や横の色は分からないので、正面の色をそのまま使います (後ろ向きは正面の絵を裏から見た形になります)。絵を切り分けて動かすしくみなので、ひざは曲がりません。持っている道具は、手の近くにあるものだけが手と一緒に動きます。画像はこのブラウザの中だけで処理され、どこにも送信されません。</p>
       </section>
     </div>
   </footer>
@@ -336,6 +404,7 @@
   <script src="app.js"></script>
   <script src="cutout.js"></script>
   <script src="pixel.js"></script>
+  <script src="turn.js"></script>
   <script src="walk.js"></script>
 </body>
 </html>

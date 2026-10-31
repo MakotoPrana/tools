@@ -45,7 +45,7 @@ h2 { font-size: 1.1rem; margin: 0 0 12px; }
 [hidden] { display: none !important; }
 
 /* 段階の切り替え */
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 16px; scroll-margin-top: 8px; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0 0 16px; scroll-margin-top: 8px; }
 .steps button {
   display: flex;
   flex-direction: column;
@@ -238,6 +238,22 @@ label.inline { display: inline; margin: 0; font-weight: 400; font-size: 0.85rem;
 .cut-stage.white { background: #fff; }
 .cut-stage.magenta { background: #ff00ff; }
 .cut-stage .view { margin: 0 auto; max-width: none; image-rendering: auto; touch-action: none; cursor: crosshair; }
+
+/* 横向きにする */
+.presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: -4px 0 12px; }
+.presets button {
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.presets button:hover { border-color: var(--accent); }
+.presets button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
+#t-view { image-rendering: pixelated; }
+#t-outline-color { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -2px; }
 
 /* 歩かせる */
 .two { display: flex; gap: 16px; }
