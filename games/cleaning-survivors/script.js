@@ -7363,12 +7363,17 @@
   // ---------- アクセス解析: ステージの開始・結末・リトライ (全ゲーム共通の形で GA4 に送る) ----------
   // stage_start / stage_end (result: clear・fail・quit) / stage_retry_fail・stage_retry_clear・stage_retry_quit
   // 終わったステージをそのまま遊び直したら、直前の結末に合わせたリトライとして送る
+  // ほかのゲームと区別して見られるように、同じ中身で頭に cs_ をつけたイベント (cs_stage_start など) も送る
   const stageTrack = (() => {
     const GAME = 'cleaning_survivors';
     const attempts = {};
     let playing = null; // { stage, at } 遊んでいる途中のステージ
     let ended = null; // { stage, result } 直前に終わったステージ
-    const send = (name, params) => track(name, { game: GAME, ...params });
+    const send = (name, params) => {
+      const p = { game: GAME, ...params };
+      track(name, p);
+      track(`cs_${name}`, p);
+    };
     const end = (result, extra) => {
       if (!playing) return;
       send('stage_end', { stage: playing.stage, result, play_sec: Math.round((performance.now() - playing.at) / 1000), ...extra });

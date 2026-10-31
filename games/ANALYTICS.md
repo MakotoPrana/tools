@@ -33,6 +33,7 @@ CrazyGames 版・itch.io 版は Google タグを外すので、何も送らな�
 - reclaim-gunners はステージの区切りがないので、まだ解放していないエリアに入ったときをエリアの開始とする。エリアを出入りしても同じ挑戦のまま。別の未解放エリアに入る・全体図へ戻る・別のステージへ移ると、途中でやめたことになる。力尽きたあとにまたそのエリアに入ると失敗リトライ、解放したエリアを「再侵攻」すると成功リトライ
 - mole の `stage_start` / `stage_end` は以前から `stage_no` で送っていたので、続けて見られるように `stage_no` も残す
 - voxel-grenade・paper-plane のゲーム専用のイベント (`voxel_grenade_start` など) もそのまま送る
+- cleaning-survivors は、共通のイベントに加えて、同じ中身で頭に `cs_` をつけたイベント (`cs_stage_start`・`cs_stage_end`・`cs_stage_retry_fail`・`cs_stage_retry_clear`・`cs_stage_retry_quit`) も送る。`game` で絞りこまなくても、このゲームのイベントだけを見られる
 
 ## Google アナリティクスで見るための設定
 
