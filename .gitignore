@@ -1,2 +1,3 @@
 games/mole/dist/
 dist/
+__pycache__/
