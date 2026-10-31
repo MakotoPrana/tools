@@ -29,7 +29,10 @@ let full = null; // 読みこんだ画像全体 { w, h, canvas }
 let crop = null; // トリミングの範囲 (full の座標) { x, y, w, h }
 let src = null; // トリミングした画像 { w, h, data: Uint8ClampedArray }
 let srcName = "pixel";
-let result = null; // { w, h, data: ImageData }
+let result = null; // { w, h, data: ImageData, cells, palette }
+// クリックで透明にした色。設定を変えても残るように、場所はトリミング範囲の中の割合で持つ
+// { type: "fill", fx, fy, rgb } つながった同じ色 / { type: "color", rgb } 同じ色すべて
+let erased = [];
 
 // ---- 画像の読みこみ ----
 
@@ -91,6 +94,8 @@ function applyCrop() {
   const w = Math.max(1, Math.round(crop.w));
   const h = Math.max(1, Math.round(crop.h));
   src = { w, h, data: full.canvas.getContext("2d", { willReadFrequently: true }).getImageData(x, y, w, h).data };
+  // 範囲が変わると、クリックした場所の意味が変わるので消した色は元に戻す
+  erased = [];
   if (lockInput.checked) fitHeight();
   drawCrop();
   render();
@@ -245,6 +250,35 @@ for (const el of [colorsInput, satInput, modeInput, ditherInput, bgInput, tolInp
   el.addEventListener("change", schedule);
 }
 gridInput.addEventListener("change", drawView);
+
+// ---- クリックした色を透明にする ----
+
+function erase(op) {
+  erased.push(op);
+  render();
+}
+
+view.addEventListener("click", (e) => {
+  if (!result) return;
+  const b = view.getBoundingClientRect();
+  const x = Math.floor(((e.clientX - b.left) / b.width) * result.w);
+  const y = Math.floor(((e.clientY - b.top) / b.height) * result.h);
+  if (x < 0 || y < 0 || x >= result.w || y >= result.h) return;
+  const j = result.cells[y * result.w + x];
+  if (j < 0) return; // 透明なマス (輪郭線を含む) は何もしない
+  if ($("erase-mode").value === "color") erase({ type: "color", rgb: result.palette[j] });
+  // マスの中心を割合で覚える
+  else erase({ type: "fill", fx: (x + 0.5) / result.w, fy: (y + 0.5) / result.h, rgb: result.palette[j] });
+});
+
+$("erase-undo").addEventListener("click", () => {
+  erased.pop();
+  render();
+});
+$("erase-clear").addEventListener("click", () => {
+  erased = [];
+  render();
+});
 
 // スライダーを動かしているあいだは、描き直しを少し待つ
 let timer = 0;
@@ -457,7 +491,45 @@ function render() {
     }
   }
 
-  // 5. 画像にする。輪郭線は、色のあるマスのとなりの透明なマスに描く
+  // 5. クリックした色を透明にする
+  for (const op of erased) {
+    const j = nearest(palette, op.rgb);
+    if (dist2(palette[j], op.rgb) > 2400) continue; // 近い色が残っていなければ何もしない
+    if (op.type === "color") {
+      for (let i = 0; i < cells.length; i++) if (cells[i] === j) cells[i] = -1;
+    } else {
+      // マスの大きさを変えると、クリックした場所が別の色のマスになることがあるので、近くから同じ色を探す
+      const ox = Math.min(W - 1, Math.floor(op.fx * W));
+      const oy = Math.min(H - 1, Math.floor(op.fy * H));
+      let start = -1;
+      for (let r = 0; r <= 2 && start < 0; r++) {
+        for (let dy = -r; dy <= r && start < 0; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            const x = ox + dx;
+            const y = oy + dy;
+            if (x >= 0 && y >= 0 && x < W && y < H && cells[y * W + x] === j) {
+              start = y * W + x;
+              break;
+            }
+          }
+        }
+      }
+      if (start < 0) continue;
+      const stack = [start];
+      while (stack.length) {
+        const i = stack.pop();
+        if (cells[i] !== j) continue;
+        cells[i] = -1;
+        const x = i % W;
+        if (x > 0) stack.push(i - 1);
+        if (x < W - 1) stack.push(i + 1);
+        if (i >= W) stack.push(i - W);
+        if (i < W * (H - 1)) stack.push(i + W);
+      }
+    }
+  }
+
+  // 6. 画像にする。輪郭線は、色のあるマスのとなりの透明なマスに描く
   const img = new ImageData(W, H);
   const hex = outlineColorInput.value;
   const line = [1, 3, 5].map((p) => parseInt(hex.slice(p, p + 2), 16));
@@ -478,20 +550,28 @@ function render() {
       img.data.set([c[0], c[1], c[2], 255], i * 4);
     }
   }
-  result = { w: W, h: H, data: img };
+  result = { w: W, h: H, data: img, cells, palette };
 
   // 使っている色 (多い順)
   const pal = $("palette");
   pal.innerHTML = "";
   [...used].sort((a, b) => b[1] - a[1]).forEach(([j]) => {
     const li = document.createElement("li");
+    const btn = document.createElement("button");
     const [r, g, b] = palette[j];
     const code = "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
-    li.style.background = code;
-    li.title = code;
+    btn.type = "button";
+    btn.style.background = code;
+    btn.title = `${code} を透明にする`;
+    btn.setAttribute("aria-label", `${code} を透明にする`);
+    btn.addEventListener("click", () => erase({ type: "color", rgb: palette[j] }));
+    li.appendChild(btn);
     pal.appendChild(li);
   });
   $("out-info").textContent = `${W} × ${H} px・${used.size} 色${outlineInput.checked ? " + 輪郭線" : ""}`;
+  $("erase-undo").disabled = $("erase-clear").disabled = !erased.length;
+  $("erase-info").textContent = erased.length ? `${erased.length} か所を透明にしています` : "";
+  view.classList.add("erasable");
   saveBtn.disabled = false;
   drawView();
 }

@@ -98,7 +98,25 @@
         <p id="empty" class="empty">画像を選ぶと、ここにドット絵が表示されます</p>
       </div>
       <p id="out-info" class="out-info"></p>
-      <ul id="palette" class="palette" aria-label="使っている色"></ul>
+
+      <div class="erase">
+        <p class="erase-title">クリックした色を透明にする</p>
+        <p class="crop-hint">結果のマス、または下の色見本をクリックすると、その色を透明にします。</p>
+        <div class="erase-row">
+          <label for="erase-mode">消す範囲</label>
+          <select id="erase-mode">
+            <option value="fill">クリックしたところとつながった同じ色</option>
+            <option value="color">画像の中の同じ色すべて</option>
+          </select>
+        </div>
+        <div class="erase-row">
+          <button type="button" id="erase-undo" class="link-button" disabled>1つ戻す</button>
+          <button type="button" id="erase-clear" class="link-button" disabled>すべて元に戻す</button>
+          <span id="erase-info" class="erase-info"></span>
+        </div>
+      </div>
+
+      <ul id="palette" class="palette" aria-label="使っている色 (クリックで透明にする)"></ul>
 
       <div class="save-row">
         <label for="scale">保存する大きさ</label>
@@ -121,6 +139,7 @@
         <ol class="guide-list">
           <li>画像を選びます (ドラッグや貼り付けでも読みこめます)。</li>
           <li>必要なら「トリミング」で、変換する範囲をドラッグで選びます。選んだ範囲だけがドット絵になります。</li>
+          <li>残したくない色 (絵に囲まれた背景など) は、結果のマスや色見本をクリックすると透明にできます。</li>
           <li>仕上がりの横と縦のピクセル数を指定します。縦横比を合わせる設定にすると、片方を変えるともう片方が自動で決まります。</li>
           <li>色数・彩度・色の決め方を変えると、すぐに結果が変わります。</li>
           <li>「PNG で保存」で保存します。ゲームのスプライトに使うなら等倍、見せるための画像なら拡大がおすすめです。</li>

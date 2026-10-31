@@ -139,7 +139,19 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 
 .palette { list-style: none; display: flex; flex-wrap: wrap; gap: 4px; margin: 12px 0 0; padding: 0; }
 .palette:empty { display: none; }
-.palette li { width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--border); }
+.palette button { display: block; width: 22px; height: 22px; padding: 0; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; }
+.palette button:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* クリックした色を透明にする */
+.view.erasable { cursor: crosshair; }
+.erase { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.erase-title { margin: 0 0 2px; font-weight: 600; }
+.erase-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+.erase-row label { margin: 0; }
+.erase-row select { width: auto; flex: 1; min-width: 200px; margin: 0 0 12px; }
+.erase-row label + select { margin-top: 0; }
+.erase-info { color: var(--muted); font-size: 0.85rem; }
+.link-button:disabled { color: var(--muted); opacity: 0.6; cursor: default; text-decoration: none; }
 
 .save-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 16px; }
 .save-row label { margin: 0; }
