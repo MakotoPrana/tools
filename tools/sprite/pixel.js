@@ -31,12 +31,19 @@ const toWalk = $("to-walk");
 
 let full = null; // 読みこんだ画像全体 { w, h, canvas }
 let crop = null; // トリミングの範囲 (full の座標) { x, y, w, h }
-let src = null; // トリミングした画像 { w, h, data: Uint8ClampedArray }
+let base = null; // トリミングした画像 { w, h, data: Uint8ClampedArray }
+let src = null; // 変換する画像。等身を変えるときは base の頭と体を作り直したもの、変えないときは base
+let srcKey = ""; // src を作ったときの設定 (変わったら作り直す)
+let shapeKey = "";
+let neckY = null; // 頭と体の境目 (首) の高さ (読みこんだ画像の座標)。null なら自動で置く
+let shapeNow = null; // 等身を変える前の { heads, headH }
 let srcName = "pixel";
 let result = null; // { w, h, data: ImageData, cells, palette }
-// クリックで透明にした色。設定を変えても残るように、場所はトリミング範囲の中の割合で持つ
-// { type: "fill", fx, fy, rgb } つながった同じ色 / { type: "color", rgb } 同じ色すべて
+// クリックで直したこと (順に)。設定を変えても残るように、場所はトリミング範囲の中の割合で持つ
+// { type: "fill", fx, fy, rgb } つながった同じ色を透明に / { type: "color", rgb } 同じ色すべてを透明に
+// { type: "eye", fx, fy, rgb } クリックした黒目に光を入れる
 let erased = [];
+let eyeMissed = 0; // 小さすぎるなどで光を入れられなかった目の数 (直前の変換で)
 
 // ---- 画像の読みこみ ----
 
@@ -59,6 +66,8 @@ function loadUrl(url, fileName) {
     URL.revokeObjectURL(url);
     full = { w, h, canvas: cv };
     crop = { x: 0, y: 0, w, h };
+    neckY = null;
+    $("shape-card").hidden = false;
     srcName = fileName.replace(/\.[^.]+$/, "") || "pixel";
     drop.classList.add("loaded");
     $("drop-text").innerHTML = "<strong>別の画像を選ぶ</strong>";
@@ -104,10 +113,13 @@ function applyCrop() {
   const y = Math.round(crop.y);
   const w = Math.max(1, Math.round(crop.w));
   const h = Math.max(1, Math.round(crop.h));
-  src = { w, h, data: full.canvas.getContext("2d", { willReadFrequently: true }).getImageData(x, y, w, h).data };
+  base = { w, h, data: full.canvas.getContext("2d", { willReadFrequently: true }).getImageData(x, y, w, h).data };
+  srcKey = "";
   // 範囲が変わると、クリックした場所の意味が変わるので消した色は元に戻す
   erased = [];
-  if (lockInput.checked) fitHeight();
+  // 首の位置が範囲の外になったら、自動で置き直す
+  if (neckY !== null && (neckY <= crop.y || neckY >= crop.y + crop.h)) neckY = null;
+  updateSrc();
   drawCrop();
   render();
 }
@@ -150,6 +162,20 @@ function drawCrop() {
     c.fillRect(px - hs / 2, py - hs / 2, hs, hs);
     c.strokeRect(px - hs / 2, py - hs / 2, hs, hs);
   }
+  // 等身を変えるときは、頭と体の境目 (首) の線
+  if (shapeInput.checked && neckY !== null) {
+    const ny = neckY * k;
+    c.strokeStyle = "#ff3b5c";
+    c.lineWidth = 2 * dpr;
+    c.beginPath();
+    c.moveTo(r[0], ny);
+    c.lineTo(r[0] + r[2], ny);
+    c.stroke();
+    c.fillStyle = "#ff3b5c";
+    c.beginPath();
+    c.arc(r[0] + r[2] - 10 * dpr, ny, 6 * dpr, 0, Math.PI * 2);
+    c.fill();
+  }
   $("crop-info").textContent = `範囲: ${Math.round(crop.w)} × ${Math.round(crop.h)} px` +
     (isWhole() ? " (全体)" : "");
 }
@@ -157,6 +183,9 @@ function drawCrop() {
 const corners = (x, y, w, h) => [[x, y], [x + w, y], [x, y + h], [x + w, y + h]];
 // 範囲が画像全体のときは、枠の中をドラッグしても新しい範囲を選ぶ
 const isWhole = () => crop.w >= full.w && crop.h >= full.h;
+// 首の線の近くか
+const onNeck = (p) => shapeInput.checked && neckY !== null && Math.abs(p.y - neckY) <= 10 * p.k &&
+  p.x >= crop.x && p.x <= crop.x + crop.w;
 const inCrop = (p) => p.x > crop.x && p.x < crop.x + crop.w && p.y > crop.y && p.y < crop.y + crop.h;
 
 // ポインターの位置を、読みこんだ画像の座標にする
@@ -177,7 +206,9 @@ cropCv.addEventListener("pointerdown", (e) => {
   const p = toImage(e);
   const near = HANDLE * p.k;
   const hit = corners(crop.x, crop.y, crop.w, crop.h).findIndex(([cx, cy]) => Math.abs(p.x - cx) <= near && Math.abs(p.y - cy) <= near);
-  if (hit >= 0) {
+  if (hit < 0 && onNeck(p)) {
+    drag = { mode: "neck" };
+  } else if (hit >= 0) {
     // 角をつかんだら、反対の角を固定して大きさを変える
     const [ax, ay] = corners(crop.x, crop.y, crop.w, crop.h)[3 - hit];
     drag = { mode: "size", ax, ay };
@@ -193,7 +224,13 @@ cropCv.addEventListener("pointermove", (e) => {
   if (!drag) {
     const near = HANDLE * p.k;
     const onCorner = corners(crop.x, crop.y, crop.w, crop.h).some(([cx, cy]) => Math.abs(p.x - cx) <= near && Math.abs(p.y - cy) <= near);
-    cropCv.style.cursor = onCorner ? "nwse-resize" : !isWhole() && inCrop(p) ? "move" : "crosshair";
+    cropCv.style.cursor = onCorner ? "nwse-resize" : onNeck(p) ? "ns-resize" : !isWhole() && inCrop(p) ? "move" : "crosshair";
+    return;
+  }
+  if (drag.mode === "neck") {
+    neckY = Math.min(crop.y + crop.h - 1, Math.max(crop.y + 1, p.y));
+    drawCrop();
+    schedule();
     return;
   }
   if (drag.mode === "move") {
@@ -209,6 +246,10 @@ cropCv.addEventListener("pointermove", (e) => {
 });
 const endDrag = () => {
   if (!drag) return;
+  if (drag.mode === "neck") {
+    drag = null;
+    return;
+  }
   drag = null;
   // 小さすぎる範囲 (クリックしただけなど) は全体に戻す
   if (crop.w < MIN_CROP || crop.h < MIN_CROP) crop = { x: 0, y: 0, w: full.w, h: full.h };
@@ -221,6 +262,139 @@ $("crop-reset").addEventListener("click", () => {
   if (!full) return;
   crop = { x: 0, y: 0, w: full.w, h: full.h };
   applyCrop();
+});
+
+// ---- 等身を変える ----
+
+const shapeInput = $("shape");
+const headsInput = $("heads");
+const bodyWInput = $("body-w");
+
+// 絵のある画素 (透明でも背景でもない) の印
+function opaqueMask(img) {
+  const { w, h, data } = img;
+  const bg = bgInput.checked ? backgroundMask(w, h, data, Number(tolInput.value)) : null;
+  const m = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) m[i] = data[i * 4 + 3] >= 128 && !(bg && bg[i]) ? 1 : 0;
+  return m;
+}
+
+// 首の位置を自動で決める: 絵の上から 12〜60% のあいだで、横幅がいちばん細い行
+function autoNeck(widths, top, bottom) {
+  const H = bottom - top + 1;
+  const a = top + Math.max(1, Math.round(H * 0.12));
+  const b = top + Math.round(H * 0.6);
+  let best = Math.round(top + H * 0.3);
+  let bestW = Infinity;
+  for (let y = a; y <= b; y++) {
+    // となりの行とならした幅 (1 行だけのすき間に引っぱられないように)
+    const wsum = widths[y - 1] + widths[y] * 2 + (widths[y + 1] || 0);
+    if (wsum < bestW) {
+      bestW = wsum;
+      best = y;
+    }
+  }
+  return best;
+}
+
+// 頭はそのままに、体を縦に縮める (または伸ばす) 。体の太さも変えられる
+function reshape(img) {
+  const { w, h, data } = img;
+  const mask = opaqueMask(img);
+  const widths = new Array(h).fill(0);
+  let top = -1, bottom = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) widths[y] += mask[y * w + x];
+    if (widths[y]) {
+      if (top < 0) top = y;
+      bottom = y;
+    }
+  }
+  if (top < 0 || bottom - top < 4) {
+    shapeNow = null;
+    return img;
+  }
+  let neck = neckY === null ? -1 : Math.round(neckY - Math.round(crop.y));
+  if (neck <= top || neck > bottom) {
+    neck = autoNeck(widths, top, bottom);
+    neckY = Math.round(crop.y) + neck;
+  }
+  const headH = neck - top;
+  const bodyH = bottom + 1 - neck;
+  shapeNow = { heads: (bottom + 1 - top) / headH, headH };
+  const newBodyH = Math.max(1, Math.round(headH * (Number(headsInput.value) - 1)));
+  const bw = Number(bodyWInput.value) / 100;
+  const below = h - 1 - bottom; // 足の下の余白
+  const outW = Math.round(w * Math.max(1, bw));
+  const outH = neck + newBodyH + below;
+
+  // 背景を先に透明にしておく (広げた余白を背景と取り違えないように)
+  const clean = new ImageData(new Uint8ClampedArray(data), w, h);
+  for (let i = 0; i < w * h; i++) if (!mask[i]) clean.data[i * 4 + 3] = 0;
+  const tmp = document.createElement("canvas");
+  tmp.width = w;
+  tmp.height = h;
+  tmp.getContext("2d").putImageData(clean, 0, 0);
+
+  const cv = document.createElement("canvas");
+  cv.width = outW;
+  cv.height = outH;
+  const c = cv.getContext("2d", { willReadFrequently: true });
+  c.imageSmoothingEnabled = true;
+  c.imageSmoothingQuality = "high";
+  const hx = (outW - w) / 2;
+  c.drawImage(tmp, 0, 0, w, neck, hx, 0, w, neck); // 頭
+  c.drawImage(tmp, 0, neck, w, bodyH, (outW - w * bw) / 2, neck, w * bw, newBodyH); // 体
+  if (below) c.drawImage(tmp, 0, bottom + 1, w, below, hx, neck + newBodyH, w, below);
+  return { w: outW, h: outH, data: c.getImageData(0, 0, outW, outH).data };
+}
+
+// 設定が変わっていたら、変換する画像を作り直す
+function updateSrc() {
+  if (!base) return;
+  const on = shapeInput.checked;
+  const sk = on ? [headsInput.value, bodyWInput.value, neckY].join() : "off";
+  const key = [sk, on ? [bgInput.checked, tolInput.value].join() : ""].join("|");
+  if (key === srcKey) return;
+  // 頭や体の位置が変わるので、クリックで直したことは元に戻す
+  if (shapeKey && sk !== shapeKey) erased = [];
+  src = on ? reshape(base) : base;
+  if (!on) shapeNow = null;
+  // 首を自動で置いたときは neckY が決まるので、それを含めて覚える
+  shapeKey = on ? [headsInput.value, bodyWInput.value, neckY].join() : "off";
+  srcKey = [shapeKey, on ? [bgInput.checked, tolInput.value].join() : ""].join("|");
+  if (lockInput.checked) fitHeight();
+  $("shape-now").textContent = shapeNow
+    ? `いまは約 ${shapeNow.heads.toFixed(1)} 等身 (頭の高さ ${shapeNow.headH} px) → ${headsInput.value} 等身にします`
+    : on ? "絵が小さすぎて、頭と体を分けられませんでした" : "";
+  drawCrop();
+}
+
+let headsTouched = false;
+shapeInput.addEventListener("change", () => {
+  $("shape-opts").hidden = !shapeInput.checked;
+  // はじめて変えるときは、いまより 1 等身少ない (ちびキャラ寄りの) 等身から始める
+  if (shapeInput.checked && !headsTouched && base) {
+    reshape(base);
+    if (shapeNow) {
+      headsInput.value = String(Math.min(8, Math.max(1.5, Math.round((shapeNow.heads - 1) * 2) / 2)));
+      $("heads-out").textContent = headsInput.value;
+    }
+  }
+  schedule();
+});
+headsInput.addEventListener("input", () => {
+  headsTouched = true;
+  $("heads-out").textContent = headsInput.value;
+  schedule();
+});
+bodyWInput.addEventListener("input", () => {
+  $("body-w-out").textContent = bodyWInput.value;
+  schedule();
+});
+$("neck-auto").addEventListener("click", () => {
+  neckY = null;
+  schedule();
 });
 
 // ---- 設定 ----
@@ -277,10 +451,20 @@ view.addEventListener("click", (e) => {
   if (x < 0 || y < 0 || x >= result.w || y >= result.h) return;
   const j = result.cells[y * result.w + x];
   if (j < 0) return; // 透明なマス (輪郭線を含む) は何もしない
-  if ($("erase-mode").value === "color") erase({ type: "color", rgb: result.palette[j] });
+  if (clickMode() === "eye") erase({ type: "eye", fx: (x + 0.5) / result.w, fy: (y + 0.5) / result.h, rgb: result.palette[j] });
+  else if ($("erase-mode").value === "color") erase({ type: "color", rgb: result.palette[j] });
   // マスの中心を割合で覚える
   else erase({ type: "fill", fx: (x + 0.5) / result.w, fy: (y + 0.5) / result.h, rgb: result.palette[j] });
 });
+
+const clickMode = () => document.querySelector('input[name="p-click"]:checked').value;
+for (const r of document.querySelectorAll('input[name="p-click"]')) {
+  r.addEventListener("change", () => {
+    $("erase-opts").hidden = clickMode() !== "erase";
+    $("eye-opts").hidden = clickMode() !== "eye";
+  });
+}
+for (const el of [$("eye-pos"), $("eye-color"), $("eye-both")]) el.addEventListener("input", schedule);
 
 $("erase-undo").addEventListener("click", () => {
   erased.pop();
@@ -296,6 +480,108 @@ let timer = 0;
 function schedule() {
   clearTimeout(timer);
   timer = setTimeout(render, 60);
+}
+
+// ---- クリックで直すときの、マスの範囲 ----
+
+// クリックした場所から、色 j のマスを探す。マスの大きさを変えると、クリックした場所が
+// 別の色のマスになることがあるので、近くからも探す
+function findStart(cells, W, H, op, j) {
+  const ox = Math.min(W - 1, Math.floor(op.fx * W));
+  const oy = Math.min(H - 1, Math.floor(op.fy * H));
+  for (let r = 0; r <= 2; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const x = ox + dx;
+        const y = oy + dy;
+        if (x >= 0 && y >= 0 && x < W && y < H && cells[y * W + x] === j) return y * W + x;
+      }
+    }
+  }
+  return -1;
+}
+
+// start とつながった同じ色のマス (上下左右でつながったもの) の一覧
+function region(cells, W, H, start, seen = new Uint8Array(W * H)) {
+  const j = cells[start];
+  const out = [];
+  const stack = [start];
+  while (stack.length) {
+    const i = stack.pop();
+    if (seen[i] || cells[i] !== j) continue;
+    seen[i] = 1;
+    out.push(i);
+    const x = i % W;
+    if (x > 0) stack.push(i - 1);
+    if (x < W - 1) stack.push(i + 1);
+    if (i >= W) stack.push(i - W);
+    if (i < W * (H - 1)) stack.push(i + W);
+  }
+  return out;
+}
+
+function bounds(list, W) {
+  let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
+  for (const i of list) {
+    const x = i % W;
+    const y = (i - x) / W;
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+    y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+  }
+  return { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+}
+
+// 黒目の中に光の点を入れるマスを決めて shine に加える。入れられなければ false
+function addShine(eye, W, H, shine) {
+  // 小さすぎる目は光を入れると黒目がなくなる。大きすぎる範囲は目ではない (髪や服など)
+  if (eye.length < 3 || eye.length > Math.max(64, (W * H) / 30)) return false;
+  const inEye = new Set(eye);
+  const b = bounds(eye, W);
+  const right = $("eye-pos").value === "right";
+  const size = b.w >= 4 && b.h >= 4 ? 2 : 1;
+  // いちばん上の行から順に、光の位置の側の端にあるマスを探す
+  for (let y = b.y0; y <= b.y1 - (size - 1); y++) {
+    const xs = [];
+    for (let x = b.x0; x <= b.x1; x++) xs.push(x);
+    if (right) xs.reverse();
+    for (const x of xs) {
+      const block = [];
+      for (let dy = 0; dy < size; dy++) {
+        for (let dx = 0; dx < size; dx++) block.push((y + dy) * W + (right ? x - dx : x + dx));
+      }
+      if (block.every((i) => inEye.has(i))) {
+        // 光のマスを除いても黒目が残るときだけ入れる
+        if (eye.length - block.length < 2) return false;
+        for (const i of block) shine.add(i);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// もう片方の目: 同じ色で、大きさが近く、高さがそろっている範囲のうち、いちばん近いもの
+function findOtherEye(cells, W, H, eye) {
+  const j = cells[eye[0]];
+  const b = bounds(eye, W);
+  const seen = new Uint8Array(W * H);
+  for (const i of eye) seen[i] = 1;
+  let best = null;
+  let bestD = Infinity;
+  for (let i = 0; i < cells.length; i++) {
+    if (seen[i] || cells[i] !== j) continue;
+    const r = region(cells, W, H, i, seen);
+    if (r.length * 2 < eye.length || r.length > eye.length * 2) continue;
+    const o = bounds(r, W);
+    if (Math.abs(o.cy - b.cy) > Math.max(1, b.h / 2)) continue;
+    const d = Math.abs(o.cx - b.cx);
+    if (d < b.w || d > W / 2) continue;
+    if (d < bestD) {
+      bestD = d;
+      best = r;
+    }
+  }
+  return best;
 }
 
 // ---- 変換 ----
@@ -420,6 +706,7 @@ function nearest(palette, c) {
 }
 
 function render() {
+  updateSrc();
   if (!src) return;
   const W = clampSize(wInput.value);
   const H = clampSize(hInput.value);
@@ -504,41 +791,37 @@ function render() {
     }
   }
 
-  // 5. クリックした色を透明にする
+  // 5. クリックで直す (色を透明にする・目に光を入れる)
+  const shine = new Set(); // 光を入れるマス
+  eyeMissed = 0;
   for (const op of erased) {
     const j = nearest(palette, op.rgb);
-    if (dist2(palette[j], op.rgb) > 2400) continue; // 近い色が残っていなければ何もしない
+    if (dist2(palette[j], op.rgb) > 2400) { // 近い色が残っていなければ何もしない
+      if (op.type === "eye") eyeMissed++;
+      continue;
+    }
     if (op.type === "color") {
       for (let i = 0; i < cells.length; i++) if (cells[i] === j) cells[i] = -1;
-    } else {
-      // マスの大きさを変えると、クリックした場所が別の色のマスになることがあるので、近くから同じ色を探す
-      const ox = Math.min(W - 1, Math.floor(op.fx * W));
-      const oy = Math.min(H - 1, Math.floor(op.fy * H));
-      let start = -1;
-      for (let r = 0; r <= 2 && start < 0; r++) {
-        for (let dy = -r; dy <= r && start < 0; dy++) {
-          for (let dx = -r; dx <= r; dx++) {
-            const x = ox + dx;
-            const y = oy + dy;
-            if (x >= 0 && y >= 0 && x < W && y < H && cells[y * W + x] === j) {
-              start = y * W + x;
-              break;
-            }
-          }
-        }
-      }
-      if (start < 0) continue;
-      const stack = [start];
-      while (stack.length) {
-        const i = stack.pop();
-        if (cells[i] !== j) continue;
-        cells[i] = -1;
-        const x = i % W;
-        if (x > 0) stack.push(i - 1);
-        if (x < W - 1) stack.push(i + 1);
-        if (i >= W) stack.push(i - W);
-        if (i < W * (H - 1)) stack.push(i + W);
-      }
+      continue;
+    }
+    const start = findStart(cells, W, H, op, j);
+    if (start < 0) {
+      if (op.type === "eye") eyeMissed++;
+      continue;
+    }
+    if (op.type === "fill") {
+      for (const i of region(cells, W, H, start)) cells[i] = -1;
+      continue;
+    }
+    // 目に光を入れる
+    const eye = region(cells, W, H, start);
+    if (!addShine(eye, W, H, shine)) {
+      eyeMissed++;
+      continue;
+    }
+    if ($("eye-both").checked) {
+      const other = findOtherEye(cells, W, H, eye);
+      if (other) addShine(other, W, H, shine);
     }
   }
 
@@ -563,6 +846,11 @@ function render() {
       img.data.set([c[0], c[1], c[2], 255], i * 4);
     }
   }
+  if (shine.size) {
+    const hexEye = $("eye-color").value;
+    const eyeColor = [1, 3, 5].map((p) => parseInt(hexEye.slice(p, p + 2), 16));
+    for (const i of shine) img.data.set([...eyeColor, 255], i * 4);
+  }
   result = { w: W, h: H, data: img, cells, palette };
 
   // 使っている色 (多い順)
@@ -583,7 +871,13 @@ function render() {
   });
   $("out-info").textContent = `${W} × ${H} px・${used.size} 色${outlineInput.checked ? " + 輪郭線" : ""}`;
   $("erase-undo").disabled = $("erase-clear").disabled = !erased.length;
-  $("erase-info").textContent = erased.length ? `${erased.length} か所を透明にしています` : "";
+  const eyes = erased.filter((op) => op.type === "eye").length;
+  const cleared = erased.length - eyes;
+  const info = [];
+  if (cleared) info.push(`${cleared} か所を透明にしています`);
+  if (eyes) info.push(`目に ${eyes} 回光を入れています`);
+  if (eyeMissed) info.push(`${eyeMissed} 回は目が小さすぎるか見つからず、光を入れられませんでした`);
+  $("erase-info").textContent = info.join("・");
   view.classList.add("erasable");
   saveBtn.disabled = false;
   toWalk.disabled = false;
