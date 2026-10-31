@@ -2057,7 +2057,7 @@
     }
   }
 
-  // 清掃員ハジメのスプライト (hajime.png: 160×160 のコマが横に7つ。下・下歩き・右・右歩き・左・左歩き・上)
+  // 清掃員ハジメのスプライト (hajime.png: 160×160 のコマが横に11。下・下歩き・右 (立ち＋歩き3コマ)・左 (同じ)・上)
   // foot: コマの中の足もとの高さ、tall: 絵の中での背の高さ (どちらもピクセル)
   const HAJIME = { img: new Image(), white: null, ready: false, fw: 160, fh: 160, foot: 156, tall: 140 };
   HAJIME.img.onload = () => {
@@ -2089,10 +2089,9 @@
   function drawHajime(c, face, t, moving, hurt) {
     const fx = Math.cos(face);
     const fy = Math.sin(face);
-    const step = moving && Math.sin(t * 7) > 0 ? 1 : 0;
     let frame;
-    if (Math.abs(fx) > Math.abs(fy)) frame = (fx > 0 ? 2 : 4) + step;
-    else frame = fy < 0 ? 6 : step;
+    if (Math.abs(fx) > Math.abs(fy)) frame = (fx > 0 ? 2 : 6) + (moving ? Math.floor(t * 7) % 4 : 0);
+    else frame = fy < 0 ? 10 : moving && Math.sin(t * 7) > 0 ? 1 : 0;
     const h = 32; // 画面での背の高さ
     const k = h / HAJIME.tall;
     const src = hurt ? HAJIME.white : HAJIME.img;
