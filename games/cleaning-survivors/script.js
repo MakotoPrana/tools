@@ -2057,46 +2057,58 @@
     }
   }
 
-  // 清掃員ハジメのスプライト (hajime.png: 160×160 のコマが横に16。下・右・左・上の順に、それぞれ立ち＋歩き3コマ)
+  // ドット絵のスプライトで描く清掃員。画像は 160×160 のコマを横に並べたもの。
+  // 下・右・左・上の順に、向きごとに walk コマ (1 コマ目が立ち、残りが歩き)
   // foot: コマの中の足もとの高さ、tall: 絵の中での背の高さ (どちらもピクセル)
-  const HAJIME = { img: new Image(), white: null, ready: false, fw: 160, fh: 160, foot: 156, tall: 140 };
-  HAJIME.img.onload = () => {
-    // ダメージを受けたときの白いシルエット
-    const cv = document.createElement('canvas');
-    cv.width = HAJIME.img.width;
-    cv.height = HAJIME.img.height;
-    const c = cv.getContext('2d');
-    c.drawImage(HAJIME.img, 0, 0);
-    c.globalCompositeOperation = 'source-in';
-    c.fillStyle = '#fff';
-    c.fillRect(0, 0, cv.width, cv.height);
-    HAJIME.white = cv;
-    HAJIME.ready = true;
-    // 読みこむ前に作ったサムネイルを作り直して、出ている画像も差しかえる
-    for (const sil of [false, true]) {
-      const key = 'char-cleaner' + (sil ? '-s' : '');
-      const old = thumbCache[key];
-      if (!old) continue;
-      delete thumbCache[key];
-      const url = charThumb('cleaner', sil);
-      document.querySelectorAll('img').forEach((im) => {
-        if (im.getAttribute('src') === old) im.src = url;
-      });
-    }
+  const SPRITES = {
+    cleaner: { src: 'hajime.png', walk: 4 },
+    tsugumi: { src: 'tsugumi.png', walk: 1 },
   };
-  HAJIME.img.src = 'hajime.png';
+  const SPRITE_FW = 160;
+  const SPRITE_FH = 160;
+  const SPRITE_FOOT = 156;
+  const SPRITE_TALL = 140;
+  for (const [id, sp] of Object.entries(SPRITES)) {
+    sp.img = new Image();
+    sp.img.onload = () => {
+      // ダメージを受けたときの白いシルエット
+      const cv = document.createElement('canvas');
+      cv.width = sp.img.width;
+      cv.height = sp.img.height;
+      const c = cv.getContext('2d');
+      c.drawImage(sp.img, 0, 0);
+      c.globalCompositeOperation = 'source-in';
+      c.fillStyle = '#fff';
+      c.fillRect(0, 0, cv.width, cv.height);
+      sp.white = cv;
+      sp.ready = true;
+      // 読みこむ前に作ったサムネイルを作り直して、出ている画像も差しかえる
+      for (const sil of [false, true]) {
+        const key = 'char-' + id + (sil ? '-s' : '');
+        const old = thumbCache[key];
+        if (!old) continue;
+        delete thumbCache[key];
+        const url = charThumb(id, sil);
+        document.querySelectorAll('img').forEach((im) => {
+          if (im.getAttribute('src') === old) im.src = url;
+        });
+      }
+    };
+    sp.img.src = sp.src;
+  }
+  const spriteReady = (id) => !!(SPRITES[id] && SPRITES[id].ready);
 
-  function drawHajime(c, face, t, moving, hurt) {
+  function drawSprite(c, sp, face, t, moving, hurt) {
     const fx = Math.cos(face);
     const fy = Math.sin(face);
     let dir;
     if (Math.abs(fx) > Math.abs(fy)) dir = fx > 0 ? 1 : 2;
     else dir = fy < 0 ? 3 : 0;
-    const frame = dir * 4 + (moving ? Math.floor(t * 7) % 4 : 0);
+    const frame = dir * sp.walk + (moving ? Math.floor(t * 7) % sp.walk : 0);
     const h = 32; // 画面での背の高さ
-    const k = h / HAJIME.tall;
-    const src = hurt ? HAJIME.white : HAJIME.img;
-    c.drawImage(src, frame * HAJIME.fw, 0, HAJIME.fw, HAJIME.fh, (-HAJIME.fw / 2) * k, 13 - HAJIME.foot * k, HAJIME.fw * k, HAJIME.fh * k);
+    const k = h / SPRITE_TALL;
+    const src = hurt ? sp.white : sp.img;
+    c.drawImage(src, frame * SPRITE_FW, 0, SPRITE_FW, SPRITE_FH, (-SPRITE_FW / 2) * k, 13 - SPRITE_FOOT * k, SPRITE_FW * k, SPRITE_FH * k);
   }
 
   function drawPlayerBody(c, charId, face, t, moving, hurt) {
@@ -2108,8 +2120,8 @@
     c.beginPath();
     c.ellipse(0, 12 - bob, 12, 4, 0, 0, TAU);
     c.fill();
-    if (charId === 'cleaner' && HAJIME.ready) {
-      drawHajime(c, face, t, moving, hurt);
+    if (spriteReady(charId)) {
+      drawSprite(c, SPRITES[charId], face, t, moving, hurt);
       c.restore();
       return;
     }
@@ -3042,7 +3054,7 @@
       const c = cv.getContext('2d');
       c.translate(32, 34);
       c.scale(1.7, 1.7);
-      drawPlayerBody(c, id, id === 'cleaner' ? Math.PI / 2 : 0.5, 0, false, false);
+      drawPlayerBody(c, id, SPRITES[id] ? Math.PI / 2 : 0.5, 0, false, false);
       if (sil) {
         // まだ仲間になっていない清掃員はシルエット
         c.setTransform(1, 0, 0, 1, 0, 0);
@@ -6291,10 +6303,10 @@
       ctx.save();
       ctx.translate(p.x, p.y);
       if (p.inv > 0 && Math.floor(tm * 20) % 2) ctx.globalAlpha = 0.6;
-      // ハジメはスプライトなので歩く向きで描く (掃除機の向きは吸引範囲で見える)
-      const vac = G.ch.id === 'cleaner' && !HAJIME.ready && G.weapons.find((w) => w.id === 'vacuum');
-      // ハジメのスプライトは顔が見えるように少し大きく描く
-      const big = G.ch.id === 'cleaner' && HAJIME.ready;
+      // スプライトの清掃員は歩く向きで描く (掃除機の向きは吸引範囲で見える)
+      const vac = G.ch.id === 'cleaner' && !spriteReady('cleaner') && G.weapons.find((w) => w.id === 'vacuum');
+      // スプライトの清掃員は顔が見えるように少し大きく描く
+      const big = spriteReady(G.ch.id);
       if (big) {
         ctx.save();
         ctx.scale(1.2, 1.2);
@@ -8289,7 +8301,7 @@
       c.translate(size / 2, size * 0.54);
       if (kind === 'char') {
         c.scale((size / 64) * 1.7, (size / 64) * 1.7);
-        drawPlayerBody(c, id, id === 'cleaner' ? Math.PI / 2 : 0.5, 0, false, false);
+        drawPlayerBody(c, id, SPRITES[id] ? Math.PI / 2 : 0.5, 0, false, false);
       } else {
         c.scale(size / 96, size / 96);
         drawEnemyBody(c, id, ENEMIES[id].boss ? 30 : 26, 0.3, 0, id === 'can' || id === 'bottle' ? 0.4 : 0);
