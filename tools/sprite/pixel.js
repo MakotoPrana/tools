@@ -430,7 +430,13 @@ const outputs = [[colorsInput, "colors-out"], [satInput, "sat-out"], [tolInput, 
 for (const [input, out] of outputs) {
   input.addEventListener("input", () => { $(out).textContent = input.value; });
 }
-for (const el of [colorsInput, satInput, modeInput, ditherInput, bgInput, tolInput, outlineInput, outlineColorInput]) {
+const shadeInput = $("shade");
+shadeInput.addEventListener("change", () => { $("shade-opts").hidden = !shadeInput.checked; });
+for (const [id, out] of [["shade-w", "shade-w-out"], ["shade-k", "shade-k-out"]]) {
+  $(id).addEventListener("input", () => { $(out).textContent = $(id).value; });
+}
+for (const el of [colorsInput, satInput, modeInput, ditherInput, bgInput, tolInput, outlineInput, outlineColorInput,
+  shadeInput, $("light"), $("shade-w"), $("shade-k"), $("shade-hi"), $("shade-parts")]) {
   el.addEventListener("input", schedule);
   el.addEventListener("change", schedule);
 }
@@ -582,6 +588,71 @@ function findOtherEye(cells, W, H, eye) {
     }
   }
   return best;
+}
+
+// ---- 影 ----
+
+// 影 (-1) と明るくする (1) マスを決める。光と反対側のふちから幅 width マスを影に、
+// 光の側のふち 1 マスを明るくする。ふちは、部分ごとなら同じ色のつながりの外、そうでなければ絵の外
+function shadeMap(cells, W, H, palette) {
+  const width = Number($("shade-w").value);
+  const light = $("light").value;
+  const parts = $("shade-parts").checked;
+  const hi = $("shade-hi").checked;
+  // 部分 (同じ色がつながった範囲) に番号を付ける。小さすぎる部分と暗すぎる色 (線や黒目) には影を付けない。
+  // 小さすぎる部分 (目や口など) はふちとみなさず、まわりの部分の一部として扱う
+  const label = new Int32Array(W * H).fill(-1);
+  const skip = new Set();
+  const small = new Set();
+  let n = 0;
+  const seen = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    if (cells[i] < 0 || seen[i]) continue;
+    if (!parts) {
+      label[i] = 0;
+      continue;
+    }
+    const r = region(cells, W, H, i, seen);
+    const [cr, cg, cb] = palette[cells[i]];
+    if (r.length < 8) small.add(n);
+    if (r.length < 8 || 0.299 * cr + 0.587 * cg + 0.114 * cb < 45) skip.add(n);
+    for (const k of r) label[k] = n;
+    n++;
+  }
+  // 影を見る向き (光と反対側) と、明るくする側
+  const dark = light === "left" ? [[1, 0], [0, 1], [1, 1]] : light === "right" ? [[-1, 0], [0, 1], [-1, 1]] : [[0, 1]];
+  const lit = light === "left" ? [[-1, 0], [0, -1]] : light === "right" ? [[1, 0], [0, -1]] : [[0, -1]];
+  const outside = (x, y, l) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return true;
+    const o = label[y * W + x];
+    return o !== l && !small.has(o);
+  };
+  const out = new Int8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const l = label[y * W + x];
+      if (l < 0 || skip.has(l)) continue;
+      let s = 0;
+      for (let k = 1; k <= width && !s; k++) {
+        if (dark.some(([dx, dy]) => outside(x + dx * k, y + dy * k, l))) s = -1;
+      }
+      if (!s && hi && lit.some(([dx, dy]) => outside(x + dx, y + dy, l))) s = 1;
+      out[y * W + x] = s;
+    }
+  }
+  return out;
+}
+
+// 影は暗くして、くすんだ紫に少し寄せる。明るい側は、やわらかい黄みの白に寄せる (k は強さ 0〜1)
+const SHADOW_TINT = [70, 55, 120];
+const LIGHT_TINT = [255, 248, 220];
+function shift(rgb, s, k) {
+  if (s < 0) {
+    const t = k * 0.35;
+    return rgb.map((v, ch) => Math.round(v * (1 - k * 0.9) * (1 - t) + SHADOW_TINT[ch] * t));
+  }
+  const t = k * 0.6;
+  return rgb.map((v, ch) => Math.round(v + (LIGHT_TINT[ch] - v) * t));
 }
 
 // ---- 変換 ----
@@ -825,7 +896,17 @@ function render() {
     }
   }
 
-  // 6. 画像にする。輪郭線は、色のあるマスのとなりの透明なマスに描く
+  // 6. 影を付けるマスを決める (-1: 影, 1: 明るく)
+  const shade = shadeInput.checked ? shadeMap(cells, W, H, palette) : null;
+  const shadeK = Number($("shade-k").value) / 100;
+  const shaded = new Map();
+  const tone = (j, s) => {
+    const key = j * 3 + s + 1;
+    if (!shaded.has(key)) shaded.set(key, shift(palette[j], s, shadeK));
+    return shaded.get(key);
+  };
+
+  // 7. 画像にする。輪郭線は、色のあるマスのとなりの透明なマスに描く
   const img = new ImageData(W, H);
   const hex = outlineColorInput.value;
   const line = [1, 3, 5].map((p) => parseInt(hex.slice(p, p + 2), 16));
@@ -835,7 +916,7 @@ function render() {
       const i = y * W + x;
       let c = null;
       if (cells[i] >= 0) {
-        c = palette[cells[i]];
+        c = shade && shade[i] ? tone(cells[i], shade[i]) : palette[cells[i]];
         used.set(cells[i], (used.get(cells[i]) || 0) + 1);
       } else if (outlineInput.checked && (
         (x > 0 && cells[i - 1] >= 0) || (x < W - 1 && cells[i + 1] >= 0) ||
