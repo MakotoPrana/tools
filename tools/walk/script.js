@@ -5,6 +5,10 @@ const MAX_SRC = 256;
 // ピクセルアート変換から絵を受け取るときのキー
 const HANDOFF_KEY = "pixel-to-walk";
 
+// ひじの位置 (肩から手までの線の、肩からの割合)。上腕と前腕は少し重ねて切り分け、曲げたときにすき間ができないようにする
+const ELBOW = 0.5;
+const ELBOW_OVERLAP = 0.06;
+
 // 手足。A は横向きなら手前、正面・後ろ向きなら画面の左。B はその反対
 const LIMBS = ["armA", "armB", "legA", "legB"];
 const COLORS = { armA: "#ff8c1a", armB: "#e6c200", legA: "#2f7de1", legB: "#18b5a8" };
@@ -21,6 +25,7 @@ const legW = $("leg-w");
 const framesInput = $("frames");
 const legAmp = $("leg-amp");
 const armAmp = $("arm-amp");
+const elbowInput = $("elbow");
 const bobInput = $("bob");
 const shadeInput = $("shade");
 const fpsInput = $("fps");
@@ -191,6 +196,8 @@ function segment() {
   const side = isSide();
   const masks = {};
   for (const k of LIMBS) masks[k] = new Uint8Array(w * h);
+  // 腕の画素が、肩から手までのどのあたりか (ひじで分けるのに使う)
+  const along = { armA: new Float32Array(w * h), armB: new Float32Array(w * h) };
   const any = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -212,6 +219,7 @@ function segment() {
         // 足先 (靴) は足の位置から横に広がっているので、広めに取る
         if (!isArm(k) && py >= end.y - th) d = Math.min(d, Math.abs(px - end.x) / 2.2);
         if (d > th) continue;
+        if (isArm(k)) along[k][i] = t;
         if (side) masks[k][i] = 1;
         else if (d < bestD) { bestD = d; best = k; }
       }
@@ -237,10 +245,16 @@ function segment() {
       torso.set(data.subarray(j * 4, j * 4 + 4), i * 4);
     }
   }
-  parts = { masks, torso };
+  parts = { masks, torso, along };
 }
 
 // ---- 歩きのコマを作る ----
+
+const rotate = (x, y, a) => {
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return [x * c - y * s, x * s + y * c];
+};
 
 function limbLen(k) {
   const { root, end } = joints[k];
@@ -253,6 +267,7 @@ function pose(phase) {
   const bob = Number(bobInput.value);
   const la = (Number(legAmp.value) * Math.PI) / 180;
   const aa = (Number(armAmp.value) * Math.PI) / 180;
+  const ea = (Number(elbowInput.value) * Math.PI) / 180;
   const m = {};
   let dy;
   if (isSide()) {
@@ -262,6 +277,9 @@ function pose(phase) {
     m.legB = { ang: s * la * S, k: 1 };
     m.armA = { ang: s * aa * S, k: 1 };
     m.armB = { ang: -s * aa * S, k: 1 };
+    // ひじは前 (向いている側) へ曲げる。前へ振っている腕ほど大きく曲げる
+    m.armA.bend = -s * ea * (0.35 + 0.65 * Math.max(0, -S));
+    m.armB.bend = -s * ea * (0.35 + 0.65 * Math.max(0, S));
     // 前後に振ると足が浮くので、低いほうの足が地面に付くまで体を下げる。足が並ぶときは少し上げる
     const drop = Math.min(...["legA", "legB"].map((k) => limbLen(k) * (1 - Math.cos(m[k].ang))));
     dy = Math.round(drop - bob * (1 - Math.abs(S)));
@@ -275,6 +293,9 @@ function pose(phase) {
     m.legB = lift("legB", 0.35 * (la / (Math.PI / 4)) * Math.max(0, -S));
     m.armA = lift("armA", 0.2 * (aa / (70 * Math.PI / 180)) * Math.max(0, -S));
     m.armB = lift("armB", 0.2 * (aa / (70 * Math.PI / 180)) * Math.max(0, S));
+    // ひじは体の内側 (画面の左の腕は右へ、右の腕は左へ) に曲げる。上がっている腕ほど大きく曲げる
+    m.armA.bend = -ea * (0.3 + 0.7 * Math.max(0, -S));
+    m.armB.bend = ea * (0.3 + 0.7 * Math.max(0, S));
     dy = -Math.round(bob * Math.abs(S));
   }
   return { m, dy };
@@ -315,21 +336,41 @@ function buildFrames() {
             buf.set(parts.torso.subarray(si * 4, si * 4 + 4), (Y * BW + X) * 4);
             continue;
           }
-          const { root } = joints[layer];
-          const { ang, k } = m[layer];
+          const { root, end } = joints[layer];
+          const { ang, k, bend } = m[layer];
+          // 元の絵での動きは「ひじで曲げる → 付け根で回す → 縦に縮める」の順なので、逆の順にたどる
           let rx = qx - root.x;
           let ry = qy - root.y;
-          if (ang) {
-            const c = Math.cos(-ang);
-            const s = Math.sin(-ang);
-            [rx, ry] = [rx * c - ry * s, rx * s + ry * c];
-          }
           if (k !== 1) ry /= k;
-          const sx = Math.floor(root.x + rx);
-          const sy = Math.floor(root.y + ry);
-          if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
-          si = sy * w + sx;
-          if (!parts.masks[layer][si]) continue;
+          if (ang) [rx, ry] = rotate(rx, ry, -ang);
+          let sx = root.x + rx;
+          let sy = root.y + ry;
+          // 腕は、上腕 (ひじより上) を描いてから前腕 (ひじより下) をひじで曲げて重ねる
+          let hit = -1;
+          for (const fore of bend ? [true, false] : [false]) {
+            let px = sx;
+            let py = sy;
+            if (fore) {
+              const ex = root.x + (end.x - root.x) * ELBOW;
+              const ey = root.y + (end.y - root.y) * ELBOW;
+              const [bx, by] = rotate(px - ex, py - ey, -bend);
+              px = ex + bx;
+              py = ey + by;
+            }
+            const ix = Math.floor(px);
+            const iy = Math.floor(py);
+            if (ix < 0 || iy < 0 || ix >= w || iy >= h) continue;
+            const j = iy * w + ix;
+            if (!parts.masks[layer][j]) continue;
+            if (bend) {
+              const t = parts.along[layer][j];
+              if (fore ? t < ELBOW - ELBOW_OVERLAP : t > ELBOW + ELBOW_OVERLAP) continue;
+            }
+            hit = j;
+            break;
+          }
+          if (hit < 0) continue;
+          si = hit;
           const o = (Y * BW + X) * 4;
           const f2 = dark ? 0.78 : 1;
           buf[o] = data[si * 4] * f2;
@@ -589,9 +630,9 @@ dirInput.addEventListener("change", () => {
 $("auto").addEventListener("click", () => img && autoPlace());
 showParts.addEventListener("change", drawEdit);
 
-const outputs = [[armW, "arm-w-out"], [legW, "leg-w-out"], [legAmp, "leg-amp-out"], [armAmp, "arm-amp-out"], [bobInput, "bob-out"], [fpsInput, "fps-out"]];
+const outputs = [[armW, "arm-w-out"], [legW, "leg-w-out"], [legAmp, "leg-amp-out"], [armAmp, "arm-amp-out"], [elbowInput, "elbow-out"], [bobInput, "bob-out"], [fpsInput, "fps-out"]];
 for (const [input, out] of outputs) input.addEventListener("input", () => { $(out).textContent = input.value; });
-for (const el of [armW, legW, framesInput, legAmp, armAmp, bobInput, shadeInput]) el.addEventListener("input", update);
+for (const el of [armW, legW, framesInput, legAmp, armAmp, elbowInput, bobInput, shadeInput]) el.addEventListener("input", update);
 fpsInput.addEventListener("input", startAnim);
 mirrorInput.addEventListener("change", () => frames.length && drawSheet());
 
