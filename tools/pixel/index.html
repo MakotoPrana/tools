@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>ピクセルアート変換</title>
+  <meta name="description" content="画像をアップロードして、縦横のピクセル数と色数を指定するだけでピクセルアート (ドット絵) に変換。背景の透過や輪郭線にも対応し、PNG で保存できます。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5093421396736590"
+     crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <p class="back"><a href="../">‹ ツール一覧</a></p>
+    <h1>ピクセルアート変換</h1>
+    <p class="subtitle">画像を指定のピクセル数に分けて色をまとめ、<br />ドット絵にして返します。画像はブラウザの外に送られません。</p>
+
+    <section class="card">
+      <label id="drop" class="drop" for="file">
+        <input type="file" id="file" accept="image/*" />
+        <img id="src-preview" class="src-preview" alt="" hidden />
+        <span id="drop-text" class="drop-text"><strong>画像を選ぶ</strong><br />ここにドラッグ、または貼り付け (Ctrl+V) もできます</span>
+      </label>
+      <p id="src-info" class="src-info"></p>
+    </section>
+
+    <section class="card settings">
+      <h2>設定</h2>
+      <div class="size-row">
+        <div>
+          <label for="w">横 (px)</label>
+          <input type="number" id="w" inputmode="numeric" min="1" max="512" value="48" />
+        </div>
+        <span class="times" aria-hidden="true">×</span>
+        <div>
+          <label for="h">縦 (px)</label>
+          <input type="number" id="h" inputmode="numeric" min="1" max="512" value="48" />
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="lock" checked /> 縦横比を元の画像に合わせる</label>
+
+      <label for="colors">色数 <output id="colors-out">16</output></label>
+      <input type="range" id="colors" min="2" max="64" value="16" />
+
+      <label for="sat">彩度 <output id="sat-out">1.2</output></label>
+      <input type="range" id="sat" min="0" max="2" step="0.1" value="1.2" />
+
+      <label for="mode">色の決め方</label>
+      <select id="mode">
+        <option value="dominant">マスの中で一番多い色 (くっきり)</option>
+        <option value="average">マスの平均の色 (なめらか)</option>
+      </select>
+
+      <label class="check"><input type="checkbox" id="dither" /> ディザリング (平均の色のときだけ)</label>
+
+      <label class="check"><input type="checkbox" id="bg" checked /> 背景を透明にする (画像のふちの色を背景とみなす)</label>
+      <div id="tol-wrap">
+        <label for="tol">背景とみなす色の幅 <output id="tol-out">40</output></label>
+        <input type="range" id="tol" min="5" max="120" value="40" />
+      </div>
+
+      <div class="outline-row">
+        <label class="check"><input type="checkbox" id="outline" /> 輪郭線を付ける</label>
+        <input type="color" id="outline-color" value="#1a1a1a" aria-label="輪郭線の色" />
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="result-head">
+        <h2>結果</h2>
+        <label class="check small"><input type="checkbox" id="grid" checked /> マス目を表示</label>
+      </div>
+      <div class="stage">
+        <canvas id="view" class="view"></canvas>
+        <p id="empty" class="empty">画像を選ぶと、ここにドット絵が表示されます</p>
+      </div>
+      <p id="out-info" class="out-info"></p>
+      <ul id="palette" class="palette" aria-label="使っている色"></ul>
+
+      <div class="save-row">
+        <label for="scale">保存する大きさ</label>
+        <select id="scale">
+          <option value="1">等倍 (1マス = 1px)</option>
+          <option value="2">2倍</option>
+          <option value="4">4倍</option>
+          <option value="8" selected>8倍</option>
+          <option value="16">16倍</option>
+        </select>
+        <button type="button" id="save" disabled>PNG で保存</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="guide">
+    <div class="container">
+      <section class="card">
+        <h2>使い方</h2>
+        <ol class="guide-list">
+          <li>画像を選びます (ドラッグや貼り付けでも読みこめます)。</li>
+          <li>仕上がりの横と縦のピクセル数を指定します。縦横比を合わせる設定にすると、片方を変えるともう片方が自動で決まります。</li>
+          <li>色数・彩度・色の決め方を変えると、すぐに結果が変わります。</li>
+          <li>「PNG で保存」で保存します。ゲームのスプライトに使うなら等倍、見せるための画像なら拡大がおすすめです。</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>しくみ</h2>
+        <p>画像を指定のマス目に分け、画像全体からよく使われている色を指定の数だけ選びます (k-means 法)。それぞれのマスを、その中で一番多い色 (または平均の色に一番近い色) で塗ります。</p>
+        <p>「背景を透明にする」は、画像のふちに一番多い色と、それにつながる似た色を背景として消します。白や単色の背景のイラストに向いています。元から透明な部分は、そのまま透明になります。</p>
+        <p class="guide-note">※ 画像はこのブラウザの中だけで処理され、どこにも送信されません。</p>
+      </section>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
