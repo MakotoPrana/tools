@@ -573,6 +573,7 @@ function render() {
   $("erase-info").textContent = erased.length ? `${erased.length} か所を透明にしています` : "";
   view.classList.add("erasable");
   saveBtn.disabled = false;
+  $("to-walk").disabled = false;
   drawView();
 }
 
@@ -641,4 +642,20 @@ saveBtn.addEventListener("click", () => {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }, "image/png");
+});
+
+// ---- 歩きアニメ作成へ渡す ----
+
+$("to-walk").addEventListener("click", () => {
+  if (!result) return;
+  const cv = document.createElement("canvas");
+  cv.width = result.w;
+  cv.height = result.h;
+  cv.getContext("2d").putImageData(result.data, 0, 0);
+  try {
+    localStorage.setItem("pixel-to-walk", JSON.stringify({ url: cv.toDataURL("image/png"), name: srcName }));
+  } catch (e) {
+    // 保存領域が使えないときは、保存した PNG を歩きアニメ作成で選んでもらう
+  }
+  location.href = "../walk/";
 });

@@ -169,6 +169,7 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 }
 .save-row button:hover { filter: brightness(1.1); }
 .save-row button:disabled { opacity: 0.5; cursor: default; filter: none; }
+.to-walk { margin: 12px 0 0; text-align: center; }
 
 /* 画面下部の使い方・解説 */
 .container:has(+ .guide) { padding-bottom: 0; }
