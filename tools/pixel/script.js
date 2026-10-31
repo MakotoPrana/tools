@@ -24,6 +24,7 @@ const gridInput = $("grid");
 const scaleInput = $("scale");
 const saveBtn = $("save");
 const view = $("view");
+const toWalk = $("to-walk");
 
 let full = null; // 読みこんだ画像全体 { w, h, canvas }
 let crop = null; // トリミングの範囲 (full の座標) { x, y, w, h }
@@ -573,7 +574,7 @@ function render() {
   $("erase-info").textContent = erased.length ? `${erased.length} か所を透明にしています` : "";
   view.classList.add("erasable");
   saveBtn.disabled = false;
-  $("to-walk").disabled = false;
+  if (toWalk) toWalk.disabled = false;
   drawView();
 }
 
@@ -646,7 +647,7 @@ saveBtn.addEventListener("click", () => {
 
 // ---- 歩きアニメ作成へ渡す ----
 
-$("to-walk").addEventListener("click", () => {
+toWalk?.addEventListener("click", () => {
   if (!result) return;
   const cv = document.createElement("canvas");
   cv.width = result.w;
