@@ -6293,7 +6293,14 @@
       if (p.inv > 0 && Math.floor(tm * 20) % 2) ctx.globalAlpha = 0.6;
       // ハジメはスプライトなので歩く向きで描く (掃除機の向きは吸引範囲で見える)
       const vac = G.ch.id === 'cleaner' && !HAJIME.ready && G.weapons.find((w) => w.id === 'vacuum');
+      // ハジメのスプライトは顔が見えるように少し大きく描く
+      const big = G.ch.id === 'cleaner' && HAJIME.ready;
+      if (big) {
+        ctx.save();
+        ctx.scale(1.2, 1.2);
+      }
       drawPlayerBody(ctx, G.ch.id, vac ? vac.ang : p.face, p.anim, p.moving, p.hurtT > 0);
+      if (big) ctx.restore();
       if (p.allergyT > 0) {
         ctx.fillStyle = 'rgba(120,200,80,0.35)';
         ctx.beginPath();
