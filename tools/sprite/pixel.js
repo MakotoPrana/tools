@@ -31,7 +31,12 @@ const toWalk = $("to-walk");
 
 let full = null; // 読みこんだ画像全体 { w, h, canvas }
 let crop = null; // トリミングの範囲 (full の座標) { x, y, w, h }
-let src = null; // トリミングした画像 { w, h, data: Uint8ClampedArray }
+let base = null; // トリミングした画像 { w, h, data: Uint8ClampedArray }
+let src = null; // 変換する画像。等身を変えるときは base の頭と体を作り直したもの、変えないときは base
+let srcKey = ""; // src を作ったときの設定 (変わったら作り直す)
+let shapeKey = "";
+let neckY = null; // 頭と体の境目 (首) の高さ (読みこんだ画像の座標)。null なら自動で置く
+let shapeNow = null; // 等身を変える前の { heads, headH }
 let srcName = "pixel";
 let result = null; // { w, h, data: ImageData, cells, palette }
 // クリックで直したこと (順に)。設定を変えても残るように、場所はトリミング範囲の中の割合で持つ
@@ -61,6 +66,8 @@ function loadUrl(url, fileName) {
     URL.revokeObjectURL(url);
     full = { w, h, canvas: cv };
     crop = { x: 0, y: 0, w, h };
+    neckY = null;
+    $("shape-card").hidden = false;
     srcName = fileName.replace(/\.[^.]+$/, "") || "pixel";
     drop.classList.add("loaded");
     $("drop-text").innerHTML = "<strong>別の画像を選ぶ</strong>";
@@ -106,10 +113,13 @@ function applyCrop() {
   const y = Math.round(crop.y);
   const w = Math.max(1, Math.round(crop.w));
   const h = Math.max(1, Math.round(crop.h));
-  src = { w, h, data: full.canvas.getContext("2d", { willReadFrequently: true }).getImageData(x, y, w, h).data };
+  base = { w, h, data: full.canvas.getContext("2d", { willReadFrequently: true }).getImageData(x, y, w, h).data };
+  srcKey = "";
   // 範囲が変わると、クリックした場所の意味が変わるので消した色は元に戻す
   erased = [];
-  if (lockInput.checked) fitHeight();
+  // 首の位置が範囲の外になったら、自動で置き直す
+  if (neckY !== null && (neckY <= crop.y || neckY >= crop.y + crop.h)) neckY = null;
+  updateSrc();
   drawCrop();
   render();
 }
@@ -152,6 +162,20 @@ function drawCrop() {
     c.fillRect(px - hs / 2, py - hs / 2, hs, hs);
     c.strokeRect(px - hs / 2, py - hs / 2, hs, hs);
   }
+  // 等身を変えるときは、頭と体の境目 (首) の線
+  if (shapeInput.checked && neckY !== null) {
+    const ny = neckY * k;
+    c.strokeStyle = "#ff3b5c";
+    c.lineWidth = 2 * dpr;
+    c.beginPath();
+    c.moveTo(r[0], ny);
+    c.lineTo(r[0] + r[2], ny);
+    c.stroke();
+    c.fillStyle = "#ff3b5c";
+    c.beginPath();
+    c.arc(r[0] + r[2] - 10 * dpr, ny, 6 * dpr, 0, Math.PI * 2);
+    c.fill();
+  }
   $("crop-info").textContent = `範囲: ${Math.round(crop.w)} × ${Math.round(crop.h)} px` +
     (isWhole() ? " (全体)" : "");
 }
@@ -159,6 +183,9 @@ function drawCrop() {
 const corners = (x, y, w, h) => [[x, y], [x + w, y], [x, y + h], [x + w, y + h]];
 // 範囲が画像全体のときは、枠の中をドラッグしても新しい範囲を選ぶ
 const isWhole = () => crop.w >= full.w && crop.h >= full.h;
+// 首の線の近くか
+const onNeck = (p) => shapeInput.checked && neckY !== null && Math.abs(p.y - neckY) <= 10 * p.k &&
+  p.x >= crop.x && p.x <= crop.x + crop.w;
 const inCrop = (p) => p.x > crop.x && p.x < crop.x + crop.w && p.y > crop.y && p.y < crop.y + crop.h;
 
 // ポインターの位置を、読みこんだ画像の座標にする
@@ -179,7 +206,9 @@ cropCv.addEventListener("pointerdown", (e) => {
   const p = toImage(e);
   const near = HANDLE * p.k;
   const hit = corners(crop.x, crop.y, crop.w, crop.h).findIndex(([cx, cy]) => Math.abs(p.x - cx) <= near && Math.abs(p.y - cy) <= near);
-  if (hit >= 0) {
+  if (hit < 0 && onNeck(p)) {
+    drag = { mode: "neck" };
+  } else if (hit >= 0) {
     // 角をつかんだら、反対の角を固定して大きさを変える
     const [ax, ay] = corners(crop.x, crop.y, crop.w, crop.h)[3 - hit];
     drag = { mode: "size", ax, ay };
@@ -195,7 +224,13 @@ cropCv.addEventListener("pointermove", (e) => {
   if (!drag) {
     const near = HANDLE * p.k;
     const onCorner = corners(crop.x, crop.y, crop.w, crop.h).some(([cx, cy]) => Math.abs(p.x - cx) <= near && Math.abs(p.y - cy) <= near);
-    cropCv.style.cursor = onCorner ? "nwse-resize" : !isWhole() && inCrop(p) ? "move" : "crosshair";
+    cropCv.style.cursor = onCorner ? "nwse-resize" : onNeck(p) ? "ns-resize" : !isWhole() && inCrop(p) ? "move" : "crosshair";
+    return;
+  }
+  if (drag.mode === "neck") {
+    neckY = Math.min(crop.y + crop.h - 1, Math.max(crop.y + 1, p.y));
+    drawCrop();
+    schedule();
     return;
   }
   if (drag.mode === "move") {
@@ -211,6 +246,10 @@ cropCv.addEventListener("pointermove", (e) => {
 });
 const endDrag = () => {
   if (!drag) return;
+  if (drag.mode === "neck") {
+    drag = null;
+    return;
+  }
   drag = null;
   // 小さすぎる範囲 (クリックしただけなど) は全体に戻す
   if (crop.w < MIN_CROP || crop.h < MIN_CROP) crop = { x: 0, y: 0, w: full.w, h: full.h };
@@ -223,6 +262,139 @@ $("crop-reset").addEventListener("click", () => {
   if (!full) return;
   crop = { x: 0, y: 0, w: full.w, h: full.h };
   applyCrop();
+});
+
+// ---- 等身を変える ----
+
+const shapeInput = $("shape");
+const headsInput = $("heads");
+const bodyWInput = $("body-w");
+
+// 絵のある画素 (透明でも背景でもない) の印
+function opaqueMask(img) {
+  const { w, h, data } = img;
+  const bg = bgInput.checked ? backgroundMask(w, h, data, Number(tolInput.value)) : null;
+  const m = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) m[i] = data[i * 4 + 3] >= 128 && !(bg && bg[i]) ? 1 : 0;
+  return m;
+}
+
+// 首の位置を自動で決める: 絵の上から 12〜60% のあいだで、横幅がいちばん細い行
+function autoNeck(widths, top, bottom) {
+  const H = bottom - top + 1;
+  const a = top + Math.max(1, Math.round(H * 0.12));
+  const b = top + Math.round(H * 0.6);
+  let best = Math.round(top + H * 0.3);
+  let bestW = Infinity;
+  for (let y = a; y <= b; y++) {
+    // となりの行とならした幅 (1 行だけのすき間に引っぱられないように)
+    const wsum = widths[y - 1] + widths[y] * 2 + (widths[y + 1] || 0);
+    if (wsum < bestW) {
+      bestW = wsum;
+      best = y;
+    }
+  }
+  return best;
+}
+
+// 頭はそのままに、体を縦に縮める (または伸ばす) 。体の太さも変えられる
+function reshape(img) {
+  const { w, h, data } = img;
+  const mask = opaqueMask(img);
+  const widths = new Array(h).fill(0);
+  let top = -1, bottom = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) widths[y] += mask[y * w + x];
+    if (widths[y]) {
+      if (top < 0) top = y;
+      bottom = y;
+    }
+  }
+  if (top < 0 || bottom - top < 4) {
+    shapeNow = null;
+    return img;
+  }
+  let neck = neckY === null ? -1 : Math.round(neckY - Math.round(crop.y));
+  if (neck <= top || neck > bottom) {
+    neck = autoNeck(widths, top, bottom);
+    neckY = Math.round(crop.y) + neck;
+  }
+  const headH = neck - top;
+  const bodyH = bottom + 1 - neck;
+  shapeNow = { heads: (bottom + 1 - top) / headH, headH };
+  const newBodyH = Math.max(1, Math.round(headH * (Number(headsInput.value) - 1)));
+  const bw = Number(bodyWInput.value) / 100;
+  const below = h - 1 - bottom; // 足の下の余白
+  const outW = Math.round(w * Math.max(1, bw));
+  const outH = neck + newBodyH + below;
+
+  // 背景を先に透明にしておく (広げた余白を背景と取り違えないように)
+  const clean = new ImageData(new Uint8ClampedArray(data), w, h);
+  for (let i = 0; i < w * h; i++) if (!mask[i]) clean.data[i * 4 + 3] = 0;
+  const tmp = document.createElement("canvas");
+  tmp.width = w;
+  tmp.height = h;
+  tmp.getContext("2d").putImageData(clean, 0, 0);
+
+  const cv = document.createElement("canvas");
+  cv.width = outW;
+  cv.height = outH;
+  const c = cv.getContext("2d", { willReadFrequently: true });
+  c.imageSmoothingEnabled = true;
+  c.imageSmoothingQuality = "high";
+  const hx = (outW - w) / 2;
+  c.drawImage(tmp, 0, 0, w, neck, hx, 0, w, neck); // 頭
+  c.drawImage(tmp, 0, neck, w, bodyH, (outW - w * bw) / 2, neck, w * bw, newBodyH); // 体
+  if (below) c.drawImage(tmp, 0, bottom + 1, w, below, hx, neck + newBodyH, w, below);
+  return { w: outW, h: outH, data: c.getImageData(0, 0, outW, outH).data };
+}
+
+// 設定が変わっていたら、変換する画像を作り直す
+function updateSrc() {
+  if (!base) return;
+  const on = shapeInput.checked;
+  const sk = on ? [headsInput.value, bodyWInput.value, neckY].join() : "off";
+  const key = [sk, on ? [bgInput.checked, tolInput.value].join() : ""].join("|");
+  if (key === srcKey) return;
+  // 頭や体の位置が変わるので、クリックで直したことは元に戻す
+  if (shapeKey && sk !== shapeKey) erased = [];
+  src = on ? reshape(base) : base;
+  if (!on) shapeNow = null;
+  // 首を自動で置いたときは neckY が決まるので、それを含めて覚える
+  shapeKey = on ? [headsInput.value, bodyWInput.value, neckY].join() : "off";
+  srcKey = [shapeKey, on ? [bgInput.checked, tolInput.value].join() : ""].join("|");
+  if (lockInput.checked) fitHeight();
+  $("shape-now").textContent = shapeNow
+    ? `いまは約 ${shapeNow.heads.toFixed(1)} 等身 (頭の高さ ${shapeNow.headH} px) → ${headsInput.value} 等身にします`
+    : on ? "絵が小さすぎて、頭と体を分けられませんでした" : "";
+  drawCrop();
+}
+
+let headsTouched = false;
+shapeInput.addEventListener("change", () => {
+  $("shape-opts").hidden = !shapeInput.checked;
+  // はじめて変えるときは、いまより 1 等身少ない (ちびキャラ寄りの) 等身から始める
+  if (shapeInput.checked && !headsTouched && base) {
+    reshape(base);
+    if (shapeNow) {
+      headsInput.value = String(Math.min(8, Math.max(1.5, Math.round((shapeNow.heads - 1) * 2) / 2)));
+      $("heads-out").textContent = headsInput.value;
+    }
+  }
+  schedule();
+});
+headsInput.addEventListener("input", () => {
+  headsTouched = true;
+  $("heads-out").textContent = headsInput.value;
+  schedule();
+});
+bodyWInput.addEventListener("input", () => {
+  $("body-w-out").textContent = bodyWInput.value;
+  schedule();
+});
+$("neck-auto").addEventListener("click", () => {
+  neckY = null;
+  schedule();
 });
 
 // ---- 設定 ----
@@ -534,6 +706,7 @@ function nearest(palette, c) {
 }
 
 function render() {
+  updateSrc();
   if (!src) return;
   const W = clampSize(wInput.value);
   const H = clampSize(hInput.value);
