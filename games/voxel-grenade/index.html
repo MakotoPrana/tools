@@ -13,14 +13,14 @@
     gtag('config', 'G-4VLZW1VMVC');
   </script>
   <title>ボクセル解体ボンバー</title>
-  <meta name="description" content="ボクセルでできた家に手榴弾を投げて壊す3Dゲーム。木の小屋からレンガの家、石のお城まで全5ステージ。家の80%以上を壊せばステージクリア。" />
+  <meta name="description" content="ボクセルでできた家や橋、ランドマーク、巨大な像に手榴弾を投げて壊す3Dゲーム。村・町・川と橋・世界のランドマーク・巨大な像の5ワールド、全50ステージ。80%以上を壊せばステージクリア。" />
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <main class="game" id="board-wrap">
@@ -55,8 +55,8 @@
     <section class="overlay" id="menu">
       <div class="panel">
         <h2 class="panel-title">ステージを選ぶ</h2>
-        <p class="panel-text">手榴弾を投げて、ボクセルの家を<strong>80%以上</strong>こわせばクリア。<br />柱や壁の根元をこわすと、上の部分がまとめてくずれ落ちます。</p>
-        <ol class="stages" id="stage-list"></ol>
+        <p class="panel-text">手榴弾を投げて、家や橋、像を<strong>80%以上</strong>こわせばクリア。<br />柱や足、壁の根元をこわすと、上の部分がまとめてくずれ落ちます。</p>
+        <div class="stages" id="stage-list"></div>
       </div>
     </section>
 
@@ -79,8 +79,8 @@
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="stages.js?v=2"></script>
-  <script src="world.js?v=2"></script>
-  <script src="script.js?v=2"></script>
+  <script src="stages.js?v=3"></script>
+  <script src="world.js?v=3"></script>
+  <script src="script.js?v=3"></script>
 </body>
 </html>

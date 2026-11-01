@@ -8,14 +8,16 @@
   const Stages = typeof module !== 'undefined' && module.exports ? require('./stages.js') : window.VoxelStages;
 
   const CELL = Stages.CELL; // ボクセル1つの大きさ
-  const RADIUS = 4.0; // 爆発がとどくきょり (ワールドの単位。ボクセルなら RADIUS / CELL 個ぶん)
-  const POWER = 3.4; // 爆心でのダメージ。はなれるほど直線で弱くなる
-  // ひとかたまりの建物は、地面に接するブロックの割合がはじめの COLLAPSE 倍より少なくなると、重さに負けてくずれる
+  const RADIUS = 4.5; // 爆発がとどくきょり (ワールドの単位。ボクセルなら RADIUS / CELL 個ぶん)
+  const POWER = 3.8; // 爆心でのダメージ。はなれるほど直線で弱くなる
+  // ひとかたまりの建物は、地面に接するブロックの割合がはじめの COLLAPSE 倍より少なくなると、重さに負けてくずれる。
+  // ステージの collapse で変えられる (小さいほど、根元を多くこわさないとくずれない)
   const COLLAPSE = 0.55;
   const JITTER = 0.5; // ダメージのばらつき (こわれた縁をぎざぎざにする)
 
   function createWorld(stageIndex) {
-    const b = Stages.STAGES[stageIndex].build();
+    const stage = Stages.STAGES[stageIndex];
+    const b = stage.build();
     const { w, h, d } = b;
     const cells = b.cells;
     const hp = new Float32Array(cells.length);
@@ -25,7 +27,7 @@
       hp[i] = Stages.MATERIALS[Stages.MATERIAL_NAMES[cells[i] - 1]].hp;
       total++;
     }
-    const world = { w, h, d, cells, hp, total, alive: total, mark: new Uint32Array(cells.length), stamp: 0 };
+    const world = { w, h, d, cells, hp, total, alive: total, mark: new Uint32Array(cells.length), stamp: 0, collapse: stage.collapse || COLLAPSE };
     // はじめの、かたまりごとの地面に接する割合を、そのかたまりのブロックに覚えておく
     world.baseRatio = new Float32Array(cells.length);
     for (const c of components(world)) for (const i of c.cells) world.baseRatio[i] = c.base / c.cells.length;
@@ -119,7 +121,7 @@
   function detach(world) {
     const fallen = [];
     for (const comp of components(world)) {
-      const weak = comp.base < 8 || comp.base / comp.cells.length < world.baseRatio[comp.cells[0]] * COLLAPSE;
+      const weak = comp.base < 8 || comp.base / comp.cells.length < world.baseRatio[comp.cells[0]] * world.collapse;
       if (comp.base > 0 && !weak) continue;
       for (const i of comp.cells) {
         const [x, y, z] = coords(world, i);

@@ -12,7 +12,7 @@
     return;
   }
 
-  const { STAGES, MATERIALS, MATERIAL_NAMES } = window.VoxelStages;
+  const { STAGES, WORLDS, MATERIALS, MATERIAL_NAMES } = window.VoxelStages;
   const World = window.VoxelWorld;
   const CELL = World.CELL; // ボクセル1つの大きさ
 
@@ -20,7 +20,7 @@
   const GRAVITY = 22;
   const GRENADE_R = 0.22;
   const DEBRIS_MAX = 4000;
-  const STARS_KEY = 'voxel-grenade-stars';
+  const STARS_KEY = 'voxel-grenade-stars-50'; // 50ステージにしたときに、前の記録とは分けた
   const SOUND_KEY = 'voxel-grenade-sound';
 
   function track(name, params) {
@@ -68,24 +68,46 @@
   scene.add(sun);
   scene.add(sun.target);
 
-  // 地面: 芝生の市松模様
+  // 地面: 市松模様。色はワールドごとに塗りなおす
+  const groundCanvas = document.createElement('canvas');
+  groundCanvas.width = groundCanvas.height = 64;
+  const groundTex = new THREE.CanvasTexture(groundCanvas);
+  groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+  groundTex.repeat.set(100, 100);
+  groundTex.magFilter = THREE.NearestFilter;
   {
-    const c = document.createElement('canvas');
-    c.width = c.height = 64;
-    const g = c.getContext('2d');
-    g.fillStyle = '#6f9a45';
-    g.fillRect(0, 0, 64, 64);
-    g.fillStyle = '#668f3f';
-    g.fillRect(0, 0, 32, 32);
-    g.fillRect(32, 32, 32, 32);
-    const tex = new THREE.CanvasTexture(c);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(100, 100);
-    tex.magFilter = THREE.NearestFilter;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ map: tex }));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ map: groundTex }));
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
+  }
+
+  // 橋のステージの川
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(1, 400), new THREE.MeshLambertMaterial({ color: 0x3f8fd0 }));
+  river.rotation.x = -Math.PI / 2;
+  river.position.y = 0.02;
+  river.receiveShadow = true;
+  river.visible = false;
+  scene.add(river);
+
+  // ワールドの空と地面の色、川
+  function applyTheme(stage) {
+    const theme = WORLDS[stage.world];
+    scene.background.setHex(theme.sky);
+    scene.fog.color.setHex(theme.sky);
+    document.body.style.background = '#' + theme.sky.toString(16).padStart(6, '0');
+    const g = groundCanvas.getContext('2d');
+    g.fillStyle = theme.ground[0];
+    g.fillRect(0, 0, 64, 64);
+    g.fillStyle = theme.ground[1];
+    g.fillRect(0, 0, 32, 32);
+    g.fillRect(32, 32, 32, 32);
+    groundTex.needsUpdate = true;
+    river.visible = !!stage.river;
+    if (stage.river) {
+      river.scale.x = stage.river;
+      river.position.x = stage.riverX || 0;
+    }
   }
 
   // ブロックの面に、うすい縁取りを描いておく (色はブロックごとに掛ける)
@@ -288,6 +310,9 @@
   }
 
   function placeCamera() {
+    // 霧は、カメラから家までのきょりに合わせて遠ざける (大きなステージがかすまないように)
+    scene.fog.near = view.dist + 25;
+    scene.fog.far = view.dist * 2 + 90;
     const c = Math.cos(view.phi);
     camera.position.set(
       view.target.x + view.dist * c * Math.sin(view.theta),
@@ -396,10 +421,22 @@
   arc.frustumCulled = false;
   scene.add(arc);
 
-  function throwOrigin() {
+  const THROW_REACH = 26; // 投げはじめる点から目標までの、いちばん遠いきょり
+
+  // 投げはじめる点。ふだんはカメラの少し前。大きなステージで遠いときは、目標から THROW_REACH の点まで近づける
+  function throwOrigin(target) {
     const fwd = tmpVec.subVectors(view.target, camera.position).normalize();
     const right = new THREE.Vector3().crossVectors(fwd, camera.up).normalize();
-    return camera.position.clone().addScaledVector(fwd, 2).addScaledVector(right, 0.8).add(new THREE.Vector3(0, -1.2, 0));
+    const origin = camera.position.clone().addScaledVector(fwd, 2).addScaledVector(right, 0.8).add(new THREE.Vector3(0, -1.2, 0));
+    const back = origin.clone().sub(target);
+    if (back.length() > THROW_REACH) {
+      back.setLength(THROW_REACH);
+      origin.copy(target).add(back);
+      // ブロックの中から投げないように、カメラの方へずらす
+      const step = camera.position.clone().sub(origin).normalize();
+      for (let k = 0; k < 80 && solidAtWorld(origin.x, origin.y, origin.z); k++) origin.add(step);
+    }
+    return origin;
   }
 
   // 目標に届く初速と、とぶ時間
@@ -428,7 +465,7 @@
     marker.visible = true;
     marker.position.copy(hit.point).addScaledVector(hit.normal, 0.03);
     marker.lookAt(tmpVec.copy(marker.position).add(hit.normal));
-    const origin = throwOrigin();
+    const origin = throwOrigin(target);
     const { v, T } = solveThrow(origin, target);
     const arr = arc.geometry.attributes.position.array;
     for (let k = 0; k < ARC_POINTS; k++) {
@@ -459,7 +496,7 @@
 
   function throwGrenade() {
     if (!aim || bombsLeft <= 0 || state !== 'play' || cleared) return;
-    const origin = throwOrigin();
+    const origin = throwOrigin(aim);
     const { v, T } = solveThrow(origin, aim);
     const group = new THREE.Group();
     const body = new THREE.Mesh(grenadeGeo, grenadeMat.clone());
@@ -846,24 +883,49 @@
     return '★'.repeat(n) + '☆'.repeat(3 - n);
   }
 
+  function unlocked(k) {
+    return k === 0 || stars[k - 1] > 0;
+  }
+
+  // ワールドごとに、10ステージのタイルを並べる
   function renderMenu() {
     const list = $('stage-list');
     list.innerHTML = '';
-    STAGES.forEach((st, k) => {
-      const li = document.createElement('li');
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'stage-btn';
-      const locked = k > 0 && !(stars[k - 1] > 0);
-      btn.disabled = locked;
-      btn.innerHTML = `<span class="stage-no">${k + 1}</span><span class="stage-name"></span><span class="stage-stars"></span>`;
-      btn.querySelector('.stage-name').innerHTML = `${st.name}<span class="stage-sub"></span>`;
-      btn.querySelector('.stage-sub').textContent = locked ? '前のステージをクリアすると遊べます' : `${st.sub} ・ 手榴弾 ${st.grenades}個`;
-      btn.querySelector('.stage-stars').textContent = locked ? '🔒' : starText(stars[k] || 0);
-      btn.addEventListener('click', () => startStage(k));
-      li.appendChild(btn);
-      list.appendChild(li);
+    let next = null;
+    WORLDS.forEach((w, wi) => {
+      const ks = STAGES.map((st, k) => k).filter((k) => STAGES[k].world === wi);
+      const got = ks.reduce((n, k) => n + (stars[k] || 0), 0);
+      const sec = document.createElement('section');
+      sec.className = 'world';
+      sec.innerHTML = `<h3 class="world-head"><span class="world-no">ワールド${wi + 1}</span><span class="world-name"></span><span class="world-stars">★ ${got} / ${ks.length * 3}</span></h3><ol class="tiles"></ol>`;
+      sec.querySelector('.world-name').textContent = w.name;
+      const ol = sec.querySelector('.tiles');
+      for (const k of ks) {
+        const st = STAGES[k];
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tile';
+        const open = unlocked(k);
+        btn.disabled = !open;
+        btn.innerHTML = '<span class="tile-no"></span><span class="tile-name"></span><span class="tile-stars"></span>';
+        btn.querySelector('.tile-no').textContent = k + 1;
+        btn.querySelector('.tile-name').textContent = open ? st.name : '???';
+        btn.querySelector('.tile-stars').textContent = open ? starText(stars[k] || 0) : '🔒';
+        btn.title = open ? `${st.name}: ${st.sub} (手榴弾 ${st.grenades}個)` : '前のステージをクリアすると遊べます';
+        btn.setAttribute('aria-label', open ? `ステージ${k + 1} ${st.name} ${st.sub} 手榴弾${st.grenades}個 星${stars[k] || 0}` : `ステージ${k + 1} まだ遊べません`);
+        if (open && !(stars[k] > 0) && next === null) {
+          next = btn;
+          btn.classList.add('next');
+        }
+        btn.addEventListener('click', () => startStage(k));
+        li.appendChild(btn);
+        ol.appendChild(li);
+      }
+      list.appendChild(sec);
     });
+    // 次に遊ぶステージが見えるところまでスクロールする
+    if (next) requestAnimationFrame(() => next.scrollIntoView({ block: 'center' }));
   }
 
   function showMenu() {
@@ -881,6 +943,7 @@
     sound.unlock();
     stageIndex = k;
     world = World.createWorld(k);
+    applyTheme(STAGES[k]);
     clearGrenades();
     clearDebris();
     clearEffects();
@@ -1059,6 +1122,7 @@
   resize();
   // 最初の画面のうしろに、1つめの家を出しておく
   world = World.createWorld(0);
+  applyTheme(STAGES[0]);
   buildHouse();
   frameStage();
   showMenu();
@@ -1073,5 +1137,6 @@
       return World.destroyedRatio(world);
     },
     explodeAt: (x, y, z) => explodeAt(new THREE.Vector3(x, y, z)),
+    start: (k) => startStage(k),
   };
 })();
