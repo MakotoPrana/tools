@@ -180,8 +180,11 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .erase-row select { width: auto; flex: 1; min-width: 200px; margin: 0 0 12px; }
 .erase-row label + select { margin-top: 0; }
 .erase-info { color: var(--muted); font-size: 0.85rem; }
-.erase .tools { margin-top: 8px; grid-template-columns: repeat(3, 1fr); }
+.erase .tools { margin-top: 8px; }
 .erase .tool span { padding: 8px 2px; font-size: 0.85rem; }
+#p-pupil-row input[type="color"] { margin-left: auto; }
+.erase .outline-row { margin-bottom: 12px; }
+.view.face-drag { touch-action: none; cursor: crosshair; }
 .shape-now { margin: 0 0 12px; }
 .shade-check { margin-top: 16px; }
 .erase-row input[type="color"] { width: 40px; height: 36px; padding: 0; margin: 0 0 12px; border: 1px solid var(--border); border-radius: 6px; background: none; }

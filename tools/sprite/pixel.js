@@ -433,7 +433,7 @@ for (const [input, out] of outputs) {
 }
 const shadeInput = $("shade");
 shadeInput.addEventListener("change", () => { $("shade-opts").hidden = !shadeInput.checked; });
-for (const [id, out] of [["shade-w", "shade-w-out"], ["shade-k", "shade-k-out"]]) {
+for (const [id, out] of [["shade-w", "shade-w-out"], ["shade-k", "shade-k-out"], ["face-y", "face-y-out"], ["face-gap", "face-gap-out"]]) {
   $(id).addEventListener("input", () => { $(out).textContent = $(id).value; });
 }
 for (const el of [colorsInput, satInput, modeInput, ditherInput, bgInput, tolInput, outlineInput, outlineColorInput,
@@ -450,8 +450,47 @@ function erase(op) {
   render();
 }
 
+// 顔を作る: 結果の上をドラッグして顔の範囲を囲む
+let faceDrag = null; // { x0, y0, x1, y1 } (マス)
+function cellAt(e) {
+  const b = view.getBoundingClientRect();
+  return {
+    x: Math.min(result.w - 1, Math.max(0, Math.floor(((e.clientX - b.left) / b.width) * result.w))),
+    y: Math.min(result.h - 1, Math.max(0, Math.floor(((e.clientY - b.top) / b.height) * result.h))),
+  };
+}
+view.addEventListener("pointerdown", (e) => {
+  if (!result || clickMode() !== "face") return;
+  e.preventDefault();
+  view.setPointerCapture(e.pointerId);
+  const c = cellAt(e);
+  faceDrag = { x0: c.x, y0: c.y, x1: c.x, y1: c.y };
+  drawView();
+});
+view.addEventListener("pointermove", (e) => {
+  if (!faceDrag) return;
+  const c = cellAt(e);
+  faceDrag.x1 = c.x;
+  faceDrag.y1 = c.y;
+  drawView();
+});
+const endFace = () => {
+  if (!faceDrag) return;
+  const x0 = Math.min(faceDrag.x0, faceDrag.x1), x1 = Math.max(faceDrag.x0, faceDrag.x1);
+  const y0 = Math.min(faceDrag.y0, faceDrag.y1), y1 = Math.max(faceDrag.y0, faceDrag.y1);
+  faceDrag = null;
+  if (x1 - x0 + 1 < 5 || y1 - y0 + 1 < 4) {
+    drawView();
+    $("erase-info").textContent = "顔の範囲は、横 5 × 縦 4 マス以上を囲んでください";
+    return;
+  }
+  erase({ type: "face", fx0: x0 / result.w, fy0: y0 / result.h, fx1: (x1 + 1) / result.w, fy1: (y1 + 1) / result.h });
+};
+view.addEventListener("pointerup", endFace);
+view.addEventListener("pointercancel", endFace);
+
 view.addEventListener("click", (e) => {
-  if (!result) return;
+  if (!result || clickMode() === "face") return;
   const b = view.getBoundingClientRect();
   const x = Math.floor(((e.clientX - b.left) / b.width) * result.w);
   const y = Math.floor(((e.clientY - b.top) / b.height) * result.h);
@@ -475,11 +514,15 @@ for (const r of document.querySelectorAll('input[name="p-click"]')) {
     $("erase-opts").hidden = m !== "erase";
     $("eye-opts").hidden = m !== "eye";
     $("draw-opts").hidden = m !== "draw";
+    $("face-opts").hidden = m !== "face";
     $("eye-common").hidden = m === "erase";
+    $("pupil-row").hidden = m === "eye";
+    view.classList.toggle("face-drag", m === "face");
   });
 }
 for (const el of [$("eye-pos"), $("eye-color"), $("eye-both"), $("eye-size"), $("eye-white"), $("eye-white-color"), $("eye-shine"),
-  $("draw-size"), $("draw-color"), $("draw-mirror")]) {
+  $("draw-size"), $("draw-color"), $("draw-mirror"),
+  $("face-eye"), $("face-y"), $("face-gap"), $("face-mouth"), $("face-blush"), $("face-blush-color"), $("face-clear")]) {
   el.addEventListener("input", schedule);
   el.addEventListener("change", schedule);
 }
@@ -644,25 +687,127 @@ function drawEyes(cells, W, H, palette, op, pupilPaint, white, holes, shine) {
   }
   let drawn = false;
   for (const x of centers) {
-    const x0 = x - Math.floor((ew - 1) / 2);
-    const y0 = cy - Math.floor((eh - 1) / 2);
-    const round = ew >= 4 && eh >= 4;
-    const pupil = [];
-    for (let y = y0; y < y0 + eh; y++) {
-      for (let xx = x0; xx < x0 + ew; xx++) {
-        if (xx < 0 || y < 0 || xx >= W || y >= H) continue;
-        if (round && (xx === x0 || xx === x0 + ew - 1) && (y === y0 || y === y0 + eh - 1)) continue;
-        if (cells[y * W + xx] < 0) continue; // 絵の外には描かない
-        pupil.push(y * W + xx);
-      }
-    }
-    if (!pupil.length) continue;
-    drawn = true;
-    for (const i of pupil) pupilPaint.add(i);
-    fixEye(cells, W, H, palette, pupil, mid, white, holes, false);
-    if ($("eye-shine").checked) addShine(pupil, W, H, shine);
+    if (drawPupil(cells, W, H, palette, x, cy, ew, eh, mid, pupilPaint, white, holes, shine).length) drawn = true;
   }
   return drawn;
+}
+
+// (x, cy) を真ん中に横 ew × 縦 eh の黒目を描き、白目と光も付ける。描いた黒目のマスを返す
+function drawPupil(cells, W, H, palette, x, cy, ew, eh, mid, pupilPaint, white, holes, shine) {
+  const x0 = x - Math.floor((ew - 1) / 2);
+  const y0 = cy - Math.floor((eh - 1) / 2);
+  const round = ew >= 4 && eh >= 4;
+  const pupil = [];
+  for (let y = y0; y < y0 + eh; y++) {
+    for (let xx = x0; xx < x0 + ew; xx++) {
+      if (xx < 0 || y < 0 || xx >= W || y >= H) continue;
+      if (round && (xx === x0 || xx === x0 + ew - 1) && (y === y0 || y === y0 + eh - 1)) continue;
+      if (cells[y * W + xx] < 0) continue; // 絵の外には描かない
+      pupil.push(y * W + xx);
+    }
+  }
+  if (!pupil.length) return pupil;
+  for (const i of pupil) pupilPaint.add(i);
+  fixEye(cells, W, H, palette, pupil, mid, white, holes, false);
+  if ($("eye-shine").checked) addShine(pupil, W, H, shine);
+  return pupil;
+}
+
+const hexRgb = (hex) => [1, 3, 5].map((p) => parseInt(hex.slice(p, p + 2), 16));
+const MOUTH_LINE = [138, 58, 70];
+const MOUTH_OPEN = [217, 87, 107];
+
+// 囲んだ範囲に、目・ほっぺ・口を描く。描けなければ false
+function makeFace(cells, W, H, palette, op, p) {
+  const x0 = Math.max(0, Math.round(op.fx0 * W)), x1 = Math.min(W - 1, Math.round(op.fx1 * W) - 1);
+  const y0 = Math.max(0, Math.round(op.fy0 * H)), y1 = Math.min(H - 1, Math.round(op.fy1 * H) - 1);
+  const fw = x1 - x0 + 1, fh = y1 - y0 + 1;
+  if (fw < 5 || fh < 4) return false;
+  const inRect = (i) => {
+    const x = i % W, y = (i - x) / W;
+    return x >= x0 && x <= x1 && y >= y0 && y <= y1;
+  };
+  // 肌の色: 範囲の中でいちばん多い色
+  const count = new Map();
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const j = cells[y * W + x];
+      if (j >= 0) count.set(j, (count.get(j) || 0) + 1);
+    }
+  }
+  if (!count.size) return false;
+  const skin = [...count].sort((a, b) => b[1] - a[1])[0][0];
+  // もとの目や口 (範囲の中に収まる、小さな別の色の範囲) を肌の色にする。前に描いた目なども消す
+  if ($("face-clear").checked) {
+    const seen = new Uint8Array(W * H);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = y * W + x;
+        if (cells[i] < 0 || cells[i] === skin || seen[i]) continue;
+        const r = region(cells, W, H, i, seen);
+        if (r.length <= fw * fh * 0.08 && r.every(inRect)) for (const k of r) cells[k] = skin;
+      }
+    }
+    for (const set of [p.pupilPaint, p.white, p.shine]) for (const i of [...set]) if (inRect(i)) set.delete(i);
+    for (const i of [...p.parts.keys()]) if (inRect(i)) p.parts.delete(i);
+  }
+  // 目
+  const k = Number($("face-eye").value);
+  const ew = Math.max(1, Math.round(fw * 0.13 * k));
+  const eh = Math.max(2, Math.round(fw * 0.19 * k));
+  const mid = x0 + fw / 2;
+  const ey = y0 + Math.round(fh * Number($("face-y").value) / 100);
+  const half = (fw * Number($("face-gap").value)) / 200;
+  // マス x を顔の真ん中で折り返したマス
+  const mirror = (x) => 2 * mid - 1 - x;
+  const off = Math.floor((ew - 1) / 2); // 黒目の左端から真ん中のマスまで
+  const lStart = Math.min(Math.floor(mid - half) - off, Math.floor(mid) - ew - 1); // 左目の左端 (右目と重ならないように)
+  const rStart = mirror(lStart + ew - 1); // 右目の左端
+  for (const start of [lStart, rStart]) {
+    drawPupil(cells, W, H, palette, start + off, ey, ew, eh, mid, p.pupilPaint, p.white, p.holes, p.shine);
+  }
+  const isSkin = (x, y) => x >= x0 && x <= x1 && y >= 0 && y < H && cells[y * W + x] === skin && !p.holes.has(y * W + x);
+  const put = (x, y, c) => {
+    if (!isSkin(x, y)) return;
+    p.parts.set(y * W + x, c);
+    p.holes.add(y * W + x);
+  };
+  const eyeBottom = ey - Math.floor((eh - 1) / 2) + eh - 1;
+  // ほっぺ: 目の下の外側に、横長の点
+  if ($("face-blush").checked) {
+    const c = hexRgb($("face-blush-color").value);
+    const bw = fw >= 20 ? 3 : 2;
+    const by = Math.min(y1, eyeBottom + 1 + (fh >= 16 ? 1 : 0));
+    // 左目の外側の端から外へ bw マス
+    for (let d = 0; d < bw; d++) {
+      put(lStart - d, by, c);
+      put(mirror(lStart - d), by, c);
+    }
+  }
+  // 口: 目の下と顔の下のふちの真ん中
+  const mouth = $("face-mouth").value;
+  if (mouth !== "none") {
+    const my = Math.min(y1, eyeBottom + Math.max(2, Math.round((y1 - eyeBottom) * 0.5)));
+    const cl = Math.ceil(mid) - 1; // 真ん中のマス (幅が偶数なら真ん中の 2 マス cl, cr)
+    const cr = mirror(cl);
+    if (mouth === "small") {
+      put(cl, my, MOUTH_LINE);
+      put(cr, my, MOUTH_LINE);
+    } else if (mouth === "smile") {
+      put(cl - 1, my, MOUTH_LINE);
+      put(cr + 1, my, MOUTH_LINE);
+      put(cl, my + 1, MOUTH_LINE);
+      put(cr, my + 1, MOUTH_LINE);
+    } else {
+      for (const y of [my, my + 1]) {
+        put(cl, y, MOUTH_OPEN);
+        put(cr, y, MOUTH_OPEN);
+      }
+      put(cl, my, MOUTH_LINE);
+      put(cr, my, MOUTH_LINE);
+    }
+  }
+  return true;
 }
 
 // 黒目の中に光の点を入れるマスを決めて shine に加える。入れられなければ false
@@ -1009,10 +1154,15 @@ function render() {
   const white = new Set(); // 白目にするマス
   const eyeHoles = new Set(); // 目のマス (影のふちとみなさない)
   const pupilPaint = new Set(); // 描き足した黒目のマス
+  const faceParts = new Map(); // 顔を作るときのほっぺと口 (マス → 色)
   eyeMissed = 0;
   for (const op of erased) {
     if (op.type === "draw") {
       if (!drawEyes(cells, W, H, palette, op, pupilPaint, white, eyeHoles, shine)) eyeMissed++;
+      continue;
+    }
+    if (op.type === "face") {
+      if (!makeFace(cells, W, H, palette, op, { pupilPaint, white, holes: eyeHoles, shine, parts: faceParts })) eyeMissed++;
       continue;
     }
     const j = nearest(palette, op.rgb);
@@ -1095,6 +1245,7 @@ function render() {
     const whiteColor = [1, 3, 5].map((p) => parseInt(hexW.slice(p, p + 2), 16));
     for (const i of white) img.data.set([...whiteColor, 255], i * 4);
   }
+  for (const [i, c] of faceParts) img.data.set([...c, 255], i * 4);
   if (shine.size) {
     const hexEye = $("eye-color").value;
     const eyeColor = [1, 3, 5].map((p) => parseInt(hexEye.slice(p, p + 2), 16));
@@ -1120,7 +1271,7 @@ function render() {
   });
   $("out-info").textContent = `${W} × ${H} px・${used.size} 色${outlineInput.checked ? " + 輪郭線" : ""}`;
   $("erase-undo").disabled = $("erase-clear").disabled = !erased.length;
-  const eyes = erased.filter((op) => op.type === "eye" || op.type === "draw").length;
+  const eyes = erased.filter((op) => op.type === "eye" || op.type === "draw" || op.type === "face").length;
   const cleared = erased.length - eyes;
   const info = [];
   if (cleared) info.push(`${cleared} か所を透明にしています`);
@@ -1166,6 +1317,16 @@ function drawView() {
       c.lineTo(view.width, y * s + 0.5);
     }
     c.stroke();
+  }
+  // 顔を作るときの、囲んでいる範囲
+  if (faceDrag) {
+    const x0 = Math.min(faceDrag.x0, faceDrag.x1), x1 = Math.max(faceDrag.x0, faceDrag.x1);
+    const y0 = Math.min(faceDrag.y0, faceDrag.y1), y1 = Math.max(faceDrag.y0, faceDrag.y1);
+    c.fillStyle = "rgba(255,90,140,0.15)";
+    c.fillRect(x0 * s, y0 * s, (x1 - x0 + 1) * s, (y1 - y0 + 1) * s);
+    c.strokeStyle = "#ff3b7a";
+    c.lineWidth = Math.max(2, s / 4);
+    c.strokeRect(x0 * s, y0 * s, (x1 - x0 + 1) * s, (y1 - y0 + 1) * s);
   }
   view.hidden = false;
   $("empty").hidden = true;
