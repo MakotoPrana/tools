@@ -41,7 +41,7 @@ let srcName = "pixel";
 let result = null; // { w, h, data: ImageData, cells, palette }
 // クリックで直したこと (順に)。設定を変えても残るように、場所はトリミング範囲の中の割合で持つ
 // { type: "fill", fx, fy, rgb } つながった同じ色を透明に / { type: "color", rgb } 同じ色すべてを透明に
-// { type: "eye", fx, fy, rgb } クリックした黒目に光を入れる
+// { type: "eye", fx, fy, rgb } クリックした目を直す (大きくする・白目・光は、そのときの設定で)
 let erased = [];
 let eyeMissed = 0; // 小さすぎるなどで光を入れられなかった目の数 (直前の変換で)
 
@@ -470,7 +470,10 @@ for (const r of document.querySelectorAll('input[name="p-click"]')) {
     $("eye-opts").hidden = clickMode() !== "eye";
   });
 }
-for (const el of [$("eye-pos"), $("eye-color"), $("eye-both")]) el.addEventListener("input", schedule);
+for (const el of [$("eye-pos"), $("eye-color"), $("eye-both"), $("eye-size"), $("eye-white"), $("eye-white-color"), $("eye-shine")]) {
+  el.addEventListener("input", schedule);
+  el.addEventListener("change", schedule);
+}
 
 $("erase-undo").addEventListener("click", () => {
   erased.pop();
@@ -537,6 +540,80 @@ function bounds(list, W) {
   return { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
 }
 
+// 目を大きくし、白目を付ける (または色を変える)。直したあとの黒目のマスの一覧を返す
+// mid は両目の真ん中の x (白目を付ける外側を決める)。白目のマスは white に、目のマスは holes に加える
+function fixEye(cells, W, H, palette, eye, mid, white, holes) {
+  const j = cells[eye[0]];
+  const b = bounds(eye, W);
+  let pupil = eye;
+  // 大きくする: 縦に n マス (下に多め)、横に n / 2 マス広げ、大きいときは角を丸める
+  const n = Number($("eye-size").value);
+  if (n > 0) {
+    const ew = Math.ceil(n / 2);
+    const x0 = b.x0 - Math.floor(ew / 2);
+    const x1 = b.x1 + (ew - Math.floor(ew / 2));
+    const y0 = b.y0 - Math.floor(n / 2);
+    const y1 = b.y1 + (n - Math.floor(n / 2));
+    const round = x1 - x0 + 1 >= 3 && y1 - y0 + 1 >= 4;
+    const grown = new Set(eye);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        if (round && (x === x0 || x === x1) && (y === y0 || y === y1)) continue;
+        const i = y * W + x;
+        if (cells[i] < 0) continue; // 絵の外には広げない
+        grown.add(i);
+      }
+    }
+    pupil = [...grown];
+    for (const i of pupil) cells[i] = j;
+  }
+  for (const i of pupil) holes.add(i);
+  const mode = $("eye-white").value;
+  if (mode === "keep") return pupil;
+  const inPupil = new Set(pupil);
+  // もとの白目: 黒目のとなりにある、明るくて小さい範囲
+  const seen = new Uint8Array(W * H);
+  for (const i of pupil) {
+    const x = i % W;
+    for (const k of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) {
+      if (k < 0 || k >= W * H || inPupil.has(k) || cells[k] < 0 || seen[k]) continue;
+      const [r, g, bl] = palette[cells[k]];
+      if (0.299 * r + 0.587 * g + 0.114 * bl < 190) continue;
+      const area = region(cells, W, H, k, seen);
+      if (area.length > pupil.length * 2) continue;
+      for (const a of area) {
+        white.add(a);
+        holes.add(a);
+      }
+    }
+  }
+  if (mode === "recolor") return pupil;
+  // 白目を付ける: 黒目の横 1 列 (いちばん上の行は除く)
+  const pb = bounds(pupil, W);
+  const outerLeft = pb.cx < mid;
+  const sides = mode === "both" ? [-1, 1] : [outerLeft ? -1 : 1];
+  for (let y = pb.y0 + (pb.h >= 3 ? 1 : 0); y <= pb.y1; y++) {
+    for (const s of sides) {
+      // その行の黒目の端のとなり
+      let edge = -1;
+      for (let x = s < 0 ? pb.x0 : pb.x1; x >= pb.x0 && x <= pb.x1; x -= s) {
+        if (inPupil.has(y * W + x)) {
+          edge = x;
+          break;
+        }
+      }
+      const x = edge + s;
+      if (edge < 0 || x < 0 || x >= W) continue;
+      const i = y * W + x;
+      if (cells[i] < 0 || inPupil.has(i)) continue;
+      white.add(i);
+      holes.add(i);
+    }
+  }
+  return pupil;
+}
+
 // 黒目の中に光の点を入れるマスを決めて shine に加える。入れられなければ false
 function addShine(eye, W, H, shine) {
   // 小さすぎる目は光を入れると黒目がなくなる。大きすぎる範囲は目ではない (髪や服など)
@@ -545,17 +622,25 @@ function addShine(eye, W, H, shine) {
   const b = bounds(eye, W);
   const right = $("eye-pos").value === "right";
   const size = b.w >= 4 && b.h >= 4 ? 2 : 1;
-  // いちばん上の行から順に、光の位置の側の端にあるマスを探す
-  for (let y = b.y0; y <= b.y1 - (size - 1); y++) {
-    const xs = [];
-    for (let x = b.x0; x <= b.x1; x++) xs.push(x);
-    if (right) xs.reverse();
-    for (const x of xs) {
-      const block = [];
-      for (let dy = 0; dy < size; dy++) {
-        for (let dx = 0; dx < size; dx++) block.push((y + dy) * W + (right ? x - dx : x + dx));
-      }
-      if (block.every((i) => inEye.has(i))) {
+  // いちばん上の行から順に、光の位置の側の端にあるマスを探す。
+  // まずは上と光の側も黒目に囲まれたマス (黒目のふちが欠けて見えないように)、なければふちのマスでもよい
+  const side = right ? 1 : -1;
+  for (const inside of [true, false]) {
+    for (let y = b.y0; y <= b.y1 - (size - 1); y++) {
+      const xs = [];
+      for (let x = b.x0; x <= b.x1; x++) xs.push(x);
+      if (right) xs.reverse();
+      for (const x of xs) {
+        const block = [];
+        for (let dy = 0; dy < size; dy++) {
+          for (let dx = 0; dx < size; dx++) block.push((y + dy) * W + (right ? x - dx : x + dx));
+        }
+        if (!block.every((i) => inEye.has(i))) continue;
+        if (inside) {
+          const inBlock = new Set(block);
+          const around = (i) => inEye.has(i) || inBlock.has(i);
+          if (!block.every((i) => around(i - W) && around(i + side))) continue;
+        }
         // 光のマスを除いても黒目が残るときだけ入れる
         if (eye.length - block.length < 2) return false;
         for (const i of block) shine.add(i);
@@ -594,7 +679,7 @@ function findOtherEye(cells, W, H, eye) {
 
 // 影 (-1) と明るくする (1) マスを決める。光と反対側のふちから幅 width マスを影に、
 // 光の側のふち 1 マスを明るくする。ふちは、部分ごとなら同じ色のつながりの外、そうでなければ絵の外
-function shadeMap(cells, W, H, palette) {
+function shadeMap(cells, W, H, palette, holes = new Set()) {
   const width = Number($("shade-w").value);
   const light = $("light").value;
   const parts = $("shade-parts").checked;
@@ -614,7 +699,7 @@ function shadeMap(cells, W, H, palette) {
     }
     const r = region(cells, W, H, i, seen);
     const [cr, cg, cb] = palette[cells[i]];
-    if (r.length < 8) small.add(n);
+    if (r.length < 8 || r.some((k) => holes.has(k))) small.add(n);
     if (r.length < 8 || 0.299 * cr + 0.587 * cg + 0.114 * cb < 45) skip.add(n);
     for (const k of r) label[k] = n;
     n++;
@@ -862,8 +947,10 @@ function render() {
     }
   }
 
-  // 5. クリックで直す (色を透明にする・目に光を入れる)
+  // 5. クリックで直す (色を透明にする・目を直す)
   const shine = new Set(); // 光を入れるマス
+  const white = new Set(); // 白目にするマス
+  const eyeHoles = new Set(); // 目のマス (影のふちとみなさない)
   eyeMissed = 0;
   for (const op of erased) {
     const j = nearest(palette, op.rgb);
@@ -884,20 +971,29 @@ function render() {
       for (const i of region(cells, W, H, start)) cells[i] = -1;
       continue;
     }
-    // 目に光を入れる
+    // 目を直す
     const eye = region(cells, W, H, start);
-    if (!addShine(eye, W, H, shine)) {
+    if (eye.length > Math.max(64, (W * H) / 30)) { // 大きすぎる範囲は目ではない (髪や服など)
       eyeMissed++;
       continue;
     }
-    if ($("eye-both").checked) {
-      const other = findOtherEye(cells, W, H, eye);
-      if (other) addShine(other, W, H, shine);
+    const other = $("eye-both").checked ? findOtherEye(cells, W, H, eye) : null;
+    // 白目を付ける側 (外側) を決めるため、両目の真ん中を求める
+    const mid = other ? (bounds(eye, W).cx + bounds(other, W).cx) / 2 : W / 2;
+    let ok = false;
+    for (const e of other ? [eye, other] : [eye]) {
+      const fixed = fixEye(cells, W, H, palette, e, mid, white, eyeHoles);
+      if ($("eye-shine").checked) {
+        if (addShine(fixed, W, H, shine)) ok = true;
+      } else {
+        ok = true;
+      }
     }
+    if (!ok) eyeMissed++;
   }
 
   // 6. 影を付けるマスを決める (-1: 影, 1: 明るく)
-  const shade = shadeInput.checked ? shadeMap(cells, W, H, palette) : null;
+  const shade = shadeInput.checked ? shadeMap(cells, W, H, palette, eyeHoles) : null;
   const shadeK = Number($("shade-k").value) / 100;
   const shaded = new Map();
   const tone = (j, s) => {
@@ -926,6 +1022,11 @@ function render() {
       if (!c) continue;
       img.data.set([c[0], c[1], c[2], 255], i * 4);
     }
+  }
+  if (white.size) {
+    const hexW = $("eye-white-color").value;
+    const whiteColor = [1, 3, 5].map((p) => parseInt(hexW.slice(p, p + 2), 16));
+    for (const i of white) img.data.set([...whiteColor, 255], i * 4);
   }
   if (shine.size) {
     const hexEye = $("eye-color").value;
@@ -956,8 +1057,8 @@ function render() {
   const cleared = erased.length - eyes;
   const info = [];
   if (cleared) info.push(`${cleared} か所を透明にしています`);
-  if (eyes) info.push(`目に ${eyes} 回光を入れています`);
-  if (eyeMissed) info.push(`${eyeMissed} 回は目が小さすぎるか見つからず、光を入れられませんでした`);
+  if (eyes) info.push(`目を ${eyes} 回直しています`);
+  if (eyeMissed) info.push(`${eyeMissed} 回は目が見つからないか、小さすぎて光を入れられませんでした`);
   $("erase-info").textContent = info.join("・");
   view.classList.add("erasable");
   saveBtn.disabled = false;
