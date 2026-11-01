@@ -53,6 +53,17 @@
       <div class="chips" id="durChips"></div>
       <div class="stepper" id="stepper"><button type="button" class="btn icon" id="durMinus" aria-label="5分短く">−</button><output id="durOut"></output><button type="button" class="btn icon" id="durPlus" aria-label="5分長く">＋</button><span class="preview" id="preview"></span></div>
     </div>
+    <details class="split" id="splitBox">
+      <summary>タスクを分解する</summary>
+      <p class="splithelp">「親タスク名-子タスク名」として開始時刻から続けて登録します。後ろのタスクは後ろ倒しになります。</p>
+      <ol class="splitlist" id="splitList"></ol>
+      <div class="splitfoot">
+        <button type="button" class="btn" id="splitAdd">＋ 行を追加</button>
+        <span class="preview" id="splitPreview"></span>
+        <span class="sp"></span>
+        <button type="button" class="btn primary" id="splitBtn">分解して登録</button>
+      </div>
+    </details>
     <div class="actions">
       <button type="button" class="btn danger" id="delBtn">削除</button>
       <button type="button" class="btn" id="unschedBtn">未定に戻す</button>

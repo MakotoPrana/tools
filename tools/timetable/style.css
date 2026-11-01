@@ -73,7 +73,8 @@ dialog{border:none;padding:0;background:transparent;max-width:none;width:100%;ma
 dialog::backdrop{background:rgba(10,15,25,.45)}
 .sheet{background:var(--surface);color:var(--fg);border-radius:16px 16px 0 0;max-width:640px;margin:0 auto;box-sizing:border-box;padding:18px max(16px,env(safe-area-inset-left,0px)) calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
 .sheet h2{margin:0;font-size:17px}
-.quick #startField,.quick #stepper,.quick #saveBtn{display:none}
+.quick #startField,.quick #stepper,.quick #saveBtn,.quick #splitBox{display:none}
+.sheet{max-height:100dvh;overflow-y:auto}
 .quick .chip{padding:9px 14px;font-size:14px}
 .field{display:flex;flex-direction:column;gap:6px}
 .field>label,.flab{font-size:12px;color:var(--muted);letter-spacing:.04em}
@@ -133,3 +134,18 @@ body.assigning .task{cursor:default}
 .dropind{position:absolute;left:4px;right:4px;border:2px dashed var(--accent);border-radius:6px;background:var(--accent-soft);opacity:.85;pointer-events:none;z-index:4}
 body.dragmode{user-select:none;-webkit-user-select:none;cursor:grabbing}
 @media (prefers-reduced-motion: reduce){.task{transition:none}}
+
+.split{border:1px solid var(--line);border-radius:10px;padding:0 12px}
+.split summary{cursor:pointer;font-size:14px;font-weight:700;padding:10px 0;color:var(--accent)}
+.split[open]{padding-bottom:12px}
+.splithelp{margin:0 0 8px;font-size:12px;color:var(--muted);line-height:1.5}
+.splitlist{margin:0 0 8px;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.splitrow{display:flex;gap:6px;align-items:center}
+.splitrow input[type=text]{flex:1;min-width:0;padding:8px 10px!important}
+.splitrow select{font:inherit;font-family:var(--f-mono);font-size:14px;padding:8px 6px;border:1px solid var(--line-strong);border-radius:8px;background:var(--bg);color:var(--fg)}
+.splitrow .rm{background:none;border:none;color:var(--muted);font-size:18px;padding:4px 6px;cursor:pointer;line-height:1}
+.splitfoot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.splitfoot .sp{flex:1}
+.task.flash{animation:flash 1.2s ease}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion: reduce){.task.flash{animation:none;outline:2px solid var(--accent)}}

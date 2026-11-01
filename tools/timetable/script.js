@@ -152,6 +152,7 @@ function openEdit(id){
   const t=tasks().find(x=>x.id===id);editing=id;
   $('dlgTitle').textContent='タスクを編集';$('delBtn').hidden=false;$('unschedBtn').hidden=t.done;
   $('fTitle').value=t.title;$('fStart').value=fmt(t.start%DAY);setDur(t.dur);
+  $('splitBox').hidden=t.done;$('splitBox').open=false;resetSplit();
   $('dlg').showModal();
 }
 $('fTitle').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();$('form').requestSubmit()}});
@@ -162,7 +163,7 @@ $('form').addEventListener('submit',e=>{
   e.preventDefault();
   const title=$('fTitle').value.trim(),start=parseTime();
   if(!title||start==null)return;
-  const list=tasks(),before=snap();let msg;
+  const list=tasks(),before=snap();let msg,focusId;
   if(editing){
     const t=list.find(x=>x.id===editing);
     const oldStart=t.start,oldEnd=t.start+t.dur;
@@ -173,14 +174,61 @@ $('form').addEventListener('submit',e=>{
       t.start=start;t.dur=dur;if(!t.done)t.plan=dur;
       const {moved}=pushAfter(list,t);msg=moved?`後続${moved}件を後ろ倒ししました`:'保存しました';
     }
-    t.title=title;
+    t.title=title;focusId=t.id;
   }else{
     if(store.sample){store.sample=false}
-    const t={id:uid(),title,start,dur,plan:dur,done:false,doneAt:null};list.push(t);
+    const t={id:uid(),title,start,dur,plan:dur,done:false,doneAt:null};list.push(t);focusId=t.id;
     const {moved}=pushAfter(list,t);msg=moved?`追加し、後続${moved}件を後ろ倒ししました`:'追加しました';
   }
-  save();$('dlg').close();render();toast(msg,before);
+  save();$('dlg').close();render();toast(msg,before);scrollToTask(focusId);
 });
+
+// ---- タスク分解 ----
+function splitRow(name='',d=15){
+  const li=document.createElement('li');li.className='splitrow';
+  li.innerHTML=`<input type="text" placeholder="子タスク名" autocomplete="off" aria-label="子タスク名"><select aria-label="所要時間">${DURS.map(x=>`<option value="${x}">${x<60?x+'分':x/60+'時間'}</option>`).join('')}</select><button type="button" class="rm" aria-label="行を削除">×</button>`;
+  const inp=li.querySelector('input'),sel=li.querySelector('select');
+  inp.value=name;sel.value=String(d);
+  inp.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'||e.isComposing||e.keyCode===229)return;
+    e.preventDefault();
+    const next=li.nextElementSibling;
+    if(next)next.querySelector('input').focus();
+    else if(inp.value.trim()){const n=splitRow('',+sel.value);$('splitList').appendChild(n);n.querySelector('input').focus();splitPreview()}
+  });
+  inp.addEventListener('input',splitPreview);sel.addEventListener('change',splitPreview);
+  li.querySelector('.rm').onclick=()=>{li.remove();if(!$('splitList').children.length)$('splitList').appendChild(splitRow());splitPreview()};
+  return li;
+}
+function splitItems(){
+  return [...$('splitList').children].map(li=>({name:li.querySelector('input').value.trim(),dur:+li.querySelector('select').value})).filter(x=>x.name);
+}
+function splitPreview(){
+  const items=splitItems(),total=items.reduce((a,x)=>a+x.dur,0),t=tasks().find(x=>x.id===editing);
+  $('splitPreview').textContent=items.length&&t?`${items.length}件・${fmt(t.start%DAY)}–${fmt((t.start+total)%DAY)}`:'';
+  $('splitBtn').disabled=!items.length;
+}
+function resetSplit(){
+  $('splitList').innerHTML='';$('splitList').append(splitRow(),splitRow());splitPreview();
+}
+$('splitAdd').onclick=()=>{const last=$('splitList').lastElementChild,n=splitRow('',last?+last.querySelector('select').value:15);$('splitList').appendChild(n);n.querySelector('input').focus();splitPreview()};
+$('splitBox').addEventListener('toggle',()=>{if($('splitBox').open){const f=$('splitList').querySelector('input');f&&f.focus()}});
+$('splitBtn').onclick=()=>{
+  const items=splitItems();if(!items.length)return;
+  const list=tasks(),i=list.findIndex(x=>x.id===editing);if(i<0)return;
+  const before=snap(),parent=list[i];
+  const pname=$('fTitle').value.trim()||parent.title;
+  list.splice(i,1);
+  // 子タスク全体を一つの塊として扱い、重なる後続を押し出す
+  const total=items.reduce((a,x)=>a+x.dur,0);
+  const block={start:parent.start,dur:total,done:false};
+  const {moved}=pushAfter([...list,block],block);
+  let t=parent.start;const kids=items.map(x=>{const k={id:uid(),title:`${pname}-${x.name}`,start:t,dur:x.dur,plan:x.dur,done:false,doneAt:null};t+=x.dur;return k});
+  list.push(...kids);
+  save();$('dlg').close();render();
+  toast(moved?`${kids.length}件に分解し、後続${moved}件を後ろ倒ししました`:`${kids.length}件に分解しました`,before);
+  scrollToTask(kids[0].id,kids[kids.length-1].id);
+};
 
 function deleteTask(id){
   const list=tasks(),i=list.findIndex(x=>x.id===id);if(i<0)return;
@@ -301,11 +349,11 @@ function assignTo(tg){
   store.inbox[keyOf(cur)]=inbox().filter(x=>x!==it);assignId=null;
   if(tg.mode==='merge'){
     const t=tg.task;t.title=`${t.title} ＋ ${it.title}`;
-    save();render();
+    save();render();scrollToTask(t.id);
     toast(`「${t.title}」にマージしました（${fmt(t.start%DAY)}–${fmt((t.start+t.dur)%DAY)}のまま）`,before);return;
   }
   const m=tg.m,t={id:uid(),title:it.title,start:m,dur:d,plan:d,done:false,doneAt:null};
-  list.push(t);const {moved}=pushAfter(list,t);save();render();
+  list.push(t);const {moved}=pushAfter(list,t);save();render();scrollToTask(t.id);
   toast(moved?`${fmt(m%DAY)}に挿入し、後続${moved}件を後ろ倒ししました`:`${fmt(m%DAY)}に入れました`,before);
 }
 $('assignCancel').onclick=()=>{assignId=null;render()};
@@ -324,6 +372,22 @@ function scrollToFocus(){
   const list=tasks();let m=isToday()?nowMin():(list.length?Math.min(...list.map(t=>t.start)):480);
   const y=$('grid').getBoundingClientRect().top+window.scrollY+(m/STEP)*ROW()-160;
   window.scrollTo({top:Math.max(0,y)});
+}
+// 登録・編集したタスク（idからlastIdまでの範囲）が見えるようにスクロールし、軽く強調
+function scrollToTask(id,lastId=id){
+  const els=[id,lastId].map(x=>x&&$('layer').querySelector(`.task[data-id="${x}"]`));
+  if(!els[0])return;
+  const a=els[0].getBoundingClientRect(),b=(els[1]||els[0]).getBoundingClientRect();
+  const top=$('grid').closest('.wrap').querySelector('header').getBoundingClientRect().bottom;
+  const panel=$('inbox').offsetHeight,viewH=window.innerHeight-panel-top;
+  const h=b.bottom-a.top;
+  const off=h<viewH?(viewH-h)/2:16;
+  const y=window.scrollY+a.top-top-off;
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({top:Math.max(0,y),behavior:reduce?'auto':'smooth'});
+  const ids=new Set();let on=false;
+  tasks().slice().sort((p,q)=>p.start-q.start).forEach(t=>{if(t.id===id)on=true;if(on)ids.add(t.id);if(t.id===lastId)on=false});
+  $('layer').querySelectorAll('.task').forEach(el=>{if(ids.has(el.dataset.id)){el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash')}});
 }
 render();scrollToFocus();
 setInterval(()=>{if(isToday())render()},30000);
