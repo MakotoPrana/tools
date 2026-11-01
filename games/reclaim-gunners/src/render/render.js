@@ -15,7 +15,7 @@ import { drawBeam, drawBullet, drawEBullet, drawLance, drawParts } from './proje
 import { resize, scale } from './screen.js';
 import { drawFeaturesLive, drawFog, drawHazard, drawLairs, drawLakeShimmer, drawMist, drawPickup, drawSeals, drawShops, drawStone, drawTele, drawVignette } from './world.js';
 import { screen } from '../ui/core.js';
-import { getMap } from '../world/mapgen.js';
+import { getMap, mapCache } from '../world/mapgen.js';
 
 export function render() {
   resize();
@@ -32,6 +32,12 @@ export function render() {
 export let backdropT = 0;
 export function renderBackdrop() {
   backdropT += 1 / 60;
+  // 背景のマップができるまでは暗い画面 (読みこみ中の表示が出ている)
+  if (!mapCache[STAGES[0].id]) {
+    ctx.fillStyle = '#0c0809';
+    ctx.fillRect(0, 0, VW, VH);
+    return;
+  }
   const map = getMap(STAGES[0]);
   const span = map.w * TILE - VW;
   const x = (Math.sin(backdropT * 0.05) * 0.5 + 0.5) * span;

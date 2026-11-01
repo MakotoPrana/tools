@@ -9,12 +9,16 @@ import { localFrac } from '../render/screen.js';
 import { actions } from './actions.js';
 import { head, rerender, screen, setScreen, uiClose, uiShow } from './core.js';
 import { selStage, showWorld } from './world-map.js';
+import { withMaps } from './loading.js';
 import { areaMask, getMap } from '../world/mapgen.js';
 
 // ---------- ステージ図 (エリア選択・転移) ----------
 export let selArea = null;
 export function showStageMap(mode, stageId) {
   const def = stageId ? stageDef(stageId) : G.def;
+  withMaps([def], () => openStageMap(mode, def));
+}
+function openStageMap(mode, def) {
   const map = getMap(def);
   selArea = null;
   const fn = () => {

@@ -245,11 +245,13 @@ export function buildMap(def) {
     areaTiles[ai].push(i);
     if (edgeDist[i] > centers[ai].d) centers[ai] = { x: i % w, y: (i / w) | 0, d: edgeDist[i] };
   }
-  // 木や岩をばらまく。まわり 1 マスに何もない所にだけ置くので、道はふさがらない
+  // 木や岩をばらまく。まわり 2 マスに何もない所にだけ置くので、障害物どうし・壁とのあいだは
+  // いつも 2 マス以上あき、道はふさがらない
   const rng = mulberry32(def.seed);
+  const GAP = 2;
   const free = (x, y) => x > 0 && y > 0 && x < w - 1 && y < h - 1 && tiles[idx(x, y)] === T.FLOOR && !keep[idx(x, y)];
   const clearAround = (x0, y0, x1, y1) => {
-    for (let j = y0 - 1; j <= y1 + 1; j++) for (let i = x0 - 1; i <= x1 + 1; i++) if (!free(i, j)) return false;
+    for (let j = y0 - GAP; j <= y1 + GAP; j++) for (let i = x0 - GAP; i <= x1 + GAP; i++) if (!free(i, j)) return false;
     return true;
   };
   const tileOf = { tree: T.TREE, rock: T.ROCK, bone: T.BONE, fence: T.FENCE, reed: T.REED };

@@ -13,6 +13,9 @@ import { showTitle } from './title.js';
 
 // ---------- 全体図 ----------
 // 全体図の絵 (assets/worldmap.jpg。1024 × 572)。絵の上に、押せる場所と名前の札を重ねる
+// 起動したらすぐ読みこみ始める
+const worldImg = new Image();
+worldImg.src = 'assets/worldmap.jpg';
 //   spots: そのステージの島 (押せる楕円)。label: 名前の札の中心 (絵に描いてある名前の上にかぶせる)
 export const WORLD_W = 1024;
 export const WORLD_H = 572;
@@ -81,6 +84,7 @@ export function showWorld() {
       </div>
       <div class="world">
         <img src="assets/worldmap.jpg" width="${WORLD_W}" height="${WORLD_H}" alt="">
+        ${worldImg.complete ? '' : '<div class="wait"><i class="spin"></i></div>'}
         <svg viewBox="0 0 ${WORLD_W} ${WORLD_H}" role="img" aria-label="${tr('全体図')}">
           <defs>
             <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a3018"/><stop offset="1" stop-color="#24160a"/></linearGradient>
@@ -107,6 +111,10 @@ export function showWorld() {
         <button class="btn primary" data-act="goStage" ${s.ready && reach ? '' : 'disabled'}>${!s.ready ? tr('準備中') : reach ? tr('このステージへ') : tr('守護者を倒すと開く')}</button>
       </div>
     </div></div>`;
+  };
+  // 全体図の絵が届くまでは、くるくるを出しておき、届いたら描き直す
+  fn.after = () => {
+    if (!worldImg.complete) worldImg.addEventListener('load', () => rerender(), { once: true });
   };
   uiShow(fn);
   updateChrome();

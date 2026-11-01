@@ -10,6 +10,7 @@ import { G, P, pointPos, spawnNests, stageDef, startStage, stoneActive } from '.
 import { touchMode } from '../input/input.js';
 import { showStoneMenu } from '../ui/pause.js';
 import { showShop } from '../ui/shop.js';
+import { withMaps } from '../ui/loading.js';
 import { toast } from '../ui/toast.js';
 import { selStage, setSelStage } from '../ui/world-map.js';
 
@@ -18,6 +19,9 @@ export function goThroughGate(gt) {
   collectAllMats();
   const hp = P.hp;
   const to = stageDef(gt.to);
+  withMaps([to], () => enterByGate(gt, to, hp));
+}
+function enterByGate(gt, to, hp) {
   startStage(to.id, gt.entry, { hp });
   hero.lastTravel = { difficulty: diffId, stage: to.id, point: gt.entry };
   setSelStage(to.id);

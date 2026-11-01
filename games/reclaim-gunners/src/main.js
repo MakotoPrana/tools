@@ -51,7 +51,8 @@ import './ui/mods.js';
 import './ui/materials.js';
 import './ui/settings.js';
 import './ui/toast.js';
-import { DEBUG } from './core/config.js';
+import { DEBUG, STAGES } from './core/config.js';
+import { preloadMaps, withMaps } from './ui/loading.js';
 import { G } from './game/stage.js';
 import { installDebug } from './debug.js';
 import { update } from './game/update.js';
@@ -73,5 +74,9 @@ function frame(now) {
 if (DEBUG) installDebug();
 
 layout();
-showTitle();
 requestAnimationFrame(frame);
+// 最初のステージのマップ (タイトルの背景にも使う) を作ってからタイトルを出し、ほかのステージのマップは手が空いたときに作る
+withMaps([STAGES[0]], () => {
+  showTitle();
+  preloadMaps();
+});
