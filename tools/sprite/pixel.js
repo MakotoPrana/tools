@@ -751,28 +751,37 @@ function makeFace(cells, W, H, palette, op, p) {
     for (const set of [p.pupilPaint, p.white, p.shine]) for (const i of [...set]) if (inRect(i)) set.delete(i);
     for (const i of [...p.parts.keys()]) if (inRect(i)) p.parts.delete(i);
   }
-  // 目
+  // 目。白目も含めて、囲んだ範囲に収まるようにする
+  const whiteMode = $("eye-white").value;
+  const outerW = whiteMode === "outer" || whiteMode === "both" ? 1 : 0; // 外側の白目の幅
+  const innerW = whiteMode === "both" ? 1 : 0; // 内側の白目の幅
+  // 顔の左半分で使えるマスの数 (真ん中に 1〜2 マスのすき間を残す)
+  const avail = Math.ceil(fw / 2) - 1;
   const k = Number($("face-eye").value);
-  const ew = Math.max(1, Math.round(fw * 0.13 * k));
-  const eh = Math.max(2, Math.round(fw * 0.19 * k));
+  const ew = Math.max(1, Math.min(Math.round(fw * 0.13 * k), avail - outerW - innerW));
+  const eh = Math.min(fh, Math.max(2, Math.round(fw * 0.19 * k)));
   const mid = x0 + fw / 2;
-  const ey = y0 + Math.round(fh * Number($("face-y").value) / 100);
+  const off = Math.floor((ew - 1) / 2); // 黒目の左端から真ん中のマスまで
+  const offY = Math.floor((eh - 1) / 2);
+  // 目の上下が範囲に収まるように、高さを寄せる
+  const eyeTop = Math.min(y1 - eh + 1, Math.max(y0, y0 + Math.round(fh * Number($("face-y").value) / 100) - offY));
+  const ey = eyeTop + offY;
   const half = (fw * Number($("face-gap").value)) / 200;
   // マス x を顔の真ん中で折り返したマス
   const mirror = (x) => 2 * mid - 1 - x;
-  const off = Math.floor((ew - 1) / 2); // 黒目の左端から真ん中のマスまで
-  const lStart = Math.min(Math.floor(mid - half) - off, Math.floor(mid) - ew - 1); // 左目の左端 (右目と重ならないように)
+  // 左目の左端。外側の白目が範囲の左端より外に出ず、内側 (白目を含む) が顔の真ん中に届かないようにする
+  const lStart = Math.max(x0 + outerW, Math.min(Math.floor(mid - half) - off, x0 + avail - innerW - ew));
   const rStart = mirror(lStart + ew - 1); // 右目の左端
   for (const start of [lStart, rStart]) {
     drawPupil(cells, W, H, palette, start + off, ey, ew, eh, mid, p.pupilPaint, p.white, p.holes, p.shine);
   }
-  const isSkin = (x, y) => x >= x0 && x <= x1 && y >= 0 && y < H && cells[y * W + x] === skin && !p.holes.has(y * W + x);
+  const isSkin = (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1 && cells[y * W + x] === skin && !p.holes.has(y * W + x);
   const put = (x, y, c) => {
     if (!isSkin(x, y)) return;
     p.parts.set(y * W + x, c);
     p.holes.add(y * W + x);
   };
-  const eyeBottom = ey - Math.floor((eh - 1) / 2) + eh - 1;
+  const eyeBottom = eyeTop + eh - 1;
   // ほっぺ: 目の下の外側に、横長の点
   if ($("face-blush").checked) {
     const c = hexRgb($("face-blush-color").value);
