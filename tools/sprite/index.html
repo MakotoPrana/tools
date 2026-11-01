@@ -258,7 +258,7 @@
           <label class="check"><input type="checkbox" id="p-draw-mirror" checked /> 顔の反対側にも左右対称に描く</label>
         </div>
         <div id="p-face-opts" hidden>
-          <p class="crop-hint">結果の上で、顔の肌の部分 (髪を除いたところ) をドラッグして囲むと、その大きさに合わせて目・ほっぺ・口を描きます。設定はあとから変えても、作った顔に効きます。</p>
+          <p class="crop-hint">結果の上に顔の見本 (目・ほっぺ・口) が重なって出ます。枠の中をドラッグすると動き、右下の角をドラッグすると大きさが変わります。枠の外をドラッグすると、新しく囲み直せます。顔の肌の部分 (髪を除いたところ) に合わせたら「この位置に顔を描く」を押します。</p>
           <div class="erase-row">
             <label for="p-face-eye">目の大きさ</label>
             <select id="p-face-eye">
@@ -285,7 +285,9 @@
             <label class="check"><input type="checkbox" id="p-face-blush" checked /> ほっぺを付ける</label>
             <input type="color" id="p-face-blush-color" value="#ff8fa8" aria-label="ほっぺの色" />
           </div>
-          <label class="check"><input type="checkbox" id="p-face-clear" checked /> 囲んだ中のもとの目や口を消してから描く</label>
+          <label class="check"><input type="checkbox" id="p-face-clear" checked /> 枠の中のもとの目や口を消してから描く</label>
+          <button type="button" id="p-face-apply" class="primary" disabled>この位置に顔を描く</button>
+          <p class="crop-hint face-after">描いたあとも、下の設定を変えると顔に効きます。描き直すときは「1つ戻す」で消してから、もう一度見本を動かしてください。</p>
         </div>
         <div id="p-eye-common" hidden>
           <div class="erase-row" id="p-pupil-row">
@@ -435,7 +437,7 @@
         <h2>使い方</h2>
         <ol class="guide-list">
           <li><b>背景を切り抜く</b>: 画像を選ぶと、背景を自動で消します。消え残りや消えすぎは、クリックやブラシで直します。</li>
-          <li><b>ドット絵にする</b>: 横と縦のピクセル数と色数を決めて、ドット絵にします。必要ならトリミングし、等身も変えられます。影を付けると立体的に見えます。残したくない色はクリックで透明にします。「目を直す」を選んで黒目をクリックすると、目を大きくしたり、白目を付けたり、光の点を入れたりできます。目がつぶれて消えたときは「目を描き足す」で、目を置きたいところをクリックします。「顔を作る」で顔の肌の部分をドラッグで囲むと、目・ほっぺ・口をまとめて描きます。</li>
+          <li><b>ドット絵にする</b>: 横と縦のピクセル数と色数を決めて、ドット絵にします。必要ならトリミングし、等身も変えられます。影を付けると立体的に見えます。残したくない色はクリックで透明にします。「目を直す」を選んで黒目をクリックすると、目を大きくしたり、白目を付けたり、光の点を入れたりできます。目がつぶれて消えたときは「目を描き足す」で、目を置きたいところをクリックします。「顔を作る」では、顔の見本を顔の肌の部分にドラッグで合わせて「この位置に顔を描く」を押すと、目・ほっぺ・口をまとめて描きます。</li>
           <li><b>歩かせる</b>: 絵の向きを選び、肩・手・腰・足の丸を手足に合わせると、歩きのコマができます。コマを横に並べたスプライトシートを保存します。</li>
           <li>各段階の下のボタンで、できた絵を次の段階へそのまま渡せます。手持ちの画像から、好きな段階で始めることもできます。</li>
         </ol>

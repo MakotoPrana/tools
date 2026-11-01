@@ -68,6 +68,7 @@ function loadUrl(url, fileName) {
     full = { w, h, canvas: cv };
     crop = { x: 0, y: 0, w, h };
     neckY = null;
+    faceBox = null;
     $("shape-card").hidden = false;
     srcName = fileName.replace(/\.[^.]+$/, "") || "pixel";
     drop.classList.add("loaded");
@@ -450,8 +451,12 @@ function erase(op) {
   render();
 }
 
-// 顔を作る: 結果の上をドラッグして顔の範囲を囲む
-let faceDrag = null; // { x0, y0, x1, y1 } (マス)
+// 顔を作る: 顔の見本 (目・ほっぺ・口) を結果に重ねて表示し、ドラッグで動かして顔に合わせる。
+// 「この位置に顔を描く」で確定する
+let faceBox = null; // 見本の範囲 (結果の大きさに対する割合) { fx0, fy0, fx1, fy1 }
+let facePreview = false; // 見本を表示しているか
+let faceDrag = null; // { mode: "move" | "size" | "new", ... } (マス)
+
 function cellAt(e) {
   const b = view.getBoundingClientRect();
   return {
@@ -459,35 +464,146 @@ function cellAt(e) {
     y: Math.min(result.h - 1, Math.max(0, Math.floor(((e.clientY - b.top) / b.height) * result.h))),
   };
 }
+
+// 見本の範囲をマスで (x1, y1 は含む)
+function faceCells() {
+  const W = result.w, H = result.h;
+  return {
+    x0: Math.round(faceBox.fx0 * W), y0: Math.round(faceBox.fy0 * H),
+    x1: Math.round(faceBox.fx1 * W) - 1, y1: Math.round(faceBox.fy1 * H) - 1,
+  };
+}
+function setFaceCells(x0, y0, x1, y1) {
+  const W = result.w, H = result.h;
+  faceBox = { fx0: x0 / W, fy0: y0 / H, fx1: (x1 + 1) / W, fy1: (y1 + 1) / H };
+}
+
+// はじめの見本の位置: 絵の横の真ん中、上のほう (頭のあたり)
+function defaultFace() {
+  const { w: W, h: H, cells } = result;
+  let bx0 = W, by0 = H, bx1 = -1, by1 = -1;
+  for (let i = 0; i < W * H; i++) {
+    if (cells[i] < 0) continue;
+    const x = i % W, y = (i - x) / W;
+    bx0 = Math.min(bx0, x); bx1 = Math.max(bx1, x);
+    by0 = Math.min(by0, y); by1 = Math.max(by1, y);
+  }
+  if (bx1 < 0) { bx0 = 0; by0 = 0; bx1 = W - 1; by1 = H - 1; }
+  const bw = bx1 - bx0 + 1, bh = by1 - by0 + 1;
+  // 顔の肌らしいところ: 絵の上半分から始まる、明るい同じ色のつながりのうち、いちばん大きいもの
+  const seen = new Uint8Array(W * H);
+  let best = null;
+  for (let y = by0; y <= by0 + bh * 0.5; y++) {
+    for (let x = bx0; x <= bx1; x++) {
+      const i = y * W + x;
+      if (cells[i] < 0 || seen[i]) continue;
+      const r = region(cells, W, H, i, seen);
+      const [cr, cg, cb] = result.palette[cells[i]];
+      if (0.299 * cr + 0.587 * cg + 0.114 * cb < 110) continue;
+      if (!best || r.length > best.length) best = r;
+    }
+  }
+  if (best && best.length >= 20) {
+    const f = bounds(best, W);
+    if (f.w >= 5 && f.h >= 4 && f.h <= bh * 0.7) {
+      setFaceCells(f.x0, f.y0, f.x1, f.y1);
+      return;
+    }
+  }
+  const fw = Math.min(W, Math.max(5, Math.round(Math.min(bw * 0.6, bh * 0.5))));
+  const fh = Math.min(H, Math.max(4, Math.round(fw * 0.75)));
+  const x0 = Math.max(0, Math.min(W - fw, Math.round((bx0 + bx1 + 1) / 2 - fw / 2)));
+  const y0 = Math.max(0, Math.min(H - fh, by0 + Math.round(bh * 0.15)));
+  setFaceCells(x0, y0, x0 + fw - 1, y0 + fh - 1);
+}
+
+function showFacePreview() {
+  if (!result) return;
+  if (!faceBox) defaultFace();
+  facePreview = true;
+  $("face-apply").disabled = false;
+  drawView();
+}
+
+// 角の近く (右下 2 マス以内) なら大きさを変える
+const onFaceCorner = (c, b) => c.x >= b.x1 - 1 && c.x <= b.x1 + 1 && c.y >= b.y1 - 1 && c.y <= b.y1 + 1;
+const inFace = (c, b) => c.x >= b.x0 && c.x <= b.x1 && c.y >= b.y0 && c.y <= b.y1;
+
 view.addEventListener("pointerdown", (e) => {
   if (!result || clickMode() !== "face") return;
   e.preventDefault();
   view.setPointerCapture(e.pointerId);
+  if (!faceBox) defaultFace();
+  facePreview = true;
+  $("face-apply").disabled = false;
   const c = cellAt(e);
-  faceDrag = { x0: c.x, y0: c.y, x1: c.x, y1: c.y };
+  const b = faceCells();
+  if (onFaceCorner(c, b)) faceDrag = { mode: "size" };
+  else if (inFace(c, b)) faceDrag = { mode: "move", dx: c.x - b.x0, dy: c.y - b.y0, w: b.x1 - b.x0, h: b.y1 - b.y0 };
+  else faceDrag = { mode: "new", ax: c.x, ay: c.y };
+  if (faceDrag.mode === "new") setFaceCells(c.x, c.y, c.x, c.y);
   drawView();
 });
 view.addEventListener("pointermove", (e) => {
-  if (!faceDrag) return;
+  if (!result || clickMode() !== "face") return;
   const c = cellAt(e);
-  faceDrag.x1 = c.x;
-  faceDrag.y1 = c.y;
+  if (!faceDrag) {
+    if (!facePreview || !faceBox) return;
+    const b = faceCells();
+    view.style.cursor = onFaceCorner(c, b) ? "nwse-resize" : inFace(c, b) ? "move" : "crosshair";
+    return;
+  }
+  const W = result.w, H = result.h;
+  const b = faceCells();
+  if (faceDrag.mode === "move") {
+    const x0 = Math.max(0, Math.min(W - 1 - faceDrag.w, c.x - faceDrag.dx));
+    const y0 = Math.max(0, Math.min(H - 1 - faceDrag.h, c.y - faceDrag.dy));
+    setFaceCells(x0, y0, x0 + faceDrag.w, y0 + faceDrag.h);
+  } else if (faceDrag.mode === "size") {
+    setFaceCells(b.x0, b.y0, Math.max(b.x0 + 4, c.x), Math.max(b.y0 + 3, c.y));
+  } else {
+    setFaceCells(Math.min(faceDrag.ax, c.x), Math.min(faceDrag.ay, c.y), Math.max(faceDrag.ax, c.x), Math.max(faceDrag.ay, c.y));
+  }
   drawView();
 });
 const endFace = () => {
   if (!faceDrag) return;
-  const x0 = Math.min(faceDrag.x0, faceDrag.x1), x1 = Math.max(faceDrag.x0, faceDrag.x1);
-  const y0 = Math.min(faceDrag.y0, faceDrag.y1), y1 = Math.max(faceDrag.y0, faceDrag.y1);
   faceDrag = null;
-  if (x1 - x0 + 1 < 5 || y1 - y0 + 1 < 4) {
-    drawView();
-    $("erase-info").textContent = "顔の範囲は、横 5 × 縦 4 マス以上を囲んでください";
-    return;
-  }
-  erase({ type: "face", fx0: x0 / result.w, fy0: y0 / result.h, fx1: (x1 + 1) / result.w, fy1: (y1 + 1) / result.h });
+  // 小さすぎる範囲は、横 5 × 縦 4 マスまで広げる
+  const W = result.w, H = result.h;
+  const b = faceCells();
+  const x1 = Math.min(W - 1, Math.max(b.x1, b.x0 + 4));
+  const y1 = Math.min(H - 1, Math.max(b.y1, b.y0 + 3));
+  setFaceCells(Math.max(0, x1 - Math.max(4, b.x1 - b.x0)), Math.max(0, y1 - Math.max(3, b.y1 - b.y0)), x1, y1);
+  drawView();
 };
 view.addEventListener("pointerup", endFace);
 view.addEventListener("pointercancel", endFace);
+
+$("face-apply").addEventListener("click", () => {
+  if (!result || !faceBox) return;
+  facePreview = false;
+  $("face-apply").disabled = true;
+  erase({ type: "face", ...faceBox });
+});
+
+// 見本に描くマスと色 (確定はしないので、変換の結果のコピーに描く)
+function previewFace() {
+  const { w: W, h: H, palette } = result;
+  const cells = Int16Array.from(result.cells);
+  const p = { pupilPaint: new Set(), white: new Set(), holes: new Set(), shine: new Set(), parts: new Map() };
+  makeFace(cells, W, H, palette, { type: "face", ...faceBox }, p);
+  const out = new Map();
+  for (let i = 0; i < W * H; i++) if (cells[i] !== result.cells[i] && cells[i] >= 0) out.set(i, palette[cells[i]]);
+  const pupil = hexRgb($("draw-color").value);
+  for (const i of p.pupilPaint) out.set(i, pupil);
+  const white = hexRgb($("eye-white-color").value);
+  for (const i of p.white) out.set(i, white);
+  for (const [i, c] of p.parts) out.set(i, c);
+  const shine = hexRgb($("eye-color").value);
+  for (const i of p.shine) out.set(i, shine);
+  return out;
+}
 
 view.addEventListener("click", (e) => {
   if (!result || clickMode() === "face") return;
@@ -518,6 +634,9 @@ for (const r of document.querySelectorAll('input[name="p-click"]')) {
     $("eye-common").hidden = m === "erase";
     $("pupil-row").hidden = m === "eye";
     view.classList.toggle("face-drag", m === "face");
+    view.style.cursor = "";
+    if (m === "face") showFacePreview();
+    else drawView();
   });
 }
 for (const el of [$("eye-pos"), $("eye-color"), $("eye-both"), $("eye-size"), $("eye-white"), $("eye-white-color"), $("eye-shine"),
@@ -1327,15 +1446,27 @@ function drawView() {
     }
     c.stroke();
   }
-  // 顔を作るときの、囲んでいる範囲
-  if (faceDrag) {
-    const x0 = Math.min(faceDrag.x0, faceDrag.x1), x1 = Math.max(faceDrag.x0, faceDrag.x1);
-    const y0 = Math.min(faceDrag.y0, faceDrag.y1), y1 = Math.max(faceDrag.y0, faceDrag.y1);
-    c.fillStyle = "rgba(255,90,140,0.15)";
-    c.fillRect(x0 * s, y0 * s, (x1 - x0 + 1) * s, (y1 - y0 + 1) * s);
+  // 顔を作るときの見本と、その範囲の枠・大きさを変えるつまみ
+  if (facePreview && faceBox && clickMode() === "face") {
+    const b = faceCells();
+    for (const [i, col] of previewFace()) {
+      const x = i % w, y = (i - x) / w;
+      c.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+      c.fillRect(x * s, y * s, s, s);
+    }
+    const r = [b.x0 * s, b.y0 * s, (b.x1 - b.x0 + 1) * s, (b.y1 - b.y0 + 1) * s];
+    c.lineWidth = Math.max(2, Math.round(s / 5));
+    c.strokeStyle = "#ffffff";
+    c.strokeRect(...r);
+    c.setLineDash([Math.max(4, s / 2), Math.max(4, s / 2)]);
     c.strokeStyle = "#ff3b7a";
-    c.lineWidth = Math.max(2, s / 4);
-    c.strokeRect(x0 * s, y0 * s, (x1 - x0 + 1) * s, (y1 - y0 + 1) * s);
+    c.strokeRect(...r);
+    c.setLineDash([]);
+    const hs = Math.max(8, s);
+    c.fillStyle = "#ff3b7a";
+    c.fillRect(r[0] + r[2] - hs / 2, r[1] + r[3] - hs / 2, hs, hs);
+    c.strokeStyle = "#ffffff";
+    c.strokeRect(r[0] + r[2] - hs / 2, r[1] + r[3] - hs / 2, hs, hs);
   }
   view.hidden = false;
   $("empty").hidden = true;
