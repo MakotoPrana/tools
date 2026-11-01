@@ -34,6 +34,7 @@ CrazyGames 版・itch.io 版は Google タグを外すので、何も送らな�
 - mole の `stage_start` / `stage_end` は以前から `stage_no` で送っていたので、続けて見られるように `stage_no` も残す
 - voxel-grenade・paper-plane のゲーム専用のイベント (`voxel_grenade_start` など) もそのまま送る
 - cleaning-survivors は、共通のイベントに加えて、同じ中身で頭に `cs_` をつけたイベント (`cs_stage_start`・`cs_stage_end`・`cs_stage_retry_fail`・`cs_stage_retry_clear`・`cs_stage_retry_quit`) も送る。`game` で絞りこまなくても、このゲームのイベントだけを見られる
+- cleaning-survivors は、力尽きるたびに `cs_death` も送る (宝物や広告で復活したぶんも数える。時間切れは数えない)。パラメータは `game`、`stage`、`mode`、`character`、`level`、`death_no` (このプレイで何回目か)、`time_sec` (プレイ開始からの秒数)、`rooms_done`、`clean_pct`
 
 ## Google アナリティクスで見るための設定
 
