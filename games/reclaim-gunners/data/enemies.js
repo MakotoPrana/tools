@@ -31,7 +31,7 @@ RG.ENEMIES = [
   { id: 'succ', name: '幻惑の妖魔', ai: 'shooter', hp: 32, atk: 7, speed: 85, r: 8, weak: ['holy'], resist: ['thunder'], exp: 17, gold: 10, mat: 'feather', demon: true, color: '#d86fb2', shot: { cd: 2, speed: 160, n: 3 } },
   { id: 'mino', name: 'ミノタウロス', ai: 'charge', hp: 140, atk: 26, speed: 38, r: 14, weak: ['thunder'], resist: [], exp: 34, gold: 20, mat: 'bullHorn', color: '#8a5a3a' },
   { id: 'dknight', name: 'デーモンナイト', ai: 'chase', hp: 180, atk: 24, speed: 60, r: 12, weak: ['holy'], resist: ['fire', 'ice'], exp: 45, gold: 26, mat: 'crest', demon: true, color: '#3b2a4f' },
-  { id: 'fiend', name: '中級悪魔', ai: 'brute', mid: true, noTouch: true, hp: 110, atk: 13, speed: 62, r: 13, weak: ['holy'], resist: [], exp: 40, gold: 25, mat: 'demonHeart', demon: true, color: '#7a1e2e' },
+  { id: 'fiend', name: '中級悪魔', ai: 'brute', mid: true, noTouch: true, hp: 220, atk: 13, speed: 62, r: 13, weak: ['holy'], resist: [], exp: 40, gold: 25, mat: 'demonHeart', demon: true, color: '#7a1e2e' },
   { id: 'archd', name: 'アークデーモン', ai: 'shooter', hp: 260, atk: 22, speed: 38, r: 14, weak: ['holy'], resist: ['fire', 'thunder'], exp: 70, gold: 40, mat: 'bloodGem', demon: true, color: '#8f1f3a', shot: { cd: 1.6, speed: 130, n: 8 } },
 ];
 

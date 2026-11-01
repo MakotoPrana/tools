@@ -22,7 +22,7 @@ export function installDebug() {
       return spawnEnemy('fiend', P.x + dx, P.y + dy, area, null, { chase: true });
     },
     give(n = 20000) {
-      hero.souls += n;
+      hero.gold += n;
     },
     clearArea(i) {
       const a = G.areas[i == null ? G.curArea : i];

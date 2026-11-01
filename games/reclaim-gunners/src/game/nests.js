@@ -1,12 +1,12 @@
 // 魔巣とエリアの解放
 import { sfx } from '../audio/sound.js';
-import { ENEMY, MOVE_BLOCK, NESTS, TAU, TILE, lvMul, soulGain, souls, tr } from '../core/config.js';
+import { ENEMY, MOVE_BLOCK, NESTS, TAU, TILE, lvMul, goldGain, money, tr } from '../core/config.js';
 import { writeSave } from '../core/save.js';
 import { dist, lerp, pick, rnd, tc } from '../core/util.js';
 import { setTimeLater } from './bosses.js';
 import { addPoison, enemyShot, ring } from './bullets.js';
 import { hitsTiles, lineClear, lockArea, moveCircle } from './collision.js';
-import { gainSouls, spawnEnemy, spawnFromNest } from './enemies.js';
+import { gainGold, spawnEnemy, spawnFromNest } from './enemies.js';
 import { addPart, showBanner } from './fx.js';
 import { D, prog, rank } from './hero.js';
 import { collectAllMats } from './pickups.js';
@@ -23,7 +23,7 @@ export function updateNests(dt) {
     const dp = dist(n.x, n.y, P.x, P.y);
     if (dp > 700 || G.dead) continue;
     n.spawnT -= dt;
-    if (n.nd.attack && dp < 340 && G.curArea === n.area.i) nestAttack(n, dt, dp); // エリアに入ってきたときだけ撃つ
+    if (n.nd.attack && dp < 340) nestAttack(n, dt, dp);
     const cap = Math.round(n.nd.cap * D.cap);
     if (n.spawnT <= 0 && n.children < cap) {
       spawnFromNest(n);
@@ -97,11 +97,11 @@ export function destroyNest(n) {
   }
   addPart({ x: n.x, y: n.y, vx: 0, vy: 0, life: 0.4, color: '#d07aff', size: n.r * 3, ring: true });
   const typeMul = { small: 1, big: 4 }[n.type] || 2;
-  gainSouls(Math.round(20 * lvMul.gold(n.lv) * typeMul * D.reward * (1 + 0.03 * rank('gold'))));
+  gainGold(Math.round(20 * lvMul.gold(n.lv) * typeMul * D.reward * (1 + 0.03 * rank('gold'))));
   addGauge(RG.SP_GAIN.nest);
   const mats = n.area.def.enemies;
   for (let i = 0; i < typeMul; i++) G.pickups.push({ type: 'mat', id: ENEMY[pick(mats)].mat, x: n.x, y: n.y, vx: rnd(-50, 50), vy: rnd(-50, 50), life: 9999 });
-  // 眷属は崩れて消える (魂は入る)
+  // 眷属は崩れて消える (お金は入る)
   for (const e of G.enemies) if (e.home === n && !e.dead) e.crumble = rnd(0.3, 3);
   const a = n.area;
   const left = a.nests.filter((x) => !x.dead).length;
@@ -120,9 +120,9 @@ export function liberate(area) {
   if (first && !area.reinvaded) {
     prog.areas.push(a.id);
     const lv = Math.min(99, a.lv[1] + D.lv);
-    const gain = Math.round(soulGain(60, 40, lv) * a.nests.length * D.reward);
-    gainSouls(gain);
-    sub = tr('解放のごほうび  +{n}', { n: souls(gain) });
+    const gain = Math.round(goldGain(60, 40, lv) * a.nests.length * D.reward);
+    gainGold(gain);
+    sub = tr('解放のごほうび  +{n}', { n: money(gain) });
     if (a.town) sub += `\n${tr('町に人が戻り、武器屋が開いた!  黄色い矢印の先へ')}`;
   } else {
     sub = tr('残党を一掃した');

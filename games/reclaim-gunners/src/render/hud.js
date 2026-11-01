@@ -1,5 +1,5 @@
 // HUD: 体力・武器スロット・エリアの名前
-import { TAU, VH, VW, souls, tr } from '../core/config.js';
+import { TAU, VH, VW, money, tr } from '../core/config.js';
 import { settings } from '../core/save.js';
 import { clamp, fmt } from '../core/util.js';
 import { bossHp } from '../game/bosses.js';
@@ -92,11 +92,11 @@ export function drawHud() {
   drawMinimap();
   drawShopPointer();
 
-  // 魂と素材
-  txt(souls(hero.souls), 10, VH - 14, 11, '#b8d8ff', 'left', 'display');
-  if (G.soulPop > 0) {
-    ctx.globalAlpha = Math.min(1, G.soulPopT);
-    txt(`+${fmt(G.soulPop)}`, 12, VH - 26, 8, '#e0f0ff');
+  // お金と素材
+  txt(money(hero.gold), 10, VH - 14, 11, '#e8c060', 'left', 'display');
+  if (G.goldPop > 0) {
+    ctx.globalAlpha = Math.min(1, G.goldPopT);
+    txt(`+${fmt(G.goldPop)}`, 12, VH - 26, 8, '#fff0b0');
     ctx.globalAlpha = 1;
   }
   G.matLog.forEach((mlog, i) => {

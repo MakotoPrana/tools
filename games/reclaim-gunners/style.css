@@ -14,7 +14,6 @@
   --panel-text: #ecdfc6;
   --panel-muted: #a8967a;
   --gold: #e0b860;
-  --soul: #a8ccff;
   --gold-dim: #8a6a3a;
   --blood: #8a161c;
   --ember: #ff7a3a;
@@ -270,7 +269,6 @@ body.rotated .app {
 
 .muted { color: var(--panel-muted); }
 .gold { color: var(--gold); }
-.soul { color: var(--soul); }
 .mint { color: var(--mint); }
 .danger { color: var(--danger); }
 .tag { display: inline-block; padding: 0 0.5em; border-radius: 6px; background: var(--panel-3); font-size: 0.82em; font-weight: 700; }

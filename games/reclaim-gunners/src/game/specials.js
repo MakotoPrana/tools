@@ -54,7 +54,7 @@ export function spDesc(id, i) {
 export const spBase = (id) => WEAPON[id].price || WEAPON[id].basePrice || 150000;
 export function spUnlockCost(id, i) {
   const u = RG.SP_UNLOCK[i];
-  return { souls: Math.max(u.min, Math.ceil((spBase(id) * u.mul) / 10) * 10), hearts: u.hearts, req: u.req };
+  return { gold: Math.max(u.min, Math.ceil((spBase(id) * u.mul) / 10) * 10), hearts: u.hearts, req: u.req };
 }
 export const spUpCost = (id, i, lv) => Math.ceil((spBase(id) * 0.2 * [1, 1.5, 2.2][i] * Math.pow(1.28, lv)) / 10) * 10;
 

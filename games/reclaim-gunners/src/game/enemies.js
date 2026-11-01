@@ -1,6 +1,6 @@
 // 敵: 出現・動き・倒したときのごほうび
 import { sfx } from '../audio/sound.js';
-import { ENEMY, FLY_BLOCK, GHOST_BLOCK, MAX_ENEMIES, MOVE_BLOCK, T, TAU, lvMul, soulGain } from '../core/config.js';
+import { ENEMY, FLY_BLOCK, GHOST_BLOCK, MAX_ENEMIES, MOVE_BLOCK, T, TAU, lvMul, goldGain } from '../core/config.js';
 import { angNorm, clamp, dist, dist2, pick, rnd, rndi } from '../core/util.js';
 import { addPoison, enemyShot, ring } from './bullets.js';
 import { hitsTiles, lineClear, moveCircle, tileAt } from './collision.js';
@@ -156,10 +156,8 @@ export function updateEnemyAI(e, dt, dp) {
     }
     return;
   }
-  // 敵は、主人公が自分のエリアに入ってこない限り気づかない (撃たれたときは別)
-  const inArea = G.curArea === e.area.i;
   if (e.state === 'idle') {
-    if ((inArea && ((dp < 250 && e.los) || dp < 120)) || e.aggro) {
+    if ((dp < 250 && e.los) || dp < 120 || e.aggro) {
       e.state = 'chase';
     } else {
       e.wt -= dt;
@@ -175,10 +173,8 @@ export function updateEnemyAI(e, dt, dp) {
       return;
     }
   }
-  // 追いかけるのをやめる: 遠く離れたとき、または主人公がエリアから出て 2 秒たったとき
-  e.outT = inArea ? 0 : (e.outT || 0) + dt;
-  if (!e.lair && (dp > 720 || e.outT > 2)) {
-    e.outT = 0;
+  // 追いかけるのをやめる
+  if (dp > 720 && !e.lair) {
     e.state = 'idle';
     e.mode = null;
     e.aggro = false;
@@ -384,7 +380,7 @@ export function killEnemy(e, w, crumbled) {
   e.dead = true;
   if (e.home) e.home.children--;
   const mul = D.reward * (e.elite ? 3 : 1) * (e.mini ? 0.3 : 1);
-  gainSouls(Math.max(1, Math.round(soulGain(e.def.exp, e.def.gold, e.lv) * mul * (1 + 0.03 * rank('gold')))));
+  gainGold(Math.max(1, Math.round(goldGain(e.def.exp, e.def.gold, e.lv) * mul * (1 + 0.03 * rank('gold')))));
   hero.kills++;
   addGauge(e.def.mid ? RG.SP_GAIN.mid : e.elite ? RG.SP_GAIN.elite : RG.SP_GAIN.kill * (e.mini ? 0.5 : 1));
   for (let i = 0; i < 8; i++) addPart({ x: e.x, y: e.y, vx: rnd(-80, 80), vy: rnd(-80, 80), life: rnd(0.2, 0.45), color: crumbled ? '#4a2a5a' : e.def.color, size: rnd(2, 3.5) });
@@ -407,9 +403,9 @@ export function killEnemy(e, w, crumbled) {
   if (w && w.demonHeal && e.def.demon) P.hp = Math.min(maxHp(), P.hp + w.demonHeal);
 }
 
-// 魂は拾わなくても、倒した瞬間に自動で集まる
-export function gainSouls(n) {
-  hero.souls += n;
-  G.soulPop += n;
-  G.soulPopT = 1.5;
+// お金は拾わなくても、倒した瞬間に自動で入る
+export function gainGold(n) {
+  hero.gold += n;
+  G.goldPop += n;
+  G.goldPopT = 1.5;
 }

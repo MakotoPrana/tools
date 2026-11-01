@@ -1,6 +1,6 @@
 // 武器の強化 (スキルツリー) の画面
 import { sfx } from '../audio/sound.js';
-import { SHOPS, WEAPON, souls, tr } from '../core/config.js';
+import { SHOPS, WEAPON, money, tr } from '../core/config.js';
 import { hero } from '../game/hero.js';
 import { spDesc, spLv, spOwned, spState, spUnlockCost, spUpCost } from '../game/specials.js';
 import { clearEff, modCost, modLv, modReqOk, modShow, modTotal } from '../game/weapon-mods.js';
@@ -11,7 +11,7 @@ import { curShop, shopPhase } from './shop.js';
 // ---------- 武器の強化 (スキルツリー) ----------
 //   武器を根にして、左から右へ枝分かれする
 //     基礎の改造 (カテゴリごとの 4 つ) → その武器だけの改造 (前の改造が決まった Lv になると上げられる)
-//     必殺技 1 → 2 → 3 (前の必殺技の Lv と、魂・悪魔の心臓で習得する)
+//     必殺技 1 → 2 → 3 (前の必殺技の Lv と、お金・悪魔の心臓で習得する)
 //   ノードを押すと、下に短い説明と大きな強化のボタンが出る。画面はスクロールしない (ツリーを枠に合わせて縮める)
 //   shopId があるときだけ強化・習得できる (上げられる Lv は、お店の格まで)。必殺技のセットはどこでもできる
 let selKey = null;
@@ -37,7 +37,7 @@ export function showMods(id, shopId) {
     // スクロールせずに 1 画面に収める: 上から 見出し → ツリー (枠に合わせて縮める) → 選んだノードと大きなボタン
     return `
     <div class="overlay"><div class="panel tpanel">
-      ${head(`${tr('強化')} ・ ${w.name}`, `<span class="soul">${souls(hero.souls)}</span>`)}
+      ${head(`${tr('強化')} ・ ${w.name}`, `<span class="gold">${money(hero.gold)}</span>`)}
       <div class="stree">${root}</div>
       ${detail(selKey, ctx)}
     </div></div>`;
@@ -56,7 +56,7 @@ function nodeInfo(key, ctx) {
     const lv = modLv(id, m.id);
     const reqOk = modReqOk(id, m);
     const cost = modCost(w, m, lv);
-    const ready = !!shop && reqOk && lv < RG.MOD_MAX && lv < cap && hero.souls >= cost;
+    const ready = !!shop && reqOk && lv < RG.MOD_MAX && lv < cap && hero.gold >= cost;
     return { m, lv, max: RG.MOD_MAX, reqOk, cost, ready, name: m.name, kind: m.req ? 'uniq' : 'base', req: m.req ? `Lv${m.req[1]}` : '' };
   }
   const i = +k;
@@ -65,13 +65,13 @@ function nodeInfo(key, ctx) {
   const lv = spLv(id, i);
   if (own) {
     const cost = spUpCost(id, i, lv);
-    const ready = !!shop && lv < RG.SP_MAX && lv < cap && hero.souls >= cost;
+    const ready = !!shop && lv < RG.SP_MAX && lv < cap && hero.gold >= cost;
     return { sp, i, own, lv, max: RG.SP_MAX, reqOk: true, cost, ready, name: sp.name, kind: 'sp', set: spState(id).set === i, req: i ? `Lv${RG.SP_UNLOCK[i].req}` : '' };
   }
   const c = spUnlockCost(id, i);
   const reqOk = spOwned(id, i - 1) && spLv(id, i - 1) >= c.req;
   const hearts = hero.materials.demonHeart || 0;
-  const ready = !!shop && reqOk && hero.souls >= c.souls && hearts >= c.hearts;
+  const ready = !!shop && reqOk && hero.gold >= c.gold && hearts >= c.hearts;
   return { sp, i, own, lv: 0, max: RG.SP_MAX, reqOk, unlock: c, hearts, ready, name: sp.name, kind: 'sp', req: `Lv${c.req}` };
 }
 
@@ -106,16 +106,16 @@ function detail(key, ctx) {
     line = n.lv < n.max ? `${tr('次')}: ${m.desc.replace('{v}', modShow(m, n.lv + 1))}` : m.desc.replace('{v}', modShow(m, n.lv));
     if (!n.reqOk) note = `🔒 ${tr('{name} Lv{n} が必要', { name: byId[m.req[0]].name, n: m.req[1] })}`;
     if (n.lv >= n.max) btns = `<span class="gold">${tr('最大')}</span>`;
-    else if (shop && n.reqOk && !capped) btns = big('modUp', `data-id="${m.id}"`, `${tr('強化')}<small>${souls(n.cost)}</small>`, n.ready);
+    else if (shop && n.reqOk && !capped) btns = big('modUp', `data-id="${m.id}"`, `${tr('強化')}<small>${money(n.cost)}</small>`, n.ready);
   } else {
     line = spDesc(id, n.i);
     if (n.own) {
       btns = n.set ? `<span class="tag">${tr('セット中')}</span>` : big('spSet', `data-i="${n.i}"`, tr('セットする'), true, false);
       if (n.lv >= n.max) btns += `<span class="gold">${tr('最大')}</span>`;
-      else if (shop && !capped) btns += big('spUp', `data-i="${n.i}"`, `${tr('強化')}<small>${souls(n.cost)}</small>`, n.ready);
+      else if (shop && !capped) btns += big('spUp', `data-i="${n.i}"`, `${tr('強化')}<small>${money(n.cost)}</small>`, n.ready);
     } else {
       note = n.reqOk ? tr('悪魔の心臓 {h}/{n}', { h: n.hearts, n: n.unlock.hearts }) : `🔒 ${tr('{name} Lv{n} が必要', { name: RG.SPECIALS[id][n.i - 1].name, n: n.unlock.req })}`;
-      if (shop) btns = big('spLearn', `data-i="${n.i}"`, `${tr('習得する')}<small>${souls(n.unlock.souls)}</small>`, n.ready);
+      if (shop) btns = big('spLearn', `data-i="${n.i}"`, `${tr('習得する')}<small>${money(n.unlock.gold)}</small>`, n.ready);
     }
   }
   if (capped) note = tr('この店では Lv{n} まで', { n: cap });
@@ -166,8 +166,8 @@ actions.spUp = (d) => {
   const cap = shop.phases[shopPhase(shop) - 1].max;
   const lv = spLv(id, i);
   const cost = spUpCost(id, i, lv);
-  if (lv >= RG.SP_MAX || lv >= cap || hero.souls < cost) return;
-  hero.souls -= cost;
+  if (lv >= RG.SP_MAX || lv >= cap || hero.gold < cost) return;
+  hero.gold -= cost;
   spState(id).lv[i] = lv + 1;
   sfx('buy');
   rerender();
@@ -178,8 +178,8 @@ actions.spLearn = (d) => {
   if (!id || !curShop || i < 1 || spOwned(id, i)) return;
   const c = spUnlockCost(id, i);
   if (!spOwned(id, i - 1) || spLv(id, i - 1) < c.req) return;
-  if (hero.souls < c.souls || (hero.materials.demonHeart || 0) < c.hearts) return;
-  hero.souls -= c.souls;
+  if (hero.gold < c.gold || (hero.materials.demonHeart || 0) < c.hearts) return;
+  hero.gold -= c.gold;
   hero.materials.demonHeart -= c.hearts;
   spState(id).lv[i] = 0;
   sfx('buy');
@@ -194,8 +194,8 @@ actions.modUp = (d) => {
   const cap = shop.phases[shopPhase(shop) - 1].max;
   const lv = modLv(id, m.id);
   const cost = modCost(w, m, lv);
-  if (lv >= RG.MOD_MAX || lv >= cap || !modReqOk(id, m) || hero.souls < cost) return;
-  hero.souls -= cost;
+  if (lv >= RG.MOD_MAX || lv >= cap || !modReqOk(id, m) || hero.gold < cost) return;
+  hero.gold -= cost;
   hero.mods[id] = hero.mods[id] || {};
   hero.mods[id][m.id] = lv + 1;
   clearEff();

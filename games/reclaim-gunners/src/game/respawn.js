@@ -1,6 +1,6 @@
 // 力尽きたとき
-import { souls, tr } from '../core/config.js';
-import { soulsAtSave, writeSave } from '../core/save.js';
+import { money, tr } from '../core/config.js';
+import { goldAtSave, writeSave } from '../core/save.js';
 import { later, resetBoss } from './bosses.js';
 import { diffId, hero, maxHp, maxPotions } from './hero.js';
 import { updateFlow } from './pathfinding.js';
@@ -9,8 +9,8 @@ import { G, P, pointPos, spawnFiends } from './stage.js';
 import { toast } from '../ui/toast.js';
 
 export function respawn() {
-  const lost = Math.max(0, Math.floor((hero.souls - soulsAtSave) * 0.5));
-  hero.souls -= lost;
+  const lost = Math.max(0, Math.floor((hero.gold - goldAtSave) * 0.5));
+  hero.gold -= lost;
   // いたエリアの魔巣は元に戻る
   const area = G.areas[G.curArea];
   if (area && !area.free) {
@@ -62,6 +62,6 @@ export function respawn() {
   G.curArea = -1;
   G.fade = 1;
   updateFlow();
-  toast(lost > 0 ? tr('力尽きた…\n−{n}', { n: souls(lost) }) : tr('力尽きた…'), 2.6);
+  toast(lost > 0 ? tr('力尽きた…\n−{n}', { n: money(lost) }) : tr('力尽きた…'), 2.6);
   writeSave();
 }
