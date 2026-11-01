@@ -3279,6 +3279,7 @@
       trSpawned: true,
       minHp: 1, // このプレイでいちばん減ったときの体力の割合
       adRevived: false, // 広告で復活したか (1 回のプレイで 1 回だけ)
+      deaths: 0, // このプレイで力尽きた回数 (復活したぶんも数える。アクセス解析の cs_death 用)
       box: 0,
       dumpCoins: 0,
       bossCoins: 0,
@@ -5253,6 +5254,8 @@
       Sound.bgm(null);
       Sound.play('lose');
       puff(p.x, p.y, '#ffffff', 30);
+      G.deaths++;
+      trackDeath();
     }
   }
 
@@ -7397,6 +7400,20 @@
   })();
   // チュートリアルは stage を 'tutorial'、ほかはステージ番号 (1〜) で送る
   const trackStage = (stageIdx) => (stageIdx === TUT ? 'tutorial' : stageIdx + 1);
+  // 力尽きるたびに送る (復活したぶんも数える。ステージの失敗は stage_end で別に送る)
+  function trackDeath() {
+    track('cs_death', {
+      game: 'cleaning_survivors',
+      stage: trackStage(G.stageIdx),
+      mode: G.mode,
+      character: G.ch.id,
+      level: G.level,
+      death_no: G.deaths,
+      time_sec: Math.round(G.time),
+      rooms_done: G.rooms.filter((r) => r.done).length,
+      clean_pct: Math.round(cleanPct()),
+    });
+  }
 
   function startGame(stageIdx) {
     if (stageIdx === TUT && !save.tutorialSeen) {
