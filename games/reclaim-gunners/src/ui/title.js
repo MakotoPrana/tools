@@ -41,7 +41,6 @@ actions.settings = () => showSettings();
 
 // ---------- 主人公選択 ----------
 export let selHero = 'kai';
-let animId = 0;
 export function showHeroSelect() {
   const fn = () => {
     const h = HEROES.find((x) => x.id === selHero);
@@ -52,7 +51,7 @@ export function showHeroSelect() {
       ${head(tr('主人公を選ぶ'))}
       <div class="cards">
         ${HEROES.map((x) => `<button class="card ${x.id === selHero ? 'sel' : ''}" data-act="pickHero" data-id="${x.id}">
-          <canvas width="96" height="96" data-hero="${x.id}"></canvas>
+          <canvas width="72" height="72" data-hero="${x.id}"></canvas>
           <div class="name">${x.name}</div><div class="muted" style="font-size:0.8em">${x.title}</div>
         </button>`).join('')}
       </div>
@@ -66,24 +65,13 @@ export function showHeroSelect() {
       <div class="btn-row"><button class="btn primary" data-act="heroOk">${tr('{name} で始める', { name: h.name })}</button></div>
     </div></div>`;
   };
-  // ドット絵を動かして見せる: 選んでいる主人公は歩き、ほかは息をしている
   fn.after = () => {
-    const t0 = performance.now();
-    const my = ++animId; // 描き直したら、前の動きは止める
-    const loop = () => {
-      const cs = uiEl.querySelectorAll('canvas[data-hero]');
-      if (!cs.length || my !== animId) return;
-      const t = (performance.now() - t0) / 1000;
-      for (const c of cs) {
-        const g = c.getContext('2d');
-        const def = HEROES.find((x) => x.id === c.dataset.hero);
-        const sel = def.id === selHero;
-        g.clearRect(0, 0, 96, 96);
-        drawHeroSprite(g, 48, 68, def, 0.3, 3, t * 10, false, false, [{ id: def.id === 'mira' ? 'E1' : def.id === 'gald' ? 'C1' : 'A1', aim: 0.3 }], sel, t);
-      }
-      requestAnimationFrame(loop);
-    };
-    loop();
+    for (const c of uiEl.querySelectorAll('canvas[data-hero]')) {
+      const g = c.getContext('2d');
+      const def = HEROES.find((x) => x.id === c.dataset.hero);
+      g.clearRect(0, 0, 72, 72);
+      drawHeroSprite(g, 36, 42, def, 0.3, 3.2, 0, false, false, [{ id: def.id === 'mira' ? 'E1' : def.id === 'gald' ? 'C1' : 'A1', aim: 0.3 }]);
+    }
   };
   uiShow(fn);
 }

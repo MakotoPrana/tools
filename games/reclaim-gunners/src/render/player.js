@@ -6,14 +6,13 @@ import { equippedIds } from '../game/player.js';
 import { G, P, ensureWs } from '../game/stage.js';
 import { effW } from '../game/weapon-mods.js';
 import { ctx } from './canvas.js';
-import { heroFrame } from './hero-sprites.js';
-import { drawSoftShadow } from './primitives.js';
+import { circle, drawShade, drawSoftShadow } from './primitives.js';
 
 export function drawPlayer() {
   if (P.inv > 0 && P.rollT <= 0 && Math.floor(G.t * 20) % 2) return;
   // 持っている武器を全部描く (2 丁目は反対の手)。それぞれ、ねらっている向きを向く
   const guns = equippedIds().map((id) => ({ id, aim: ensureWs(id).aim != null ? ensureWs(id).aim : P.aim }));
-  drawHeroSprite(ctx, P.x, P.y, heroDef, P.aim, 1, P.walk, P.rollT > 0, P.hurtT > 0, guns, P.moving, G.t);
+  drawHeroSprite(ctx, P.x, P.y, heroDef, P.aim, 1, P.walk, P.rollT > 0, P.hurtT > 0, guns);
   // 足もとの体力 (いつも出す)
   {
     const m = maxHp();
@@ -56,8 +55,7 @@ export function drawPlayer() {
 }
 
 // guns: [{ id, aim }] 持っている武器と、その向き
-// moving: 歩いているか (歩きのコマにする) / t: 止まっているときの息のコマに使う時間
-export function drawHeroSprite(c, x, y, def, aim, s = 1, walk = 0, rolling = false, hurt = false, guns = [], moving = false, t = 0) {
+export function drawHeroSprite(c, x, y, def, aim, s = 1, walk = 0, rolling = false, hurt = false, guns = []) {
   c.save();
   c.translate(x, y);
   c.scale(s, s);
@@ -84,13 +82,57 @@ export function drawHeroSprite(c, x, y, def, aim, s = 1, walk = 0, rolling = fal
   };
   const behind = (g, i) => i >= 2 || Math.sin(g.aim) < -0.2;
   guns.forEach((g, i) => behind(g, i) && drawGun(g, i));
-  // 体はドット絵 (hero-sprites.js)。左を向くときは左右を返す
-  const fr = heroFrame(def.id, aim, moving, walk, t);
-  c.save();
-  c.imageSmoothingEnabled = false;
-  if (fr.flip) c.scale(-1, 1);
-  c.drawImage(hurt ? fr.white : fr.cv, -fr.ax, -fr.ay);
-  c.restore();
+  const step = Math.sin(walk) * 1.5;
+  c.fillStyle = '#2a2430';
+  c.fillRect(-4, 4 + step * 0.3, 3, 4);
+  c.fillRect(1, 4 - step * 0.3, 3, 4);
+  c.fillStyle = hurt ? '#ffffff' : def.color;
+  c.beginPath();
+  c.ellipse(0, 1, def.id === 'gald' ? 7.5 : 6.2, 6, 0, 0, TAU);
+  c.fill();
+  // ベルト
+  c.fillStyle = 'rgba(40,28,20,0.85)';
+  c.fillRect(def.id === 'gald' ? -7 : -6, 2.5, def.id === 'gald' ? 14 : 12, 1.6);
+  drawShade(c, 0, 1, def.id === 'gald' ? 7.5 : 6.4, 0.9);
+  c.fillStyle = hurt ? '#ffffff' : '#f1d3b0';
+  circle(c, 0, -5, 4.3);
+  drawShade(c, 0, -5, 4.4, 0.7);
+  if (def.id === 'kai') {
+    c.fillStyle = '#5a3a20';
+    c.beginPath();
+    c.arc(0, -6, 4.5, Math.PI, TAU);
+    c.fill();
+    c.fillStyle = def.accent;
+    c.fillRect(-4.5, -7, 9, 1.6);
+  } else if (def.id === 'mira') {
+    c.fillStyle = '#3a2a5a';
+    c.beginPath();
+    c.moveTo(-7, -6);
+    c.lineTo(7, -6);
+    c.lineTo(2, -16);
+    c.lineTo(5, -18);
+    c.lineTo(-1, -13);
+    c.closePath();
+    c.fill();
+    c.fillStyle = def.accent;
+    c.fillRect(-4, -7, 8, 1.4);
+  } else {
+    c.fillStyle = '#8a5a3a';
+    c.beginPath();
+    c.arc(0, -2.5, 4, 0, Math.PI);
+    c.fill();
+    c.fillStyle = '#d9d2c0';
+    c.fillRect(-4.5, -8.5, 9, 1.5);
+  }
+  if (Math.cos(aim) !== 0) {
+    c.fillStyle = '#2a2020';
+    const ex = Math.cos(aim) * 1.6;
+    const ey = Math.sin(aim) * 0.8;
+    if (Math.sin(aim) > -0.6) {
+      circle(c, -1.6 + ex, -5 + ey, 0.9);
+      circle(c, 1.6 + ex, -5 + ey, 0.9);
+    }
+  }
   guns.forEach((g, i) => !behind(g, i) && drawGun(g, i));
   c.restore();
 }
