@@ -2062,7 +2062,7 @@
   // foot: コマの中の足もとの高さ、tall: 絵の中での背の高さ (どちらもピクセル)
   const SPRITES = {
     cleaner: { src: 'hajime.png', walk: 4 },
-    tsugumi: { src: 'tsugumi.png?v=2', walk: 4 },
+    tsugumi: { src: 'tsugumi.png?v=3', walk: 4 },
   };
   const SPRITE_FW = 160;
   const SPRITE_FH = 160;
