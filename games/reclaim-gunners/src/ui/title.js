@@ -1,6 +1,6 @@
 // タイトル・主人公選択・難易度
 import { CATS, DIFFS, DIFF_IDS, HEROES, money, tr } from '../core/config.js';
-import { newProgress, save, saveOk, setGoldAtSave } from '../core/save.js';
+import { allStagesOpen, newProgress, save, saveOk, setGoldAtSave } from '../core/save.js';
 import { D, diffId, hero, heroDef, prog, setD, setDiffId, setHero, setHeroDef, setProg } from '../game/hero.js';
 import { G, setG } from '../game/stage.js';
 import { clearEff } from '../game/weapon-mods.js';
@@ -87,8 +87,9 @@ actions.heroOk = () => {
 };
 
 // ---------- 難易度 ----------
+// テスト版で「全ステージに行ける」を ON にしていれば、難易度もすべて選べる
 export function diffOpen(id) {
-  if (id === 'normal') return true;
+  if (id === 'normal' || allStagesOpen()) return true;
   if (id === 'hard') return !!(hero.progress.normal && hero.progress.normal.cleared);
   return !!(hero.progress.hard && hero.progress.hard.cleared);
 }
