@@ -6,7 +6,9 @@ export const { HEROES, CATS, BOARD, SLOTS, WEAPONS, WEAPON, ELEMS, ENEMY, BOSSES
 // 基本の値
 // ===================================================================
 export let VW = 640;
-export const VH = 360;
+export let VH = 360;
+// 縦長の画面 (スマホの縦持ち) で遊んでいるか。HUD の置き方を変える
+export let portrait = false;
 export const TILE = 20;
 export const TAU = Math.PI * 2;
 export const CELL = 64;
@@ -15,6 +17,8 @@ export const MAX_PARTS = 600;
 export const SAVE_KEY = 'reclaimGunners.v1';
 export const SETTINGS_KEY = 'reclaimGunners.settings';
 export const DEBUG = /[?&]debug=1/.test(location.search);
+// テスト版 (テストプレイ用のページは window.RG_TEST を立てる。?debug=1 でも同じ): 設定に「全ステージに行ける」が出る
+export const TEST = DEBUG || !!window.RG_TEST;
 // 言葉 (lang.js)。tr('日本語の文', { 差しこむ値 }) で、選んでいる言葉の文になる
 export const tr = RG.t;
 
@@ -28,11 +32,11 @@ export const DIFF_IDS = ['normal', 'hard', 'extreme'];
 RG.i18nExtra.push(DIFFS);
 
 // タイル
-// SWAMP: 沼 (通れるが、足が遅くなる)。REED: 葦 (通れないが、弾は越える)
-export const T = { FLOOR: 0, WALL: 1, FENCE: 2, WATER: 3, SEAL: 4, TREE: 5, ROCK: 6, BONE: 7, FEATURE: 8, SWAMP: 9, REED: 10 };
-export const MOVE_BLOCK = [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1];
-export const SHOT_BLOCK = [0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0];
-export const GHOST_BLOCK = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0];
+// SWAMP: 沼 (通れるが、足が遅くなる)。REED: 葦 (通れないが、弾は越える)。LAVA: 溶岩 (通れるが、上にいると焼ける)
+export const T = { FLOOR: 0, WALL: 1, FENCE: 2, WATER: 3, SEAL: 4, TREE: 5, ROCK: 6, BONE: 7, FEATURE: 8, SWAMP: 9, REED: 10, LAVA: 11 };
+export const MOVE_BLOCK = [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0];
+export const SHOT_BLOCK = [0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0];
+export const GHOST_BLOCK = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0];
 export const isFloor = (t) => t === T.FLOOR || t === T.SWAMP;
 export const FLY_BLOCK = SHOT_BLOCK;
 
@@ -44,11 +48,17 @@ export const lvMul = {
   gold: (l) => 1 + 0.15 * (l - 1),
 };
 
-// スマホを縦に持っているときは、ゲーム全体を 90° 回して横向きで遊べるようにする
-// (画面が自動で回らないとき用。自動で横になったときは、ふつうの横向き表示)
+// お金 (G): 敵を倒すと自動で入り、能力ボード・武器屋・改造などすべてに使う
+//   もらえる量 = データの exp と gold をそれぞれレベル補正して足したもの (前の版の経験値とお金をまとめた)
+export const goldGain = (exp, gold, lv) => exp * lvMul.exp(lv) + gold * lvMul.gold(lv);
+export const money = (n) => `${Math.floor(n).toLocaleString('ja-JP')} G`;
+
+// タッチで操作する端末か
 export const touchDev = !!((window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0);
 
-// ほかのモジュールから VW を入れかえるとき
-export function setVW(v) {
-  VW = v;
+// ほかのモジュールから、見える範囲 (VW × VH) と縦長かどうかを入れかえるとき
+export function setView(w, h) {
+  VW = w;
+  VH = h;
+  portrait = h > w;
 }

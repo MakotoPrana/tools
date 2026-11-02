@@ -1,16 +1,18 @@
 // 魔巣とエリアの解放
 import { sfx } from '../audio/sound.js';
-import { ENEMY, MOVE_BLOCK, NESTS, TAU, TILE, lvMul, tr } from '../core/config.js';
+import { ENEMY, MOVE_BLOCK, NESTS, TAU, TILE, lvMul, goldGain, money, tr } from '../core/config.js';
 import { writeSave } from '../core/save.js';
-import { dist, fmt, lerp, pick, rnd, tc } from '../core/util.js';
+import { dist, lerp, pick, rnd, tc } from '../core/util.js';
 import { setTimeLater } from './bosses.js';
 import { addPoison, enemyShot, ring } from './bullets.js';
 import { hitsTiles, lineClear, lockArea, moveCircle } from './collision.js';
-import { dropGold, gainExp, spawnEnemy, spawnFromNest } from './enemies.js';
+import { gainGold, spawnEnemy, spawnFromNest } from './enemies.js';
 import { addPart, showBanner } from './fx.js';
 import { areaTrack } from '../core/analytics.js';
-import { D, hero, prog, rank } from './hero.js';
+import { D, prog, rank } from './hero.js';
 import { collectAllMats } from './pickups.js';
+import { physHit, physPos } from './player.js';
+import { addGauge } from './specials.js';
 import { G, P } from './stage.js';
 import { toast } from '../ui/toast.js';
 import { randomAreaTile } from '../world/mapgen.js';
@@ -22,8 +24,10 @@ export function updateNests(dt) {
     n.hitFlash = Math.max(0, n.hitFlash - dt);
     const dp = dist(n.x, n.y, P.x, P.y);
     if (dp > 700 || G.dead) continue;
+    if (n.nd.move) crawlNest(n, dt, dp);
     n.spawnT -= dt;
     if (n.nd.attack && dp < 340) nestAttack(n, dt, dp);
+    nestJustAttack(n, dt, dp);
     const cap = Math.round(n.nd.cap * D.cap);
     if (n.spawnT <= 0 && n.children < cap) {
       spawnFromNest(n);
@@ -37,6 +41,74 @@ export function updateNests(dt) {
       moveCircle(P, Math.cos(a) * 2, Math.sin(a) * 2, P.r, MOVE_BLOCK, lockArea());
     }
   }
+}
+
+// 這いずる魔巣: 主人公が近く (380px) にいると、ゆっくり近づいてくる。遠いときは、のろのろとさまよう
+//   自分のエリアの外へは出ない。通った跡に、粘液のしみを残す
+function crawlNest(n, dt, dp) {
+  let a;
+  if (dp < 380 && dp > n.r + 40) a = Math.atan2(P.y - n.y, P.x - n.x);
+  else {
+    n.wanderT = (n.wanderT || 0) - dt;
+    if (n.wanderT <= 0) {
+      n.wanderT = rnd(2, 4);
+      n.wanderA = rnd(0, TAU);
+    }
+    a = n.wanderA;
+  }
+  if (a == null) return;
+  const sp = n.nd.move * (dp < 380 ? 1 : 0.5) * (0.75 + Math.max(0, Math.sin(n.ph * 2.2)) * 0.5); // 這うように、速さが波打つ
+  const hit = moveCircle(n, Math.cos(a) * sp * dt, Math.sin(a) * sp * dt, n.r * 0.7, MOVE_BLOCK, n.area.i);
+  if (hit) n.wanderA = rnd(0, TAU);
+  n.crawlA = a;
+  n.slimeT = (n.slimeT || 0) - dt;
+  if (n.slimeT <= 0) {
+    n.slimeT = 0.35;
+    addPart({ x: n.x + rnd(-6, 6), y: n.y + n.r * 0.5, vx: 0, vy: 0, life: 2.5, color: 'rgba(120,70,20,0.5)', size: rnd(4, 7) });
+  }
+}
+
+// どの魔巣もする、ジャスト回避できる攻撃 (予兆のあと、最後の 0.15 秒は白く光る)
+//   近く (90px まで): まわりに棘を突き出す / 少し離れている (110〜320px): ため撃ちの大きな弾 (当たる直前に回避するとジャスト回避)
+const JUST_CD = { small: 1.5, big: 0.75 };
+export function nestJustAttack(n, dt, dp) {
+  n.jT = (n.jT == null ? rnd(1.5, 3.5) : n.jT) - dt;
+  if (n.charge) {
+    // ため撃ち: ためている間は、主人公の方へ向きを合わせる (最後の 0.3 秒は固める)
+    const c = n.charge;
+    c.t -= dt;
+    if (c.t > 0.3) c.tele.a = Math.atan2(P.y - n.y, P.x - n.x);
+    if (c.t <= 0) {
+      n.charge = null;
+      const a = c.tele.a;
+      const dmg = 9 * lvMul.atk(n.lv);
+      G.ebullets.push({ x: n.x + Math.cos(a) * n.r, y: n.y + Math.sin(a) * n.r, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, dmg, lv: n.lv, color: '#ffe8f0', r: 6, life: 2.2, phys: true, src: n });
+      sfx('swing');
+    }
+    return;
+  }
+  if (n.jT > 0 || G.dead) return;
+  const cd = (JUST_CD[n.type] || 1) * rnd(3.2, 4.4);
+  if (dp < 90) {
+    n.jT = cd;
+    const R = n.r + 58;
+    G.teles.push({ type: 'circle', x: n.x, y: n.y, r: R, t: 0, dur: 0.95, just: true, onDone: () => {
+      if (n.dead) return;
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * TAU;
+        addPart({ x: n.x + Math.cos(a) * n.r, y: n.y + Math.sin(a) * n.r, x2: n.x + Math.cos(a) * R, y2: n.y + Math.sin(a) * R, vx: 0, vy: 0, life: 0.25, color: n.nd.colors[2], size: 3, line: true });
+      }
+      sfx('swing');
+      G.shake = Math.max(G.shake, 3);
+      const pp = physPos();
+      if (!G.dead && dist(n.x, n.y, pp.x, pp.y) < R + P.r) physHit(12 * lvMul.atk(n.lv), n.lv, n);
+    } });
+  } else if (dp > 110 && dp < 320 && lineClear(n.x, n.y, P.x, P.y)) {
+    n.jT = cd;
+    const tele = { type: 'line', x: n.x, y: n.y, a: Math.atan2(P.y - n.y, P.x - n.x), len: 320, w: 14, t: 0, dur: 0.9, just: true };
+    G.teles.push(tele);
+    n.charge = { t: 0.9, tele };
+  } else n.jT = 0.5;
 }
 
 // 魔巣の種類ごとの攻撃 (主人公が近くにいるときだけ)
@@ -97,10 +169,11 @@ export function destroyNest(n) {
   }
   addPart({ x: n.x, y: n.y, vx: 0, vy: 0, life: 0.4, color: '#d07aff', size: n.r * 3, ring: true });
   const typeMul = { small: 1, big: 4 }[n.type] || 2;
-  dropGold(n.x, n.y, Math.round(20 * lvMul.gold(n.lv) * typeMul * D.reward * (1 + 0.03 * rank('gold'))));
+  gainGold(Math.round(20 * lvMul.gold(n.lv) * typeMul * D.reward * (1 + 0.03 * rank('gold'))));
+  addGauge(RG.SP_GAIN.nest);
   const mats = n.area.def.enemies;
   for (let i = 0; i < typeMul; i++) G.pickups.push({ type: 'mat', id: ENEMY[pick(mats)].mat, x: n.x, y: n.y, vx: rnd(-50, 50), vy: rnd(-50, 50), life: 9999 });
-  // 眷属は崩れて消える (経験値は入る)
+  // 眷属は崩れて消える (お金は入る)
   for (const e of G.enemies) if (e.home === n && !e.dead) e.crumble = rnd(0.3, 3);
   const a = n.area;
   const left = a.nests.filter((x) => !x.dead).length;
@@ -120,11 +193,9 @@ export function liberate(area) {
   if (first && !area.reinvaded) {
     prog.areas.push(a.id);
     const lv = Math.min(99, a.lv[1] + D.lv);
-    const exp = Math.round(60 * lvMul.exp(lv) * a.nests.length * D.reward);
-    const gold = Math.round(40 * lvMul.gold(lv) * a.nests.length * D.reward);
-    gainExp(exp);
-    hero.gold += gold;
-    sub = tr('解放のごほうび  +{exp} EXP  ・  +{gold} G', { exp: fmt(exp), gold: fmt(gold) });
+    const gain = Math.round(goldGain(60, 40, lv) * a.nests.length * D.reward);
+    gainGold(gain);
+    sub = tr('解放のごほうび  +{n}', { n: money(gain) });
     if (a.town) sub += `\n${tr('町に人が戻り、武器屋が開いた!  黄色い矢印の先へ')}`;
   } else {
     sub = tr('残党を一掃した');

@@ -8,6 +8,7 @@ import { G, stoneActive } from '../game/stage.js';
 import { mouse, sticks } from '../input/input.js';
 import { actions } from './actions.js';
 import { head, screen, ui, uiClose, uiShow } from './core.js';
+import { showBoard } from './board.js';
 import { showMats } from './materials.js';
 import { leaveToWorld, showStageMap } from './stage-map.js';
 
@@ -65,9 +66,10 @@ export function showStoneMenu(s) {
     <div class="overlay"><div class="panel narrow">
       ${head(tr('転移碑'), s.name)}
       <p class="mint" style="text-align:center">${tr('体力と回復薬が全回復した')}</p>
+      ${G.revived ? `<p class="danger" style="text-align:center;font-size:0.85em">${tr('まだ解放していないエリアの魔巣と中級悪魔がよみがえった')}</p>` : ''}
       <div class="btn-col">
-        <button class="btn primary" data-act="stoneTravel">${tr('転移する')}</button>
-        <button class="btn" data-act="openBoard">${tr('能力ボード')}</button>
+        <button class="btn primary" data-act="stoneBoard">${tr('能力を上げる（能力ボード）')}</button>
+        <button class="btn" data-act="stoneTravel">${tr('転移する')}</button>
         <button class="btn" data-act="openEquip">${tr('装備')}</button>
         ${canRe ? `<button class="btn" data-act="reinvade">${tr('再侵攻（残党狩り）')}</button>` : ''}
         ${area && area.reinvaded ? `<button class="btn" data-act="purify">${tr('浄化する（残党狩りをやめる）')}</button>` : ''}
@@ -78,6 +80,7 @@ export function showStoneMenu(s) {
     </div></div>`;
   };
   actions.stoneTravel = () => showStageMap('travel');
+  actions.stoneBoard = () => showBoard(true);
   actions.reinvade = () => {
     reinvade(s.area);
     uiClose();

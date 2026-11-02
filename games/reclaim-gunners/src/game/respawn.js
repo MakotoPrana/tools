@@ -1,13 +1,12 @@
 // 力尽きたとき
 import { areaTrack, bossTrack } from '../core/analytics.js';
-import { tr } from '../core/config.js';
+import { money, tr } from '../core/config.js';
 import { goldAtSave, writeSave } from '../core/save.js';
-import { fmt } from '../core/util.js';
 import { later, resetBoss } from './bosses.js';
 import { diffId, hero, maxHp, maxPotions } from './hero.js';
 import { updateFlow } from './pathfinding.js';
 import { collectAllMats } from './pickups.js';
-import { G, P, pointPos } from './stage.js';
+import { G, P, pointPos, spawnFiends } from './stage.js';
 import { toast } from '../ui/toast.js';
 
 export function respawn() {
@@ -26,7 +25,15 @@ export function respawn() {
       n.filled = false;
     }
   }
-  G.enemies = G.enemies.filter((e) => e.dormant);
+  // 中級悪魔は、ほかのエリアにいるものは残す (いたエリアのものは、魔巣と一緒に出し直す)
+  G.enemies = G.enemies.filter((e) => e.dormant || (e.def.mid && e.area !== area));
+  for (const e of G.enemies) {
+    if (!e.def.mid) continue;
+    e.state = 'idle';
+    e.mode = null;
+    e.aggro = false;
+  }
+  if (area && !area.free && !area.def.town) spawnFiends(area);
   for (const n of G.nests) n.children = 0;
   for (const b of G.bosses) resetBoss(b);
   G.lock = null;
@@ -35,6 +42,10 @@ export function respawn() {
   G.teles = [];
   G.hazards = [];
   P.slowT = 0;
+  P.rapid = null;
+  P.dodgeAt = null;
+  G.slowT = 0;
+  G.lances = [];
   P.pull = null;
   G.pickups = G.pickups.filter((p) => p.type === 'mat');
   collectAllMats();
@@ -55,6 +66,6 @@ export function respawn() {
   G.curArea = -1;
   G.fade = 1;
   updateFlow();
-  toast(lost > 0 ? tr('力尽きた…\n所持金 −{g} G', { g: fmt(lost) }) : tr('力尽きた…'), 2.6);
+  toast(lost > 0 ? tr('力尽きた…\n−{n}', { n: money(lost) }) : tr('力尽きた…'), 2.6);
   writeSave();
 }

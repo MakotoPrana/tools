@@ -10,12 +10,18 @@ import { localFrac } from '../render/screen.js';
 import { actions } from './actions.js';
 import { head, rerender, screen, setScreen, uiClose, uiShow } from './core.js';
 import { selStage, showWorld } from './world-map.js';
+import { withMaps } from './loading.js';
+import { allStagesOpen, settings } from '../core/save.js';
+import { pauseTutorial, startTutorial } from '../game/tutorial.js';
 import { areaMask, getMap } from '../world/mapgen.js';
 
 // ---------- ステージ図 (エリア選択・転移) ----------
 export let selArea = null;
 export function showStageMap(mode, stageId) {
   const def = stageId ? stageDef(stageId) : G.def;
+  withMaps([def], () => openStageMap(mode, def));
+}
+function openStageMap(mode, def) {
   const map = getMap(def);
   selArea = null;
   const fn = () => {
@@ -26,7 +32,8 @@ export function showStageMap(mode, stageId) {
     for (const l of def.lairs) if (l.travel && prog.travel.includes(l.travel)) points.push({ id: l.travel, name: tr('{name}（守護者の決闘場）', { name: l.name }) });
     for (const en of def.entries || []) if (prog.travel.includes(en.id)) points.push({ id: en.id, name: tr('{name}（{from}から）', { name: en.name, from: stageDef(def.gates.find((g) => g.boss === en.boss).to).name }) });
     // 最初のエリア (始まりの村) からは、いつでも始められる
-    const canStart = (ar) => prog.travel.includes(ar.id) || !!ar.start;
+    // テスト版で「全ステージに行ける」が ON なら、どのエリアからでも始められる
+    const canStart = (ar) => prog.travel.includes(ar.id) || !!ar.start || allStagesOpen();
     let info = `<span class="muted">${tr('エリアを押すと、くわしく出ます')}</span>`;
     if (a) {
       const lv0 = a.lv[0] + D.lv;
@@ -178,9 +185,12 @@ export function enterPlay(stageId, pointId) {
   hero.lastTravel = { difficulty: diffId, stage: stageId, point: pointId };
   setScreen('play');
   uiClose();
+  // はじめてのときはチュートリアル
+  if (!settings.tutorialDone) startTutorial();
 }
 
 export function leaveToWorld() {
+  pauseTutorial();
   areaTrack.quit();
   bossTrack.quit();
   collectAllMats();

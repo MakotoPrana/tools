@@ -1,8 +1,9 @@
 // 装備
-import { CATS, ELEMS, WEAPON, WEAPONS, tr } from '../core/config.js';
+import { ELEMS, WEAPON, WEAPONS, tr } from '../core/config.js';
 import { clamp } from '../core/util.js';
 import { canEquip, hero } from '../game/hero.js';
 import { P, ensureWs } from '../game/stage.js';
+import { spState } from '../game/specials.js';
 import { effW, modTotal } from '../game/weapon-mods.js';
 import { CAT_COLORS } from '../render/hud.js';
 import { actions } from './actions.js';
@@ -17,18 +18,22 @@ export function showEquip() {
     for (let i = 0; i < 6; i++) {
       const id = hero.equipped[i];
       const locked = i >= hero.equipped.length;
-      slots.push(`<button class="slot ${id ? 'filled' : ''} ${i === selSlot && !locked ? 'sel' : ''} ${locked ? 'locked' : ''}" data-act="${locked ? '' : 'pickSlot'}" data-i="${i}">
-        ${locked ? '🔒' : id ? `<img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><span class="sn">${WEAPON[id].name}${modTotal(id) ? ` <span class="gold">★${modTotal(id)}</span>` : ''}</span>` : `<span class="muted">${tr('空き')}</span>`}</button>`);
+      // スロットは絵と番号だけ (名前は下の武器庫の行に出る)
+      slots.push(`<button class="slot ${id ? 'filled' : ''} ${i === selSlot && !locked ? 'sel' : ''} ${locked ? 'locked' : ''}" data-act="${locked ? '' : 'pickSlot'}" data-i="${i}" ${id ? `title="${WEAPON[id].name}"` : ''}>
+        <span class="sno">${i + 1}</span>${locked ? '🔒' : id ? `<img class="wicon" src="${RG.weaponIcon(id)}" alt="${WEAPON[id].name}" width="60" height="30">` : `<span class="muted">${tr('空き')}</span>`}</button>`);
     }
     const owned = WEAPONS.filter((w) => hero.weapons[w.id] != null);
     const rows = owned.map((w) => {
       const lv = modTotal(w.id);
       const inSlot = hero.equipped.indexOf(w.id);
-      return `<div class="row wrow ${canEquip(w) ? '' : 'dim'}"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
-        <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name}${lv ? ` <span class="gold">★${lv}</span>` : ''} ${inSlot >= 0 ? `<span class="tag">${tr('スロット{n}', { n: inSlot + 1 })}</span>` : ''}</div>
-        <div class="s">${weaponStats(effW(w.id))} ・ ${w.desc}</div></div>
-        <button class="btn small" data-act="viewMods" data-id="${w.id}">${tr('改造')}</button>
-        ${canEquip(w) ? `<button class="btn small" data-act="equip" data-id="${w.id}" ${hero.equipped[selSlot] === w.id ? 'disabled' : ''}>${tr('スロット{n}へ', { n: selSlot + 1 })}</button>` : `<span class="muted">${tr('使えない')}</span>`}
+      // 1 行目: 名前 (カテゴリの色)・★・入っているスロット / 2 行目: 能力と必殺技 (1 行に収め、はみ出しは … )
+      return `<div class="row erow ${canEquip(w) ? '' : 'dim'} ${inSlot === selSlot ? 'sel' : ''}"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30">
+        <div class="einfo">
+          <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${w.name}</span>${lv ? ` <span class="gold">★${lv}</span>` : ''}${inSlot >= 0 ? ` <span class="tag">${inSlot + 1}</span>` : ''}</div>
+          <div class="s" title="${w.desc}">${weaponStats(effW(w.id))} ・ <span class="gold">✦${RG.SPECIALS[w.id][spState(w.id).set].name}</span></div>
+        </div>
+        <div class="ebtns"><button class="btn small" data-act="viewMods" data-id="${w.id}" aria-label="${tr('スキルツリー')}">${tr('強化')}</button>
+        ${canEquip(w) ? `<button class="btn small ${inSlot !== selSlot ? 'primary' : ''}" data-act="equip" data-id="${w.id}" ${hero.equipped[selSlot] === w.id ? 'disabled' : ''}>${tr('装備')}</button>` : `<span class="muted">${tr('使えない')}</span>`}</div>
       </div>`;
     }).join('');
     const count = hero.equipped.filter(Boolean).length;
@@ -36,8 +41,7 @@ export function showEquip() {
     <div class="overlay"><div class="panel">
       ${head(tr('装備'), tr('武器スロット {a}/6', { a: hero.equipped.length }))}
       <div class="slots">${slots.join('')}</div>
-      <div class="btn-row" style="margin:0 0 6px;justify-content:flex-end"><button class="btn small" data-act="unequip" ${hero.equipped[selSlot] && count > 1 ? '' : 'disabled'}>${tr('スロット{n}を外す', { n: selSlot + 1 })}</button></div>
-      <h3>${tr('武器庫')}</h3>
+      <div class="ehead"><h3>${tr('武器庫')} <span class="muted">${tr('「装備」でスロット{n}に入れる', { n: selSlot + 1 })}</span></h3><button class="btn small" data-act="unequip" ${hero.equipped[selSlot] && count > 1 ? '' : 'disabled'}>${tr('スロット{n}を外す', { n: selSlot + 1 })}</button></div>
       <div class="list">${rows}</div>
     </div></div>`;
   };

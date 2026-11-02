@@ -294,6 +294,22 @@ export function sfx(type) {
           tn(t + i * 0.12, { wave: 'sine', f: f * 2, gain: 0.06, attack: 0.02, dur: 0.7, verb: 0.6 });
         });
         break;
+      case 'special': // 必殺技: 力をためて解き放つ
+        tn(t, { wave: 'sawtooth', f: 220, f1: 880, gain: 0.22, attack: 0.02, dur: 0.35, verb: 0.5 });
+        nz(t + 0.2, { type: 'lowpass', f: 1600, f1: 200, gain: 0.7, dur: 0.6, verb: 0.6 });
+        tn(t + 0.2, { f: 90, f1: 40, gain: 0.6, dur: 0.5, verb: 0.3 });
+        break;
+      case 'just': // ジャスト回避: 澄んだ金属音
+        tn(t, { wave: 'triangle', f: 1760, gain: 0.25, dur: 0.5, verb: 0.7 });
+        tn(t + 0.05, { wave: 'sine', f: 2637, gain: 0.15, dur: 0.6, verb: 0.7 });
+        break;
+      case 'ready': // 必殺技ゲージが満タンになった
+        tn(t, { wave: 'triangle', f: 880, gain: 0.14, dur: 0.18, verb: 0.4 });
+        tn(t + 0.08, { wave: 'triangle', f: 1320, gain: 0.14, dur: 0.3, verb: 0.4 });
+        break;
+      case 'swing': // 中級悪魔の大振り
+        nz(t, { type: 'bandpass', f: 600, f1: 1800, q: 0.8, gain: 0.5, attack: 0.03, dur: 0.22, verb: 0.2 });
+        break;
       default: break;
     }
   } catch (e) { /* 音が鳴らなくても遊べる */ }

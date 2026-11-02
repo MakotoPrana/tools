@@ -68,7 +68,7 @@ export function renderBg(map) {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const t = tiles[idx(x, y)];
-      if (t === T.WATER || t === T.SWAMP) continue;
+      if (t === T.WATER || t === T.SWAMP || t === T.LAVA) continue;
       const th = themeAt(x, y);
       const base = hexRgb(th.floor[0]);
       const px = x * TILE;
@@ -186,6 +186,19 @@ export function renderBg(map) {
         if (d <= 1) {
           g.fillStyle = 'rgba(200,230,240,0.25)';
           g.fillRect(px + rng() * 8, py + rng() * 16, 10, 1.2);
+        }
+      } else if (t === T.LAVA) {
+        // 溶岩: 赤く光る池。ところどころ黒く冷えた皮
+        const gr = g.createRadialGradient(px + 10, py + 10, 2, px + 10, py + 10, 16);
+        gr.addColorStop(0, '#ffb040');
+        gr.addColorStop(1, 'rgba(200,50,10,0.9)');
+        g.fillStyle = gr;
+        g.fillRect(px, py, TILE, TILE);
+        if (rng() < 0.3) {
+          g.fillStyle = 'rgba(40,14,8,0.7)';
+          g.beginPath();
+          g.ellipse(px + 4 + rng() * 12, py + 4 + rng() * 12, 3 + rng() * 3, 1.5 + rng() * 2, rng() * 3, 0, TAU);
+          g.fill();
         }
       } else if (t === T.SWAMP) {
         const gr = g.createRadialGradient(px + 10, py + 10, 2, px + 10, py + 10, 16);
@@ -574,6 +587,7 @@ export function renderMini(map) {
       else if (t === T.TREE) col = '#1f3a1d';
       else if (t === T.WATER) col = '#2f6a9e';
       else if (t === T.SWAMP) col = '#3a4a2e';
+      else if (t === T.LAVA) col = '#d0501a';
       else if (t === T.REED) col = '#5a6a24';
       else if (t !== T.FLOOR) col = '#666';
       g.fillStyle = col;

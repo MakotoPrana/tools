@@ -21,8 +21,56 @@ export function drawBeam() {
   ctx.restore();
 }
 
+// 必殺技の貫く一撃 (太い光の帯が細くなって消える)
+export function drawLance(l) {
+  const k = l.t / l.max;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = k;
+  ctx.strokeStyle = l.color;
+  ctx.lineWidth = l.w * (0.4 + k * 0.6);
+  ctx.globalAlpha = 0.35 * k;
+  ctx.beginPath();
+  ctx.moveTo(l.sx, l.sy);
+  ctx.lineTo(l.ex, l.ey);
+  ctx.stroke();
+  // 外側のぼんやりした光 (ちらつく)
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.25 * k * (0.7 + Math.random() * 0.3);
+  ctx.lineWidth = l.w * 2;
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = k;
+  ctx.strokeStyle = '#fffbe8';
+  ctx.lineWidth = Math.max(2, l.w * 0.25 * k);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawBullet(b) {
   const col = ELEMS[b.elem] ? ELEMS[b.elem].color : '#fff3b0';
+  // 必殺技の弾: 光る尾を引く大きな弾
+  if (b.special) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(b.x - b.vx * 0.06, b.y - b.vy * 0.06);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#fff6d0';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    drawGlow(ctx, b.x, b.y, 14, col, 0.7);
+    ctx.fillStyle = '#fff6d0';
+    circle(ctx, b.x, b.y, 3);
+    return;
+  }
   if (b.type === 'grenade') {
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     circle(ctx, b.x, b.y + 3, 3);
@@ -70,6 +118,22 @@ export function drawBullet(b) {
 }
 
 export function drawEBullet(b) {
+  // ジャスト回避できる大きな弾: 白く光る芯と、赤い尾
+  if (b.phys) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,90,130,0.6)';
+    ctx.lineWidth = b.r * 1.6;
+    ctx.beginPath();
+    ctx.moveTo(b.x - b.vx * 0.08, b.y - b.vy * 0.08);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.restore();
+    drawGlow(ctx, b.x, b.y, b.r * 4, '#ff5a8a', 0.8);
+    ctx.fillStyle = '#ffffff';
+    circle(ctx, b.x, b.y, b.r * (0.8 + Math.sin(G.t * 30) * 0.15));
+    return;
+  }
   drawGlow(ctx, b.x, b.y, b.r * 3.2, b.color, 0.7);
   ctx.fillStyle = b.color;
   circle(ctx, b.x, b.y, b.r);

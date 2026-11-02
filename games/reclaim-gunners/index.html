@@ -21,7 +21,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;700;800&family=Zen+Antique&family=Cinzel:wght@500;700&family=EB+Garamond:wght@500;600;700;800&family=Noto+Serif+SC:wght@500;700;900&family=ZCOOL+XiaoWei&family=Nanum+Myeongjo:wght@700;800&family=Song+Myung&display=swap" />
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=16" />
 </head>
 <body>
   <main class="app">
@@ -42,11 +42,16 @@
         <div class="touch" id="touch" hidden>
           <button type="button" class="tbtn t-interact" id="t-interact" hidden data-i18n>調べる</button>
           <button type="button" class="tbtn t-potion" id="t-potion"><span data-i18n>回復</span><small id="t-potion-n">3</small></button>
-          <button type="button" class="tbtn t-reload" id="t-reload">R</button>
-          <button type="button" class="tbtn t-dodge" id="t-dodge"><span data-i18n>回避</span></button>
+          <button type="button" class="tbtn t-special" id="t-special"><span data-i18n>必殺</span></button>
         </div>
 
         <div class="toast" id="toast" hidden></div>
+        <div class="tut" id="tut" hidden>
+          <div class="tut-head"><span class="tut-step"></span><button type="button" class="tut-skip" data-tut="skip"><span data-i18n>スキップ</span></button></div>
+          <p class="tut-text"></p>
+          <button type="button" class="btn small primary" data-tut="next" hidden>次へ</button>
+        </div>
+        <div class="loading" id="loading" hidden><i class="spin"></i><span data-i18n>読みこみ中…</span></div>
         <div class="saving" id="saving" hidden><img src="../../assets/favicon.svg" alt="" width="20" height="20" /><span data-i18n>セーブしました</span></div>
         <div id="ui"></div>
       </div>
@@ -54,20 +59,22 @@
 
     <p class="howto">
       <span data-i18n>武器は近くの敵を自動でねらって撃ち、持っている武器は全部同時に攻撃します。</span>
-      <span data-i18n>パソコン: WASD で移動。マウスを押している間は、その向きに撃つ。Space / Shift 回避 / R リロード / E 調べる / F 回復薬 / M マップ / Esc メニュー。</span>
-      <span data-i18n>スマホ: 横持ちで、画面の左半分で移動。右半分をなぞると、その向きに撃つ。回避と回復は右下の大きなボタン。</span>
+      <span data-i18n>パソコン: WASD で移動。マウスを押している間は、その向きに撃つ。Space / Shift 回避 / Q 必殺技 / R リロード / E 調べる / F 回復薬 / M マップ / Esc メニュー。</span>
+      <span data-i18n>スマホ: 縦持ちで、指 1 本で遊ぶ。指を置いて動かすと移動、素早くはらって離すと回避。撃つのは自動。</span>
+      <span data-i18n>中級悪魔の攻撃が当たる直前に回避すると「ジャスト回避」。ゲージを使わずに必殺技で反撃する。</span>
     </p>
   </main>
 
   <script src="../origami-intro.js"></script>
   <script>OrigamiIntro.play();</script>
-  <script src="lang.js?v=2"></script>
-  <script src="art.js?v=1"></script>
-  <script src="data/heroes.js?v=2"></script>
-  <script src="data/weapons.js?v=1"></script>
-  <script src="data/enemies.js?v=1"></script>
-  <script src="data/stages.js?v=3"></script>
-  <script src="data/mods.js?v=1"></script>
+  <script src="lang.js?v=16"></script>
+  <script src="art.js?v=16"></script>
+  <script src="data/heroes.js?v=16"></script>
+  <script src="data/weapons.js?v=16"></script>
+  <script src="data/enemies.js?v=16"></script>
+  <script src="data/stages.js?v=16"></script>
+  <script src="data/mods.js?v=16"></script>
+  <script src="data/specials.js?v=16"></script>
   <!-- ゲームの本体 (ES モジュール。src/main.js からすべてを読みこむ) -->
   <script type="module" src="src/main.js"></script>
 </body>

@@ -7,9 +7,18 @@ import { ctx } from './canvas.js';
 import { mix } from './color.js';
 import { circle, drawGlow, drawShade, drawSoftShadow, txt } from './primitives.js';
 
+// 欠けた所: 体力が減るほど増える (最大 6 か所)。場所は魔巣ごとに決まっている
+function bites(n, sd) {
+  const hurt = 1 - n.hp / n.maxHp;
+  const k = Math.min(6, Math.floor(hurt * 7));
+  return Array.from({ length: k }, (_, j) => ({ a: sd * 1.7 + j * 2.399, depth: 0.22 + ((j * 53 + sd * 10) % 10) / 60 }));
+}
+
 export function drawNest(n) {
-  const pulse = Math.sin(n.ph * 3) * 0.08 + 1;
-  const r = n.r * pulse;
+  const hurt = 1 - n.hp / n.maxHp;
+  // 傷つくほど脈が速く、全体が少ししぼむ
+  const pulse = Math.sin(n.ph * (3 + hurt * 4)) * (0.08 + hurt * 0.05) + 1;
+  const r = n.r * pulse * (1 - hurt * 0.18);
   const [c0, c1, c2] = n.nd.colors;
   ctx.save();
   ctx.translate(n.x, n.y);
@@ -26,11 +35,12 @@ export function drawNest(n) {
     ctx.fill();
   }
   drawSoftShadow(ctx, 0, r * 0.55, r * 1.25, r * 0.55);
-  // 触手の根 (先へいくほど細く、ゆらゆら動く)
+  // 触手の根 (先へいくほど細く、ゆらゆら動く)。傷つくと根元から千切れて短くなる
   const roots = n.type === 'brood' ? 9 : 7;
   for (let i = 0; i < roots; i++) {
     const a = (i / roots) * TAU + sd + Math.sin(n.ph * 0.7 + i) * 0.12;
-    const len = r * (1.7 + ((i * 37 + sd * 10) % 7) / 10);
+    const cut = ((i * 5 + Math.floor(sd)) % roots) / roots < hurt * 0.85;
+    const len = r * (1.7 + ((i * 37 + sd * 10) % 7) / 10) * (cut ? 0.28 : 1);
     const sw = Math.sin(n.ph * 1.3 + i * 1.7) * 0.35;
     const steps = 7;
     const pts = [];
@@ -64,12 +74,41 @@ export function drawNest(n) {
     ctx.lineWidth = 0.8;
     ctx.stroke();
     ctx.globalAlpha = 1;
-    // 先っぽがほのかに光る
+    // 先っぽがほのかに光る (千切れた根は、切り口から体液がしたたる)
     const [tx, ty] = pts[steps];
-    ctx.fillStyle = c2;
-    ctx.globalAlpha = 0.5 + Math.sin(n.ph * 3 + i) * 0.3;
-    circle(ctx, tx, ty, 1.2);
+    if (cut) {
+      ctx.fillStyle = mix(c1, '#3a0010');
+      circle(ctx, tx, ty, 2.6);
+      const drip = (n.ph * 0.9 + i * 0.37) % 1;
+      ctx.globalAlpha = 1 - drip;
+      ctx.fillStyle = c2;
+      circle(ctx, tx, ty + drip * 10, 1.2);
+    } else {
+      ctx.fillStyle = c2;
+      ctx.globalAlpha = 0.5 + Math.sin(n.ph * 3 + i) * 0.3;
+      circle(ctx, tx, ty, 1.2);
+    }
     ctx.globalAlpha = 1;
+  }
+  if (n.type === 'crawler') {
+    // 這いずる魔巣: 体の下から生えた太い足が、かわるがわる地面をかく
+    const fa = n.crawlA || 0;
+    ctx.fillStyle = mix(c1, '#000000');
+    for (let i = 0; i < 6; i++) {
+      const side = i % 2 ? 1 : -1;
+      const a = fa + side * (0.7 + Math.floor(i / 2) * 0.55);
+      const step = Math.sin(n.ph * 6 + i * 1.7) * 0.25;
+      const fx = Math.cos(a + step) * r * 1.35;
+      const fy = Math.sin(a + step) * r * 1.15;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a - 0.2) * r * 0.6, Math.sin(a - 0.2) * r * 0.55);
+      ctx.quadraticCurveTo(fx * 0.9, fy * 0.9 - 6, fx, fy);
+      ctx.lineTo(Math.cos(a + 0.2) * r * 0.6, Math.sin(a + 0.2) * r * 0.55);
+      ctx.fill();
+      ctx.fillStyle = c2;
+      circle(ctx, fx, fy, 1.6);
+      ctx.fillStyle = mix(c1, '#000000');
+    }
   }
   if (n.type === 'bone') {
     // 骨の杭が突き出ている
@@ -118,11 +157,17 @@ export function drawNest(n) {
   // 本体: いくつものふくらみが重なった肉のかたまり
   const lobes = 6;
   const flash = n.hitFlash > 0;
+  const bs = bites(n, sd);
+  // 欠けた所は、ふちが内側へえぐれる
+  const dent = (a) => bs.reduce((m, b) => {
+    const da = Math.atan2(Math.sin(a - b.a), Math.cos(a - b.a));
+    return m + b.depth * Math.exp(-(da * da) / 0.09);
+  }, 0);
   const blob = (rr, wob) => {
     ctx.beginPath();
-    for (let k = 0; k <= 36; k++) {
-      const a = (k / 36) * TAU;
-      const d = rr * (1 + Math.sin(a * lobes + sd) * 0.09 + Math.sin(a * 3 - n.ph * 1.5 + sd) * wob);
+    for (let k = 0; k <= 48; k++) {
+      const a = (k / 48) * TAU;
+      const d = rr * (1 + Math.sin(a * lobes + sd) * 0.09 + Math.sin(a * 3 - n.ph * 1.5 + sd) * wob - dent(a));
       const x = Math.cos(a) * d, y = Math.sin(a) * d * 0.9;
       k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     }
@@ -155,6 +200,40 @@ export function drawNest(n) {
     ctx.stroke();
   }
   ctx.restore();
+  // 傷: えぐれた所の生々しい肉と、光るひび割れ
+  for (const b of bs) {
+    const d = r * (1 - b.depth) * 0.95;
+    const x = Math.cos(b.a) * d;
+    const y = Math.sin(b.a) * d * 0.9;
+    ctx.fillStyle = mix(c1, '#5a0018');
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * 0.2, r * 0.13, b.a, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = c2;
+    ctx.globalAlpha = 0.6 + Math.sin(n.ph * 6 + b.a) * 0.3;
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * 0.09, r * 0.05, b.a, 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  if (hurt > 0.3) {
+    ctx.save();
+    blob(r * 0.98, 0.05);
+    ctx.clip();
+    ctx.strokeStyle = c2;
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = Math.min(1, (hurt - 0.3) * 2) * (0.7 + Math.sin(n.ph * 8) * 0.3);
+    const nc = 2 + Math.floor(hurt * 4);
+    for (let i = 0; i < nc; i++) {
+      const a = sd * 3 + i * 1.9;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.15, Math.sin(a) * r * 0.15);
+      ctx.lineTo(Math.cos(a + 0.35) * r * 0.5, Math.sin(a + 0.35) * r * 0.5);
+      ctx.lineTo(Math.cos(a - 0.1) * r * 0.95, Math.sin(a - 0.1) * r * 0.95);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   drawShade(ctx, 0, 0, r, 0.55);
   if (n.type === 'eye') {
     // 主人公を見つめる大きな目

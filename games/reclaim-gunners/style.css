@@ -97,6 +97,8 @@ body.playing { overflow: hidden; }
 
 /* スマホ (と高さの低い画面): 余白を減らし、プレイ中は上の見出しを隠す */
 body.compact .app { padding: 0 4px 4px; }
+body.tall .app { padding: 0; }
+body.tall .board { border-radius: 0; }
 body.compact .top { height: 30px; }
 body.compact .top h1 { font-size: 0.85rem; }
 body.compact .icon-btn { height: 26px; }
@@ -109,31 +111,20 @@ body.compact.playing .app { padding: 4px; }
   position: absolute;
   right: 1.2cqw;
   top: 15.5cqh;
-  width: 9cqh;
-  height: 9cqh;
-  border-radius: 2cqh;
+  width: 9cqmin;
+  height: 9cqmin;
+  border-radius: 2cqmin;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(10, 8, 16, 0.6);
   color: #fff;
   font: inherit;
   font-weight: 800;
-  font-size: 3.4cqh;
+  font-size: 3.4cqmin;
   touch-action: none;
 }
+/* 縦長: ミニマップ (画面の幅の約 3 割の高さ) の下 */
+body.tall .pause-in { top: 30cqw; right: 2.5cqw; }
 body:not(.compact) .pause-in { display: none; }
-
-/* 縦持ちのスマホ: ゲーム全体を 90° 回して横向きにする (--rw・--rh は回したあとの幅と高さ。script.js が入れる) */
-body.rotated { overflow: hidden; }
-body.rotated .app {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: var(--rw);
-  height: var(--rh);
-  max-width: none;
-  transform-origin: top left;
-  transform: translateX(var(--rh)) rotate(90deg);
-}
 
 .howto { margin: 10px 0 0; color: var(--muted); font-size: 0.8rem; }
 
@@ -162,10 +153,6 @@ body.rotated .app {
 
 .tbtn small { font-size: 2.4cqh; opacity: 0.8; }
 .tbtn:active, .tbtn.on { background: rgba(176, 75, 255, 0.55); }
-.t-dodge { right: 3cqw; bottom: 20cqh; width: 16cqh; height: 16cqh; }
-.t-reload { right: 14cqw; bottom: 6cqh; }
-.t-potion { right: 3cqw; bottom: 42cqh; }
-.t-interact { right: 14cqw; bottom: 24cqh; width: auto; min-width: 15cqh; padding: 0 2cqh; border-radius: 4cqh; height: 9cqh; background: rgba(60, 120, 230, 0.7); }
 
 /* お知らせ (画面の上のほうに出る帯) */
 .toast {
@@ -173,12 +160,13 @@ body.rotated .app {
   left: 50%;
   top: 38%;
   transform: translateX(-50%);
+  width: max-content;
   max-width: 86%;
-  padding: 1.2cqh 3cqh;
+  padding: 1.6cqmin 4cqmin;
   border-radius: 999px;
   background: rgba(10, 8, 16, 0.82);
   color: #fff;
-  font-size: 3.4cqh;
+  font-size: clamp(12px, 4.2cqmin, 20px);
   font-weight: 700;
   text-align: center;
   pointer-events: none;
@@ -511,22 +499,21 @@ input[type="range"] { accent-color: var(--gold); }
   .row.wrow .wicon { width: 46px; height: 23px; }
 }
 
-/* スマホのボタン: 回避と回復を大きく、右手の親指が届く所に置く */
-.t-dodge { right: 3cqw; bottom: 6cqh; width: 22cqh; height: 22cqh; font-size: 4cqh; }
-.t-potion { right: calc(3cqw + 24cqh); bottom: 4cqh; width: 16cqh; height: 16cqh; font-size: 3.2cqh; }
-.t-reload { right: 4cqw; bottom: 31cqh; width: 11cqh; height: 11cqh; font-size: 2.8cqh; }
-.t-interact { right: calc(3cqw + 24cqh); bottom: 23cqh; }
-/* 回避の使えるまでの残り (時計回りに減っていく影) */
-.t-dodge::after {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  background: conic-gradient(rgba(0, 0, 0, 0.6) var(--cd, 0deg), transparent 0);
-  pointer-events: none;
-}
-.t-dodge.cooling { border-color: rgba(216, 176, 100, 0.35); }
+/* スマホのボタン: 必殺技と回復を、画面の下のまん中に横に並べる (移動と回避は指 1 本で画面のどこでも)
+   大きさは画面の短い辺 (cqmin) に合わせるので、縦持ちでも横持ちでも同じくらいの大きさ */
+.tbtn { font-size: 3.2cqmin; }
+.tbtn small { font-size: 2.6cqmin; }
+.t-potion { left: 3cqmin; bottom: 5cqmin; width: 16cqmin; height: 16cqmin; }
+.t-special { left: 21cqmin; bottom: 4cqmin; width: 18cqmin; height: 18cqmin; opacity: 0.45; }
+/* 設定で右寄せにしたとき (左右を入れかえて、右のふちに並べる) */
+body.btn-right .t-potion { left: auto; right: 3cqmin; }
+body.btn-right .t-special { left: auto; right: 21cqmin; }
+/* 調べる・武器屋に入るのボタンも、同じ側に寄せる (回復と必殺技の上) */
+body.btn-right .t-interact { left: auto; right: 3cqmin; }
+.t-interact { left: 3cqmin; right: auto; transform: none; bottom: 25cqmin; width: auto; height: 11cqmin; min-width: 24cqmin; padding: 0 4cqmin; border-radius: 6cqmin; background: rgba(60, 120, 230, 0.75); }
 .t-potion.empty { opacity: 0.4; }
+/* 必殺技: ゲージがたまるまで暗く、満タンで金色に光る */
+.t-special.ready { opacity: 1; border-color: #ffd84a; background: rgba(160, 110, 20, 0.6); box-shadow: 0 0 3cqmin rgba(255, 216, 74, 0.6); }
 
 /* 言葉ごとの文字の形 (lang.js が html の lang を切り替える) */
 :root:lang(en) {
@@ -553,26 +540,128 @@ input[type="range"] { accent-color: var(--gold); }
 .langs .btn[lang="ko"] { font-family: "Nanum Myeongjo", serif; }
 .langs .btn.on { border-color: var(--gold); color: #fff3d0; box-shadow: inset 0 0 0 1px rgba(224, 184, 96, 0.5), 0 0 8px rgba(224, 184, 96, 0.25); }
 
-/* 武器の改造 (スキルツリー) */
-.mtree { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
-.mtl { font-family: var(--font-display); color: var(--gold); font-size: 0.85em; letter-spacing: 0.06em; margin-bottom: 4px; }
-.mrow { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
-.mnode {
-  position: relative;
-  display: flex; flex-direction: column; gap: 3px;
-  padding: 6px 8px;
-  border: 1px solid rgba(200, 160, 90, 0.35);
-  border-radius: 3px;
-  background: linear-gradient(180deg, rgba(48, 30, 22, 0.9), rgba(24, 14, 12, 0.9));
+/* 武器の強化 (スキルツリー): 武器を根に、左から右へ枝分かれする。線は .kids と .tn の擬似要素で引く */
+.tpanel { height: 100%; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.tpanel .panel-head { margin-bottom: 2px; }
+.stree { position: relative; flex: 1; min-height: 0; overflow: hidden; --line: rgba(200, 160, 90, 0.28); --line-on: rgba(232, 192, 104, 0.85); }
+.tn { position: relative; display: flex; align-items: center; }
+.stree > .tn { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.kids { position: relative; display: flex; flex-direction: column; gap: 8px; padding-left: 34px; }
+.kids::before { content: ""; position: absolute; left: 0; top: 50%; width: 17px; border-top: 2px solid var(--line-on); }
+.kids > .tn::before { content: ""; position: absolute; left: -17px; top: 50%; width: 17px; border-top: 2px solid var(--line); }
+.kids > .tn::after { content: ""; position: absolute; left: -17px; top: -4px; bottom: -4px; border-left: 2px solid var(--line-on); }
+.kids > .tn:first-child::after { top: 50%; }
+.kids > .tn:last-child::after { bottom: 50%; }
+.kids > .tn:only-child::after { display: none; }
+.kids > .tn.open::before { border-top-color: var(--line-on); }
+.treq { position: absolute; left: -17px; top: 50%; transform: translate(-30%, -125%); font-size: 0.62em; color: #c8a8e8; white-space: nowrap; pointer-events: none; }
+.tcard {
+  flex: none; width: 120px; display: flex; flex-direction: column; gap: 2px;
+  padding: 5px 7px; text-align: left; font: inherit; color: var(--panel-text); cursor: pointer;
+  border: 1px solid rgba(200, 160, 90, 0.45); border-radius: 3px;
+  background: linear-gradient(180deg, rgba(58, 36, 22, 0.95), rgba(26, 15, 11, 0.95));
 }
-.mnode.uniq { border-color: rgba(200, 90, 255, 0.45); background: linear-gradient(180deg, rgba(44, 22, 48, 0.9), rgba(20, 10, 22, 0.9)); }
-.mnode.locked { opacity: 0.55; }
-.mnode.max { border-color: var(--gold); box-shadow: 0 0 8px rgba(224, 184, 96, 0.25); }
-.mreq { font-size: 0.72em; color: #c8a8e8; }
-.mname { font-weight: 800; color: #f0e0c0; }
-.mlv { float: right; font-size: 0.8em; color: var(--gold); font-weight: 700; }
-.pips { display: flex; gap: 2px; }
-.pips i { flex: 1; height: 4px; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(200, 160, 90, 0.25); }
-.pips i.on { background: linear-gradient(90deg, #e0b860, #ffe9a8); border-color: #e0b860; }
-.mnode .s { font-size: 0.78em; line-height: 1.35; flex: 1; }
-.mbtn { display: flex; justify-content: flex-end; font-size: 0.78em; min-height: 1.6em; align-items: center; }
+.tcard:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.tcard.uniq { border-color: rgba(200, 90, 255, 0.55); background: linear-gradient(180deg, rgba(48, 24, 54, 0.95), rgba(22, 10, 24, 0.95)); }
+.tcard.sp { border-color: rgba(255, 200, 90, 0.7); background: linear-gradient(180deg, rgba(74, 46, 14, 0.95), rgba(30, 18, 8, 0.95)); }
+.tcard.locked { opacity: 0.45; }
+.tcard.open:not(.ready) { opacity: 0.8; }
+.tcard.max { border-color: var(--gold); box-shadow: 0 0 8px rgba(224, 184, 96, 0.3); }
+.tcard.ready { box-shadow: 0 0 0 1px rgba(255, 230, 150, 0.35), 0 0 10px rgba(255, 210, 110, 0.35); }
+.tcard.sel { outline: 2px solid #fff0c0; outline-offset: 1px; }
+.troot { width: 96px; align-items: center; text-align: center; cursor: default; border-color: var(--gold); }
+.troot .wicon { width: 60px; height: 30px; }
+.tname { font-weight: 800; font-size: 0.8em; line-height: 1.2; color: #f0e0c0; }
+.tlv { font-size: 0.68em; color: var(--gold); }
+.tset { color: #ffe680; }
+.tpips { display: flex; gap: 1px; }
+.tpips i { flex: 1; height: 3px; background: rgba(0, 0, 0, 0.55); }
+.tpips i.on { background: #e8c068; }
+.tdetail {
+  flex: none; display: flex; align-items: center; gap: 10px; margin: 0 -14px; padding: 8px 14px 10px;
+  border-top: 1px solid rgba(200, 160, 90, 0.45); background: rgba(16, 9, 8, 0.97);
+}
+.tinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tdetail .t { font-weight: 800; }
+.tdetail .s { font-size: 0.82em; line-height: 1.35; }
+.tbtns { flex: none; display: flex; gap: 8px; align-items: center; }
+/* 押しやすい大きなボタン (値段は下に小さく) */
+.btn.tbig { min-width: max(110px, 7.5em); min-height: max(46px, 2.9em); padding: 4px 14px; flex-direction: column; gap: 0; font-size: 1.05em; font-weight: 800; line-height: 1.15; }
+.btn.tbig small { font-size: 0.72em; font-weight: 600; opacity: 0.9; }
+
+/* 読みこみ中 (マップの絵を作っているあいだ・全体図の絵が届くまで) */
+.loading {
+  position: absolute; inset: 0; z-index: 30;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  background: rgba(8, 5, 6, 0.88); color: var(--gold); font-family: var(--font-display); letter-spacing: 0.1em;
+}
+.loading[hidden] { display: none; }
+.spin {
+  display: block; width: 34px; height: 34px; border-radius: 50%;
+  border: 3px solid rgba(224, 184, 96, 0.25); border-top-color: var(--gold);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+.world { position: relative; }
+.world .wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #1a120c; }
+
+/* チュートリアルの案内 (プレイ画面の上のほう。下は指で操作するので空けておく) */
+.tut {
+  position: absolute; left: 50%; top: 17cqh; transform: translateX(-50%); z-index: 5;
+  width: min(88%, 420px); padding: 8px 12px 10px; font-size: clamp(12px, 3.6cqmin, 16px);
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  border: 1px solid var(--gold); border-radius: 4px;
+  background: rgba(14, 8, 8, 0.9); color: #f0e2c0; font-family: var(--font-ui);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+.tut[hidden] { display: none; }
+body.tall .tut { top: 46cqw; }
+.tut-head { display: flex; width: 100%; align-items: center; justify-content: space-between; font-size: 0.8em; color: var(--gold); }
+.tut-text { margin: 0; font-size: 0.95em; line-height: 1.5; }
+.tut-skip { border: 0; background: none; color: var(--panel-muted); font: inherit; text-decoration: underline; cursor: pointer; padding: 4px; }
+.tut [data-tut=next] { align-self: flex-end; min-width: 6em; }
+
+/* 装備の画面: 行を 2 行に収める (改行を減らす) */
+.slot { position: relative; min-height: 0; padding: 6px 2px; }
+.slot .sno { position: absolute; top: 2px; left: 5px; font-size: 0.75em; color: var(--panel-muted); }
+.erow { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; grid-template-areas: "icon name name" "icon stats btns"; align-items: center; column-gap: 8px; row-gap: 2px; padding: 6px 8px; }
+.erow .wicon { grid-area: icon; width: 52px; height: 26px; }
+.einfo { display: contents; }
+.einfo .t { grid-area: name; }
+.einfo .s { grid-area: stats; }
+.einfo .t, .einfo .s { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ebtns { grid-area: btns; display: flex; gap: 4px; }
+.ehead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 6px; }
+.ehead h3 { margin: 0; font-size: 1em; }
+.ehead h3 .muted { font-size: 0.75em; font-weight: 400; }
+.ehead .muted { display: block; }
+
+/* 武器屋: 装備の画面と同じ 2 行の行。道具は名前と説明を 1 行ずつ */
+.irow { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name btns" "stats btns"; align-items: center; column-gap: 8px; row-gap: 2px; padding: 6px 10px; }
+.shint { margin: 2px 2px 0; font-size: 0.78em; line-height: 1.4; }
+.tabs { flex-wrap: nowrap; }
+.tabs .btn { flex: 1; }
+/* 見出しは 1 行 (長い店の名前は … で切る) */
+.panel-head h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 能力ボード (スフィア盤): 盤は上下左右にスクロールできる。下に選んだノードと解放のボタン */
+.bslot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 2px 6px; font-size: 0.85em; border-bottom: 1px solid rgba(200, 160, 90, 0.25); }
+.sgrid { flex: 1; min-height: 0; overflow: auto; margin: 0 -14px; background: radial-gradient(circle at 50% 50%, rgba(60, 30, 60, 0.35), rgba(8, 4, 6, 0.2) 70%); touch-action: pan-x pan-y; }
+.sgrid svg { display: block; }
+.sl line { stroke: rgba(200, 160, 90, 0.18); stroke-width: 3; stroke-linecap: round; }
+.sl line.half { stroke: rgba(224, 184, 96, 0.45); }
+.sl line.on { stroke: #e0b860; }
+.sn { cursor: pointer; }
+.sn circle { fill: #1a1210; stroke: var(--c); stroke-width: 2; }
+.sn text { fill: #f0e2c0; font-size: 12px; font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; font-family: var(--font-ui); }
+.sn.locked { opacity: 0.4; }
+.sn.own circle { fill: var(--c); stroke: #fff3d0; }
+.sn.own text { fill: #1a0e08; }
+.sn.open circle { stroke-width: 3; }
+.sn.ready circle { animation: npulse 1.2s ease-in-out infinite; }
+.sn.sel circle { stroke: #ffffff; stroke-width: 3.5; }
+.sn.center circle { fill: #e0b860; stroke: #fff3d0; }
+.sn.center text { fill: #1a0e08; }
+@keyframes npulse { 50% { stroke: #ffffff; stroke-width: 4.5; } }
+@media (prefers-reduced-motion: reduce) { .sn.ready circle { animation: none; stroke: #ffffff; } }

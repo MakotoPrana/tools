@@ -10,9 +10,10 @@ import { areaTrack } from '../core/analytics.js';
 import { D, diffId, hero, heroDef, maxHp, moveSpeed, powerLv, rank, recvMul } from './hero.js';
 import { updateInteract } from './interact.js';
 import { G, P, ensureWs } from './stage.js';
+import { justDodge } from './specials.js';
 import { effW } from './weapon-mods.js';
 import { updateWeapon } from './weapons.js';
-import { mouse, moveInput, sticks, touchMode } from '../input/input.js';
+import { mouse, moveInput, touchMode } from '../input/input.js';
 import { toast } from '../ui/toast.js';
 
 // 装備している武器はすべて同時に撃つ。どれも、それぞれの射程の中のいちばん近い敵を自動でねらう
@@ -41,11 +42,15 @@ export function manualReload() {
   }
 }
 
-export function dodge() {
+// dir: 回避する向き (スマホのはらい)。なければ、動いている向き (止まっていれば向いている向き)
+export function dodge(dir) {
   if (!P || G.dead || P.dodgeCd > 0) return;
   const { mx, my } = moveInput();
-  const a = mx || my ? Math.atan2(my, mx) : P.aim;
+  const a = dir != null ? dir : mx || my ? Math.atan2(my, mx) : P.aim;
   P.dodgeDir = a;
+  P.dodgeAt = G.t; // ジャスト回避の判定に使う
+  P.dodgeX = P.x;
+  P.dodgeY = P.y;
   P.dodgeCd = heroDef.dodgeCd * (1 - 0.03 * rank('dodge'));
   P.twinBoost = 3; // 回避してからの時間は 3 − これ
   sfx('dodge');
@@ -86,14 +91,7 @@ export function usePotion() {
 
 // 自分でねらうとき (マウスを押している間・スマホで右側をなぞっている間) の向き。null なら自動でねらう
 export function manualAim() {
-  if (touchMode) {
-    if (sticks.aim) {
-      const dx = sticks.aim.x - sticks.aim.ox;
-      const dy = sticks.aim.y - sticks.aim.oy;
-      if (Math.hypot(dx, dy) > 8) return Math.atan2(dy, dx);
-    }
-    return null;
-  }
+  if (touchMode) return null; // スマホはいつも自動でねらう
   if (!mouse.down) return null;
   const wx = G.cam.x - VW / 2 + mouse.x;
   const wy = G.cam.y - VH / 2 + mouse.y;
@@ -136,6 +134,19 @@ export function updatePlayer(dt) {
   P.slowT = Math.max(0, (P.slowT || 0) - dt);
   if (P.slowT > 0) sp *= 0.6; // 泥・氷の弾に当たると遅くなる
   if (tileAt(P.x, P.y) === T.SWAMP && P.rollT <= 0 && P.tackleT <= 0) sp *= 0.7; // 沼
+  // 溶岩: 上にいると 0.5 秒ごとに最大体力の 4% 焼ける (回避で飛びこえている間は焼けない)
+  P.lavaT = (P.lavaT || 0) - dt;
+  if (tileAt(P.x, P.y) === T.LAVA && P.rollT <= 0 && P.lavaT <= 0 && !G.dead) {
+    P.lavaT = 0.5;
+    const d = Math.max(1, Math.round(maxHp() * 0.04));
+    P.hp -= d;
+    addText(P.x + rnd(-4, 4), P.y - 12, `-${d}`, '#ffa040', 8);
+    addPart({ x: P.x, y: P.y + 4, vx: rnd(-20, 20), vy: -40, life: 0.4, color: '#ff8a2c', size: 2.5 });
+    if (P.hp <= 0) {
+      P.hp = 0;
+      G.dead = 2.2;
+    }
+  }
   if (P.pull) {
     // 大蝦蟇の舌で引き寄せられている
     P.pull.t -= dt;
@@ -211,6 +222,28 @@ export function updatePlayer(dt) {
   updateInteract();
 }
 
+// 物理攻撃の当たり判定に使う主人公の位置。ジャスト回避の受付中は、回避を始めた位置で調べる
+// (よけて動いたぶん攻撃の外に出ても、ジャスト回避になるように)
+export const justOpen = () => P.dodgeAt != null && G.t - P.dodgeAt <= RG.JUST_WINDOW;
+export const physPos = () => (justOpen() ? { x: P.dodgeX, y: P.dodgeY } : { x: P.x, y: P.y });
+
+// 中級悪魔の物理攻撃が当たるとき。当たる直前 (RG.JUST_WINDOW 秒) に回避を始めていればジャスト回避
+export function physHit(raw, srcLv, src) {
+  if (G.dead) return;
+  if (justOpen()) {
+    // 回避を始めてから当たるまでが短いほど、上の段階 (1: 白 / 2: 赤 / 3: 紫)
+    const dtJ = G.t - P.dodgeAt;
+    let tier = 1;
+    RG.JUST_TIERS.forEach((t, i) => {
+      if (dtJ <= t.within) tier = i + 1;
+    });
+    P.dodgeAt = null; // 1 回の回避で 1 回だけ
+    justDodge(src, tier);
+    return;
+  }
+  hurtPlayer(raw, srcLv);
+}
+
 export function hurtPlayer(raw, srcLv) {
   if (P.inv > 0 || G.dead) return;
   let d = raw * recvMul(srcLv - powerLv()) * (1 - Math.min(0.45, 0.015 * rank('def')));
@@ -219,6 +252,8 @@ export function hurtPlayer(raw, srcLv) {
   d = Math.max(1, Math.round(d));
   P.hp -= d;
   P.inv = 0.6;
+  G.combo = 0; // 攻撃を受けると、コンボが切れる
+  G.comboT = 0;
   P.hurtT = 0.25;
   G.shake = Math.max(G.shake, 4);
   addText(P.x, P.y - 14, `-${d}`, '#ff6b6b', 11);

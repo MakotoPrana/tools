@@ -1,5 +1,5 @@
 // 設定
-import { tr } from '../core/config.js';
+import { TEST, tr } from '../core/config.js';
 import { saveSettings, settings } from '../core/save.js';
 import { layout } from '../render/screen.js';
 import { actions, uiEl } from './actions.js';
@@ -13,9 +13,11 @@ export function showSettings() {
       <div class="list">
         <div class="row"><div class="t">🌐 Language</div>${langBtns()}</div>
         <div class="row"><div class="t">${tr('効果音')}</div><input type="range" min="0" max="1" step="0.1" value="${settings.se}" data-set="se"></div>
-        <div class="row"><div><div class="t">${tr('自動でねらって撃つ')}</div><div class="s">${tr('近くの敵へ武器が自動でねらいを向けて撃つ。OFF のときは、マウスを押している間（スマホは右側をなぞっている間）だけ撃つ')}</div></div><button class="btn small" data-act="toggleSet" data-id="autoAim">${settings.autoAim ? 'ON' : 'OFF'}</button></div>
+        <div class="row"><div><div class="t">${tr('自動でねらって撃つ')}</div><div class="s">${tr('近くの敵へ武器が自動でねらいを向けて撃つ。OFF のときは、マウスを押している間だけ撃つ（スマホはいつも自動）')}</div></div><button class="btn small" data-act="toggleSet" data-id="autoAim">${settings.autoAim ? 'ON' : 'OFF'}</button></div>
+        <div class="row"><div><div class="t">${tr('必殺技と回復のボタン（スマホ）')}</div><div class="s">${tr('画面の下の、左か右に寄せる')}</div></div><button class="btn small" data-act="toggleSet" data-id="btnRight">${settings.btnRight ? tr('右') : tr('左')}</button></div>
         <div class="row"><div class="t">${tr('ダメージの数字')}</div><button class="btn small" data-act="toggleSet" data-id="numbers">${settings.numbers ? 'ON' : 'OFF'}</button></div>
-        <div class="row"><div><div class="t">${tr('縦持ちのとき横向きに回す（スマホ）')}</div><div class="s">${tr('画面が自動で回らないときに、ゲームを 90° 回して横向きで遊ぶ')}</div></div><button class="btn small" data-act="toggleSet" data-id="rotate">${settings.rotate ? 'ON' : 'OFF'}</button></div>
+        ${TEST ? `<div class="row"><div><div class="t">${tr('全ステージ・全難易度（テスト版）')}</div><div class="s">${tr('門の守護者や魔王を倒していなくても、どの難易度・どのステージ・どのエリアにも行ける')}</div></div><button class="btn small ${settings.allStages ? 'primary' : ''}" data-act="toggleSet" data-id="allStages">${settings.allStages ? 'ON' : 'OFF'}</button></div>` : ''}
+        <div class="row"><div><div class="t">${tr('チュートリアル')}</div><div class="s">${tr('次にステージに入ったとき、遊び方の案内をもう一度出す')}</div></div><button class="btn small" data-act="replayTutorial" ${settings.tutorialDone ? '' : 'disabled'}>${settings.tutorialDone ? tr('もう一度見る') : tr('予約済み')}</button></div>
       </div>
     </div></div>`);
 }
@@ -26,6 +28,11 @@ actions.setLang = (d) => {
   settings.lang = d.id;
   saveSettings();
   RG.setLang(d.id);
+  rerender();
+};
+actions.replayTutorial = () => {
+  settings.tutorialDone = false;
+  saveSettings();
   rerender();
 };
 actions.toggleSet = (d) => {

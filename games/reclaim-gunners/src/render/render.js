@@ -11,11 +11,13 @@ import { drawHud } from './hud.js';
 import { drawNest } from './nest.js';
 import { drawPlayer } from './player.js';
 import { txt } from './primitives.js';
-import { drawBeam, drawBullet, drawEBullet, drawParts } from './projectiles.js';
+import { drawBeam, drawBullet, drawEBullet, drawLance, drawParts } from './projectiles.js';
 import { resize, scale } from './screen.js';
 import { drawFeaturesLive, drawFog, drawHazard, drawLairs, drawLakeShimmer, drawMist, drawPickup, drawSeals, drawShops, drawStone, drawTele, drawVignette } from './world.js';
 import { screen } from '../ui/core.js';
-import { getMap } from '../world/mapgen.js';
+import { getMap, mapCache } from '../world/mapgen.js';
+import { drawTutorialWorld } from '../game/tutorial.js';
+import { drawCutin, drawJustPop, drawSpecialWorld } from './special-fx.js';
 
 export function render() {
   resize();
@@ -32,6 +34,12 @@ export function render() {
 export let backdropT = 0;
 export function renderBackdrop() {
   backdropT += 1 / 60;
+  // 背景のマップができるまでは暗い画面 (読みこみ中の表示が出ている)
+  if (!mapCache[STAGES[0].id]) {
+    ctx.fillStyle = '#0c0809';
+    ctx.fillRect(0, 0, VW, VH);
+    return;
+  }
   const map = getMap(STAGES[0]);
   const span = map.w * TILE - VW;
   const x = (Math.sin(backdropT * 0.05) * 0.5 + 0.5) * span;
@@ -57,10 +65,15 @@ export function renderPlay() {
   const camY = Math.round(G.cam.y - VH / 2 + rnd(-sh, sh));
   ctx.save();
   ctx.translate(-camX, -camY);
-  const bx = clamp(camX, 0, G.map.w * TILE - VW);
-  const by = clamp(camY, 0, G.map.h * TILE - VH);
+  // マップの外 (主人公がふちにいるとき見える所) は暗く塗り、背景の絵は見えている所だけ描く
+  ctx.fillStyle = '#0c0809';
+  ctx.fillRect(camX, camY, VW, VH);
+  const bx = clamp(camX, 0, G.map.w * TILE);
+  const by = clamp(camY, 0, G.map.h * TILE);
+  const bw = clamp(camX + VW, 0, G.map.w * TILE) - bx;
+  const bh = clamp(camY + VH, 0, G.map.h * TILE) - by;
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(G.map.bg, bx * BG_SCALE, by * BG_SCALE, VW * BG_SCALE, VH * BG_SCALE, bx, by, VW, VH);
+  if (bw > 0 && bh > 0) ctx.drawImage(G.map.bg, bx * BG_SCALE, by * BG_SCALE, bw * BG_SCALE, bh * BG_SCALE, bx, by, bw, bh);
   const view = { x0: camX - 40, y0: camY - 40, x1: camX + VW + 40, y1: camY + VH + 40 };
   const inView = (x, y, r = 0) => x + r > view.x0 && x - r < view.x1 && y + r > view.y0 && y - r < view.y1;
 
@@ -78,7 +91,10 @@ export function renderPlay() {
   for (const e of G.enemies) if (inView(e.x, e.y, e.r)) drawEnemy(e);
   for (const b of G.bosses) drawBoss(b);
   if (!G.dead) drawPlayer();
+  drawTutorialWorld();
+  drawSpecialWorld();
   if (G.beam) drawBeam();
+  if (G.lances) for (const l of G.lances) drawLance(l);
   for (const b of G.bullets) if (inView(b.x, b.y)) drawBullet(b);
   for (const b of G.ebullets) if (inView(b.x, b.y)) drawEBullet(b);
   drawParts(inView);
@@ -93,8 +109,8 @@ export function renderPlay() {
     if (e.dormant || !inView(e.x, e.y)) continue;
     const d = dist(e.x, e.y, P.x, P.y);
     const hurt = e.hp < e.maxHp;
-    if (d < 140 || (hurt && d < 300)) {
-      txt(`Lv${e.lv}`, e.x, e.y - e.r - 6, 7, lvColor(e.lv - pl), 'center');
+    if (d < 140 || (hurt && d < 300) || (e.def.mid && d < 320)) {
+      txt(e.def.mid ? `${e.def.name} Lv${e.lv}` : `Lv${e.lv}`, e.x, e.y - e.r - (e.def.mid ? 14 : 6), 7, lvColor(e.lv - pl), 'center');
       if (hurt) {
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(e.x - 10, e.y + e.r + 3, 20, 3);
@@ -107,7 +123,19 @@ export function renderPlay() {
   ctx.imageSmoothingEnabled = false;
   drawMist();
   drawVignette();
+  // 必殺技を出した瞬間の金色の光と、ジャスト回避のゆっくりの間の青み
+  if (G.spFlash > 0) {
+    const [fr, fg, fb] = G.spFlashRgb || [255, 220, 120];
+    ctx.fillStyle = `rgba(${fr},${fg},${fb},${G.spFlash * 0.5})`;
+    ctx.fillRect(0, 0, VW, VH);
+  }
+  if (G.slowT > 0) {
+    ctx.fillStyle = `rgba(90,200,255,${Math.min(0.18, G.slowT * 0.4)})`;
+    ctx.fillRect(0, 0, VW, VH);
+  }
   drawHud();
+  drawCutin();
+  drawJustPop();
   if (G.fade > 0) {
     ctx.fillStyle = `rgba(0,0,0,${G.fade})`;
     ctx.fillRect(0, 0, VW, VH);

@@ -232,10 +232,13 @@ export function drawLairs() {
 export function drawTele(t) {
   const k = clamp(t.t / t.dur, 0, 1);
   ctx.save();
+  // ジャスト回避できる攻撃は、最後の 0.15 秒だけ白く光る (この少し前に回避するとジャスト回避)
+  const hot = t.just && t.dur - t.t < 0.15;
   if (t.type === 'circle') {
-    ctx.fillStyle = `rgba(255,60,60,${0.12 + k * 0.18})`;
+    // 自分の必殺技の爆発は金色、敵の攻撃は赤
+    ctx.fillStyle = hot ? 'rgba(255,255,255,0.45)' : t.mine ? `rgba(255,210,90,${0.1 + k * 0.15})` : `rgba(255,60,60,${0.12 + k * 0.18})`;
     circle(ctx, t.x, t.y, t.r);
-    ctx.strokeStyle = 'rgba(255,90,90,0.8)';
+    ctx.strokeStyle = hot ? '#ffffff' : t.mine ? 'rgba(255,220,120,0.85)' : 'rgba(255,90,90,0.8)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(t.x, t.y, t.r * k, 0, TAU);
@@ -251,7 +254,7 @@ export function drawTele(t) {
   } else if (t.type === 'line') {
     ctx.translate(t.x, t.y);
     ctx.rotate(t.a);
-    ctx.fillStyle = `rgba(255,60,60,${0.1 + k * 0.2})`;
+    ctx.fillStyle = hot ? 'rgba(255,255,255,0.5)' : `rgba(255,60,60,${0.1 + k * 0.2})`;
     ctx.fillRect(0, -t.w / 2, t.len, t.w);
     ctx.fillStyle = 'rgba(255,90,90,0.7)';
     ctx.fillRect(0, -1, t.len * k, 2);
@@ -286,13 +289,7 @@ export function drawStone(s) {
 }
 
 export function drawPickup(p) {
-  if (p.type === 'coin') {
-    if (p.life < 2 && Math.floor(p.life * 8) % 2) return;
-    ctx.fillStyle = '#b8860b';
-    circle(ctx, p.x, p.y, 3.5);
-    ctx.fillStyle = '#ffd84a';
-    circle(ctx, p.x - 0.5, p.y - 0.5, 2.6);
-  } else if (p.type === 'mat') {
+  if (p.type === 'mat') {
     const b = Math.sin(G.t * 5 + p.x) * 1.5;
     ctx.fillStyle = 'rgba(200,140,255,0.35)';
     circle(ctx, p.x, p.y + b, 8);
@@ -314,18 +311,24 @@ export function drawPickup(p) {
 }
 
 // 毒の沼
+const HAZARD_COLORS = {
+  poison: ['#b8ff5a', 'rgba(90,140,30,0)', '#e0ff9a'],
+  lava: ['#ffb040', 'rgba(200,50,10,0)', '#fff0a0'],
+  curse: ['#c070ff', 'rgba(90,20,140,0)', '#f0c0ff'],
+};
 export function drawHazard(z) {
   const k = Math.min(1, z.t / 0.6, (z.max - z.t) / 0.3);
   ctx.globalAlpha = 0.55 * k;
+  const col = HAZARD_COLORS[z.kind] || HAZARD_COLORS.poison;
   const g = ctx.createRadialGradient(z.x, z.y, 0, z.x, z.y, z.r);
-  g.addColorStop(0, '#b8ff5a');
-  g.addColorStop(1, 'rgba(90,140,30,0)');
+  g.addColorStop(0, col[0]);
+  g.addColorStop(1, col[1]);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.ellipse(z.x, z.y, z.r, z.r * 0.7, 0, 0, TAU);
   ctx.fill();
   ctx.globalAlpha = k;
-  ctx.fillStyle = '#e0ff9a';
+  ctx.fillStyle = col[2];
   const b = (G.t * 1.5 + z.x * 0.1) % 1;
   circle(ctx, z.x + Math.sin(z.x) * z.r * 0.4, z.y - b * 6, 1.5);
   ctx.globalAlpha = 1;
@@ -334,7 +337,7 @@ export function drawHazard(z) {
 // 画面のふちを少し暗くする (目が中央に行くように)。画面の幅が変わったら作り直す
 export let vignette = null;
 export function drawVignette() {
-  if (!vignette || vignette.width !== VW) {
+  if (!vignette || vignette.width !== VW || vignette.height !== VH) {
     vignette = document.createElement('canvas');
     vignette.width = VW;
     vignette.height = VH;

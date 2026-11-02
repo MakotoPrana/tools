@@ -1,7 +1,6 @@
 // タイトル・主人公選択・難易度
-import { CATS, DIFFS, DIFF_IDS, HEROES, tr } from '../core/config.js';
-import { goldAtSave, newProgress, save, saveOk, setGoldAtSave } from '../core/save.js';
-import { fmt } from '../core/util.js';
+import { CATS, DIFFS, DIFF_IDS, HEROES, money, tr } from '../core/config.js';
+import { allStagesOpen, newProgress, save, saveOk, setGoldAtSave } from '../core/save.js';
 import { D, diffId, hero, heroDef, prog, setD, setDiffId, setHero, setHeroDef, setProg } from '../game/hero.js';
 import { G, setG } from '../game/stage.js';
 import { clearEff } from '../game/weapon-mods.js';
@@ -61,7 +60,7 @@ export function showHeroSelect() {
         <p class="muted">${tr('体力 {hp} ・ 移動速度 {spd} ・ 回避: {dn}（{dd}）', { hp: h.hp, spd: h.speed, dn: h.dodgeName, dd: h.dodgeDesc })}</p>
         <div class="cats">${cats}</div>
         <p>${tr('特性: {v}', { v: h.trait })}</p>
-        <p class="muted">${tr('解放したエリア {a} ・ 所持金 {g} G ・ EXP {e}', { a: hh.progress.normal.areas.length, g: fmt(hh.gold), e: fmt(hh.exp) })}</p>
+        <p class="muted">${tr('解放したエリア {a} ・ {s}', { a: hh.progress.normal.areas.length, s: money(hh.gold) })}</p>
       </div>
       <div class="btn-row"><button class="btn primary" data-act="heroOk">${tr('{name} で始める', { name: h.name })}</button></div>
     </div></div>`;
@@ -88,8 +87,9 @@ actions.heroOk = () => {
 };
 
 // ---------- 難易度 ----------
+// テスト版で「全ステージに行ける」を ON にしていれば、難易度もすべて選べる
 export function diffOpen(id) {
-  if (id === 'normal') return true;
+  if (id === 'normal' || allStagesOpen()) return true;
   if (id === 'hard') return !!(hero.progress.normal && hero.progress.normal.cleared);
   return !!(hero.progress.hard && hero.progress.hard.cleared);
 }

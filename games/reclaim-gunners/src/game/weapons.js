@@ -15,6 +15,13 @@ export function updateWeapon(w, st, dt, ang, tdist, slot) {
   const firing = ang != null;
   st.active = firing;
   const mag = w.mag;
+  // 必殺技「連射」の間は、リロードも弾・魔力の消費もなし
+  const rapid = P.rapid && P.rapid.id === w.id ? P.rapid.k : 0;
+  if (rapid) {
+    st.reloadT = 0;
+    if (w.mag) st.ammo = Math.max(st.ammo, 1);
+    if (w.spin) st.spin = 1;
+  }
   if (st.reloadT > 0) {
     st.reloadT -= dt;
     if (st.reloadT <= 0) {
@@ -58,7 +65,8 @@ export function updateWeapon(w, st, dt, ang, tdist, slot) {
   let rate = w.rate;
   if (w.spin) rate = lerp(w.rateMin, w.rate, st.spin);
   if (w.twin && 3 - P.twinBoost < w.twinT) rate *= w.twinBoost;
-  if (w.mana) {
+  if (rapid) rate *= rapid;
+  else if (w.mana) {
     if (st.mana < w.mana[1]) return;
     st.mana -= w.mana[1];
   } else {
