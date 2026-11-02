@@ -14,6 +14,7 @@ export const newHero = () => ({
   slots: 0, // 開けた武器スロットの数 (最初の 2 つに足す数)
   weapons: { A1: 0 }, // 持っている武器
   mods: {}, // 武器の改造 { 武器の id: { 改造の id: Lv } }
+  grid: [], // 能力ボード (スフィア盤) で解放したノードの id
   sp: {}, // 必殺技 { 武器の id: { lv: [Lv, Lv, Lv] (-1 は未習得), set: セットしている番号 } }
   spGauge: 0, // 必殺技ゲージ (0〜100)
   equipped: ['A1', null],
@@ -45,6 +46,15 @@ export function loadSave() {
     if (hh.exp != null) {
       hh.gold += hh.exp;
       delete hh.exp;
+    }
+    // 前の版の能力ボード (一覧の形) で上げたランクは、使ったお金を返して、スフィア盤ではじめからやり直す
+    if (!s.heroes[h.id] || !s.heroes[h.id].grid) {
+      for (const b of RG.BOARD) {
+        const r = hh.board[b.id] || 0;
+        for (let k = 1; k <= r; k++) hh.gold += Math.ceil(b.base * Math.pow(k, 1.5));
+      }
+      hh.board = {};
+      hh.grid = [];
     }
     while (hh.equipped.length < 2 + hh.slots) hh.equipped.push(null);
     // 前の版の「+強化値」は、改造の「威力」に移す

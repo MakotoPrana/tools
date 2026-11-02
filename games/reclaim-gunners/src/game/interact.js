@@ -6,7 +6,7 @@ import { addPart, showBanner } from './fx.js';
 import { diffId, hero, maxHp, maxPotions, prog } from './hero.js';
 import { updateFlow } from './pathfinding.js';
 import { collectAllMats } from './pickups.js';
-import { G, P, pointPos, spawnNests, stageDef, startStage, stoneActive } from './stage.js';
+import { G, P, pointPos, spawnFiends, spawnNests, stageDef, startStage, stoneActive } from './stage.js';
 import { touchMode } from '../input/input.js';
 import { showStoneMenu } from '../ui/pause.js';
 import { showShop } from '../ui/shop.js';
@@ -99,9 +99,34 @@ export function shopOpen(f) {
   return !!(G.areas[ai] && G.areas[ai].free);
 }
 
+// 転移碑を調べると、まだ解放していないエリアの魔巣 (壊したもの) と中級悪魔がよみがえる
+export function reviveUnfreed() {
+  let n = 0;
+  for (const a of G.areas) {
+    if (a.free) continue;
+    for (const ns of a.nests) {
+      if (!ns.dead) continue;
+      ns.dead = false;
+      ns.hp = ns.maxHp;
+      ns.scream = 0;
+      ns.filled = false;
+      ns.children = 0;
+      if (!G.nests.includes(ns)) G.nests.push(ns);
+      n++;
+    }
+    if (!a.def.town) {
+      const before = G.enemies.filter((e) => e.def.mid && e.area === a && !e.dead).length;
+      spawnFiends(a);
+      n += G.enemies.filter((e) => e.def.mid && e.area === a && !e.dead).length - before;
+    }
+  }
+  return n;
+}
+
 export function useStone(s) {
   P.hp = maxHp();
   hero.potions = maxPotions();
+  G.revived = reviveUnfreed();
   hero.lastTravel = { difficulty: diffId, stage: G.def.id, point: s.id };
   for (let i = 0; i < 20; i++) addPart({ x: s.x + rnd(-10, 10), y: s.y + rnd(-6, 10), vx: 0, vy: rnd(-60, -20), life: 0.8, color: '#7fd8ff', size: 2.5, glow: true });
   sfx('pick');

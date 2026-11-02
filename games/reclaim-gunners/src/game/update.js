@@ -27,8 +27,11 @@ export function rebuildGrid() {
 }
 
 export function update(dt) {
-  // ジャスト回避のあと、少しのあいだ時間がゆっくりになる
-  if (G.slowT > 0) {
+  // ジャスト回避の瞬間は、ほんの一瞬ほぼ止まり (freezeT)、そのあと少しのあいだゆっくりになる (slowT)
+  if (G.freezeT > 0) {
+    G.freezeT -= dt;
+    dt *= 0.04;
+  } else if (G.slowT > 0) {
     G.slowT -= dt;
     dt *= 0.3;
   }

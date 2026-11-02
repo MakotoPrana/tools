@@ -639,3 +639,24 @@ body.tall .tut { top: 46cqw; }
 .tabs .btn { flex: 1; }
 /* 見出しは 1 行 (長い店の名前は … で切る) */
 .panel-head h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 能力ボード (スフィア盤): 盤は上下左右にスクロールできる。下に選んだノードと解放のボタン */
+.bslot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 2px 6px; font-size: 0.85em; border-bottom: 1px solid rgba(200, 160, 90, 0.25); }
+.sgrid { flex: 1; min-height: 0; overflow: auto; margin: 0 -14px; background: radial-gradient(circle at 50% 50%, rgba(60, 30, 60, 0.35), rgba(8, 4, 6, 0.2) 70%); touch-action: pan-x pan-y; }
+.sgrid svg { display: block; }
+.sl line { stroke: rgba(200, 160, 90, 0.18); stroke-width: 3; stroke-linecap: round; }
+.sl line.half { stroke: rgba(224, 184, 96, 0.45); }
+.sl line.on { stroke: #e0b860; }
+.sn { cursor: pointer; }
+.sn circle { fill: #1a1210; stroke: var(--c); stroke-width: 2; }
+.sn text { fill: #f0e2c0; font-size: 12px; font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; font-family: var(--font-ui); }
+.sn.locked { opacity: 0.4; }
+.sn.own circle { fill: var(--c); stroke: #fff3d0; }
+.sn.own text { fill: #1a0e08; }
+.sn.open circle { stroke-width: 3; }
+.sn.ready circle { animation: npulse 1.2s ease-in-out infinite; }
+.sn.sel circle { stroke: #ffffff; stroke-width: 3.5; }
+.sn.center circle { fill: #e0b860; stroke: #fff3d0; }
+.sn.center text { fill: #1a0e08; }
+@keyframes npulse { 50% { stroke: #ffffff; stroke-width: 4.5; } }
+@media (prefers-reduced-motion: reduce) { .sn.ready circle { animation: none; stroke: #ffffff; } }

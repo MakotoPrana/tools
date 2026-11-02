@@ -8,6 +8,28 @@ import { ctx } from './canvas.js';
 import { drawGlow, txt } from './primitives.js';
 
 export function drawSpecialWorld() {
+  // ジャスト回避で時間が止まっている間: 主人公のまわりに、すぼまっていく水色の輪と残像の十字
+  if (G.freezeT > 0) {
+    const k = G.freezeT / 0.16;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = '#bff6ff';
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(P.x, P.y, 20 + k * 70, 0, TAU);
+    ctx.stroke();
+    ctx.globalAlpha = 0.5 * k;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * TAU + Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(P.x + Math.cos(a) * 14, P.y + Math.sin(a) * 14);
+      ctx.lineTo(P.x + Math.cos(a) * (40 + k * 60), P.y + Math.sin(a) * (40 + k * 60));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   const sb = G.spBurst;
   if (sb) {
     // 光の筋: 主人公から外へ、のびて消える
@@ -58,6 +80,11 @@ export function drawSpecialWorld() {
 
 // ジャスト回避: 画面のふちが水色に光り、上のほうに大きく「JUST!」と連続の数・威力の倍率
 export function drawJustPop() {
+  // 時間が止まっている間は、画面全体を青白く冷たい色に
+  if (G.freezeT > 0) {
+    ctx.fillStyle = 'rgba(150,200,255,0.22)';
+    ctx.fillRect(0, 0, VW, VH);
+  }
   if (G.justFlash > 0) {
     const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.3, VW / 2, VH / 2, Math.hypot(VW, VH) * 0.6);
     g.addColorStop(0, 'rgba(160,240,255,0)');

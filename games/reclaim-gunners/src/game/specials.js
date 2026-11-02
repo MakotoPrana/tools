@@ -88,7 +88,8 @@ export function justDodge(src) {
   G.justStreak = G.t - (G.justAt || -99) < 8 ? (G.justStreak || 0) + 1 : 1;
   G.justAt = G.t;
   const mul = Math.min(2, 1 + 0.25 * (G.justStreak - 1));
-  G.slowT = 0.45; // 少しのあいだ時間がゆっくりになる
+  G.freezeT = 0.16; // ほんの一瞬、時間がほぼ止まる (演出を際立たせる)
+  G.slowT = 0.4; // そのあと少しのあいだゆっくり
   G.justPop = { n: G.justStreak, mul, t: 0.9, max: 0.9 };
   G.justFlash = 0.3;
   P.inv = Math.max(P.inv, 0.6);
