@@ -12,6 +12,7 @@ import { updatePickups } from './pickups.js';
 import { updatePlayer } from './player.js';
 import { respawn } from './respawn.js';
 import { SP_FULL, updateSpecial } from './specials.js';
+import { updateTutorial } from './tutorial.js';
 import { G, P } from './stage.js';
 import { potionBtn, specialBtn, touchMode } from '../input/input.js';
 
@@ -49,6 +50,7 @@ export function update(dt) {
   rebuildGrid();
   updatePlayer(dt);
   updateSpecial(dt);
+  updateTutorial(dt);
   updateBullets(dt);
   rebuildGrid();
   updateEnemies(dt);

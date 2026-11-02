@@ -16,6 +16,7 @@ import { resize, scale } from './screen.js';
 import { drawFeaturesLive, drawFog, drawHazard, drawLairs, drawLakeShimmer, drawMist, drawPickup, drawSeals, drawShops, drawStone, drawTele, drawVignette } from './world.js';
 import { screen } from '../ui/core.js';
 import { getMap, mapCache } from '../world/mapgen.js';
+import { drawTutorialWorld } from '../game/tutorial.js';
 
 export function render() {
   resize();
@@ -84,6 +85,7 @@ export function renderPlay() {
   for (const e of G.enemies) if (inView(e.x, e.y, e.r)) drawEnemy(e);
   for (const b of G.bosses) drawBoss(b);
   if (!G.dead) drawPlayer();
+  drawTutorialWorld();
   if (G.beam) drawBeam();
   if (G.lances) for (const l of G.lances) drawLance(l);
   for (const b of G.bullets) if (inView(b.x, b.y)) drawBullet(b);

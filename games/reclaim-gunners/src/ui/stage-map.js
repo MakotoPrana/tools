@@ -10,6 +10,8 @@ import { actions } from './actions.js';
 import { head, rerender, screen, setScreen, uiClose, uiShow } from './core.js';
 import { selStage, showWorld } from './world-map.js';
 import { withMaps } from './loading.js';
+import { settings } from '../core/save.js';
+import { pauseTutorial, startTutorial } from '../game/tutorial.js';
 import { areaMask, getMap } from '../world/mapgen.js';
 
 // ---------- ステージ図 (エリア選択・転移) ----------
@@ -181,9 +183,12 @@ export function enterPlay(stageId, pointId) {
   hero.lastTravel = { difficulty: diffId, stage: stageId, point: pointId };
   setScreen('play');
   uiClose();
+  // はじめてのときはチュートリアル
+  if (!settings.tutorialDone) startTutorial();
 }
 
 export function leaveToWorld() {
+  pauseTutorial();
   collectAllMats();
   setG(null);
   showWorld();
