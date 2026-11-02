@@ -142,7 +142,6 @@ export const bindBtn = (id, fn) => {
   });
 };
 export const potionBtn = document.getElementById('t-potion');
-bindBtn('t-reload', () => manualReload());
 bindBtn('t-special', () => useSpecial());
 export const specialBtn = document.getElementById('t-special');
 bindBtn('t-potion', () => usePotion());

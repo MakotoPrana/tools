@@ -160,12 +160,13 @@ body:not(.compact) .pause-in { display: none; }
   left: 50%;
   top: 38%;
   transform: translateX(-50%);
+  width: max-content;
   max-width: 86%;
-  padding: 1.2cqh 3cqh;
+  padding: 1.6cqmin 4cqmin;
   border-radius: 999px;
   background: rgba(10, 8, 16, 0.82);
   color: #fff;
-  font-size: 3.4cqh;
+  font-size: clamp(12px, 4.2cqmin, 20px);
   font-weight: 700;
   text-align: center;
   pointer-events: none;
@@ -498,14 +499,13 @@ input[type="range"] { accent-color: var(--gold); }
   .row.wrow .wicon { width: 46px; height: 23px; }
 }
 
-/* スマホのボタン: 移動と回避は指 1 本 (画面のどこでも) なので、ボタンは右のふちに縦に並べる
+/* スマホのボタン: 必殺技と回復を、画面の下のまん中に横に並べる (移動と回避は指 1 本で画面のどこでも)
    大きさは画面の短い辺 (cqmin) に合わせるので、縦持ちでも横持ちでも同じくらいの大きさ */
 .tbtn { font-size: 3.2cqmin; }
 .tbtn small { font-size: 2.6cqmin; }
-.t-potion { right: 3cqmin; bottom: 4cqmin; width: 16cqmin; height: 16cqmin; }
-.t-special { right: 3cqmin; bottom: 23cqmin; width: 16cqmin; height: 16cqmin; opacity: 0.45; }
-.t-reload { right: 5.5cqmin; bottom: 42cqmin; width: 11cqmin; height: 11cqmin; }
-.t-interact { left: 50%; right: auto; transform: translateX(-50%); bottom: 22cqmin; width: auto; height: 11cqmin; min-width: 24cqmin; padding: 0 4cqmin; border-radius: 6cqmin; background: rgba(60, 120, 230, 0.75); }
+.t-special { left: calc(50% - 19cqmin); bottom: 4cqmin; width: 18cqmin; height: 18cqmin; opacity: 0.45; }
+.t-potion { left: calc(50% + 3cqmin); bottom: 5cqmin; width: 16cqmin; height: 16cqmin; }
+.t-interact { left: 50%; right: auto; transform: translateX(-50%); bottom: 26cqmin; width: auto; height: 11cqmin; min-width: 24cqmin; padding: 0 4cqmin; border-radius: 6cqmin; background: rgba(60, 120, 230, 0.75); }
 .t-potion.empty { opacity: 0.4; }
 /* 必殺技: ゲージがたまるまで暗く、満タンで金色に光る */
 .t-special.ready { opacity: 1; border-color: #ffd84a; background: rgba(160, 110, 20, 0.6); box-shadow: 0 0 3cqmin rgba(255, 216, 74, 0.6); }
@@ -616,3 +616,18 @@ body.tall .tut { top: 46cqw; }
 .tut-text { margin: 0; font-size: 0.95em; line-height: 1.5; }
 .tut-skip { border: 0; background: none; color: var(--panel-muted); font: inherit; text-decoration: underline; cursor: pointer; padding: 4px; }
 .tut [data-tut=next] { align-self: flex-end; min-width: 6em; }
+
+/* 装備の画面: 行を 2 行に収める (改行を減らす) */
+.slot { position: relative; min-height: 0; padding: 6px 2px; }
+.slot .sno { position: absolute; top: 2px; left: 5px; font-size: 0.75em; color: var(--panel-muted); }
+.erow { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; grid-template-areas: "icon name name" "icon stats btns"; align-items: center; column-gap: 8px; row-gap: 2px; padding: 6px 8px; }
+.erow .wicon { grid-area: icon; width: 52px; height: 26px; }
+.einfo { display: contents; }
+.einfo .t { grid-area: name; }
+.einfo .s { grid-area: stats; }
+.einfo .t, .einfo .s { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ebtns { grid-area: btns; display: flex; gap: 4px; }
+.ehead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 6px; }
+.ehead h3 { margin: 0; font-size: 1em; }
+.ehead h3 .muted { font-size: 0.75em; font-weight: 400; }
+.ehead .muted { display: block; }

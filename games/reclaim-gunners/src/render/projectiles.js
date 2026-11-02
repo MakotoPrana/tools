@@ -34,6 +34,12 @@ export function drawLance(l) {
   ctx.moveTo(l.sx, l.sy);
   ctx.lineTo(l.ex, l.ey);
   ctx.stroke();
+  // 外側のぼんやりした光 (ちらつく)
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.25 * k * (0.7 + Math.random() * 0.3);
+  ctx.lineWidth = l.w * 2;
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = k;
   ctx.strokeStyle = '#fffbe8';
   ctx.lineWidth = Math.max(2, l.w * 0.25 * k);
@@ -43,6 +49,28 @@ export function drawLance(l) {
 
 export function drawBullet(b) {
   const col = ELEMS[b.elem] ? ELEMS[b.elem].color : '#fff3b0';
+  // 必殺技の弾: 光る尾を引く大きな弾
+  if (b.special) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(b.x - b.vx * 0.06, b.y - b.vy * 0.06);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#fff6d0';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    drawGlow(ctx, b.x, b.y, 14, col, 0.7);
+    ctx.fillStyle = '#fff6d0';
+    circle(ctx, b.x, b.y, 3);
+    return;
+  }
   if (b.type === 'grenade') {
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     circle(ctx, b.x, b.y + 3, 3);

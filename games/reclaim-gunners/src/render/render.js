@@ -17,6 +17,7 @@ import { drawFeaturesLive, drawFog, drawHazard, drawLairs, drawLakeShimmer, draw
 import { screen } from '../ui/core.js';
 import { getMap, mapCache } from '../world/mapgen.js';
 import { drawTutorialWorld } from '../game/tutorial.js';
+import { drawCutin, drawSpecialWorld } from './special-fx.js';
 
 export function render() {
   resize();
@@ -86,6 +87,7 @@ export function renderPlay() {
   for (const b of G.bosses) drawBoss(b);
   if (!G.dead) drawPlayer();
   drawTutorialWorld();
+  drawSpecialWorld();
   if (G.beam) drawBeam();
   if (G.lances) for (const l of G.lances) drawLance(l);
   for (const b of G.bullets) if (inView(b.x, b.y)) drawBullet(b);
@@ -126,6 +128,7 @@ export function renderPlay() {
     ctx.fillRect(0, 0, VW, VH);
   }
   drawHud();
+  drawCutin();
   if (G.fade > 0) {
     ctx.fillStyle = `rgba(0,0,0,${G.fade})`;
     ctx.fillRect(0, 0, VW, VH);

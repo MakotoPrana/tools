@@ -1,28 +1,15 @@
 // HUD: 体力・武器スロット・エリアの名前
 import { TAU, VH, VW, money, portrait, tr } from '../core/config.js';
-import { settings } from '../core/save.js';
 import { clamp, fmt } from '../core/util.js';
 import { bossHp } from '../game/bosses.js';
 import { D, hero, lvColor, maxHp, powerLv } from '../game/hero.js';
-import { reloadTime } from '../game/player.js';
 import { SP_FULL, spState, spWeaponId } from '../game/specials.js';
-import { G, P, ensureWs } from '../game/stage.js';
-import { effW, modTotal } from '../game/weapon-mods.js';
+import { G, P } from '../game/stage.js';
 import { sticks, touchMode } from '../input/input.js';
 import { ctx } from './canvas.js';
 import { drawMinimap } from './minimap.js';
-import { circle, drawGlow, hudFrame, txt } from './primitives.js';
+import { circle, hudFrame, txt } from './primitives.js';
 import { drawShopPointer } from './world.js';
-
-// 武器スロットの位置 (論理ピクセル)
-export function slotRects() {
-  const n = hero.equipped.length;
-  const s = 30;
-  const gap = 4;
-  const w = n * s + (n - 1) * gap;
-  const x0 = VW / 2 - w / 2;
-  return hero.equipped.map((id, i) => ({ x: x0 + i * (s + gap), y: VH - s - 8, w: s, h: s, id }));
-}
 
 // 縦長の画面で、上に並ぶ HUD (体力・お金・ミニマップ) のいちばん下の y
 export function hudBottom() {
@@ -116,55 +103,9 @@ export function drawHud() {
   });
   ctx.globalAlpha = 1;
 
-  // 武器スロット
-  const rects = slotRects();
-  rects.forEach((r, i) => {
-    // 撃っている武器のふちを光らせる (全部の武器が同時に撃つ)
-    const active = r.id && ensureWs(r.id).active;
-    if (r.id) hudFrame(r.x, r.y, r.w, r.h, active ? '#ffd070' : null);
-    else {
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.strokeStyle = 'rgba(200,160,90,0.3)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
-    }
-    if (active) drawGlow(ctx, r.x + r.w / 2, r.y + r.h / 2, r.w * 0.9, '#ff9a40', 0.25);
-    if (!r.id) return;
-    const w = effW(r.id);
-    const st = ensureWs(r.id);
-    ctx.save();
-    ctx.translate(r.x + r.w / 2 - 5, r.y + 12);
-    ctx.rotate(-0.35);
-    ctx.scale(0.62, 0.62);
-    RG.drawWeapon(ctx, r.id);
-    ctx.restore();
-    const lv = modTotal(r.id);
-    if (lv) txt(`★${lv}`, r.x + r.w - 2, r.y + 5, 6, '#ffe45c', 'right');
-    txt(String(i + 1), r.x + 3, r.y + 5, 6, '#aaa', 'left');
-    if (w.mana) {
-      ctx.fillStyle = '#2a2040';
-      ctx.fillRect(r.x + 4, r.y + r.h - 7, r.w - 8, 3);
-      ctx.fillStyle = '#9a7aff';
-      ctx.fillRect(r.x + 4, r.y + r.h - 7, (r.w - 8) * (st.mana / w.mana[0]), 3);
-    } else {
-      txt(`${st.ammo}`, r.x + r.w / 2, r.y + r.h - 6, 7, st.ammo ? '#fff' : '#ff6a6a', 'center');
-    }
-    if (st.reloadT > 0) {
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.strokeStyle = '#f0d890';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(r.x + r.w / 2, r.y + r.h / 2, 9, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - st.reloadT / reloadTime(w)));
-      ctx.stroke();
-    }
-  });
-  if (rects.length) txt(settings.autoAim ? tr('自動でねらって撃つ') : tr('ねらって撃つ'), VW / 2, rects[0].y - 7, 7, 'rgba(232,212,168,0.75)', 'center');
-
   // 調べる
   if (G.interact && !touchMode) {
-    txt(`[E] ${G.interact.label}`, VW / 2, VH - 64, 9, '#f0d890', 'center');
+    txt(`[E] ${G.interact.label}`, VW / 2, VH - 30, 9, '#f0d890', 'center');
   }
 
   // バナー

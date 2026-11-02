@@ -4,7 +4,7 @@ import { ELEMS, TAU, WEAPON, tr } from '../core/config.js';
 import { dist, pick, rnd } from '../core/util.js';
 import { setTimeLater } from './bosses.js';
 import { damageTarget, explode, forAllTargets, forTargets } from './damage.js';
-import { addPart, addText, showBanner } from './fx.js';
+import { addPart, addText } from './fx.js';
 import { hero, rank } from './hero.js';
 import { G, P } from './stage.js';
 import { effW } from './weapon-mods.js';
@@ -123,13 +123,23 @@ export function castSpecial(id, src) {
   P.inv = Math.max(P.inv, 0.5); // 出した瞬間の 0.5 秒だけ無敵
   P.aim = a;
   sfx('special');
-  G.spFlash = 0.35;
-  G.shake = Math.max(G.shake, 4);
-  showBanner(RG.SPECIALS[id][i].name, WEAPON[id].name, '', 1, '#ffd84a');
+  // 派手な演出: 名前の帯 (カットイン)・一瞬の時間止め・金色の光・主人公から広がる光の筋と輪
+  G.spFlash = 0.45;
+  G.shake = Math.max(G.shake, 6);
+  G.slowT = Math.max(G.slowT || 0, 0.22);
+  G.cutin = { name: RG.SPECIALS[id][i].name, sub: WEAPON[id].name, color, t: 1.3, max: 1.3 };
+  G.spBurst = { x: P.x, y: P.y, t: 0.7, max: 0.7, color, seed: Math.random() * TAU };
+  for (let k = 0; k < 3; k++) setTimeLater(k * 0.09, () => addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.45, color: k === 1 ? '#fff6d0' : color, size: 40 + k * 30, ring: true }));
+  addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.5, color, size: 120, light: true });
+  for (let k = 0; k < 28; k++) {
+    const ang = rnd(0, TAU);
+    const sp = rnd(120, 320);
+    addPart({ x: P.x, y: P.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: rnd(0.3, 0.7), color: k % 3 ? color : '#fff6d0', size: rnd(2, 4), glow: true });
+  }
   const shot = (ang, extra = {}) => {
     G.bullets.push({
       type: w.kind === 'magic' ? 'magic' : 'gun', w, x: P.x + Math.cos(ang) * 10, y: P.y + Math.sin(ang) * 10, vx: Math.cos(ang) * 480, vy: Math.sin(ang) * 480, sp: 480,
-      travel: 0, range: 420, dmg: p.dmg, elem: elem(), pierce: p.pierce || 0, hit: new Set(), r: 3.5, homing: false, life: 0, ...extra,
+      travel: 0, range: 420, dmg: p.dmg, elem: elem(), pierce: p.pierce || 0, hit: new Set(), r: 4.5, homing: false, life: 0, special: true, ...extra,
     });
   };
   switch (p.kind) {
@@ -150,7 +160,15 @@ export function castSpecial(id, src) {
         const bx = tx + Math.cos(ang) * r0;
         const by = ty + Math.sin(ang) * r0;
         G.teles.push({ type: 'circle', x: bx, y: by, r: p.r, t: 0, dur: 0.25 + k * 0.12, mine: true });
-        setTimeLater(0.25 + k * 0.12, () => explode(bx, by, p.r, p.dmg, elem(), w));
+        setTimeLater(0.25 + k * 0.12, () => {
+          explode(bx, by, p.r, p.dmg, elem(), w);
+          // 光の柱と、二重の輪
+          addPart({ x: bx, y: by, vx: 0, vy: 0, life: 0.5, color, size: p.r * 2.4, light: true });
+          addPart({ x: bx, y: by, vx: 0, vy: 0, life: 0.4, color: '#fff6d0', size: p.r * 1.5, ring: true });
+          G.pillars = G.pillars || [];
+          G.pillars.push({ x: bx, y: by, r: p.r * 0.5, t: 0.45, max: 0.45, color });
+          G.shake = Math.max(G.shake, 6);
+        });
       }
       break;
     case 'lance': {
@@ -159,7 +177,12 @@ export function castSpecial(id, src) {
       const ex = sx + Math.cos(a) * p.len;
       const ey = sy + Math.sin(a) * p.len;
       G.lances = G.lances || [];
-      G.lances.push({ sx, sy, ex, ey, w: p.w, t: 0.35, max: 0.35, color });
+      G.lances.push({ sx, sy, ex, ey, w: p.w, t: 0.55, max: 0.55, color });
+      for (let k = 0; k < 30; k++) {
+        const q = Math.random();
+        addPart({ x: sx + (ex - sx) * q, y: sy + (ey - sy) * q, vx: rnd(-80, 80), vy: rnd(-80, 80), life: rnd(0.3, 0.6), color: k % 2 ? color : '#fff6d0', size: rnd(2, 4), glow: true });
+      }
+      G.shake = Math.max(G.shake, 8);
       forAllTargets((t) => {
         if (segDist(t.x, t.y, sx, sy, ex, ey) < t.r + p.w / 2) damageTarget(t, p.dmg, { elem: elem(), w, dirx: Math.cos(a), diry: Math.sin(a), knock: 160, sx: P.x, sy: P.y });
       });
@@ -177,16 +200,23 @@ export function castSpecial(id, src) {
       list.slice(0, p.n).forEach((c, k) => {
         setTimeLater(k * 0.05, () => {
           if (c.t.dead) return;
-          addPart({ x: P.x, y: P.y, x2: c.t.x, y2: c.t.y, vx: 0, vy: 0, life: 0.18, color, size: 2, line: true });
-          for (let j = 0; j < 5; j++) addPart({ x: c.t.x, y: c.t.y, vx: rnd(-60, 60), vy: rnd(-60, 60), life: 0.3, color, size: 2.5, glow: true });
+          addPart({ x: P.x, y: P.y, x2: c.t.x, y2: c.t.y, vx: 0, vy: 0, life: 0.25, color, size: 4, line: true });
+          addPart({ x: P.x, y: P.y, x2: c.t.x, y2: c.t.y, vx: 0, vy: 0, life: 0.18, color: '#fff6d0', size: 1.5, line: true });
+          addPart({ x: c.t.x, y: c.t.y, vx: 0, vy: 0, life: 0.3, color, size: 26, ring: true });
+          for (let j = 0; j < 10; j++) addPart({ x: c.t.x, y: c.t.y, vx: rnd(-90, 90), vy: rnd(-90, 90), life: 0.35, color, size: 3, glow: true });
           damageTarget(c.t, p.dmg, { elem: elem(), w, sx: P.x, sy: P.y });
         });
       });
       break;
     }
     case 'quake':
-      addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.35, color, size: p.r, ring: true });
-      addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.35, color, size: p.r * 1.4, light: true });
+      for (let k = 0; k < 3; k++) setTimeLater(k * 0.1, () => addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.45, color: k === 1 ? '#fff6d0' : color, size: p.r * (0.7 + k * 0.3), ring: true }));
+      addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.45, color, size: p.r * 1.6, light: true });
+      for (let k = 0; k < 36; k++) {
+        const ang = rnd(0, TAU);
+        const sp = rnd(100, 260);
+        addPart({ x: P.x + Math.cos(ang) * 8, y: P.y + Math.sin(ang) * 8, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: rnd(0.4, 0.7), color: k % 3 ? '#8a7a6a' : color, size: rnd(2, 4.5) });
+      }
       forTargets(P.x, P.y, p.r, (t) => {
         const d = dist(P.x, P.y, t.x, t.y) || 1;
         damageTarget(t, p.dmg, { elem: elem(), w, aoe: true, dirx: (t.x - P.x) / d, diry: (t.y - P.y) / d, knock: 320, sx: P.x, sy: P.y });
@@ -204,6 +234,18 @@ export function updateSpecial(dt) {
     if (P.rapid.t <= 0) P.rapid = null;
   }
   G.spFlash = Math.max(0, (G.spFlash || 0) - dt);
+  if (G.cutin) {
+    G.cutin.t -= dt;
+    if (G.cutin.t <= 0) G.cutin = null;
+  }
+  if (G.spBurst) {
+    G.spBurst.t -= dt;
+    if (G.spBurst.t <= 0) G.spBurst = null;
+  }
+  if (G.pillars) {
+    for (const q of G.pillars) q.t -= dt;
+    G.pillars = G.pillars.filter((q) => q.t > 0);
+  }
   if (G.lances) {
     for (const l of G.lances) l.t -= dt;
     G.lances = G.lances.filter((l) => l.t > 0);
