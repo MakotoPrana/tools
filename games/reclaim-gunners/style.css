@@ -508,7 +508,9 @@ input[type="range"] { accent-color: var(--gold); }
 /* 設定で右寄せにしたとき (左右を入れかえて、右のふちに並べる) */
 body.btn-right .t-potion { left: auto; right: 3cqmin; }
 body.btn-right .t-special { left: auto; right: 21cqmin; }
-.t-interact { left: 50%; right: auto; transform: translateX(-50%); bottom: 26cqmin; width: auto; height: 11cqmin; min-width: 24cqmin; padding: 0 4cqmin; border-radius: 6cqmin; background: rgba(60, 120, 230, 0.75); }
+/* 調べる・武器屋に入るのボタンも、同じ側に寄せる (回復と必殺技の上) */
+body.btn-right .t-interact { left: auto; right: 3cqmin; }
+.t-interact { left: 3cqmin; right: auto; transform: none; bottom: 25cqmin; width: auto; height: 11cqmin; min-width: 24cqmin; padding: 0 4cqmin; border-radius: 6cqmin; background: rgba(60, 120, 230, 0.75); }
 .t-potion.empty { opacity: 0.4; }
 /* 必殺技: ゲージがたまるまで暗く、満タンで金色に光る */
 .t-special.ready { opacity: 1; border-color: #ffd84a; background: rgba(160, 110, 20, 0.6); box-shadow: 0 0 3cqmin rgba(255, 216, 74, 0.6); }
