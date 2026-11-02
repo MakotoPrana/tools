@@ -271,6 +271,24 @@ export function updateEnemyAI(e, dt, dp) {
       moveEnemy(e, chaseAngle(e, dp), e.speed * (e.facing == null ? 1.15 : 1), dt);
       break;
     }
+    case 'bomber': {
+      // 爆裂ワーム: 近づくと 0.7 秒光って自爆する (まわり 40px にダメージ)
+      if (e.fuse == null) {
+        moveEnemy(e, chaseAngle(e, dp), e.speed, dt);
+        if (dp < 30) e.fuse = 0.7;
+      } else {
+        e.fuse -= dt;
+        if (e.fuse <= 0) {
+          if (!G.dead && dist(e.x, e.y, P.x, P.y) < 40 + P.r) hurtPlayer(e.atk, e.lv);
+          for (let i = 0; i < 16; i++) addPart({ x: e.x, y: e.y, vx: rnd(-110, 110), vy: rnd(-110, 110), life: rnd(0.3, 0.5), color: i % 2 ? '#ffb84a' : '#ff5a2a', size: rnd(2, 4), glow: true });
+          addPart({ x: e.x, y: e.y, vx: 0, vy: 0, life: 0.25, color: '#ffcf6a', size: 40, ring: true });
+          sfx('explode');
+          G.shake = Math.max(G.shake, 3);
+          killEnemy(e, null, true);
+        }
+      }
+      break;
+    }
     case 'brute': {
       // 中級悪魔: 近ければ大振り、少し離れていれば突進。どちらも ため → 攻撃 → すき
       //   ためている間は向きを合わせ、最後の 0.25 秒は向きを固める (白く光るのが合図)

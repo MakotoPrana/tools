@@ -103,9 +103,10 @@ export function enemyShot(x, y, a, speed, dmg, lv, color = '#ff5a8a', r = 4, lif
 }
 
 // 毒の沼: 上にいる間、0.5 秒ごとに体力が減る (被弾のあとの無敵は効かない。力尽きたあとの無敵の間は減らない)
-export function addPoison(x, y, r, dps, lv, life = 4) {
+// kind: poison (毒の沼・緑) / lava (溶岩・赤) / curse (呪いの魔法陣・紫)
+export function addPoison(x, y, r, dps, lv, life = 4, kind = 'poison') {
   if (G.hazards.length > 40) G.hazards.shift();
-  G.hazards.push({ x, y, r, dps, lv, t: life, max: life });
+  G.hazards.push({ x, y, r, dps, lv, t: life, max: life, kind });
 }
 export function updateHazards(dt) {
   G.poisonTick = (G.poisonTick || 0) - dt;

@@ -44,6 +44,12 @@ export function damageTarget(t, base, o) {
     t.dormant = false;
     t.state = 'chase';
   }
+  // 守られている部位 (ユグドラの本体は、枝の目を全部潰すまで) は効かない
+  if (t.kind === 'boss' && t.armored) {
+    if (Math.random() < 0.3) addPart({ x: t.x + rnd(-t.r, t.r) * 0.5, y: t.y + rnd(-t.r, t.r) * 0.5, vx: rnd(-40, 40), vy: rnd(-40, 40), life: 0.2, color: '#fff', size: 2 });
+    sfx('block');
+    return 0;
+  }
   const w = o.w;
   let d = base * (1 + 0.04 * rank('atk'));
   if (heroDef.id === 'gald' && P.hp <= maxHp() * 0.3) d *= 1.25;

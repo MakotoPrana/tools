@@ -1,7 +1,7 @@
 // お店 (武器を買う・改造の入口・道具)
 import { sfx } from '../audio/sound.js';
 import { CATS, ITEMS, SHOPS, WEAPON, WEAPONS, money, tr } from '../core/config.js';
-import { canEquip, hero, maxPotions, prog } from '../game/hero.js';
+import { canEquip, diffId, hero, maxPotions, prog } from '../game/hero.js';
 import { P, ensureWs, stageDef } from '../game/stage.js';
 import { effW, modTotal } from '../game/weapon-mods.js';
 import { CAT_COLORS } from '../render/hud.js';
@@ -28,7 +28,8 @@ export function showShop(shopId) {
   const fn = () => {
     const phase = shopPhase(shop);
     const max = shop.phases[phase - 1].max;
-    const lineup = shop.phases.slice(0, phase).flatMap((p) => p.weapons);
+    // hardOnly の武器 (B4・D4) は、ハード以上のときだけ並ぶ
+    const lineup = shop.phases.slice(0, phase).flatMap((p) => p.weapons).filter((id) => diffId !== 'normal' || !WEAPON[id].hardOnly);
     let body = '';
     if (shopTab === 'buy') {
       body = lineup.map((id) => {

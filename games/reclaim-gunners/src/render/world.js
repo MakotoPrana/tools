@@ -309,18 +309,24 @@ export function drawPickup(p) {
 }
 
 // 毒の沼
+const HAZARD_COLORS = {
+  poison: ['#b8ff5a', 'rgba(90,140,30,0)', '#e0ff9a'],
+  lava: ['#ffb040', 'rgba(200,50,10,0)', '#fff0a0'],
+  curse: ['#c070ff', 'rgba(90,20,140,0)', '#f0c0ff'],
+};
 export function drawHazard(z) {
   const k = Math.min(1, z.t / 0.6, (z.max - z.t) / 0.3);
   ctx.globalAlpha = 0.55 * k;
+  const col = HAZARD_COLORS[z.kind] || HAZARD_COLORS.poison;
   const g = ctx.createRadialGradient(z.x, z.y, 0, z.x, z.y, z.r);
-  g.addColorStop(0, '#b8ff5a');
-  g.addColorStop(1, 'rgba(90,140,30,0)');
+  g.addColorStop(0, col[0]);
+  g.addColorStop(1, col[1]);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.ellipse(z.x, z.y, z.r, z.r * 0.7, 0, 0, TAU);
   ctx.fill();
   ctx.globalAlpha = k;
-  ctx.fillStyle = '#e0ff9a';
+  ctx.fillStyle = col[2];
   const b = (G.t * 1.5 + z.x * 0.1) % 1;
   circle(ctx, z.x + Math.sin(z.x) * z.r * 0.4, z.y - b * 6, 1.5);
   ctx.globalAlpha = 1;

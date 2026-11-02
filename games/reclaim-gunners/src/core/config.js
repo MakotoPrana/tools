@@ -30,11 +30,11 @@ export const DIFF_IDS = ['normal', 'hard', 'extreme'];
 RG.i18nExtra.push(DIFFS);
 
 // タイル
-// SWAMP: 沼 (通れるが、足が遅くなる)。REED: 葦 (通れないが、弾は越える)
-export const T = { FLOOR: 0, WALL: 1, FENCE: 2, WATER: 3, SEAL: 4, TREE: 5, ROCK: 6, BONE: 7, FEATURE: 8, SWAMP: 9, REED: 10 };
-export const MOVE_BLOCK = [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1];
-export const SHOT_BLOCK = [0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0];
-export const GHOST_BLOCK = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0];
+// SWAMP: 沼 (通れるが、足が遅くなる)。REED: 葦 (通れないが、弾は越える)。LAVA: 溶岩 (通れるが、上にいると焼ける)
+export const T = { FLOOR: 0, WALL: 1, FENCE: 2, WATER: 3, SEAL: 4, TREE: 5, ROCK: 6, BONE: 7, FEATURE: 8, SWAMP: 9, REED: 10, LAVA: 11 };
+export const MOVE_BLOCK = [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0];
+export const SHOT_BLOCK = [0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0];
+export const GHOST_BLOCK = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0];
 export const isFloor = (t) => t === T.FLOOR || t === T.SWAMP;
 export const FLY_BLOCK = SHOT_BLOCK;
 

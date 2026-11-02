@@ -259,17 +259,18 @@ export function buildMap(def) {
     const ai = aIndex[s.area];
     const list = areaTiles[ai];
     let placed = 0;
-    // 沼: 通れるので、まるい水たまりを広げる (道はふさがらない)
-    if (s.tile === 'swamp') {
+    // 沼・溶岩: 通れるので、まるい池を広げる (道はふさがらない)
+    if (s.tile === 'swamp' || s.tile === 'lava') {
+      const pool = s.tile === 'lava' ? T.LAVA : T.SWAMP;
       for (let n = 0; n < s.n; n++) {
         const k = list[Math.floor(rng() * list.length)];
         const cx = k % w;
         const cy = (k / w) | 0;
-        const r = 2 + rng() * 2.5;
+        const r = pool === T.LAVA ? 1.5 + rng() * 1.5 : 2 + rng() * 2.5; // 溶岩は小さめ
         for (let j = Math.floor(cy - r); j <= cy + r; j++) {
           for (let i = Math.floor(cx - r); i <= cx + r; i++) {
             const d = Math.hypot(i - cx, (j - cy) * 1.3);
-            if (inside(i, j) && d <= r && areaOf[idx(i, j)] === ai && tiles[idx(i, j)] === T.FLOOR) tiles[idx(i, j)] = T.SWAMP;
+            if (inside(i, j) && d <= r && areaOf[idx(i, j)] === ai && tiles[idx(i, j)] === T.FLOOR) tiles[idx(i, j)] = pool;
           }
         }
       }

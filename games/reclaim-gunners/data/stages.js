@@ -6,6 +6,8 @@
  *   scatter: エリアの中に木や岩をばらまく (まわり 2 マスに何もない場所にだけ置くので、障害物のあいだは 2 マス以上あき、道がふさがらない)
  *   gates: 隣のステージへの門。ボスを倒すまで結界で閉じている
  *   lairs: ボスの決闘場 (円)。入ると結界が閉じ、倒すか力尽きるまで出られない
+ *          needArea: そのエリアを解放するまで、決闘場に入れない (魔王の玉座)
+ *   エリアの throne: 魔巣がなく、そこにいるボスを倒すと解放される
  */
 window.RG = window.RG || {};
 
@@ -153,7 +155,7 @@ RG.STAGES = [
     ],
     gates: [
       { id: 'east', rect: [143, 44, 1, 5], boss: 'G1', to: 2, entry: 'g1b' },
-      { id: 'north', rect: [34, 0, 4, 1], boss: 'G2', to: 3 },
+      { id: 'north', rect: [34, 0, 4, 1], boss: 'G2', to: 3, entry: 'g2b' },
     ],
     lairs: [
       { boss: 'G1', area: 's1a7', x: 134, y: 46, r: 7, travel: 'g1', name: '東の門' },
@@ -286,7 +288,7 @@ RG.STAGES = [
     ],
     gates: [
       { id: 'west', rect: [0, 25, 1, 5], boss: 'G1', to: 1, entry: 'g1' },
-      { id: 'east', rect: [143, 44, 1, 5], boss: 'G3', to: 4 },
+      { id: 'east', rect: [143, 44, 1, 5], boss: 'G3', to: 4, entry: 'g3b' },
     ],
     // 隣のステージから門を通って来たときの場所 (その門の守護者を倒すと転移碑になる)
     entries: [
@@ -297,10 +299,425 @@ RG.STAGES = [
       { boss: 'N2', area: 's2a8', x: 128, y: 9, r: 6.5 },
     ],
   },
-  { id: 3, name: 'アイゼン鉱山', desc: '掘りかけの鉱山と崖', lv: [13, 46], ready: false },
-  { id: 4, name: '黒森シュヴァルツ', desc: '呪われた深い森', lv: [26, 54], ready: false },
-  { id: 5, name: '灰燼火山', desc: '溶岩と灰の火山', lv: [30, 57], ready: false },
-  { id: 6, name: '魔都ゲヘナ', desc: '悪魔に呑まれた旧王都', lv: [44, 59], ready: false },
+  {
+    id: 3,
+    name: 'アイゼン鉱山',
+    desc: '掘りかけの鉱山と崖。狭い坑道が多い',
+    lv: [13, 46],
+    ready: true,
+    // 横 2 × 縦 3 画面ほど (66 × 54 タイル)・6 エリア。左上に地底湖 (~)
+    w: 66,
+    h: 54,
+    seed: 37,
+    layout: {
+      scale: 3,
+      warp: 2.2,
+      key: { D: 's3a1', K: 's3a2', V: 's3a3', L: 's3a4', W: 's3a5', N: 's3a6' },
+      rows: [
+        'NNNNNNNNNNNWWWWWWWWWWW',
+        'NNNNNNNNNNNWWWWWWWWWWW',
+        'NNNNNNNNNNWWWWWWWWWWWW',
+        'NNNNNNNNNNWWWWWWWWWWWW',
+        'NNNNNNNNNNNWWWWWWWWWWW',
+        'LLL~~~LLLLLLWWWWWWWWWW',
+        'LL~~~~~LLLLLVVVVVVVVVV',
+        'LL~~~~~~LLLLVVVVVVVVVV',
+        'LLL~~~~LLLLVVVVVVVVVVV',
+        'LLLLLLLLLLKVVVVVVVVVVV',
+        'KKKKKKKKKKKKVVVVVVVVVV',
+        'KKKKKKKKKKKKKVVVVVVVVV',
+        'KKKKKKKKKKKKKVVVVVVVVV',
+        'KKKKKKKDDDDDDDDVVVVVVV',
+        'KKKKKKDDDDDDDDDDVVVVVV',
+        'KKKKKDDDDDDDDDDDDVVVVV',
+        'KKKKKDDDDDDDDDDDDDVVVV',
+        'KKKKKDDDDDDDDDDDDDVVVV',
+      ],
+    },
+    links: [
+      ['s3a1', 's3a2'], ['s3a1', 's3a3'], ['s3a2', 's3a4'], ['s3a4', 's3a6'], ['s3a4', 's3a3'], ['s3a3', 's3a5'], ['s3a6', 's3a5'],
+    ],
+    walls: [],
+    features: [
+      { type: 'house', rect: [20, 47, 4, 3] },
+      { type: 'house', rect: [44, 47, 4, 3] },
+      { type: 'house', rect: [25, 50, 4, 3] },
+      { type: 'shop', rect: [30, 40, 6, 4], shop: 'dorm', door: [33, 44] },
+    ],
+    areas: [
+      {
+        id: 's3a1', name: '鉱山町ドルム', town: true, lv: [13, 16], theme: 'mineTown',
+        enemies: ['imp', 'garg', 'worm'],
+        nests: [{ x: 22, y: 43, type: 'small' }, { x: 44, y: 42, type: 'small' }, { x: 38, y: 51, type: 'small' }],
+        stone: [38, 47],
+      },
+      {
+        id: 's3a2', name: '第一坑道', lv: [15, 19], theme: 'mine',
+        enemies: ['worm', 'skel', 'garg', 'hound'],
+        nests: [{ x: 8, y: 32, type: 'normal' }, { x: 22, y: 36, type: 'eye' }, { x: 6, y: 46, type: 'brood' }],
+        stone: [14, 40],
+      },
+      {
+        id: 's3a3', name: '崩落の谷', lv: [19, 24], theme: 'canyon',
+        enemies: ['garg', 'worm', 'orc', 'eye'],
+        nests: [{ x: 40, y: 22, type: 'normal' }, { x: 50, y: 32, type: 'bone' }, { x: 60, y: 44, type: 'eye' }, { x: 42, y: 36, type: 'brood' }],
+        stone: [52, 40],
+      },
+      {
+        id: 's3a4', name: '地底湖', lv: [24, 28], theme: 'underlake',
+        enemies: ['wraith', 'slime', 'eye', 'garg'],
+        nests: [{ x: 28, y: 15, type: 'mire' }, { x: 30, y: 25, type: 'normal' }, { x: 4, y: 27, type: 'eye' }, { x: 12, y: 14, type: 'mire' }],
+        stone: [20, 28],
+      },
+      {
+        id: 's3a5', name: '王虫の巣', strong: true, lv: [42, 46], theme: 'hive',
+        enemies: ['worm', 'garg', 'mino', 'knight'],
+        nests: [{ x: 35, y: 3, type: 'big' }, { x: 38, y: 13, type: 'big' }, { x: 62, y: 3, type: 'big' }, { x: 63, y: 14, type: 'eye' }, { x: 44, y: 2, type: 'brood' }],
+        stone: [44, 9],
+      },
+      {
+        id: 's3a6', name: '北の竪坑', lv: [28, 33], theme: 'shaft',
+        enemies: ['garg', 'knight', 'worm', 'eye'],
+        nests: [{ x: 4, y: 11, type: 'normal' }, { x: 29, y: 3, type: 'eye' }],
+        stone: [26, 11],
+      },
+    ],
+    scatter: [
+      { area: 's3a1', tile: 'rock', n: 3 },
+      { area: 's3a2', tile: 'rock', n: 14 },
+      { area: 's3a3', tile: 'rock', n: 16 },
+      { area: 's3a3', tile: 'bone', n: 4 },
+      { area: 's3a4', tile: 'rock', n: 8 },
+      { area: 's3a4', tile: 'swamp', n: 4 },
+      { area: 's3a5', tile: 'bone', n: 10 },
+      { area: 's3a5', tile: 'rock', n: 6 },
+      { area: 's3a6', tile: 'rock', n: 6 },
+    ],
+    gates: [
+      { id: 'south', rect: [33, 53, 4, 1], boss: 'G2', to: 1, entry: 'g2' },
+      { id: 'east', rect: [65, 21, 1, 5], boss: 'G4', to: 4, entry: 'g4b' },
+      { id: 'north', rect: [12, 0, 4, 1], boss: 'G5', to: 5, entry: 'g5b' },
+    ],
+    entries: [
+      { id: 'g2b', boss: 'G2', area: 's3a1', x: 34, y: 50, name: '南の門' },
+    ],
+    lairs: [
+      { boss: 'G4', area: 's3a3', x: 57, y: 24, r: 6, travel: 'g4', name: '東の門' },
+      { boss: 'G5', area: 's3a6', x: 15, y: 6, r: 5.5, travel: 'g5', name: '北の門' },
+      { boss: 'N3', area: 's3a5', x: 50, y: 8, r: 6 },
+    ],
+  },
+  {
+    id: 4,
+    name: '黒森シュヴァルツ',
+    desc: '呪われた深い森。道が入り組み、毒の沼が広がる',
+    lv: [26, 54],
+    ready: true,
+    // 横 3 × 縦 2 画面ほど (96 × 36 タイル)・6 エリア
+    w: 96,
+    h: 36,
+    seed: 41,
+    layout: {
+      scale: 3,
+      warp: 2.4,
+      key: { T: 's4a1', P: 's4a2', S: 's4a3', A: 's4a4', W: 's4a5', Y: 's4a6' },
+      rows: [
+        'PPPPPPPPPPPAAAAAAAAAWWWWWWWWWWWW',
+        'PPPPPPPPPPPAAAAAAAAAWWWWWWWWWWWW',
+        'PPPPPPPPPPAAAAAAAAAAWWWWWWWWWWWW',
+        'PPPPPPPPPPAAAAAAAAAAWWWWWWWWWWWW',
+        'PPPPPPPPPSSSAAAAAAAAWWWWWWWWWWWW',
+        'TTTTTTTTSSSSSSAAAAAAAWWWWWWWWWWW',
+        'TTTTTTTTSSSSSSSSAAAAYYYYYYYYYYYY',
+        'TTTTTTTTTSSSSSSSSSSSYYYYYYYYYYYY',
+        'TTTTTTTTTSSSSSSSSSSSYYYYYYYYYYYY',
+        'TTTTTTTTTTSSSSSSSSSSYYYYYYYYYYYY',
+        'TTTTTTTTTTSSSSSSSSSSYYYYYYYYYYYY',
+        'TTTTTTTTTTSSSSSSSSSSYYYYYYYYYYYY',
+      ],
+    },
+    links: [
+      ['s4a1', 's4a2'], ['s4a1', 's4a3'], ['s4a2', 's4a3'], ['s4a2', 's4a4'], ['s4a3', 's4a4'], ['s4a4', 's4a5'], ['s4a3', 's4a6'], ['s4a5', 's4a6'],
+    ],
+    walls: [],
+    features: [
+      { type: 'house', rect: [4, 19, 4, 3] },
+      { type: 'house', rect: [22, 31, 4, 3] },
+      { type: 'house', rect: [5, 31, 4, 3] },
+      { type: 'shop', rect: [12, 22, 6, 4], shop: 'silva', door: [15, 26] },
+    ],
+    areas: [
+      {
+        id: 's4a1', name: '隠れ里シルヴァ', town: true, lv: [26, 29], theme: 'silva',
+        enemies: ['moth', 'shadow', 'imp'],
+        nests: [{ x: 8, y: 26, type: 'small' }, { x: 24, y: 20, type: 'small' }, { x: 14, y: 32, type: 'small' }],
+        stone: [21, 27],
+      },
+      {
+        id: 's4a2', name: '迷いの小径', lv: [28, 32], theme: 'path',
+        enemies: ['shadow', 'moth', 'hound', 'succ'],
+        nests: [{ x: 12, y: 3, type: 'normal' }, { x: 26, y: 3, type: 'spore' }, { x: 20, y: 11, type: 'brood' }, { x: 5, y: 12, type: 'eye' }],
+        stone: [15, 7],
+      },
+      {
+        id: 's4a3', name: '毒沼の廃村', lv: [32, 36], theme: 'poisonVillage',
+        enemies: ['moth', 'slime', 'shaman', 'shadow'],
+        nests: [{ x: 34, y: 18, type: 'spore' }, { x: 46, y: 26, type: 'mire' }, { x: 56, y: 32, type: 'normal' }, { x: 36, y: 32, type: 'spore' }],
+        stone: [45, 32],
+      },
+      {
+        id: 's4a4', name: '古樹の祭壇', lv: [36, 40], theme: 'altar',
+        enemies: ['shaman', 'succ', 'shadow', 'knight'],
+        nests: [{ x: 34, y: 3, type: 'normal' }, { x: 45, y: 10, type: 'eye' }, { x: 55, y: 3, type: 'bone' }, { x: 41, y: 16, type: 'spore' }, { x: 57, y: 15, type: 'normal' }],
+        stone: [47, 5],
+      },
+      {
+        id: 's4a5', name: '魔女の庵', strong: true, lv: [50, 54], theme: 'witch',
+        enemies: ['succ', 'shaman', 'moth', 'dknight'],
+        nests: [{ x: 63, y: 3, type: 'big' }, { x: 71, y: 14, type: 'big' }, { x: 93, y: 3, type: 'big' }, { x: 91, y: 15, type: 'eye' }, { x: 66, y: 12, type: 'spore' }],
+        stone: [72, 4],
+      },
+      {
+        id: 's4a6', name: '千年樹の根', lv: [40, 44], theme: 'roots',
+        enemies: ['shadow', 'succ', 'dknight', 'moth'],
+        nests: [{ x: 65, y: 22, type: 'normal' }, { x: 70, y: 32, type: 'brood' }, { x: 76, y: 20, type: 'spore' }],
+        stone: [72, 27],
+      },
+    ],
+    scatter: [
+      { area: 's4a1', tile: 'tree', n: 10 },
+      { area: 's4a2', tile: 'tree', n: 40 },
+      { area: 's4a3', tile: 'swamp', n: 12 },
+      { area: 's4a3', tile: 'fence', n: 5 },
+      { area: 's4a3', tile: 'tree', n: 10 },
+      { area: 's4a4', tile: 'tree', n: 24 },
+      { area: 's4a4', tile: 'rock', n: 4 },
+      { area: 's4a5', tile: 'tree', n: 20 },
+      { area: 's4a5', tile: 'swamp', n: 5 },
+      { area: 's4a6', tile: 'tree', n: 18 },
+    ],
+    gates: [
+      { id: 'west', rect: [0, 26, 1, 5], boss: 'G3', to: 2, entry: 'g3' },
+      { id: 'northwest', rect: [0, 5, 1, 5], boss: 'G4', to: 3, entry: 'g4' },
+      { id: 'east', rect: [95, 25, 1, 5], boss: 'G6', to: 6, entry: 'g6b' },
+    ],
+    entries: [
+      { id: 'g3b', boss: 'G3', area: 's4a1', x: 3, y: 28, name: '西の門' },
+      { id: 'g4b', boss: 'G4', area: 's4a2', x: 3, y: 7, name: '北西の門' },
+    ],
+    lairs: [
+      { boss: 'G6', area: 's4a6', x: 86, y: 27, r: 6, travel: 'g6', name: '東の門' },
+      { boss: 'N4', area: 's4a5', x: 82, y: 8, r: 6.5 },
+    ],
+  },
+  {
+    id: 5,
+    name: '灰燼火山',
+    desc: '溶岩と灰の火山。溶岩の池に入ると焼ける',
+    lv: [30, 57],
+    ready: true,
+    // 横 2 × 縦 3 画面ほど (66 × 54 タイル)・6 エリア。まん中に細い火口の橋
+    w: 66,
+    h: 54,
+    seed: 53,
+    layout: {
+      scale: 3,
+      warp: 2,
+      key: { T: 's5a1', L: 's5a2', C: 's5a3', A: 's5a4', F: 's5a5', B: 's5a6' },
+      rows: [
+        'FFFFFFFFFFFBBBBBBBBBBB',
+        'FFFFFFFFFFFBBBBBBBBBBB',
+        'FFFFFFFFFFBBBBBBBBBBBB',
+        'FFFFFFFFFFBBBBBBBBBBBB',
+        'FFFFFFFFFCCCCBBBBBBBBB',
+        'LLLLLLLLLCCCCCAAAAAAAA',
+        'LLLLLLLLLCCCCCAAAAAAAA',
+        'LLLLLLLLLCCCCCAAAAAAAA',
+        'LLLLLLLLLCCCCCAAAAAAAA',
+        'LLLLLLLLLCCCCAAAAAAAAA',
+        'LLLLLLLLLLCCCAAAAAAAAA',
+        'LLLLLLLLLLCCCAAAAAAAAA',
+        'LLLLLLLLTTTTTTTAAAAAAA',
+        'LLLLLLLTTTTTTTTTAAAAAA',
+        'LLLLLLTTTTTTTTTTTAAAAA',
+        'LLLLLLTTTTTTTTTTTAAAAA',
+        'LLLLLTTTTTTTTTTTTTAAAA',
+        'LLLLLTTTTTTTTTTTTTAAAA',
+      ],
+    },
+    links: [
+      ['s5a1', 's5a2'], ['s5a1', 's5a3'], ['s5a1', 's5a4'], ['s5a2', 's5a5'], ['s5a3', 's5a5'], ['s5a3', 's5a6'], ['s5a4', 's5a6'],
+    ],
+    walls: [],
+    features: [
+      { type: 'house', rect: [20, 47, 4, 3] },
+      { type: 'house', rect: [43, 47, 4, 3] },
+      { type: 'house', rect: [25, 50, 4, 3] },
+      { type: 'shop', rect: [30, 40, 6, 4], shop: 'ignis', door: [33, 44] },
+    ],
+    areas: [
+      {
+        id: 's5a1', name: '砦町イグニス', town: true, lv: [30, 33], theme: 'ignis',
+        enemies: ['wisp', 'imp', 'hound'],
+        nests: [{ x: 23, y: 43, type: 'small' }, { x: 46, y: 43, type: 'small' }, { x: 38, y: 51, type: 'small' }],
+        stone: [39, 47],
+      },
+      {
+        id: 's5a2', name: '溶岩洞', lv: [33, 37], theme: 'lavaCave',
+        enemies: ['wisp', 'mino', 'hound', 'garg'],
+        nests: [{ x: 6, y: 18, type: 'normal' }, { x: 20, y: 24, type: 'eye' }, { x: 8, y: 36, type: 'brood' }, { x: 14, y: 46, type: 'normal' }],
+        stone: [14, 30],
+      },
+      {
+        id: 's5a3', name: '火口の橋', lv: [37, 41], theme: 'bridge',
+        enemies: ['wisp', 'garg', 'dknight'],
+        nests: [{ x: 34, y: 16, type: 'normal' }, { x: 34, y: 26, type: 'eye' }, { x: 35, y: 33, type: 'normal' }],
+        stone: [33, 21],
+      },
+      {
+        id: 's5a4', name: '灰の墓所', lv: [41, 44], theme: 'ashGrave',
+        enemies: ['dknight', 'wisp', 'mino', 'knight'],
+        nests: [{ x: 46, y: 18, type: 'bone' }, { x: 60, y: 22, type: 'normal' }, { x: 52, y: 31, type: 'big' }, { x: 62, y: 40, type: 'eye' }, { x: 58, y: 50, type: 'bone' }],
+        stone: [54, 25],
+      },
+      {
+        id: 's5a5', name: '不死鳥の巣', strong: true, lv: [53, 57], theme: 'phoenix',
+        enemies: ['wisp', 'dknight', 'archd', 'garg'],
+        nests: [{ x: 3, y: 3, type: 'big' }, { x: 29, y: 3, type: 'big' }, { x: 28, y: 12, type: 'big' }, { x: 4, y: 12, type: 'eye' }],
+        stone: [24, 8],
+      },
+      {
+        id: 's5a6', name: '炎獄の門', lv: [42, 46], theme: 'hellGate',
+        enemies: ['dknight', 'mino', 'wisp', 'archd'],
+        nests: [{ x: 36, y: 4, type: 'normal' }, { x: 41, y: 12, type: 'eye' }],
+        stone: [42, 7],
+      },
+    ],
+    scatter: [
+      { area: 's5a1', tile: 'rock', n: 3 },
+      { area: 's5a2', tile: 'lava', n: 8 },
+      { area: 's5a2', tile: 'rock', n: 10 },
+      { area: 's5a3', tile: 'fence', n: 4 },
+      { area: 's5a4', tile: 'bone', n: 14 },
+      { area: 's5a4', tile: 'lava', n: 4 },
+      { area: 's5a5', tile: 'lava', n: 6 },
+      { area: 's5a5', tile: 'rock', n: 4 },
+      { area: 's5a6', tile: 'lava', n: 4 },
+      { area: 's5a6', tile: 'rock', n: 4 },
+    ],
+    gates: [
+      { id: 'south', rect: [31, 53, 4, 1], boss: 'G5', to: 3, entry: 'g5' },
+      { id: 'east', rect: [65, 5, 1, 5], boss: 'G7', to: 6, entry: 'g7b' },
+    ],
+    entries: [
+      { id: 'g5b', boss: 'G5', area: 's5a1', x: 33, y: 50, name: '南の門' },
+    ],
+    lairs: [
+      { boss: 'G7', area: 's5a6', x: 55, y: 7, r: 6, travel: 'g7', name: '東の門' },
+      { boss: 'N5', area: 's5a5', x: 15, y: 7, r: 6.5 },
+    ],
+  },
+  {
+    id: 6,
+    name: '魔都ゲヘナ',
+    desc: '悪魔に呑まれた旧王都。最奥の玉座に魔王がいる',
+    lv: [44, 59],
+    ready: true,
+    // 横 3 × 縦 2 画面ほど (96 × 36 タイル)・6 エリア。右上が魔王城
+    w: 96,
+    h: 36,
+    seed: 67,
+    layout: {
+      scale: 3,
+      warp: 2.2,
+      key: { N: 's6a1', C: 's6a2', B: 's6a3', G: 's6a4', K: 's6a5', T: 's6a6' },
+      rows: [
+        'CCCCCCCCCCCCBBBBBBBBBGGGGGGKKKKK',
+        'CCCCCCCCCCCCBBBBBBBBBGGGGGGKKKKK',
+        'CCCCCCCCCCCBBBBBBBBBBGGGGGGKKKKK',
+        'CCCCCCCCCCCBBBBBBBBBBGGGGGGKKKKK',
+        'NNNNNNNNNNCCBBBBBBBBBGGGGGGKKKKK',
+        'NNNNNNNNNNCCCBBBBBBBBGGGGGGKKKKK',
+        'NNNNNNNNNNCCCCCCCTTTTTTTTTTTTTTT',
+        'NNNNNNNNNNNCCCCCCTTTTTTTTTTTTTTT',
+        'NNNNNNNNNNNCCCCCCTTTTTTTTTTTTTTT',
+        'NNNNNNNNNNNCCCCCCTTTTTTTTTTTTTTT',
+        'NNNNNNNNNNNNCCCCCTTTTTTTTTTTTTTT',
+        'NNNNNNNNNNNNCCCCCTTTTTTTTTTTTTTT',
+      ],
+    },
+    links: [
+      ['s6a1', 's6a2'], ['s6a2', 's6a3'], ['s6a3', 's6a4'], ['s6a4', 's6a5'], ['s6a2', 's6a6'],
+    ],
+    walls: [],
+    features: [
+      { type: 'house', rect: [4, 15, 4, 3] },
+      { type: 'house', rect: [24, 16, 4, 3] },
+      { type: 'house', rect: [6, 31, 4, 3] },
+      { type: 'house', rect: [24, 30, 4, 3] },
+      { type: 'shop', rect: [13, 21, 6, 4], shop: 'nether', door: [16, 25] },
+    ],
+    areas: [
+      {
+        id: 's6a1', name: '地下街ネザー', town: true, lv: [44, 47], theme: 'nether',
+        enemies: ['garg', 'shadow', 'imp'],
+        nests: [{ x: 8, y: 23, type: 'small' }, { x: 29, y: 24, type: 'small' }, { x: 16, y: 32, type: 'small' }, { x: 30, y: 14, type: 'small' }],
+        stone: [20, 28],
+      },
+      {
+        id: 's6a2', name: '崩れた城下', lv: [46, 50], theme: 'ruinsCity',
+        enemies: ['garg', 'dknight', 'shadow', 'succ'],
+        nests: [{ x: 6, y: 4, type: 'normal' }, { x: 24, y: 6, type: 'eye' }, { x: 40, y: 21, type: 'normal' }, { x: 44, y: 31, type: 'bone' }],
+        stone: [16, 6],
+      },
+      {
+        id: 's6a3', name: '血の大聖堂', lv: [50, 54], theme: 'bloodCath',
+        enemies: ['archd', 'dknight', 'succ', 'knight'],
+        nests: [{ x: 40, y: 3, type: 'normal' }, { x: 52, y: 4, type: 'eye' }, { x: 60, y: 6, type: 'bone' }, { x: 45, y: 13, type: 'big' }, { x: 57, y: 14, type: 'normal' }],
+        stone: [51, 10],
+      },
+      {
+        id: 's6a4', name: '魔王城・城門', lv: [54, 57], theme: 'castleGate',
+        enemies: ['archd', 'dknight', 'garg'],
+        nests: [{ x: 67, y: 3, type: 'big' }, { x: 77, y: 14, type: 'big' }, { x: 77, y: 3, type: 'eye' }, { x: 66, y: 14, type: 'normal' }],
+        stone: [71, 9],
+      },
+      {
+        id: 's6a5', name: '魔王城・玉座', lv: [58, 58], theme: 'throne', throne: 's6a4',
+        enemies: ['dknight'],
+        nests: [],
+        stone: [86, 15],
+      },
+      {
+        id: 's6a6', name: '堕天の塔', strong: true, lv: [57, 59], theme: 'fallenTower',
+        enemies: ['archd', 'dknight', 'succ', 'garg'],
+        nests: [{ x: 55, y: 21, type: 'big' }, { x: 55, y: 32, type: 'big' }, { x: 67, y: 20, type: 'big' }, { x: 68, y: 33, type: 'big' }, { x: 75, y: 20, type: 'eye' }, { x: 93, y: 33, type: 'normal' }],
+        stone: [62, 27],
+      },
+    ],
+    scatter: [
+      { area: 's6a1', tile: 'rock', n: 3 },
+      { area: 's6a2', tile: 'rock', n: 16 },
+      { area: 's6a2', tile: 'bone', n: 6 },
+      { area: 's6a3', tile: 'bone', n: 8 },
+      { area: 's6a3', tile: 'rock', n: 4 },
+      { area: 's6a4', tile: 'rock', n: 4 },
+      { area: 's6a6', tile: 'lava', n: 5 },
+      { area: 's6a6', tile: 'rock', n: 6 },
+    ],
+    gates: [
+      { id: 'westA', rect: [0, 16, 1, 5], boss: 'G6', to: 4, entry: 'g6' },
+      { id: 'westB', rect: [0, 28, 1, 5], boss: 'G7', to: 5, entry: 'g7' },
+    ],
+    entries: [
+      { id: 'g6b', boss: 'G6', area: 's6a1', x: 3, y: 18, name: '西の門（黒森から）' },
+      { id: 'g7b', boss: 'G7', area: 's6a1', x: 3, y: 30, name: '西の門（火山から）' },
+    ],
+    lairs: [
+      { boss: 'K', area: 's6a5', x: 88, y: 8, r: 6, needArea: 's6a4' },
+      { boss: 'N6', area: 's6a6', x: 84, y: 27, r: 6.5 },
+    ],
+  },
 ];
 
 // ステージのつながり (どの守護者を倒すと開くか)
@@ -333,6 +750,55 @@ RG.SHOPS.lume = {
     { weapons: ['A2', 'B2', 'D2', 'E2'], max: 6 },
     { weapons: ['C2'], max: 7 },
     { weapons: [], max: 8 },
+  ],
+  items: ['potion'],
+};
+
+RG.SHOPS.dorm = {
+  name: '鉱山町ドルムの武器屋',
+  stage: 3,
+  nushi: 'N3',
+  phases: [
+    { weapons: ['A2', 'B2', 'C2', 'D2', 'E2'], max: 6 },
+    { weapons: [], max: 7 },
+    { weapons: ['E3'], max: 8 },
+  ],
+  items: ['potion'],
+};
+
+RG.SHOPS.silva = {
+  name: '隠れ里シルヴァの武器屋',
+  stage: 4,
+  nushi: 'N4',
+  phases: [
+    { weapons: ['A3', 'B3', 'C3', 'D3'], max: 9 },
+    { weapons: ['E3'], max: 9 },
+    { weapons: [], max: 9 },
+  ],
+  items: ['potion'],
+};
+
+RG.SHOPS.ignis = {
+  name: '砦町イグニスの武器屋',
+  stage: 5,
+  nushi: 'N5',
+  phases: [
+    { weapons: ['A3', 'B3', 'C3', 'D3', 'E3'], max: 9 },
+    { weapons: [], max: 9 },
+    { weapons: [], max: 10 },
+  ],
+  items: ['potion'],
+};
+
+// 地下街ネザー: いちばんの品ぞろえ。B4・D4 はハード以上だけ並ぶ (hardOnly)
+RG.SHOPS.nether = {
+  name: '地下街ネザーの武器屋',
+  stage: 6,
+  nushi: 'N6',
+  phases: [
+    { weapons: ['A4', 'C4', 'E4'], max: 10 },
+    { weapons: ['B4', 'D4'], max: 10 },
+    { weapons: [], max: 10 },
   ],
   items: ['potion'],
 };

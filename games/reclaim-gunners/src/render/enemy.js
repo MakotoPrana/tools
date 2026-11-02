@@ -2,10 +2,12 @@
 import { TAU } from '../core/config.js';
 import { clamp } from '../core/util.js';
 import { BRUTE } from '../game/enemies.js';
-import { G } from '../game/stage.js';
+import { G, P } from '../game/stage.js';
 import { ctx } from './canvas.js';
 import { mix } from './color.js';
-import { circle, drawShade, drawSoftShadow, eyes, txt } from './primitives.js';
+import { circle, drawGlow, drawShade, drawSoftShadow, eyes, txt } from './primitives.js';
+
+const drawGlowE = (x, y, r, col) => drawGlow(ctx, x, y, r, col, 0.3);
 
 export function drawEnemy(e) {
   const def = e.def;
@@ -162,6 +164,137 @@ export function drawEnemy(e) {
       eyes(fx, -3, 1.8, e.mode === 'wind' ? '#ffffff' : '#ff3a3a');
       break;
     }
+    case 'garg': {
+      ctx.fillStyle = flash ? '#fff' : '#5a5856';
+      const wf = Math.sin(G.t * 9 + e.hx) * 4;
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(s * 3, -2);
+        ctx.lineTo(s * (r + 9), -r - wf);
+        ctx.lineTo(s * (r + 4), 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = col;
+      circle(ctx, 0, 0, r);
+      ctx.fillStyle = '#4a4846';
+      ctx.fillRect(-r * 0.6, -r - 3, 3, 5);
+      ctx.fillRect(r * 0.6 - 3, -r - 3, 3, 5);
+      eyes(fx, -2, 1.6, '#ff5a3a');
+      break;
+    }
+    case 'worm': {
+      const lit = e.fuse != null && Math.floor(G.t * 16) % 2;
+      for (let i = 2; i >= 0; i--) {
+        ctx.fillStyle = lit ? '#fff0a0' : i ? '#9a6430' : col;
+        circle(ctx, -fx * i * 5, Math.sin(G.t * 8 + i) * 1.5, r - i * 1.5);
+      }
+      ctx.fillStyle = '#ff5a2a';
+      ctx.fillRect(-2, -r * 0.4, 4, 3);
+      eyes(fx, -2, 1.2, '#1a0a0a');
+      break;
+    }
+    case 'shadow': {
+      // 影: 遠くではほとんど見えない
+      ctx.globalAlpha *= clamp(1.4 - Math.hypot(e.x - P.x, e.y - P.y) / 130, 0.15, 1);
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(-r, r);
+      ctx.quadraticCurveTo(-r * 1.2, -r, 0, -r * 1.1);
+      ctx.quadraticCurveTo(r * 1.2, -r, r, r);
+      for (let i = 0; i < 4; i++) ctx.lineTo(r - (i + 0.5) * (r / 2), r - 4 - (i % 2) * 4);
+      ctx.fill();
+      eyes(fx, -3, 1.6, '#c8a0ff');
+      break;
+    }
+    case 'eye': {
+      drawGlowE(0, 0, r * 2, '#c2457a');
+      ctx.fillStyle = col;
+      circle(ctx, 0, 0, r);
+      ctx.fillStyle = '#f8f0e0';
+      circle(ctx, 0, 0, r * 0.7);
+      const la = Math.atan2(P.y - e.y, P.x - e.x);
+      ctx.fillStyle = '#c03040';
+      circle(ctx, Math.cos(la) * 3, Math.sin(la) * 3, r * 0.38);
+      ctx.fillStyle = '#100808';
+      circle(ctx, Math.cos(la) * 3.4, Math.sin(la) * 3.4, r * 0.18);
+      break;
+    }
+    case 'wisp': {
+      drawGlowE(0, 0, r * 2.4, '#ff7a2c');
+      ctx.fillStyle = flash ? '#fff' : '#ff9a3c';
+      ctx.beginPath();
+      ctx.moveTo(-r, 2);
+      ctx.quadraticCurveTo(-r, -r, 0, -r * 1.8 - Math.sin(G.t * 12) * 2);
+      ctx.quadraticCurveTo(r, -r, r, 2);
+      ctx.arc(0, 2, r, 0, Math.PI);
+      ctx.fill();
+      ctx.fillStyle = '#ffe08a';
+      circle(ctx, 0, 1, r * 0.5);
+      eyes(fx, 0, 1.2, '#7a1a0a');
+      break;
+    }
+    case 'succ': {
+      ctx.fillStyle = flash ? '#fff' : '#5a1a4a';
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(s * 2, -2);
+        ctx.lineTo(s * (r + 8), -r - 2 + Math.sin(G.t * 6) * 3);
+        ctx.lineTo(s * (r + 2), 4);
+        ctx.fill();
+      }
+      ctx.fillStyle = col;
+      circle(ctx, 0, 0, r);
+      ctx.fillStyle = '#2a0a1a';
+      ctx.beginPath();
+      ctx.arc(0, -2, r, Math.PI, TAU);
+      ctx.fill();
+      eyes(fx, -1, 1.3, '#ffe0f0');
+      break;
+    }
+    case 'dknight': {
+      const wind = e.mode === 'wind';
+      ctx.fillStyle = flash ? '#fff' : '#2a1e38';
+      ctx.beginPath();
+      ctx.moveTo(-r, r);
+      ctx.lineTo(0, -r * 1.3);
+      ctx.lineTo(r, r);
+      ctx.fill();
+      ctx.fillStyle = wind ? (Math.floor(G.t * 14) % 2 ? '#ff5a5a' : col) : col;
+      circle(ctx, 0, 0, r * 0.85);
+      ctx.fillStyle = '#9a8ab0';
+      ctx.fillRect(-r * 0.6, -3, r * 1.2, 2);
+      ctx.strokeStyle = '#c8c0d8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(fx * r * 0.6, 2);
+      ctx.lineTo(fx * (r + 10), -r);
+      ctx.stroke();
+      eyes(fx, -5, 1.4, '#ff3a6a');
+      break;
+    }
+    case 'archd': {
+      drawGlowE(0, 0, r * 2, '#ff2a4a');
+      ctx.fillStyle = flash ? '#fff' : '#3a0a14';
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(s * 4, -4);
+        ctx.lineTo(s * (r + 14), -r - 6 + Math.sin(G.t * 5) * 4);
+        ctx.lineTo(s * (r + 6), 6);
+        ctx.fill();
+      }
+      ctx.fillStyle = col;
+      circle(ctx, 0, 0, r);
+      ctx.fillStyle = '#e8d8c0';
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(s * 4, -r + 2);
+        ctx.quadraticCurveTo(s * 14, -r - 4, s * 10, -r - 10);
+        ctx.lineTo(s * 2, -r + 1);
+        ctx.fill();
+      }
+      eyes(fx, -3, 2, '#ffd84a');
+      break;
+    }
     case 'orc': {
       ctx.fillStyle = col;
       circle(ctx, 0, 0, r);
@@ -278,6 +411,6 @@ export function drawEnemy(e) {
   }
   ctx.restore();
   // 丸みの陰影 (箱や骨・半透明の敵にはつけない)
-  if (!['mimic', 'skel', 'wraith', 'moth'].includes(def.id)) drawShade(ctx, 0, 0, r * 1.02, 0.85);
+  if (!['mimic', 'skel', 'wraith', 'moth', 'shadow', 'wisp', 'worm'].includes(def.id)) drawShade(ctx, 0, 0, r * 1.02, 0.85);
   ctx.restore();
 }

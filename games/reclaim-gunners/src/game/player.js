@@ -133,6 +133,19 @@ export function updatePlayer(dt) {
   P.slowT = Math.max(0, (P.slowT || 0) - dt);
   if (P.slowT > 0) sp *= 0.6; // 泥・氷の弾に当たると遅くなる
   if (tileAt(P.x, P.y) === T.SWAMP && P.rollT <= 0 && P.tackleT <= 0) sp *= 0.7; // 沼
+  // 溶岩: 上にいると 0.5 秒ごとに最大体力の 4% 焼ける (回避で飛びこえている間は焼けない)
+  P.lavaT = (P.lavaT || 0) - dt;
+  if (tileAt(P.x, P.y) === T.LAVA && P.rollT <= 0 && P.lavaT <= 0 && !G.dead) {
+    P.lavaT = 0.5;
+    const d = Math.max(1, Math.round(maxHp() * 0.04));
+    P.hp -= d;
+    addText(P.x + rnd(-4, 4), P.y - 12, `-${d}`, '#ffa040', 8);
+    addPart({ x: P.x, y: P.y + 4, vx: rnd(-20, 20), vy: -40, life: 0.4, color: '#ff8a2c', size: 2.5 });
+    if (P.hp <= 0) {
+      P.hp = 0;
+      G.dead = 2.2;
+    }
+  }
   if (P.pull) {
     // 大蝦蟇の舌で引き寄せられている
     P.pull.t -= dt;

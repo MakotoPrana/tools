@@ -4,10 +4,12 @@ import { BOSSES, MATERIALS, MOVE_BLOCK, SHOT_BLOCK, STAGES, T, TILE, lvMul, gold
 import { writeSave } from '../core/save.js';
 import { dist, pick, rnd, tc } from '../core/util.js';
 import { updateBlob, updateDragon, updateGolem, updateSiren, updateToad } from './boss-ai.js';
+import { clampBody, phoenixEgg, resetBoss2, updateBoss2 } from './boss-ai2.js';
 import { gainGold } from './enemies.js';
 import { addPart, addText, showBanner } from './fx.js';
 import { D, hero, lvColor, powerLv, prog } from './hero.js';
 import { updateFlow } from './pathfinding.js';
+import { liberate } from './nests.js';
 import { collectAllMats } from './pickups.js';
 import { hurtPlayer } from './player.js';
 import { G, P, stageDef } from './stage.js';
@@ -63,6 +65,7 @@ export function resetBoss(b) {
     b.mt = 1;
     b.parts = [bossPart(b, b.cx, b.cy, 18, b.total, { fade: 1 })];
   } else if (b.id === 'N2') b.parts = [bossPart(b, b.cx, b.cy, 30, b.total, { mode: 'idle', t: 1.2 })];
+  else resetBoss2(b);
 }
 
 export const bossHp = (b) => b.parts.reduce((s, p) => s + (p.clone ? 0 : Math.max(0, p.hp)), 0) + (b.id === 'G1' ? b.parts.reduce((s, p) => s + (p.dead ? 0 : p.size === 2 ? b.total * 0.6 : p.size === 1 ? b.total * 0.15 : 0), 0) : 0);
@@ -76,6 +79,18 @@ export function updateBosses(dt) {
       if (!G.dead && !G.lock && dp < b.R + 50 && dp >= b.R - 4 && !(b.warnT > G.t)) {
         b.warnT = G.t + 8;
         toast(tr('この先は {name}（Lv{lv}）の決闘場\n入ると、倒すか力尽きるまでこのエリアから出られない', { name: b.def.name, lv: b.lv }), 2.6);
+      }
+      // 魔王の玉座: 城門のエリアを解放するまで、結界で入れない
+      const need = b.lair.needArea && G.areas.find((a) => a.def.id === b.lair.needArea);
+      if (need && !need.free && dp < b.R + 4) {
+        const a = Math.atan2(P.y - b.cy, P.x - b.cx);
+        P.x = b.cx + Math.cos(a) * (b.R + 6);
+        P.y = b.cy + Math.sin(a) * (b.R + 6);
+        if (!(b.warnT > G.t)) {
+          b.warnT = G.t + 4;
+          toast(tr('玉座の結界が閉じている\n{name} を解放すると開く', { name: need.def.name }), 2.6);
+        }
+        continue;
       }
       if (!G.dead && !G.lock && dp < b.R - 4) {
         b.state = 'fight';
@@ -96,6 +111,8 @@ export function updateBosses(dt) {
     else if (b.id === 'N1') updateDragon(b, dt);
     else if (b.id === 'G3') updateSiren(b, dt);
     else if (b.id === 'N2') updateToad(b, dt);
+    else updateBoss2(b, dt);
+    clampBody(b);
     for (const p of b.parts) {
       if (p.dead) continue;
       // ボスもエリアの外へは出ない (外に出たら、最後にいたエリアの中の場所へ戻す)
@@ -135,6 +152,7 @@ export function updateLater(dt) {
 
 export function bossPartDown(p) {
   const b = p.boss;
+  if (phoenixEgg(b, p)) return;
   p.dead = true;
   if (p.clone) {
     for (let i = 0; i < 14; i++) addPart({ x: p.x, y: p.y, vx: rnd(-60, 60), vy: rnd(-60, 60), life: 0.5, color: '#dff4ff', size: 3 });
@@ -177,6 +195,14 @@ export function bossDefeated(b) {
     sub += `\n${tr('{name}への門が開いた', { name: stageDef(gt.to).name })}`;
   }
   if (b.lair.travel && !prog.travel.includes(b.lair.travel)) prog.travel.push(b.lair.travel);
+  // 魔巣のないエリア (魔王の玉座) は、ボスを倒すと解放される
+  const area = G.areas[b.area];
+  if (area && !area.free && !area.def.nests.length) liberate(area);
+  // 魔王を倒したら、この難易度はクリア (次の難易度が開く)
+  if (b.def.kind === 'king' && !prog.cleared) {
+    prog.cleared = true;
+    sub += `\n${tr('ヴェルデ地方を奪還した! 次の難易度が開いた')}`;
+  }
   // 門の向こう側 (隣のステージ) の転移碑も起動する
   for (const st of STAGES) for (const en of st.entries || []) if (en.boss === b.id && !prog.travel.includes(en.id)) prog.travel.push(en.id);
   showBanner(tr('{name} 撃破!', { name: b.def.name }), sub, '', 4.5, '#ffd84a');

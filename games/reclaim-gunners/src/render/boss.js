@@ -2,9 +2,14 @@
 import { TAU } from '../core/config.js';
 import { G } from '../game/stage.js';
 import { ctx } from './canvas.js';
+import { BOSS2, drawBoss2 } from './boss2.js';
 import { circle, drawShade, roundRect, txt } from './primitives.js';
 
 export function drawBoss(b) {
+  if (BOSS2.has(b.id)) {
+    drawBoss2(b);
+    return;
+  }
   for (const p of b.parts) {
     ctx.save();
     ctx.translate(p.x, p.y);
