@@ -1,5 +1,5 @@
 // 入力: キーボード・マウス・タッチ・スマホのボタン
-import { VH, VW } from '../core/config.js';
+import { DEBUG, VH, VW } from '../core/config.js';
 import { doInteract } from '../game/interact.js';
 import { dodge, manualReload, usePotion } from '../game/player.js';
 import { useSpecial } from '../game/specials.js';
@@ -113,9 +113,11 @@ export const endPointer = (e) => {
       for (const h of s.hist) if (e.timeStamp - h.t >= FLICK_MS) h0 = h;
       const dx = p.x - h0.x;
       const dy = p.y - h0.y;
-      const dt = Math.max(1, e.timeStamp - h0.t) / 1000;
+      // 指を止めていたあと (move が来ない間) にはらったときも速さを正しく測れるよう、時間は FLICK_MS + 40 までにする
+      const dt = Math.max(1, Math.min(e.timeStamp - h0.t, FLICK_MS + 40)) / 1000;
       const d = Math.hypot(dx, dy);
       if (d >= FLICK_MIN && d / dt >= FLICK_SPEED) dodge(Math.atan2(dy, dx));
+      if (DEBUG) window.RG_FLICK = { d: Math.round(d), speed: Math.round(d / dt), n: s.hist.length };
     }
     sticks.move = null;
   }
