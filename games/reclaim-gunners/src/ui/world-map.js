@@ -1,5 +1,6 @@
 // 全体図
-import { LINKS, STAGES, money, tr } from '../core/config.js';
+import { LINKS, STAGES, TEST, money, tr } from '../core/config.js';
+import './playroom.js';
 import { allStagesOpen, loadSave, save, setSave } from '../core/save.js';
 import { D, hero, heroDef, prog } from '../game/hero.js';
 import { G, setG, stageDef } from '../game/stage.js';
@@ -106,6 +107,7 @@ export function showWorld() {
       <div class="region-info">
         <div class="grow"><b>${s.id}. ${s.name}</b> <span class="muted"><span class="desc">${s.desc} ・ </span>${tr('推奨 Lv{a}〜{b}', { a: s.lv[0] + D.lv, b: Math.min(99, s.lv[1] + D.lv) })}</span>
           ${sp ? `<span class="muted"> ・ ${tr('解放 {a}/{b} エリア', { a: sp.n, b: sp.total })}</span>` : ''}</div>
+        ${TEST ? `<button class="btn small" data-act="openRoom">${tr('プレイルーム')}</button>` : ''}
         <button class="btn small" data-act="openBoard">${tr('能力ボード')}</button>
         <button class="btn small" data-act="openEquip">${tr('装備')}</button>
         <button class="btn primary" data-act="goStage" ${s.ready && reach ? '' : 'disabled'}>${!s.ready ? tr('準備中') : reach ? tr('このステージへ') : tr('守護者を倒すと開く')}</button>

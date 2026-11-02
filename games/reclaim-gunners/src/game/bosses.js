@@ -96,7 +96,7 @@ export function updateBosses(dt) {
       if (!G.dead && !G.lock && dp < b.R - 4) {
         b.state = 'fight';
         G.lock = b;
-        bossTrack.start(`boss_${b.id}`, { difficulty: diffId, hero: heroDef.id, boss_lv: b.lv, player_lv: powerLv() });
+        if (!G.room) bossTrack.start(`boss_${b.id}`, { difficulty: diffId, hero: heroDef.id, boss_lv: b.lv, player_lv: powerLv() });
         showBanner(b.def.name, `Lv${b.lv}  ・  ${tr('エリアの出口に結界が張られた!')}`, lvColor(b.lv - powerLv()) === '#ff5a5a' ? tr('危険!') : '', 3, '#ff8aa8');
         sfx('boss');
         G.shake = 6;
@@ -181,6 +181,12 @@ export function bossDefeated(b) {
   for (const e of G.enemies) if (e.lair === b) e.crumble = rnd(0.2, 1);
   G.ebullets = [];
   G.teles = [];
+  // プレイルーム (テスト版) では、ごほうびもセーブもなし
+  if (G.room) {
+    showBanner(tr('{name} 撃破!', { name: b.def.name }), tr('メニューから、相手を選び直せる'), '', 4, '#ffd84a');
+    sfx('liberate');
+    return;
+  }
   const first = !prog.bosses.includes(b.id);
   let sub = '';
   if (first) {

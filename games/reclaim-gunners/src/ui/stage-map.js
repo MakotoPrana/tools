@@ -11,6 +11,7 @@ import { actions } from './actions.js';
 import { head, rerender, screen, setScreen, uiClose, uiShow } from './core.js';
 import { selStage, showWorld } from './world-map.js';
 import { withMaps } from './loading.js';
+import { leaveRoom } from './playroom.js';
 import { allStagesOpen, settings } from '../core/save.js';
 import { pauseTutorial, startTutorial } from '../game/tutorial.js';
 import { areaMask, getMap } from '../world/mapgen.js';
@@ -190,6 +191,7 @@ export function enterPlay(stageId, pointId) {
 }
 
 export function leaveToWorld() {
+  if (G && G.room) leaveRoom(); // プレイルームから出るときは、進み具合と持ち物を元に戻す
   pauseTutorial();
   areaTrack.quit();
   bossTrack.quit();

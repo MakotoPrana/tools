@@ -215,7 +215,7 @@ export function liberate(area) {
 // 解放したエリアの「はぐれ悪魔」
 export function updateStrays(dt) {
   const area = G.areas[G.curArea];
-  if (!area || !area.free || area.def.town || G.lock) return;
+  if (!area || !area.free || area.def.town || area.def.noFiends || G.lock) return;
   G.strayT -= dt;
   if (G.strayT > 0) return;
   G.strayT = 5;

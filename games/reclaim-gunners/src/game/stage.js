@@ -14,6 +14,7 @@ export let G = null;
 export let P = null;
 
 export function stageDef(id) {
+  if (id === 'room') return RG.ROOM; // プレイルーム (テスト版)
   return STAGES.find((s) => s.id === id);
 }
 
@@ -142,7 +143,7 @@ export function spawnNests(area) {
     G.nests.push(nest);
     return nest;
   });
-  if (!a.town) spawnFiends(area);
+  if (!a.town && !a.noFiends) spawnFiends(area);
 }
 
 // 中級悪魔: まだ解放していないエリアに 1〜2 体。魔巣から離れた所にいて、レベルはエリアの最高レベル

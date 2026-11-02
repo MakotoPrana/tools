@@ -727,6 +727,17 @@ window.RG = window.RG || {};
     [`湖畔の町ルーメの武器屋`, `Lume Gunsmith`, `湖畔小镇卢梅的武器店`, `루메 무기점`],
     [`回復薬`, `Potion`, `回复药`, `회복약`],
     [`体力を 40% 回復`, `Restores 40% HP`, `回复 40% 体力`, `체력 40% 회복`],
+    [`プレイルーム`, `Play Room`, `游戏室`, `플레이룸`],
+    [`プレイルーム（テスト版）`, `Play Room (Test)`, `游戏室（测试版）`, `플레이룸(테스트판)`],
+    [`相手を選ぶと、広場で戦える。ここで手に入れたお金や素材は、部屋を出ると元に戻る`, `Pick an opponent to fight in the arena. Gold and materials earned here are reverted when you leave.`, `选择对手即可在广场战斗。在此获得的金钱和素材会在离开后还原`, `상대를 고르면 광장에서 싸울 수 있다. 여기서 얻은 돈과 소재는 방을 나가면 원래대로 돌아간다`],
+    [`無敵`, `Invincible`, `无敌`, `무적`],
+    [`必殺技ゲージ満タン`, `Full special gauge`, `必杀技槽全满`, `필살기 게이지 가득`],
+    [`ボス`, `Bosses`, `首领`, `보스`],
+    [`プレイルームを出る`, `Leave Play Room`, `离开游戏室`, `플레이룸 나가기`],
+    [`テスト版`, `Test build`, `测试版`, `테스트판`],
+    [`相手を選び直す`, `Choose another opponent`, `重新选择对手`, `상대 다시 고르기`],
+    [`メニューから、相手を選び直せる`, `Choose another opponent from the menu`, `可从菜单重新选择对手`, `메뉴에서 상대를 다시 고를 수 있다`],
+    [`開発中のバージョンです`, `Development version`, `开发中的版本`, `개발 중인 버전입니다`],
   ];
 
   const DICT = { en: {}, zh: {}, ko: {} };
