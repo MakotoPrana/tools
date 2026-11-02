@@ -1,6 +1,6 @@
 // 必殺技の派手な演出の描画
 //   drawSpecialWorld: マップの上 (主人公から広がる光の筋・光の柱・連射の間のオーラ)
-//   drawCutin: 画面の上 (必殺技の名前の帯が、ななめに走りこんでくる)
+//   drawCutin: 画面の上 (必殺技の名前が、ななめに走りこんでくる。黒い帯はなし)
 import { TAU, VH, VW, portrait, tr } from '../core/config.js';
 import { clamp } from '../core/util.js';
 import { G, P } from '../game/stage.js';
@@ -125,30 +125,12 @@ export function drawCutin() {
   ctx.save();
   ctx.translate(VW / 2 + x, cy);
   ctx.rotate(-0.12);
-  // 帯: 黒い地に、属性の色のすじと金のふち
-  const bw = VW * 1.5;
-  const g = ctx.createLinearGradient(-bw / 2, 0, bw / 2, 0);
-  g.addColorStop(0, 'rgba(10,4,6,0)');
-  g.addColorStop(0.18, 'rgba(14,6,8,0.92)');
-  g.addColorStop(0.82, 'rgba(14,6,8,0.92)');
-  g.addColorStop(1, 'rgba(10,4,6,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(-bw / 2, -h / 2, bw, h);
-  ctx.globalAlpha = 0.55;
-  ctx.fillStyle = c.color;
-  for (let i = 0; i < 6; i++) {
-    const sx = ((age * 900 + i * 173) % bw) - bw / 2;
-    ctx.fillRect(sx, -h / 2 + 6 + i * 8, 60 + i * 10, 2);
-  }
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = '#e0b860';
-  ctx.fillRect(-bw / 2, -h / 2, bw, 2);
-  ctx.fillRect(-bw / 2, h / 2 - 2, bw, 2);
+  // 帯の地は描かない (視界をさえぎらないように)。名前と武器の名前だけが、ななめに走りこむ
   // 名前 (少し遅れて、大きく光って出る)
   const tk = clamp((age - 0.08) / 0.15, 0, 1);
   const size = (portrait ? 24 : 28) * (1.4 - 0.4 * ease(tk));
   ctx.globalAlpha = tk;
-  drawGlow(ctx, 0, -4, 90, c.color, 0.35);
+  drawGlow(ctx, 0, -4, 70, c.color, 0.2);
   txt(c.name, 0, -4, size, '#fff3c8', 'center', 'display');
   txt(c.sub, 0, h / 2 - 11, 8, c.color, 'center');
   ctx.restore();
