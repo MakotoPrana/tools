@@ -23,6 +23,7 @@ export function updateNests(dt) {
     n.hitFlash = Math.max(0, n.hitFlash - dt);
     const dp = dist(n.x, n.y, P.x, P.y);
     if (dp > 700 || G.dead) continue;
+    if (n.nd.move) crawlNest(n, dt, dp);
     n.spawnT -= dt;
     if (n.nd.attack && dp < 340) nestAttack(n, dt, dp);
     nestJustAttack(n, dt, dp);
@@ -38,6 +39,31 @@ export function updateNests(dt) {
       const a = Math.atan2(P.y - n.y, P.x - n.x);
       moveCircle(P, Math.cos(a) * 2, Math.sin(a) * 2, P.r, MOVE_BLOCK, lockArea());
     }
+  }
+}
+
+// 這いずる魔巣: 主人公が近く (380px) にいると、ゆっくり近づいてくる。遠いときは、のろのろとさまよう
+//   自分のエリアの外へは出ない。通った跡に、粘液のしみを残す
+function crawlNest(n, dt, dp) {
+  let a;
+  if (dp < 380 && dp > n.r + 40) a = Math.atan2(P.y - n.y, P.x - n.x);
+  else {
+    n.wanderT = (n.wanderT || 0) - dt;
+    if (n.wanderT <= 0) {
+      n.wanderT = rnd(2, 4);
+      n.wanderA = rnd(0, TAU);
+    }
+    a = n.wanderA;
+  }
+  if (a == null) return;
+  const sp = n.nd.move * (dp < 380 ? 1 : 0.5) * (0.75 + Math.max(0, Math.sin(n.ph * 2.2)) * 0.5); // 這うように、速さが波打つ
+  const hit = moveCircle(n, Math.cos(a) * sp * dt, Math.sin(a) * sp * dt, n.r * 0.7, MOVE_BLOCK, n.area.i);
+  if (hit) n.wanderA = rnd(0, TAU);
+  n.crawlA = a;
+  n.slimeT = (n.slimeT || 0) - dt;
+  if (n.slimeT <= 0) {
+    n.slimeT = 0.35;
+    addPart({ x: n.x + rnd(-6, 6), y: n.y + n.r * 0.5, vx: 0, vy: 0, life: 2.5, color: 'rgba(120,70,20,0.5)', size: rnd(4, 7) });
   }
 }
 

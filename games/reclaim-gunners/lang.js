@@ -105,6 +105,8 @@ window.RG = window.RG || {};
     [`JUST!`, `JUST!`, `JUST!`, `JUST!`],
     [`連続 {n} ・ 反撃 ×{m}`, `Chain {n} · Counter ×{m}`, `连续 {n} ・ 反击 ×{m}`, `연속 {n} ・ 반격 ×{m}`],
     [`「装備」でスロット{n}に入れる`, `Tap Equip to put it in slot {n}`, `点「装备」放入 {n} 号槽`, `「장비」로 슬롯 {n}에 넣는다`],
+    [`這いずる魔巣`, `Crawling Nest`, `爬行魔巢`, `기어다니는 마둥지`],
+    [`ゆっくり這って近づいてくる`, `Slowly crawls toward you`, `会缓缓爬向你`, `천천히 기어서 다가온다`],
     [`必殺技 OK!`, `Special ready!`, `必杀技就绪!`, `필살기 준비!`],
     [`ジャスト回避!`, `Perfect dodge!`, `完美闪避!`, `저스트 회피!`],
     [`連射 ×{k}`, `Fire rate ×{k}`, `射速 ×{k}`, `연사 ×{k}`],

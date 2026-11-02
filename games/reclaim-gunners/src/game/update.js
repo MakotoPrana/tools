@@ -1,5 +1,5 @@
 // 1 フレームの更新
-import { CELL, TILE, VH, VW } from '../core/config.js';
+import { CELL } from '../core/config.js';
 import { clamp } from '../core/util.js';
 import { updateBosses, updateLater } from './bosses.js';
 import { updateBullets, updateHazards } from './bullets.js';
@@ -14,7 +14,7 @@ import { respawn } from './respawn.js';
 import { SP_FULL, updateSpecial } from './specials.js';
 import { updateTutorial } from './tutorial.js';
 import { G, P } from './stage.js';
-import { potionBtn, specialBtn, touchMode } from '../input/input.js';
+import { potionBtn, specialBtn } from '../input/input.js';
 
 export function rebuildGrid() {
   for (const c of G.grid) c.length = 0;
@@ -61,12 +61,10 @@ export function update(dt) {
   updatePickups(dt);
   updateHazards(dt);
   updateFx(dt);
-  // カメラ: 主人公を中心に、ねらっている方向へ少し先を見せる
-  const look = touchMode ? 30 : 60;
-  const tx = clamp(P.x + Math.cos(P.aim) * look, VW / 2, G.map.w * TILE - VW / 2);
-  const ty = clamp(P.y + Math.sin(P.aim) * look, VH / 2, G.map.h * TILE - VH / 2);
-  G.cam.x += (tx - G.cam.x) * Math.min(1, dt * 6);
-  G.cam.y += (ty - G.cam.y) * Math.min(1, dt * 6);
+  // カメラ: 主人公をいつも画面のまん中に置く (マップのふちでも寄せない。外は暗く描く)
+  //   スマホでは指が画面の下のほうに来るので、主人公が指に隠れないようにまん中にする
+  G.cam.x = P.x;
+  G.cam.y = P.y;
   document.getElementById('t-potion-n').textContent = hero.potions;
   potionBtn.classList.toggle('empty', hero.potions <= 0);
   specialBtn.classList.toggle('ready', (hero.spGauge || 0) >= SP_FULL);

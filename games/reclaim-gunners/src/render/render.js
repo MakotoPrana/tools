@@ -65,10 +65,15 @@ export function renderPlay() {
   const camY = Math.round(G.cam.y - VH / 2 + rnd(-sh, sh));
   ctx.save();
   ctx.translate(-camX, -camY);
-  const bx = clamp(camX, 0, G.map.w * TILE - VW);
-  const by = clamp(camY, 0, G.map.h * TILE - VH);
+  // マップの外 (主人公がふちにいるとき見える所) は暗く塗り、背景の絵は見えている所だけ描く
+  ctx.fillStyle = '#0c0809';
+  ctx.fillRect(camX, camY, VW, VH);
+  const bx = clamp(camX, 0, G.map.w * TILE);
+  const by = clamp(camY, 0, G.map.h * TILE);
+  const bw = clamp(camX + VW, 0, G.map.w * TILE) - bx;
+  const bh = clamp(camY + VH, 0, G.map.h * TILE) - by;
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(G.map.bg, bx * BG_SCALE, by * BG_SCALE, VW * BG_SCALE, VH * BG_SCALE, bx, by, VW, VH);
+  if (bw > 0 && bh > 0) ctx.drawImage(G.map.bg, bx * BG_SCALE, by * BG_SCALE, bw * BG_SCALE, bh * BG_SCALE, bx, by, bw, bh);
   const view = { x0: camX - 40, y0: camY - 40, x1: camX + VW + 40, y1: camY + VH + 40 };
   const inView = (x, y, r = 0) => x + r > view.x0 && x - r < view.x1 && y + r > view.y0 && y - r < view.y1;
 

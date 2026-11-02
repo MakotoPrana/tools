@@ -90,6 +90,26 @@ export function drawNest(n) {
     }
     ctx.globalAlpha = 1;
   }
+  if (n.type === 'crawler') {
+    // 這いずる魔巣: 体の下から生えた太い足が、かわるがわる地面をかく
+    const fa = n.crawlA || 0;
+    ctx.fillStyle = mix(c1, '#000000');
+    for (let i = 0; i < 6; i++) {
+      const side = i % 2 ? 1 : -1;
+      const a = fa + side * (0.7 + Math.floor(i / 2) * 0.55);
+      const step = Math.sin(n.ph * 6 + i * 1.7) * 0.25;
+      const fx = Math.cos(a + step) * r * 1.35;
+      const fy = Math.sin(a + step) * r * 1.15;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a - 0.2) * r * 0.6, Math.sin(a - 0.2) * r * 0.55);
+      ctx.quadraticCurveTo(fx * 0.9, fy * 0.9 - 6, fx, fy);
+      ctx.lineTo(Math.cos(a + 0.2) * r * 0.6, Math.sin(a + 0.2) * r * 0.55);
+      ctx.fill();
+      ctx.fillStyle = c2;
+      circle(ctx, fx, fy, 1.6);
+      ctx.fillStyle = mix(c1, '#000000');
+    }
+  }
   if (n.type === 'bone') {
     // 骨の杭が突き出ている
     ctx.strokeStyle = '#e8dcc0';

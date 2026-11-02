@@ -15,6 +15,7 @@ window.RG = window.RG || {};
 //   pool: 湧きやすい敵 (そのエリアに出る敵の中から選ぶ。いなければエリアの敵から)
 //   attack: 魔巣の攻撃 (ring: 全方位の弾 / aim: 主人公をねらう弾 / poison: 毒の沼をまく / slow: 当たると遅くなる弾)
 //   elite: エリートの出やすさの倍率。colors: [外側, まん中, 光る所]
+//   move: 這って動く速さ (px/秒)。主人公が近くにいると、ゆっくり近づいてくる (自分のエリアの外へは出ない)
 RG.NESTS = {
   small: { name: '小魔巣', hp: 100, interval: 5, cap: 5, r: 14, colors: ['#3a0a2a', '#8a1f5a', '#ff4a8a'] },
   normal: { name: '魔巣', hp: 300, interval: 3.5, cap: 10, r: 18, colors: ['#3a0a2a', '#8a1f5a', '#ff4a8a'] },
@@ -23,6 +24,7 @@ RG.NESTS = {
   bone: { name: '骨塚の魔巣', desc: 'スケルトンが多い。ときどき骨をまき散らす', hp: 380, interval: 3.2, cap: 9, r: 19, pool: ['skel'], attack: { type: 'ring', cd: 4.2, n: 10, speed: 115 }, colors: ['#2a2420', '#8a7a64', '#f0e6c8'] },
   eye: { name: '魔眼の魔巣', desc: '近づくと、主人公をねらって撃ってくる', hp: 340, interval: 4.5, cap: 6, r: 18, attack: { type: 'aim', cd: 2.4, n: 3, speed: 190 }, colors: ['#2a0a1a', '#8a1f4a', '#ffd84a'] },
   spore: { name: '胞子の魔巣', desc: 'まわりに毒の沼をまく', hp: 320, interval: 3.6, cap: 9, r: 18, pool: ['moth', 'slime'], attack: { type: 'poison', cd: 5, n: 3 }, colors: ['#1a2a0a', '#5a7a1f', '#d8ff5a'] },
+  crawler: { name: '這いずる魔巣', desc: 'ゆっくり這って近づいてくる', hp: 340, interval: 3.6, cap: 8, r: 18, move: 16, colors: ['#2a1a0a', '#8a4a1f', '#ffa04a'] },
   mire: { name: '泥沼の魔巣', desc: '当たると足が遅くなる泥をまく', hp: 360, interval: 3.4, cap: 10, r: 19, pool: ['slime', 'ghoul'], attack: { type: 'slow', cd: 4, n: 12, speed: 100 }, colors: ['#0a2a2a', '#1f6a6a', '#7affe8'] },
 };
 
@@ -108,7 +110,7 @@ RG.STAGES = [
       {
         id: 's1a3', name: '風車の丘', lv: [4, 8], theme: 'hill',
         enemies: ['imp', 'ghoul', 'hound', 'skel'],
-        nests: [{ x: 34, y: 20, type: 'normal' }, { x: 76, y: 22, type: 'eye' }, { x: 68, y: 30, type: 'normal' }],
+        nests: [{ x: 34, y: 20, type: 'crawler' }, { x: 76, y: 22, type: 'eye' }, { x: 68, y: 30, type: 'normal' }],
         stone: [58, 28],
       },
       {
@@ -127,7 +129,7 @@ RG.STAGES = [
       {
         id: 's1a8', name: '古戦場の砦跡', lv: [16, 20], theme: 'fort',
         enemies: ['ghoul', 'skel', 'hound', 'orc'],
-        nests: [{ x: 118, y: 27, type: 'big' }, { x: 100, y: 25, type: 'normal' }, { x: 138, y: 22, type: 'bone' }, { x: 100, y: 34, type: 'eye' }],
+        nests: [{ x: 118, y: 27, type: 'crawler' }, { x: 100, y: 25, type: 'normal' }, { x: 138, y: 22, type: 'bone' }, { x: 100, y: 34, type: 'eye' }],
         stone: [134, 31],
         mimics: [[124, 29]],
       },
@@ -239,7 +241,7 @@ RG.STAGES = [
       {
         id: 's2a4', name: '蛍の沼', lv: [14, 18], theme: 'firefly',
         enemies: ['moth', 'slime', 'wraith', 'imp'],
-        nests: [{ x: 52, y: 45, type: 'spore' }, { x: 72, y: 50, type: 'normal' }, { x: 88, y: 40, type: 'mire' }],
+        nests: [{ x: 52, y: 45, type: 'spore' }, { x: 72, y: 50, type: 'crawler' }, { x: 88, y: 40, type: 'mire' }],
         stone: [62, 44],
       },
       {
@@ -251,7 +253,7 @@ RG.STAGES = [
       {
         id: 's2a6', name: '漁村跡', lv: [18, 22], theme: 'fishing',
         enemies: ['slime', 'moth', 'knight', 'shaman'],
-        nests: [{ x: 94, y: 30, type: 'mire' }, { x: 116, y: 24, type: 'normal' }, { x: 120, y: 34, type: 'brood' }],
+        nests: [{ x: 94, y: 30, type: 'mire' }, { x: 116, y: 24, type: 'crawler' }, { x: 120, y: 34, type: 'brood' }],
         stone: [104, 28],
         mimics: [[100, 34]],
       },
@@ -360,7 +362,7 @@ RG.STAGES = [
       {
         id: 's3a3', name: '崩落の谷', lv: [19, 24], theme: 'canyon',
         enemies: ['garg', 'worm', 'orc', 'eye'],
-        nests: [{ x: 40, y: 22, type: 'normal' }, { x: 50, y: 32, type: 'bone' }, { x: 60, y: 44, type: 'eye' }, { x: 42, y: 36, type: 'brood' }],
+        nests: [{ x: 40, y: 22, type: 'crawler' }, { x: 50, y: 32, type: 'bone' }, { x: 60, y: 44, type: 'eye' }, { x: 42, y: 36, type: 'brood' }],
         stone: [52, 40],
       },
       {
@@ -378,7 +380,7 @@ RG.STAGES = [
       {
         id: 's3a6', name: '北の竪坑', lv: [28, 33], theme: 'shaft',
         enemies: ['garg', 'knight', 'worm', 'eye'],
-        nests: [{ x: 4, y: 11, type: 'normal' }, { x: 29, y: 3, type: 'eye' }],
+        nests: [{ x: 4, y: 11, type: 'crawler' }, { x: 29, y: 3, type: 'eye' }],
         stone: [26, 11],
       },
     ],
@@ -462,7 +464,7 @@ RG.STAGES = [
       {
         id: 's4a3', name: '毒沼の廃村', lv: [32, 36], theme: 'poisonVillage',
         enemies: ['moth', 'slime', 'shaman', 'shadow'],
-        nests: [{ x: 34, y: 18, type: 'spore' }, { x: 46, y: 26, type: 'mire' }, { x: 56, y: 32, type: 'normal' }, { x: 36, y: 32, type: 'spore' }],
+        nests: [{ x: 34, y: 18, type: 'spore' }, { x: 46, y: 26, type: 'mire' }, { x: 56, y: 32, type: 'crawler' }, { x: 36, y: 32, type: 'spore' }],
         stone: [45, 32],
       },
       {
@@ -480,7 +482,7 @@ RG.STAGES = [
       {
         id: 's4a6', name: '千年樹の根', lv: [40, 44], theme: 'roots',
         enemies: ['shadow', 'succ', 'dknight', 'moth'],
-        nests: [{ x: 65, y: 22, type: 'normal' }, { x: 70, y: 32, type: 'brood' }, { x: 76, y: 20, type: 'spore' }],
+        nests: [{ x: 65, y: 22, type: 'crawler' }, { x: 70, y: 32, type: 'brood' }, { x: 76, y: 20, type: 'spore' }],
         stone: [72, 27],
       },
     ],
@@ -565,7 +567,7 @@ RG.STAGES = [
       {
         id: 's5a2', name: '溶岩洞', lv: [33, 37], theme: 'lavaCave',
         enemies: ['wisp', 'mino', 'hound', 'garg'],
-        nests: [{ x: 6, y: 18, type: 'normal' }, { x: 20, y: 24, type: 'eye' }, { x: 8, y: 36, type: 'brood' }, { x: 14, y: 46, type: 'normal' }],
+        nests: [{ x: 6, y: 18, type: 'crawler' }, { x: 20, y: 24, type: 'eye' }, { x: 8, y: 36, type: 'brood' }, { x: 14, y: 46, type: 'normal' }],
         stone: [14, 30],
       },
       {
@@ -577,7 +579,7 @@ RG.STAGES = [
       {
         id: 's5a4', name: '灰の墓所', lv: [41, 44], theme: 'ashGrave',
         enemies: ['dknight', 'wisp', 'mino', 'knight'],
-        nests: [{ x: 46, y: 18, type: 'bone' }, { x: 60, y: 22, type: 'normal' }, { x: 52, y: 31, type: 'big' }, { x: 62, y: 40, type: 'eye' }, { x: 58, y: 50, type: 'bone' }],
+        nests: [{ x: 46, y: 18, type: 'bone' }, { x: 60, y: 22, type: 'crawler' }, { x: 52, y: 31, type: 'big' }, { x: 62, y: 40, type: 'eye' }, { x: 58, y: 50, type: 'bone' }],
         stone: [54, 25],
       },
       {
@@ -667,13 +669,13 @@ RG.STAGES = [
       {
         id: 's6a2', name: '崩れた城下', lv: [46, 50], theme: 'ruinsCity',
         enemies: ['garg', 'dknight', 'shadow', 'succ'],
-        nests: [{ x: 6, y: 4, type: 'normal' }, { x: 24, y: 6, type: 'eye' }, { x: 40, y: 21, type: 'normal' }, { x: 44, y: 31, type: 'bone' }],
+        nests: [{ x: 6, y: 4, type: 'crawler' }, { x: 24, y: 6, type: 'eye' }, { x: 40, y: 21, type: 'normal' }, { x: 44, y: 31, type: 'bone' }],
         stone: [16, 6],
       },
       {
         id: 's6a3', name: '血の大聖堂', lv: [50, 54], theme: 'bloodCath',
         enemies: ['archd', 'dknight', 'succ', 'knight'],
-        nests: [{ x: 40, y: 3, type: 'normal' }, { x: 52, y: 4, type: 'eye' }, { x: 60, y: 6, type: 'bone' }, { x: 45, y: 13, type: 'big' }, { x: 57, y: 14, type: 'normal' }],
+        nests: [{ x: 40, y: 3, type: 'normal' }, { x: 52, y: 4, type: 'eye' }, { x: 60, y: 6, type: 'bone' }, { x: 45, y: 13, type: 'big' }, { x: 57, y: 14, type: 'crawler' }],
         stone: [51, 10],
       },
       {
