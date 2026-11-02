@@ -81,23 +81,27 @@ export function useSpecial() {
 }
 
 // ジャスト回避: 攻撃してきた相手へ、ゲージを使わずに 1 回出す
-//   続けて決めると「連続」が増え (8 秒あくか、攻撃を受けると 0 に戻る)、反撃の威力が 1 回ごとに +25% (最大 ×2)。
-//   ジャスト回避するたびに、必殺技ゲージも 10 たまる
+//   決めたあと 1 秒 (RG.COMBO_T) は無敵になり、回避のクールダウンもなくなる。その間にもう一度ジャスト回避すると
+//   コンボがつながり、反撃の威力が 1 つつながるごとに 2 倍 (×2・×4・×8…。最大 RG.COMBO_MAX 倍) になる。起死回生の一手
+//   ジャスト回避するたびに、必殺技ゲージもたまる
 //   段階 (tier 1〜3。RG.JUST_TIERS) で、反撃の威力・止まる長さ・光の色と派手さが変わる (白 → 赤 → 紫)
 export function justDodge(src, tier = 1) {
   if (G.dead) return;
   const T = RG.JUST_TIERS[tier - 1];
-  G.justStreak = G.t - (G.justAt || -99) < 8 ? (G.justStreak || 0) + 1 : 1;
-  G.justAt = G.t;
-  const mul = Math.min(2, 1 + 0.25 * (G.justStreak - 1)) * T.mul;
+  G.combo = G.comboT > 0 ? (G.combo || 1) + 1 : 1;
+  G.comboT = RG.COMBO_T;
+  G.comboMax = RG.COMBO_T;
+  const comboMul = Math.min(RG.COMBO_MAX, 2 ** (G.combo - 1));
+  const mul = comboMul * T.mul;
   G.justTier = tier;
   G.freezeT = T.freeze; // ほんの一瞬、時間がほぼ止まる (演出を際立たせる)。上の段階ほど長い
   G.freezeMax = T.freeze;
   G.slowT = 0.4; // そのあと少しのあいだゆっくり
-  G.justPop = { n: G.justStreak, mul, tier, t: 0.9 + tier * 0.15, max: 0.9 + tier * 0.15 };
+  G.justPop = { n: G.combo, mul, tier, t: 0.9 + tier * 0.15, max: 0.9 + tier * 0.15 };
   G.justFlash = 0.3 + tier * 0.1;
   G.shake = Math.max(G.shake, 2 + tier * 3);
-  P.inv = Math.max(P.inv, 0.6);
+  P.inv = Math.max(P.inv, RG.COMBO_T); // コンボの受付の間は無敵
+  P.dodgeCd = 0; // すぐ次の回避ができる
   sfx('just');
   if (tier >= 2) sfx('special');
   addGauge(10 * tier);
@@ -273,6 +277,13 @@ export function updateSpecial(dt) {
   }
   G.spFlash = Math.max(0, (G.spFlash || 0) - dt);
   G.justFlash = Math.max(0, (G.justFlash || 0) - dt);
+  if (G.comboT > 0) {
+    G.comboT -= dt;
+    if (G.comboT <= 0) {
+      if (G.combo > 1) addText(P.x, P.y - 30, tr('{n} コンボ!', { n: G.combo }), '#ffd84a', 11);
+      G.combo = 0;
+    }
+  }
   if (G.justPop) {
     G.justPop.t -= dt;
     if (G.justPop.t <= 0) G.justPop = null;

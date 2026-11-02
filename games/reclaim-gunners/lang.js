@@ -125,6 +125,8 @@ window.RG = window.RG || {};
     [`右`, `Right`, `右`, `오른쪽`],
     [`反撃 ×{m}`, `Counter ×{m}`, `反击 ×{m}`, `반격 ×{m}`],
     [`連続 {n}`, `Chain {n}`, `连续 {n}`, `연속 {n}`],
+    [`{n} COMBO`, `{n} COMBO`, `{n} COMBO`, `{n} COMBO`],
+    [`{n} コンボ!`, `{n} combo!`, `{n} 连击!`, `{n} 콤보!`],
     [`必殺技 OK!`, `Special ready!`, `必杀技就绪!`, `필살기 준비!`],
     [`ジャスト回避!`, `Perfect dodge!`, `完美闪避!`, `저스트 회피!`],
     [`連射 ×{k}`, `Fire rate ×{k}`, `射速 ×{k}`, `연사 ×{k}`],

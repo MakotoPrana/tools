@@ -31,6 +31,20 @@ export function drawSpecialWorld() {
     }
     ctx.restore();
   }
+  // コンボの受付 (無敵) の残り時間: 主人公のまわりの金色の輪が、時計回りに減っていく
+  if (G.comboT > 0) {
+    const k = G.comboT / (G.comboMax || 1);
+    ctx.save();
+    ctx.strokeStyle = '#ffd84a';
+    ctx.lineWidth = 2.5;
+    ctx.globalAlpha = 0.6 + Math.sin(G.t * 30) * 0.3;
+    ctx.beginPath();
+    ctx.arc(P.x, P.y, 18, -Math.PI / 2, -Math.PI / 2 + TAU * k);
+    ctx.stroke();
+    ctx.restore();
+    drawGlow(ctx, P.x, P.y, 26, '#ffd84a', 0.25);
+    if (G.combo > 1) txt(tr('{n} COMBO', { n: G.combo }), P.x, P.y - 28, 8, '#ffe680', 'center');
+  }
   const sb = G.spBurst;
   if (sb) {
     // 光の筋: 主人公から外へ、のびて消える
@@ -106,7 +120,13 @@ export function drawJustPop() {
   ctx.globalAlpha = clamp(j.t / 0.25, 0, 1);
   drawGlow(ctx, VW / 2, y, 60 + (j.tier || 1) * 20, T.color, 0.45);
   txt(T.name, VW / 2, y, size, (j.tier || 1) === 1 ? '#ffffff' : T.color, 'center', 'display');
-  txt(tr('反撃 ×{m}', { m: (Math.round(j.mul * 100) / 100).toString() }) + (j.n > 1 ? ` ・ ${tr('連続 {n}', { n: j.n })}` : ''), VW / 2, y + 24, 9, T.color === '#ffffff' ? '#e8f4ff' : T.color, 'center');
+  txt(tr('反撃 ×{m}', { m: (Math.round(j.mul * 100) / 100).toString() }), VW / 2, y + 30, 10, T.color === '#ffffff' ? '#e8f4ff' : T.color, 'center');
+  // コンボがつながったら、大きく「◯ COMBO」
+  if (j.n > 1) {
+    const cs = Math.min(40, 18 + j.n * 3) * (1.5 - 0.5 * k);
+    drawGlow(ctx, VW / 2, y + 60, 50 + j.n * 6, '#ffd84a', 0.5);
+    txt(tr('{n} COMBO', { n: j.n }), VW / 2, y + 60, cs, '#ffe680', 'center', 'display');
+  }
   ctx.globalAlpha = 1;
 }
 
