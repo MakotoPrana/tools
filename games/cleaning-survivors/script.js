@@ -3279,6 +3279,7 @@
       trSpawned: true,
       minHp: 1, // このプレイでいちばん減ったときの体力の割合
       adRevived: false, // 広告で復活したか (1 回のプレイで 1 回だけ)
+      deaths: 0, // このプレイで力尽きた回数 (復活したぶんも数える。アクセス解析の cs_death 用)
       box: 0,
       dumpCoins: 0,
       bossCoins: 0,
@@ -5253,6 +5254,8 @@
       Sound.bgm(null);
       Sound.play('lose');
       puff(p.x, p.y, '#ffffff', 30);
+      G.deaths++;
+      trackDeath();
     }
   }
 
@@ -7355,6 +7358,63 @@
     return planCache[key];
   }
 
+  // Google アナリティクスにイベントを送る。タグのないところ (CrazyGames 版など) では何もしない
+  const track = (name, params) => {
+    if (typeof window.gtag === 'function') window.gtag('event', name, params);
+  };
+
+  // ---------- アクセス解析: ステージの開始・結末・リトライ (全ゲーム共通の形で GA4 に送る) ----------
+  // stage_start / stage_end (result: clear・fail・quit) / stage_retry_fail・stage_retry_clear・stage_retry_quit
+  // 終わったステージをそのまま遊び直したら、直前の結末に合わせたリトライとして送る
+  // ほかのゲームと区別して見られるように、同じ中身で頭に cs_ をつけたイベント (cs_stage_start など) も送る
+  const stageTrack = (() => {
+    const GAME = 'cleaning_survivors';
+    const attempts = {};
+    let playing = null; // { stage, at } 遊んでいる途中のステージ
+    let ended = null; // { stage, result } 直前に終わったステージ
+    const send = (name, params) => {
+      const p = { game: GAME, ...params };
+      track(name, p);
+      track(`cs_${name}`, p);
+    };
+    const end = (result, extra) => {
+      if (!playing) return;
+      send('stage_end', { stage: playing.stage, result, play_sec: Math.round((performance.now() - playing.at) / 1000), ...extra });
+      ended = { stage: playing.stage, result };
+      playing = null;
+    };
+    window.addEventListener('pagehide', () => end('quit'));
+    return {
+      start(stage, extra) {
+        end('quit');
+        if (ended && ended.stage === stage) send(`stage_retry_${ended.result}`, { stage });
+        attempts[stage] = (attempts[stage] || 0) + 1;
+        playing = { stage, at: performance.now() };
+        ended = null;
+        send('stage_start', { stage, attempt: attempts[stage], ...extra });
+      },
+      clear: (extra) => end('clear', extra),
+      fail: (extra) => end('fail', extra),
+      quit: () => end('quit'),
+    };
+  })();
+  // チュートリアルは stage を 'tutorial'、ほかはステージ番号 (1〜) で送る
+  const trackStage = (stageIdx) => (stageIdx === TUT ? 'tutorial' : stageIdx + 1);
+  // 力尽きるたびに送る (復活したぶんも数える。ステージの失敗は stage_end で別に送る)
+  function trackDeath() {
+    track('cs_death', {
+      game: 'cleaning_survivors',
+      stage: trackStage(G.stageIdx),
+      mode: G.mode,
+      character: G.ch.id,
+      level: G.level,
+      death_no: G.deaths,
+      time_sec: Math.round(G.time),
+      rooms_done: G.rooms.filter((r) => r.done).length,
+      clean_pct: Math.round(cleanPct()),
+    });
+  }
+
   function startGame(stageIdx) {
     if (stageIdx === TUT && !save.tutorialSeen) {
       save.tutorialSeen = true;
@@ -7374,6 +7434,7 @@
     showBanner(L(stageOf(stageIdx), 'name'), '#ffffff', 2);
     renderTutor();
     Ads.gameplay(true);
+    stageTrack.start(trackStage(stageIdx), { mode: G.mode, character: G.ch.id });
   }
 
   function pauseGame() {
@@ -7702,6 +7763,9 @@
     const mul = g.md.coin * (1 + shopOf(g.ch.id).coin * 0.1) * (1 + (g.ch.mods.coin || 0));
     const total = Math.round(base * mul);
     save.coins += total;
+    const trackInfo = { mode: g.mode, character: g.ch.id, rooms_done: doneN, clean_pct: Math.round(pct), level: g.level };
+    if (win) stageTrack.clear(trackInfo);
+    else stageTrack.fail({ ...trackInfo, reason: g.timeUp ? 'time_up' : 'worn_out' });
     if (i === TUT) {
       // チュートリアルは記録や達成率には入れず、終えたことだけ覚えておく
       if (win) save.tutorialDone = true;
@@ -8075,7 +8139,10 @@
       const i = G.stageIdx;
       startGame(i);
     },
-    quit: showRooms,
+    quit: () => {
+      stageTrack.quit();
+      showRooms();
+    },
     choose: (i) => {
       applyChoice(choices[Number(i)]);
       afterMenu();

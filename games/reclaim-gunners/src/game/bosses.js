@@ -7,7 +7,8 @@ import { updateBlob, updateDragon, updateGolem, updateSiren, updateToad } from '
 import { clampBody, phoenixEgg, resetBoss2, updateBoss2 } from './boss-ai2.js';
 import { gainGold } from './enemies.js';
 import { addPart, addText, showBanner } from './fx.js';
-import { D, hero, lvColor, powerLv, prog } from './hero.js';
+import { bossTrack } from '../core/analytics.js';
+import { D, diffId, hero, heroDef, lvColor, powerLv, prog } from './hero.js';
 import { updateFlow } from './pathfinding.js';
 import { liberate } from './nests.js';
 import { collectAllMats } from './pickups.js';
@@ -95,6 +96,7 @@ export function updateBosses(dt) {
       if (!G.dead && !G.lock && dp < b.R - 4) {
         b.state = 'fight';
         G.lock = b;
+        bossTrack.start(`boss_${b.id}`, { difficulty: diffId, hero: heroDef.id, boss_lv: b.lv, player_lv: powerLv() });
         showBanner(b.def.name, `Lv${b.lv}  ・  ${tr('エリアの出口に結界が張られた!')}`, lvColor(b.lv - powerLv()) === '#ff5a5a' ? tr('危険!') : '', 3, '#ff8aa8');
         sfx('boss');
         G.shake = 6;
@@ -174,6 +176,7 @@ export function bossPartDown(p) {
 export function bossDefeated(b) {
   b.state = 'dead';
   G.lock = null;
+  bossTrack.clear();
   G.bosses = G.bosses.filter((x) => x !== b);
   for (const e of G.enemies) if (e.lair === b) e.crumble = rnd(0.2, 1);
   G.ebullets = [];

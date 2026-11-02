@@ -177,3 +177,7 @@
 ### 保存
 
 - ブラウザの localStorage（キー `brick-siege-save`）に、所持 Gold・アップグレードのレベル・前回の難易度・チャレンジの達成状況とベストタイムを保存する
+
+## アクセス解析
+
+- ステージの開始・結末・リトライを、全ゲーム共通のイベント (`stage_start` / `stage_end` / `stage_retry_fail` など) で送る。中身は [games/ANALYTICS.md](../ANALYTICS.md)

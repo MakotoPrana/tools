@@ -1,4 +1,5 @@
 // ステージの中の状態 (G・P) と、ステージに入るときの用意
+import { areaTrack, bossTrack } from '../core/analytics.js';
 import { BOSSES, CELL, MOVE_BLOCK, NESTS, STAGES, T, TAU, TILE, lvMul } from '../core/config.js';
 import { clamp, dist, rnd, tc } from '../core/util.js';
 import { makeBoss } from './bosses.js';
@@ -18,6 +19,9 @@ export function stageDef(id) {
 
 // opt.hp: 門を通ってきたときは、体力をそのまま持ち越す
 export function startStage(stageId, pointId, opt = {}) {
+  // 別のステージへ移ったら、途中の挑戦はやめたことにする
+  areaTrack.quit();
+  bossTrack.quit();
   const def = stageDef(stageId);
   const map = getMap(def);
   const tiles = map.tiles.slice();

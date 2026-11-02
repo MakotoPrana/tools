@@ -10,6 +10,7 @@ games/mole/dist/mole-itchio.zip ができるので、itch.io のプロジェク�
 やっていること:
 - index.html の <meta name="mole-edition"> を demo にする (STAGE 11〜30 は鍵つきで表示される)
 - ゲーム一覧へ戻るリンクを外す (itch.io では行き先がないため)
+- Google アナリティクスのタグを外す (サイトの計測に itch.io のアクセスを混ぜないため)
 - index.html・style.css・script.js を zip の一番上に入れる
 - 共通のロゴアニメーション (games/origami-intro.js) と、それが使う画像 (assets/ の2つ) も入れる
 - ファビコン (assets/ の favicon.ico・favicon.svg・apple-touch-icon.png) も入れ、index.html の参照を zip の中の assets/ に向ける
@@ -34,6 +35,10 @@ def build_index() -> str:
     html, n = re.subn(r'<meta name="mole-edition" content="full" />', '<meta name="mole-edition" content="demo" />', html)
     if n != 1:
         raise SystemExit('index.html に <meta name="mole-edition" content="full" /> が見つかりません')
+
+    html, n = re.subn(r'\s*<!-- Google tag \(gtag\.js\) -->.*?</script>.*?</script>', '', html, flags=re.S)
+    if n != 1:
+        raise SystemExit('index.html に Google アナリティクスのタグが見つかりません')
 
     html, n = re.subn(r'\s*<a class="back"[^>]*>.*?</a>', '', html)
     if n != 1:

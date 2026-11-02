@@ -485,6 +485,42 @@
   const timeEl = $('time');
   const coarseMQ = window.matchMedia('(pointer: coarse)');
 
+  // Google アナリティクスにイベントを送る。タグのないところでは何もしない
+  const track = (name, params) => {
+    if (typeof window.gtag === 'function') window.gtag('event', name, params);
+  };
+
+  // ---------- アクセス解析: ステージの開始・結末・リトライ (全ゲーム共通の形で GA4 に送る) ----------
+  // stage_start / stage_end (result: clear・fail・quit) / stage_retry_fail・stage_retry_clear・stage_retry_quit
+  // 終わったステージをそのまま遊び直したら、直前の結末に合わせたリトライとして送る
+  const stageTrack = (() => {
+    const GAME = 'breakout';
+    const attempts = {};
+    let playing = null; // { stage, at } 遊んでいる途中のステージ
+    let ended = null; // { stage, result } 直前に終わったステージ
+    const send = (name, params) => track(name, { game: GAME, ...params });
+    const end = (result, extra) => {
+      if (!playing) return;
+      send('stage_end', { stage: playing.stage, result, play_sec: Math.round((performance.now() - playing.at) / 1000), ...extra });
+      ended = { stage: playing.stage, result };
+      playing = null;
+    };
+    window.addEventListener('pagehide', () => end('quit'));
+    return {
+      start(stage, extra) {
+        end('quit');
+        if (ended && ended.stage === stage) send(`stage_retry_${ended.result}`, { stage });
+        attempts[stage] = (attempts[stage] || 0) + 1;
+        playing = { stage, at: performance.now() };
+        ended = null;
+        send('stage_start', { stage, attempt: attempts[stage], ...extra });
+      },
+      clear: (extra) => end('clear', extra),
+      fail: (extra) => end('fail', extra),
+      quit: () => end('quit'),
+    };
+  })();
+
   // ---------- 状態 ----------
   // title: タイトル / select・confirm・upgrade・achieve: メニュー画面 /
   // serve: ボールがパドルの上 / playing / paused / result: ステージの結果
@@ -820,6 +856,7 @@
     paddle.x = (W - paddle.w) / 2;
     serve();
     updateStats();
+    stageTrack.start(index + 1, { difficulty: diff });
   }
 
   // タップでパドルの枠を一瞬光らせる
@@ -873,7 +910,7 @@
 
   // ステージの終わり。クリアなら集めた Gold をすべて、失敗 (リタイアを含む) なら 1/3 を受け取り、
   // チャレンジの結果を保存して結果画面を出す
-  function finishStage(cleared) {
+  function finishStage(cleared, retired = false) {
     state = 'result';
     const d = DIFFICULTIES[difficulty];
     const full = runGoldShown();
@@ -899,6 +936,8 @@
     }
     persist();
     updateStats();
+    if (cleared) stageTrack.clear({ difficulty, clear_time: Math.round(runTime * 10) / 10, no_damage: noDamage, time_attack: timeOk });
+    else stageTrack.fail({ difficulty, retired });
 
     const list = el('dl', 'result-list');
     const row = (label, value, isNew = false) => {
@@ -938,7 +977,7 @@
         text: `STAGE ${stageIndex + 1} ・ ${DIFFICULTIES[difficulty].name}`,
         buttons: [
           { label: '再開', action: togglePause, primary: true },
-          { label: 'リタイア (Gold は 1/3)', action: () => finishStage(false) },
+          { label: 'リタイア (Gold は 1/3)', action: () => finishStage(false, true) },
         ],
         back: togglePause,
       });

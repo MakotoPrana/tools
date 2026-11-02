@@ -172,6 +172,41 @@
   const GAMES_URL = `${SITE_URL}games/`;
   const trackedURL = (url, placement) => `${url}?utm_source=itch.io&utm_medium=demo&utm_campaign=mole_demo&utm_content=${placement}`;
   const isPlayable = (no) => no <= PLAYABLE_STAGES;
+  // Google アナリティクスにイベントを送る。タグのない itch.io 版では何もしない
+  const trackEvent = (name, params) => {
+    if (typeof window.gtag === 'function') window.gtag('event', name, params);
+  };
+
+  // ---------- アクセス解析: ステージの開始・結末・リトライ (全ゲーム共通の形で GA4 に送る) ----------
+  // stage_start / stage_end (result: clear・fail・quit) / stage_retry_fail・stage_retry_clear・stage_retry_quit
+  // 終わったステージをそのまま遊び直したら、直前の結末に合わせたリトライとして送る
+  const stageTrack = (() => {
+    const GAME = 'mole';
+    const attempts = {};
+    let playing = null; // { stage, at } 遊んでいる途中のステージ
+    let ended = null; // { stage, result } 直前に終わったステージ
+    const send = (name, params) => trackEvent(name, { game: GAME, ...params });
+    const end = (result, extra) => {
+      if (!playing) return;
+      send('stage_end', { stage: playing.stage, result, play_sec: Math.round((performance.now() - playing.at) / 1000), ...extra });
+      ended = { stage: playing.stage, result };
+      playing = null;
+    };
+    window.addEventListener('pagehide', () => end('quit'));
+    return {
+      start(stage, extra) {
+        end('quit');
+        if (ended && ended.stage === stage) send(`stage_retry_${ended.result}`, { stage });
+        attempts[stage] = (attempts[stage] || 0) + 1;
+        playing = { stage, at: performance.now() };
+        ended = null;
+        send('stage_start', { stage, attempt: attempts[stage], ...extra });
+      },
+      clear: (extra) => end('clear', extra),
+      fail: (extra) => end('fail', extra),
+      quit: () => end('quit'),
+    };
+  })();
 
   const lerp = (a, b, t) => a + (b - a) * t;
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -2417,9 +2452,11 @@
     hideOverlay();
     game.start();
     renderHud();
+    stageTrack.start(s.no, { stage_no: s.no });
   };
 
   const leavePlay = () => {
+    stageTrack.quit();
     if (game) game.abort();
     game = null;
     hideOverlay();
@@ -2447,6 +2484,7 @@
     fieldEl.classList.remove('stunned');
     renderHud();
     Sound.end(r.cleared);
+    (r.cleared ? stageTrack.clear : stageTrack.fail)({ stage_no: stage.no, cleared: r.cleared, score: r.score, stars: r.stars, legend_caught: r.legendCaught });
 
     // 演出: クリアは紙吹雪と光、失敗は盤面を暗くして揺らす
     showCrowd(r.cleared);

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>5分刻みタイムテーブル</title>
+  <meta name="description" content="1日を5分枠に分けて予定を組むTodoアプリ。完了が遅れると後続が自動で後ろ倒し、削除すると前倒しになります。時間未定のタスクも登録できます。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hrow"><a class="back" href="../">‹ ツール一覧</a><h1>5分刻みタイムテーブル</h1><button class="btn" id="todayBtn">今日</button></div>
+    <div class="datebar">
+      <button class="btn icon" id="prevDay" aria-label="前の日">‹</button>
+      <div class="date" id="dateLabel"></div>
+      <button class="btn icon" id="nextDay" aria-label="次の日">›</button>
+    </div>
+    <div class="summary" id="summary"></div>
+  </header>
+  <div class="sample" id="sampleBar" hidden>
+    <span>表示中のタスクはサンプルです。空いている枠をタップして自分のタスクを追加できます。</span>
+    <button class="btn" id="clearSample">サンプルを消す</button>
+  </div>
+  <div class="grid" id="grid">
+    <div id="slots"></div>
+    <div class="layer" id="layer"></div>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <form class="sheet" id="form" method="dialog">
+    <h2 id="dlgTitle">タスクを追加</h2>
+    <div class="field"><label for="fTitle">タスク名</label><input type="text" id="fTitle" placeholder="例：メール返信" autocomplete="off" required></div>
+    <div class="field" id="startField"><label for="fStart">開始時刻</label><input type="time" id="fStart" step="300" required></div>
+    <div class="field">
+      <span class="flab" id="durLab">所要時間</span>
+      <div class="chips" id="durChips"></div>
+      <div class="stepper" id="stepper"><button type="button" class="btn icon" id="durMinus" aria-label="5分短く">−</button><output id="durOut"></output><button type="button" class="btn icon" id="durPlus" aria-label="5分長く">＋</button><span class="preview" id="preview"></span></div>
+    </div>
+    <details class="split" id="splitBox">
+      <summary>タスクを分解する</summary>
+      <p class="splithelp">「親タスク名-子タスク名」として開始時刻から続けて登録します。後ろのタスクは後ろ倒しになります。</p>
+      <ol class="splitlist" id="splitList"></ol>
+      <div class="splitfoot">
+        <button type="button" class="btn" id="splitAdd">＋ 行を追加</button>
+        <span class="preview" id="splitPreview"></span>
+        <span class="sp"></span>
+        <button type="button" class="btn primary" id="splitBtn">分解して登録</button>
+      </div>
+    </details>
+    <div class="actions">
+      <button type="button" class="btn danger" id="delBtn">削除</button>
+      <button type="button" class="btn" id="unschedBtn">未定に戻す</button>
+      <span class="sp"></span>
+      <button type="button" class="btn" id="cancelBtn">キャンセル</button>
+      <button type="submit" class="btn primary" id="saveBtn">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<section class="inbox" id="inbox" aria-label="時間未定のタスク">
+  <div class="inbox-in">
+    <button class="ibhead" id="ibToggle" aria-expanded="true"><b>時間未定</b><span class="cnt" id="ibCount">0</span><span class="hint">タップして時間枠に割り当て</span><span class="car">▾</span></button>
+    <div class="assignbar" id="assignBar" hidden><span>「<b id="assignName"></b>」の入れ先を選択：空き枠の「ここに挿入」、タスクの「前に挿入」か「マージ」</span><button class="btn" id="assignCancel">やめる</button></div>
+    <div class="ibbody">
+      <form class="ibadd" id="ibForm"><input type="text" id="ibInput" placeholder="今日やること（時間は後で決める）" autocomplete="off"><button class="btn primary" type="submit">追加</button></form>
+      <ul class="iblist" id="ibList"></ul>
+    </div>
+  </div>
+</section>
+
+<div class="toast" id="toast" hidden><span id="toastMsg"></span><button id="undoBtn">元に戻す</button></div>
+
+<script src="script.js"></script>
+</body>
+</html>
