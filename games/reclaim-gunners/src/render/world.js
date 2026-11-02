@@ -329,7 +329,7 @@ export function drawHazard(z) {
 // 画面のふちを少し暗くする (目が中央に行くように)。画面の幅が変わったら作り直す
 export let vignette = null;
 export function drawVignette() {
-  if (!vignette || vignette.width !== VW) {
+  if (!vignette || vignette.width !== VW || vignette.height !== VH) {
     vignette = document.createElement('canvas');
     vignette.width = VW;
     vignette.height = VH;

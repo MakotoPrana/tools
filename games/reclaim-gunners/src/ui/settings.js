@@ -13,9 +13,8 @@ export function showSettings() {
       <div class="list">
         <div class="row"><div class="t">🌐 Language</div>${langBtns()}</div>
         <div class="row"><div class="t">${tr('効果音')}</div><input type="range" min="0" max="1" step="0.1" value="${settings.se}" data-set="se"></div>
-        <div class="row"><div><div class="t">${tr('自動でねらって撃つ')}</div><div class="s">${tr('近くの敵へ武器が自動でねらいを向けて撃つ。OFF のときは、マウスを押している間（スマホは右側をなぞっている間）だけ撃つ')}</div></div><button class="btn small" data-act="toggleSet" data-id="autoAim">${settings.autoAim ? 'ON' : 'OFF'}</button></div>
+        <div class="row"><div><div class="t">${tr('自動でねらって撃つ')}</div><div class="s">${tr('近くの敵へ武器が自動でねらいを向けて撃つ。OFF のときは、マウスを押している間だけ撃つ（スマホはいつも自動）')}</div></div><button class="btn small" data-act="toggleSet" data-id="autoAim">${settings.autoAim ? 'ON' : 'OFF'}</button></div>
         <div class="row"><div class="t">${tr('ダメージの数字')}</div><button class="btn small" data-act="toggleSet" data-id="numbers">${settings.numbers ? 'ON' : 'OFF'}</button></div>
-        <div class="row"><div><div class="t">${tr('縦持ちのとき横向きに回す（スマホ）')}</div><div class="s">${tr('画面が自動で回らないときに、ゲームを 90° 回して横向きで遊ぶ')}</div></div><button class="btn small" data-act="toggleSet" data-id="rotate">${settings.rotate ? 'ON' : 'OFF'}</button></div>
       </div>
     </div></div>`);
 }

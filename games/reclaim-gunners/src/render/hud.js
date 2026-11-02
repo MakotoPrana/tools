@@ -1,5 +1,5 @@
 // HUD: 体力・武器スロット・エリアの名前
-import { TAU, VH, VW, money, tr } from '../core/config.js';
+import { TAU, VH, VW, money, portrait, tr } from '../core/config.js';
 import { settings } from '../core/save.js';
 import { clamp, fmt } from '../core/util.js';
 import { bossHp } from '../game/bosses.js';
@@ -22,6 +22,11 @@ export function slotRects() {
   const w = n * s + (n - 1) * gap;
   const x0 = VW / 2 - w / 2;
   return hero.equipped.map((id, i) => ({ x: x0 + i * (s + gap), y: VH - s - 8, w: s, h: s, id }));
+}
+
+// 縦長の画面で、上に並ぶ HUD (体力・お金・ミニマップ) のいちばん下の y
+export function hudBottom() {
+  return Math.max(112, 14 + (G.map.h / G.map.w) * 120);
 }
 
 export const CAT_COLORS = { hand: '#6fb0ff', shot: '#ff9a5a', heavy: '#ff6a6a', prec: '#7dffb0', magic: '#c88aff', special: '#ffd84a' };
@@ -71,37 +76,43 @@ export function drawHud() {
     const lv1 = Math.min(99, area.def.lv[1] + D.lv);
     const left = area.nests.filter((n) => !n.dead).length;
     const status = area.free ? tr('解放済み ✓') : tr('魔巣 {a}/{b}', { a: left, b: area.def.nests.length });
-    txt(area.def.name, VW / 2, 12, 11, '#f0d890', 'center', 'display');
-    txt(`${tr('推奨 Lv{a}〜{b}', { a: lv0, b: lv1 })}  ・  ${status}`, VW / 2, 24, 7.5, area.free ? '#7dffb0' : lvColor(lv1 - pl), 'center');
+    // 縦長の画面では、体力とミニマップの下に出す
+    const ay = portrait ? hudBottom() + 10 : 12;
+    txt(area.def.name, VW / 2, ay, 11, '#f0d890', 'center', 'display');
+    txt(`${tr('推奨 Lv{a}〜{b}', { a: lv0, b: lv1 })}  ・  ${status}`, VW / 2, ay + 12, 7.5, area.free ? '#7dffb0' : lvColor(lv1 - pl), 'center');
   }
 
   // ボスの体力
   if (G.lock) {
     const b = G.lock;
-    const w = 280;
+    const w = Math.min(280, VW - 40);
     const x = VW / 2 - w / 2;
-    txt(`${b.def.name}  Lv${b.lv}`, VW / 2, 37, 10, lvColor(b.lv - pl), 'center', 'display');
-    hudFrame(x - 4, 43, w + 8, 12, 'rgba(220,90,70,0.9)');
-    const bg = ctx.createLinearGradient(0, 46, 0, 52);
+    const by = portrait ? hudBottom() + 36 : 37;
+    txt(`${b.def.name}  Lv${b.lv}`, VW / 2, by, 10, lvColor(b.lv - pl), 'center', 'display');
+    hudFrame(x - 4, by + 6, w + 8, 12, 'rgba(220,90,70,0.9)');
+    const bg = ctx.createLinearGradient(0, by + 9, 0, by + 15);
     bg.addColorStop(0, '#c02a2a');
     bg.addColorStop(1, '#4a0608');
     ctx.fillStyle = bg;
-    ctx.fillRect(x, 46, w * clamp(bossHp(b) / b.total, 0, 1), 6);
+    ctx.fillRect(x, by + 9, w * clamp(bossHp(b) / b.total, 0, 1), 6);
   }
 
   drawMinimap();
   drawShopPointer();
 
-  // お金と素材
-  txt(money(hero.gold), 10, VH - 14, 11, '#e8c060', 'left', 'display');
+  // お金と素材 (横長は左下。縦長は下が指で隠れるので、体力の下)
+  const gy = portrait ? 72 : VH - 14;
+  txt(money(hero.gold), 10, gy, 11, '#e8c060', 'left', 'display');
   if (G.goldPop > 0) {
     ctx.globalAlpha = Math.min(1, G.goldPopT);
-    txt(`+${fmt(G.goldPop)}`, 12, VH - 26, 8, '#fff0b0');
+    if (portrait) txt(`+${fmt(G.goldPop)}`, 12 + ctx.measureText(money(hero.gold)).width + 6, gy, 8, '#fff0b0');
+    else txt(`+${fmt(G.goldPop)}`, 12, VH - 26, 8, '#fff0b0');
     ctx.globalAlpha = 1;
   }
   G.matLog.forEach((mlog, i) => {
     ctx.globalAlpha = Math.min(1, mlog.t);
-    txt(mlog.text, 10, VH - 38 - (G.matLog.length - 1 - i) * 11, 7.5, '#e0c0ff');
+    const my = portrait ? gy + 14 + i * 11 : VH - 38 - (G.matLog.length - 1 - i) * 11;
+    txt(mlog.text, 10, my, 7.5, '#e0c0ff');
   });
   ctx.globalAlpha = 1;
 
@@ -163,23 +174,24 @@ export function drawHud() {
     ctx.globalAlpha = clamp(k, 0, 1);
     const lines = b.sub ? b.sub.split('\n') : [];
     const hgt = 32 + lines.length * 12;
+    const top = portrait ? Math.round(VH * 0.3) : 69; // 帯の上のふち
     const bg = ctx.createLinearGradient(0, 0, VW, 0);
     bg.addColorStop(0, 'rgba(8,4,4,0)');
     bg.addColorStop(0.2, 'rgba(20,8,8,0.82)');
     bg.addColorStop(0.8, 'rgba(20,8,8,0.82)');
     bg.addColorStop(1, 'rgba(8,4,4,0)');
     ctx.fillStyle = bg;
-    ctx.fillRect(0, 69, VW, hgt);
+    ctx.fillRect(0, top, VW, hgt);
     const lg = ctx.createLinearGradient(0, 0, VW, 0);
     lg.addColorStop(0, 'rgba(224,184,96,0)');
     lg.addColorStop(0.5, 'rgba(224,184,96,0.85)');
     lg.addColorStop(1, 'rgba(224,184,96,0)');
     ctx.fillStyle = lg;
-    ctx.fillRect(0, 69, VW, 1);
-    ctx.fillRect(0, 69 + hgt, VW, 1);
-    txt(b.text, VW / 2, 87, 17, b.color, 'center', 'display');
-    if (b.warn) txt(b.warn, VW / 2 + ctx.measureText(b.text).width / 2 + 20, 87, 12, '#ff5a4a', 'left', 'display');
-    lines.forEach((l, i) => txt(l, VW / 2, 106 + i * 12, 8.5, '#eadcc0', 'center'));
+    ctx.fillRect(0, top, VW, 1);
+    ctx.fillRect(0, top + hgt, VW, 1);
+    txt(b.text, VW / 2, top + 18, portrait ? 15 : 17, b.color, 'center', 'display');
+    if (b.warn) txt(b.warn, VW / 2 + ctx.measureText(b.text).width / 2 + 20, top + 18, 12, '#ff5a4a', 'left', 'display');
+    lines.forEach((l, i) => txt(l, VW / 2, top + 37 + i * 12, 8.5, '#eadcc0', 'center'));
     ctx.globalAlpha = 1;
   }
 

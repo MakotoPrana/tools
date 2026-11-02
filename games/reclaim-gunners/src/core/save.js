@@ -76,7 +76,7 @@ export function writeSave(showIcon = true) {
 }
 
 // 設定はセーブとは別に、変えたらすぐ保存する
-export const settings = Object.assign({ se: 0.7, autoAim: true, numbers: true, rotate: true, lang: RG.lang }, (() => {
+export const settings = Object.assign({ se: 0.7, autoAim: true, numbers: true, lang: RG.lang }, (() => {
   try {
     return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
   } catch (e) {

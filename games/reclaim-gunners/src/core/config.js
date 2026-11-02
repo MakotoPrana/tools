@@ -6,7 +6,9 @@ export const { HEROES, CATS, BOARD, SLOTS, WEAPONS, WEAPON, ELEMS, ENEMY, BOSSES
 // 基本の値
 // ===================================================================
 export let VW = 640;
-export const VH = 360;
+export let VH = 360;
+// 縦長の画面 (スマホの縦持ち) で遊んでいるか。HUD の置き方を変える
+export let portrait = false;
 export const TILE = 20;
 export const TAU = Math.PI * 2;
 export const CELL = 64;
@@ -49,11 +51,12 @@ export const lvMul = {
 export const goldGain = (exp, gold, lv) => exp * lvMul.exp(lv) + gold * lvMul.gold(lv);
 export const money = (n) => `${Math.floor(n).toLocaleString('ja-JP')} G`;
 
-// スマホを縦に持っているときは、ゲーム全体を 90° 回して横向きで遊べるようにする
-// (画面が自動で回らないとき用。自動で横になったときは、ふつうの横向き表示)
+// タッチで操作する端末か
 export const touchDev = !!((window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0);
 
-// ほかのモジュールから VW を入れかえるとき
-export function setVW(v) {
-  VW = v;
+// ほかのモジュールから、見える範囲 (VW × VH) と縦長かどうかを入れかえるとき
+export function setView(w, h) {
+  VW = w;
+  VH = h;
+  portrait = h > w;
 }

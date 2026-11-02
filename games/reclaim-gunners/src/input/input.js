@@ -11,6 +11,11 @@ import { showPause } from '../ui/pause.js';
 import { showStageMap } from '../ui/stage-map.js';
 
 export const keys = {};
+// 指 1 本の操作: スティックの輪の大きさ・回避になる「はらい」(最後の FLICK_MS ミリ秒に FLICK_MIN 以上・FLICK_SPEED 以上の速さ)
+export const STICK_R = 36;
+const FLICK_MS = 120;
+const FLICK_MIN = 26;
+const FLICK_SPEED = 420;
 export const mouse = { x: VW / 2, y: VH / 2, down: false, inside: false };
 export const sticks = { move: null, aim: null };
 export let touchMode = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
@@ -59,14 +64,11 @@ canvas.addEventListener('pointerdown', (e) => {
   if (screen !== 'play' || ui.open) return;
   const p = logical(e);
   if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+    // スマホは指 1 本: 画面のどこに置いても、そこが中心のスティックになる (撃つのはいつも自動)
     touchMode = true;
     e.preventDefault();
     canvas.setPointerCapture(e.pointerId);
-    if (p.x < VW / 2) {
-      if (!sticks.move) sticks.move = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y };
-    } else if (!sticks.aim) {
-      sticks.aim = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y };
-    }
+    if (!sticks.move) sticks.move = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y, hist: [{ x: p.x, y: p.y, t: e.timeStamp }] };
   } else {
     touchMode = false;
     mouse.x = p.x;
@@ -78,11 +80,21 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
   const p = logical(e);
   if (e.pointerType === 'touch' || e.pointerType === 'pen') {
-    for (const s of [sticks.move, sticks.aim]) {
-      if (s && s.id === e.pointerId) {
-        s.x = p.x;
-        s.y = p.y;
+    const s = sticks.move;
+    if (s && s.id === e.pointerId) {
+      s.x = p.x;
+      s.y = p.y;
+      // 指が輪の外まで行ったら、中心もついてくる (向きを変えやすく)
+      const dx = s.x - s.ox;
+      const dy = s.y - s.oy;
+      const l = Math.hypot(dx, dy);
+      if (l > STICK_R) {
+        s.ox = s.x - (dx / l) * STICK_R;
+        s.oy = s.y - (dy / l) * STICK_R;
       }
+      s.hist.push({ x: p.x, y: p.y, t: e.timeStamp });
+      // FLICK_MS より前の点は、いちばん新しい 1 つだけ残す (はらいの始まりを測るため)
+      while (s.hist.length > 2 && e.timeStamp - s.hist[1].t > FLICK_MS) s.hist.shift();
     }
   } else {
     mouse.x = p.x;
@@ -91,7 +103,22 @@ canvas.addEventListener('pointermove', (e) => {
   }
 });
 export const endPointer = (e) => {
-  if (sticks.move && sticks.move.id === e.pointerId) sticks.move = null;
+  const s = sticks.move;
+  if (s && s.id === e.pointerId) {
+    // 素早くはらって離したら、はらった向きへ回避する
+    if (e.type === 'pointerup') {
+      const p = logical(e);
+      // FLICK_MS 前 (の少し前) の指の位置から、離した位置までの動き
+      let h0 = s.hist[0];
+      for (const h of s.hist) if (e.timeStamp - h.t >= FLICK_MS) h0 = h;
+      const dx = p.x - h0.x;
+      const dy = p.y - h0.y;
+      const dt = Math.max(1, e.timeStamp - h0.t) / 1000;
+      const d = Math.hypot(dx, dy);
+      if (d >= FLICK_MIN && d / dt >= FLICK_SPEED) dodge(Math.atan2(dy, dx));
+    }
+    sticks.move = null;
+  }
   if (sticks.aim && sticks.aim.id === e.pointerId) sticks.aim = null;
   if (e.pointerType === 'mouse' && e.button === 0) mouse.down = false;
 };
@@ -112,8 +139,6 @@ export const bindBtn = (id, fn) => {
     if (screen === 'play' && !ui.open) fn();
   });
 };
-bindBtn('t-dodge', () => dodge());
-export const dodgeBtn = document.getElementById('t-dodge');
 export const potionBtn = document.getElementById('t-potion');
 bindBtn('t-reload', () => manualReload());
 bindBtn('t-special', () => useSpecial());

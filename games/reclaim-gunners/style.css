@@ -97,6 +97,8 @@ body.playing { overflow: hidden; }
 
 /* スマホ (と高さの低い画面): 余白を減らし、プレイ中は上の見出しを隠す */
 body.compact .app { padding: 0 4px 4px; }
+body.tall .app { padding: 0; }
+body.tall .board { border-radius: 0; }
 body.compact .top { height: 30px; }
 body.compact .top h1 { font-size: 0.85rem; }
 body.compact .icon-btn { height: 26px; }
@@ -109,31 +111,20 @@ body.compact.playing .app { padding: 4px; }
   position: absolute;
   right: 1.2cqw;
   top: 15.5cqh;
-  width: 9cqh;
-  height: 9cqh;
-  border-radius: 2cqh;
+  width: 9cqmin;
+  height: 9cqmin;
+  border-radius: 2cqmin;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(10, 8, 16, 0.6);
   color: #fff;
   font: inherit;
   font-weight: 800;
-  font-size: 3.4cqh;
+  font-size: 3.4cqmin;
   touch-action: none;
 }
+/* 縦長: ミニマップ (画面の幅の約 3 割の高さ) の下 */
+body.tall .pause-in { top: 30cqw; right: 2.5cqw; }
 body:not(.compact) .pause-in { display: none; }
-
-/* 縦持ちのスマホ: ゲーム全体を 90° 回して横向きにする (--rw・--rh は回したあとの幅と高さ。script.js が入れる) */
-body.rotated { overflow: hidden; }
-body.rotated .app {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: var(--rw);
-  height: var(--rh);
-  max-width: none;
-  transform-origin: top left;
-  transform: translateX(var(--rh)) rotate(90deg);
-}
 
 .howto { margin: 10px 0 0; color: var(--muted); font-size: 0.8rem; }
 
@@ -162,10 +153,6 @@ body.rotated .app {
 
 .tbtn small { font-size: 2.4cqh; opacity: 0.8; }
 .tbtn:active, .tbtn.on { background: rgba(176, 75, 255, 0.55); }
-.t-dodge { right: 3cqw; bottom: 20cqh; width: 16cqh; height: 16cqh; }
-.t-reload { right: 14cqw; bottom: 6cqh; }
-.t-potion { right: 3cqw; bottom: 42cqh; }
-.t-interact { right: 14cqw; bottom: 24cqh; width: auto; min-width: 15cqh; padding: 0 2cqh; border-radius: 4cqh; height: 9cqh; background: rgba(60, 120, 230, 0.7); }
 
 /* お知らせ (画面の上のほうに出る帯) */
 .toast {
@@ -511,25 +498,17 @@ input[type="range"] { accent-color: var(--gold); }
   .row.wrow .wicon { width: 46px; height: 23px; }
 }
 
-/* スマホのボタン: 回避と回復を大きく、右手の親指が届く所に置く */
-.t-dodge { right: 3cqw; bottom: 6cqh; width: 22cqh; height: 22cqh; font-size: 4cqh; }
-.t-potion { right: calc(3cqw + 24cqh); bottom: 4cqh; width: 16cqh; height: 16cqh; font-size: 3.2cqh; }
-.t-reload { right: 4cqw; bottom: 31cqh; width: 11cqh; height: 11cqh; font-size: 2.8cqh; }
-.t-interact { right: calc(3cqw + 24cqh); bottom: 23cqh; }
-/* 回避の使えるまでの残り (時計回りに減っていく影) */
-.t-dodge::after {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  background: conic-gradient(rgba(0, 0, 0, 0.6) var(--cd, 0deg), transparent 0);
-  pointer-events: none;
-}
-.t-dodge.cooling { border-color: rgba(216, 176, 100, 0.35); }
+/* スマホのボタン: 移動と回避は指 1 本 (画面のどこでも) なので、ボタンは右のふちに縦に並べる
+   大きさは画面の短い辺 (cqmin) に合わせるので、縦持ちでも横持ちでも同じくらいの大きさ */
+.tbtn { font-size: 3.2cqmin; }
+.tbtn small { font-size: 2.6cqmin; }
+.t-potion { right: 3cqmin; bottom: 4cqmin; width: 16cqmin; height: 16cqmin; }
+.t-special { right: 3cqmin; bottom: 23cqmin; width: 16cqmin; height: 16cqmin; opacity: 0.45; }
+.t-reload { right: 5.5cqmin; bottom: 42cqmin; width: 11cqmin; height: 11cqmin; }
+.t-interact { left: 50%; right: auto; transform: translateX(-50%); bottom: 22cqmin; width: auto; height: 11cqmin; min-width: 24cqmin; padding: 0 4cqmin; border-radius: 6cqmin; background: rgba(60, 120, 230, 0.75); }
 .t-potion.empty { opacity: 0.4; }
 /* 必殺技: ゲージがたまるまで暗く、満タンで金色に光る */
-.t-special { right: 3cqw; bottom: 45cqh; width: 14cqh; height: 14cqh; font-size: 2.8cqh; opacity: 0.45; }
-.t-special.ready { opacity: 1; border-color: #ffd84a; background: rgba(160, 110, 20, 0.6); box-shadow: 0 0 2cqh rgba(255, 216, 74, 0.6); }
+.t-special.ready { opacity: 1; border-color: #ffd84a; background: rgba(160, 110, 20, 0.6); box-shadow: 0 0 3cqmin rgba(255, 216, 74, 0.6); }
 
 /* 言葉ごとの文字の形 (lang.js が html の lang を切り替える) */
 :root:lang(en) {

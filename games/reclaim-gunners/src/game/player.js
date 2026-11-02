@@ -12,7 +12,7 @@ import { G, P, ensureWs } from './stage.js';
 import { justDodge } from './specials.js';
 import { effW } from './weapon-mods.js';
 import { updateWeapon } from './weapons.js';
-import { mouse, moveInput, sticks, touchMode } from '../input/input.js';
+import { mouse, moveInput, touchMode } from '../input/input.js';
 import { toast } from '../ui/toast.js';
 
 // 装備している武器はすべて同時に撃つ。どれも、それぞれの射程の中のいちばん近い敵を自動でねらう
@@ -41,10 +41,11 @@ export function manualReload() {
   }
 }
 
-export function dodge() {
+// dir: 回避する向き (スマホのはらい)。なければ、動いている向き (止まっていれば向いている向き)
+export function dodge(dir) {
   if (!P || G.dead || P.dodgeCd > 0) return;
   const { mx, my } = moveInput();
-  const a = mx || my ? Math.atan2(my, mx) : P.aim;
+  const a = dir != null ? dir : mx || my ? Math.atan2(my, mx) : P.aim;
   P.dodgeDir = a;
   P.dodgeAt = G.t; // ジャスト回避の判定に使う
   P.dodgeX = P.x;
@@ -89,14 +90,7 @@ export function usePotion() {
 
 // 自分でねらうとき (マウスを押している間・スマホで右側をなぞっている間) の向き。null なら自動でねらう
 export function manualAim() {
-  if (touchMode) {
-    if (sticks.aim) {
-      const dx = sticks.aim.x - sticks.aim.ox;
-      const dy = sticks.aim.y - sticks.aim.oy;
-      if (Math.hypot(dx, dy) > 8) return Math.atan2(dy, dx);
-    }
-    return null;
-  }
+  if (touchMode) return null; // スマホはいつも自動でねらう
   if (!mouse.down) return null;
   const wx = G.cam.x - VW / 2 + mouse.x;
   const wy = G.cam.y - VH / 2 + mouse.y;
