@@ -83,25 +83,48 @@ export function useSpecial() {
 // ジャスト回避: 攻撃してきた相手へ、ゲージを使わずに 1 回出す
 //   続けて決めると「連続」が増え (8 秒あくか、攻撃を受けると 0 に戻る)、反撃の威力が 1 回ごとに +25% (最大 ×2)。
 //   ジャスト回避するたびに、必殺技ゲージも 10 たまる
-export function justDodge(src) {
+//   段階 (tier 1〜3。RG.JUST_TIERS) で、反撃の威力・止まる長さ・光の色と派手さが変わる (白 → 赤 → 紫)
+export function justDodge(src, tier = 1) {
   if (G.dead) return;
+  const T = RG.JUST_TIERS[tier - 1];
   G.justStreak = G.t - (G.justAt || -99) < 8 ? (G.justStreak || 0) + 1 : 1;
   G.justAt = G.t;
-  const mul = Math.min(2, 1 + 0.25 * (G.justStreak - 1));
-  G.freezeT = 0.16; // ほんの一瞬、時間がほぼ止まる (演出を際立たせる)
+  const mul = Math.min(2, 1 + 0.25 * (G.justStreak - 1)) * T.mul;
+  G.justTier = tier;
+  G.freezeT = T.freeze; // ほんの一瞬、時間がほぼ止まる (演出を際立たせる)。上の段階ほど長い
+  G.freezeMax = T.freeze;
   G.slowT = 0.4; // そのあと少しのあいだゆっくり
-  G.justPop = { n: G.justStreak, mul, t: 0.9, max: 0.9 };
-  G.justFlash = 0.3;
+  G.justPop = { n: G.justStreak, mul, tier, t: 0.9 + tier * 0.15, max: 0.9 + tier * 0.15 };
+  G.justFlash = 0.3 + tier * 0.1;
+  G.shake = Math.max(G.shake, 2 + tier * 3);
   P.inv = Math.max(P.inv, 0.6);
   sfx('just');
-  addGauge(10);
-  for (let i = 0; i < 24; i++) {
-    const a = (i / 24) * TAU;
-    addPart({ x: P.x, y: P.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, life: 0.4, color: i % 2 ? '#9ff0ff' : '#ffffff', size: 2.5, glow: true });
+  if (tier >= 2) sfx('special');
+  addGauge(10 * tier);
+  const n = Math.round(24 * T.fx);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    const sp = 160 * (0.8 + T.fx * 0.4) * (i % 3 ? 1 : 1.5);
+    addPart({ x: P.x, y: P.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.4 + tier * 0.1, color: i % 2 ? T.color : '#ffffff', size: 2 + tier, glow: true });
   }
-  addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.35, color: '#9ff0ff', size: 50, ring: true });
+  for (let k = 0; k < tier; k++) setTimeLater(k * 0.06, () => addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.4 + tier * 0.1, color: T.color, size: 50 + k * 40, ring: true }));
+  if (tier === 3) {
+    // 紫: 稲妻のような光が四方へ走る
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * TAU + rnd(-0.2, 0.2);
+      let x = P.x;
+      let y = P.y;
+      for (let s = 0; s < 5; s++) {
+        const nx = x + Math.cos(a + rnd(-0.5, 0.5)) * 22;
+        const ny = y + Math.sin(a + rnd(-0.5, 0.5)) * 22;
+        addPart({ x, y, x2: nx, y2: ny, vx: 0, vy: 0, life: 0.45, color: s % 2 ? '#f0d0ff' : T.color, size: 2.5, line: true });
+        x = nx;
+        y = ny;
+      }
+    }
+  }
   const id = spWeaponId();
-  if (id) castSpecial(id, src, mul);
+  if (id) castSpecial(id, src, mul, tier);
 }
 
 // 向き: 相手が決まっていればその方へ。なければ近くの敵、いなければいま向いている方へ
@@ -121,27 +144,32 @@ function aimAt(src) {
   return { a: P.aim, x: P.x + Math.cos(P.aim) * 140, y: P.y + Math.sin(P.aim) * 140 };
 }
 
-export function castSpecial(id, src, mul = 1) {
+// tier: ジャスト回避の段階 (あれば、光の色と派手さを段階に合わせる)
+export function castSpecial(id, src, mul = 1, tier = 0) {
   const st = spState(id);
   const i = st.set;
   const p = spParams(id, i);
   p.dmg *= mul;
   const w = effW(id);
   const elem = () => (w.elem === 'cycle' ? pick(['fire', 'ice', 'thunder']) : w.elem);
-  const color = ELEMS[w.elem] ? ELEMS[w.elem].color : '#ffd84a';
+  const look = tier ? RG.JUST_TIERS[tier - 1] : null;
+  const color = look ? look.color : ELEMS[w.elem] ? ELEMS[w.elem].color : '#ffd84a';
+  const fx = look ? look.fx : 1;
   const { a, x: tx, y: ty } = aimAt(src);
   P.inv = Math.max(P.inv, 0.5); // 出した瞬間の 0.5 秒だけ無敵
   P.aim = a;
   sfx('special');
   // 派手な演出: 名前の帯 (カットイン)・一瞬の時間止め・金色の光・主人公から広がる光の筋と輪
   G.spFlash = 0.45;
-  G.shake = Math.max(G.shake, 6);
+  G.spFlashRgb = look ? look.rgb : [255, 220, 120];
+  G.shake = Math.max(G.shake, 6 * fx);
   G.slowT = Math.max(G.slowT || 0, 0.22);
-  G.cutin = { name: RG.SPECIALS[id][i].name, sub: WEAPON[id].name, color, t: 1.3, max: 1.3 };
-  G.spBurst = { x: P.x, y: P.y, t: 0.7, max: 0.7, color, seed: Math.random() * TAU };
-  for (let k = 0; k < 3; k++) setTimeLater(k * 0.09, () => addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.45, color: k === 1 ? '#fff6d0' : color, size: 40 + k * 30, ring: true }));
-  addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.5, color, size: 120, light: true });
-  for (let k = 0; k < 28; k++) {
+  G.cutin = { name: RG.SPECIALS[id][i].name, sub: look ? `${look.name}  ×${look.mul}  ・  ${WEAPON[id].name}` : WEAPON[id].name, color, t: 1.3, max: 1.3 };
+  G.spBurst = { x: P.x, y: P.y, t: 0.7 * fx, max: 0.7 * fx, color, n: Math.round(18 * fx), seed: Math.random() * TAU };
+  const rings = Math.round(3 * fx);
+  for (let k = 0; k < rings; k++) setTimeLater(k * 0.09, () => addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.45, color: k % 2 ? '#fff6d0' : color, size: 40 + k * 30, ring: true }));
+  addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.5, color, size: 120 * fx, light: true });
+  for (let k = 0; k < Math.round(28 * fx); k++) {
     const ang = rnd(0, TAU);
     const sp = rnd(120, 320);
     addPart({ x: P.x, y: P.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: rnd(0.3, 0.7), color: k % 3 ? color : '#fff6d0', size: rnd(2, 4), glow: true });

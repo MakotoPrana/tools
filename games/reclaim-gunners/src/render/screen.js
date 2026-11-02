@@ -1,5 +1,6 @@
 // 画面 (Canvas): 大きさ・横向きへの回転・レイアウト
 import { VW, setView, touchDev } from '../core/config.js';
+import { settings } from '../core/save.js';
 import { clamp } from '../core/util.js';
 import { boardBox, canvas } from './canvas.js';
 import { screen } from '../ui/core.js';
@@ -24,6 +25,7 @@ export function layout() {
   const compact = touchDev || H < 500 || tall;
   document.body.classList.toggle('compact', compact);
   document.body.classList.toggle('tall', tall);
+  document.body.classList.toggle('btn-right', !!settings.btnRight); // スマホのボタンを右寄せにする設定
   document.body.classList.toggle('playing', screen === 'play');
   const rs = getComputedStyle(document.documentElement);
   const inset = (parseFloat(rs.paddingTop) || 0) + (parseFloat(rs.paddingBottom) || 0);

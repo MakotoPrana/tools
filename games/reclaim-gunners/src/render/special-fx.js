@@ -10,10 +10,11 @@ import { drawGlow, txt } from './primitives.js';
 export function drawSpecialWorld() {
   // ジャスト回避で時間が止まっている間: 主人公のまわりに、すぼまっていく水色の輪と残像の十字
   if (G.freezeT > 0) {
-    const k = G.freezeT / 0.16;
+    const k = G.freezeT / (G.freezeMax || 0.16);
+    const T = RG.JUST_TIERS[(G.justTier || 1) - 1];
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = '#bff6ff';
+    ctx.strokeStyle = T.color;
     ctx.lineWidth = 3;
     ctx.globalAlpha = 0.9;
     ctx.beginPath();
@@ -37,8 +38,9 @@ export function drawSpecialWorld() {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
-    for (let i = 0; i < 18; i++) {
-      const a = sb.seed + (i / 18) * TAU + Math.sin(i * 7.3) * 0.12;
+    const nr = sb.n || 18;
+    for (let i = 0; i < nr; i++) {
+      const a = sb.seed + (i / nr) * TAU + Math.sin(i * 7.3) * 0.12;
       const r0 = 14 + k * 90;
       const r1 = r0 + 40 + (i % 3) * 30 * (1 - k);
       ctx.strokeStyle = i % 2 ? sb.color : '#fff6d0';
@@ -81,14 +83,17 @@ export function drawSpecialWorld() {
 // ジャスト回避: 画面のふちが水色に光り、上のほうに大きく「JUST!」と連続の数・威力の倍率
 export function drawJustPop() {
   // 時間が止まっている間は、画面全体を青白く冷たい色に
+  // 色は段階で変わる (白 → 赤 → 紫)
+  const T = RG.JUST_TIERS[(G.justTier || 1) - 1];
+  const [r, g0, b] = T.rgb;
   if (G.freezeT > 0) {
-    ctx.fillStyle = 'rgba(150,200,255,0.22)';
+    ctx.fillStyle = `rgba(${r},${g0},${b},${0.14 + (G.justTier || 1) * 0.06})`;
     ctx.fillRect(0, 0, VW, VH);
   }
   if (G.justFlash > 0) {
     const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.3, VW / 2, VH / 2, Math.hypot(VW, VH) * 0.6);
-    g.addColorStop(0, 'rgba(160,240,255,0)');
-    g.addColorStop(1, `rgba(160,240,255,${G.justFlash * 1.6})`);
+    g.addColorStop(0, `rgba(${r},${g0},${b},0)`);
+    g.addColorStop(1, `rgba(${r},${g0},${b},${G.justFlash * 1.6})`);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, VW, VH);
   }
@@ -96,12 +101,12 @@ export function drawJustPop() {
   if (!j) return;
   const age = j.max - j.t;
   const k = clamp(age / 0.12, 0, 1);
-  const size = 30 * (1.6 - 0.6 * k);
+  const size = (26 + (j.tier || 1) * 4) * (1.6 - 0.6 * k);
   const y = portrait ? VH * 0.22 : VH * 0.24;
   ctx.globalAlpha = clamp(j.t / 0.25, 0, 1);
-  drawGlow(ctx, VW / 2, y, 70, '#9ff0ff', 0.4);
-  txt(tr('JUST!'), VW / 2, y, size, '#e8fbff', 'center', 'display');
-  if (j.n > 1) txt(tr('連続 {n} ・ 反撃 ×{m}', { n: j.n, m: j.mul.toFixed(2).replace(/0$/, '') }), VW / 2, y + 22, 9, '#9ff0ff', 'center');
+  drawGlow(ctx, VW / 2, y, 60 + (j.tier || 1) * 20, T.color, 0.45);
+  txt(T.name, VW / 2, y, size, (j.tier || 1) === 1 ? '#ffffff' : T.color, 'center', 'display');
+  txt(tr('反撃 ×{m}', { m: (Math.round(j.mul * 100) / 100).toString() }) + (j.n > 1 ? ` ・ ${tr('連続 {n}', { n: j.n })}` : ''), VW / 2, y + 24, 9, T.color === '#ffffff' ? '#e8f4ff' : T.color, 'center');
   ctx.globalAlpha = 1;
 }
 

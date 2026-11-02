@@ -503,8 +503,11 @@ input[type="range"] { accent-color: var(--gold); }
    大きさは画面の短い辺 (cqmin) に合わせるので、縦持ちでも横持ちでも同じくらいの大きさ */
 .tbtn { font-size: 3.2cqmin; }
 .tbtn small { font-size: 2.6cqmin; }
-.t-potion { left: calc(50% - 19cqmin); bottom: 5cqmin; width: 16cqmin; height: 16cqmin; }
-.t-special { left: calc(50% + 1cqmin); bottom: 4cqmin; width: 18cqmin; height: 18cqmin; opacity: 0.45; }
+.t-potion { left: 3cqmin; bottom: 5cqmin; width: 16cqmin; height: 16cqmin; }
+.t-special { left: 21cqmin; bottom: 4cqmin; width: 18cqmin; height: 18cqmin; opacity: 0.45; }
+/* 設定で右寄せにしたとき (左右を入れかえて、右のふちに並べる) */
+body.btn-right .t-potion { left: auto; right: 3cqmin; }
+body.btn-right .t-special { left: auto; right: 21cqmin; }
 .t-interact { left: 50%; right: auto; transform: translateX(-50%); bottom: 26cqmin; width: auto; height: 11cqmin; min-width: 24cqmin; padding: 0 4cqmin; border-radius: 6cqmin; background: rgba(60, 120, 230, 0.75); }
 .t-potion.empty { opacity: 0.4; }
 /* 必殺技: ゲージがたまるまで暗く、満タンで金色に光る */

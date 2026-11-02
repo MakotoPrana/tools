@@ -136,4 +136,12 @@ window.RG = window.RG || {};
   // ゲージ (最大 100) のたまる量
   RG.SP_GAIN = { kill: 2, elite: 6, mid: 15, nest: 8 };
   RG.JUST_WINDOW = 0.12; // ジャスト回避: 攻撃が当たる前の、この秒数の間に回避を始める
+  // ジャスト回避の 3 段階: 回避を始めてから当たるまでが within 秒以内なら、その段階 (下から 白 → 赤 → 紫)
+  //   mul: 反撃の必殺技の威力の倍率 / freeze: 時間が止まる長さ / fx: 光の派手さ (光の筋・輪・粒の多さ)
+  //   紫は 0.02 秒以内 (60 コマ/秒で、当たる 1 コマ前まで) ととてもシビア
+  RG.JUST_TIERS = [
+    { name: 'JUST!', within: 0.12, mul: 1, color: '#ffffff', rgb: [225, 240, 255], freeze: 0.12, fx: 1 },
+    { name: 'GREAT!', within: 0.05, mul: 1.6, color: '#ff4a5a', rgb: [255, 70, 90], freeze: 0.18, fx: 1.7 },
+    { name: 'PERFECT!', within: 0.02, mul: 2.5, color: '#c060ff', rgb: [190, 90, 255], freeze: 0.28, fx: 2.6 },
+  ];
 })();

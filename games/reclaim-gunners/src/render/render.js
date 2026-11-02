@@ -125,7 +125,8 @@ export function renderPlay() {
   drawVignette();
   // 必殺技を出した瞬間の金色の光と、ジャスト回避のゆっくりの間の青み
   if (G.spFlash > 0) {
-    ctx.fillStyle = `rgba(255,220,120,${G.spFlash * 0.5})`;
+    const [fr, fg, fb] = G.spFlashRgb || [255, 220, 120];
+    ctx.fillStyle = `rgba(${fr},${fg},${fb},${G.spFlash * 0.5})`;
     ctx.fillRect(0, 0, VW, VH);
   }
   if (G.slowT > 0) {

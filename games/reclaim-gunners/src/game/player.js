@@ -228,8 +228,14 @@ export const physPos = () => (justOpen() ? { x: P.dodgeX, y: P.dodgeY } : { x: P
 export function physHit(raw, srcLv, src) {
   if (G.dead) return;
   if (justOpen()) {
+    // 回避を始めてから当たるまでが短いほど、上の段階 (1: 白 / 2: 赤 / 3: 紫)
+    const dtJ = G.t - P.dodgeAt;
+    let tier = 1;
+    RG.JUST_TIERS.forEach((t, i) => {
+      if (dtJ <= t.within) tier = i + 1;
+    });
     P.dodgeAt = null; // 1 回の回避で 1 回だけ
-    justDodge(src);
+    justDodge(src, tier);
     return;
   }
   hurtPlayer(raw, srcLv);
