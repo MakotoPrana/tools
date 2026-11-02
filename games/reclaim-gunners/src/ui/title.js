@@ -32,7 +32,7 @@ export function showTitle() {
         return tr('{name} 解放 {n} エリア', { name: h.name, n });
       }).join(tr(' ・ '))}</p>
       ${saveOk ? '' : `<p class="danger">${tr('この環境ではセーブできません')}</p>`}
-      <p class="muted" style="font-size:0.75em">${tr('開発中のバージョンです（ステージ2 まで遊べます）')}</p>
+      <p class="muted" style="font-size:0.75em">${tr('開発中のバージョンです')}</p>
     </div></div>`;
   uiShow(t);
 }

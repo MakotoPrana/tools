@@ -26,14 +26,15 @@ export function showPause() {
       <div class="panel-head"><h2>${tr('メニュー')}</h2><span class="stat">${heroDef.name} ・ ${D.name}</span></div>
       <div class="btn-col">
         <button class="btn primary" data-act="close">${tr('再開')}</button>
+        ${G.room ? `<button class="btn" data-act="openRoom">${tr('相手を選び直す')}</button><button class="btn" data-act="roomLeave">${tr('プレイルームを出る')}</button>` : ''}
         <button class="btn" data-act="openEquip">${tr('装備')}</button>
         <button class="btn" data-act="openBoard">${tr('能力ボード')}</button>
         <button class="btn" data-act="openMap">${tr('マップ')}</button>
         <button class="btn" data-act="openMats">${tr('素材')}</button>
         <button class="btn" data-act="settings">${tr('設定')}</button>
-        <button class="btn" data-act="pauseWorld" ${canLeave ? '' : 'disabled'}>${tr('全体図へ戻る')}</button>
+        ${G.room ? '' : `<button class="btn" data-act="pauseWorld" ${canLeave ? '' : 'disabled'}>${tr('全体図へ戻る')}</button>`}
       </div>
-      ${canLeave ? '' : `<p class="muted" style="text-align:center;font-size:0.85em">${tr('全体図へ戻れるのは、解放済みのエリアか、転移碑のそばにいるときだけ')}</p>`}
+      ${canLeave || G.room ? '' : `<p class="muted" style="text-align:center;font-size:0.85em">${tr('全体図へ戻れるのは、解放済みのエリアか、転移碑のそばにいるときだけ')}</p>`}
       <p class="muted" style="text-align:center;font-size:0.85em">${saveOk ? tr('セーブはエリアの解放・ボスの撃破・力尽きたときに自動で行われます') : tr('この環境ではセーブできません')}</p>
     </div></div>`;
   };

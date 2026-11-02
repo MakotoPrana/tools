@@ -210,7 +210,7 @@ export function updatePlayer(dt) {
     G.curArea = ai;
     const a = G.areas[ai];
     // まだ解放していないエリアに入ったら、そのエリアの解放への挑戦が始まる (出入りしても同じ挑戦のまま)
-    if (!a.free && areaTrack.stage !== a.def.id) areaTrack.start(a.def.id, { difficulty: diffId, hero: heroDef.id, player_lv: powerLv() });
+    if (!G.room && !a.free && areaTrack.stage !== a.def.id) areaTrack.start(a.def.id, { difficulty: diffId, hero: heroDef.id, player_lv: powerLv() });
     if (!G.bannerSeen[ai] || G.t - G.bannerSeen[ai] > 8) {
       G.bannerSeen[ai] = G.t;
       const lv0 = a.def.lv[0] + D.lv;

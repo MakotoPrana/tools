@@ -10,7 +10,8 @@ import { G, P, pointPos, spawnFiends } from './stage.js';
 import { toast } from '../ui/toast.js';
 
 export function respawn() {
-  const lost = Math.max(0, Math.floor((hero.gold - goldAtSave) * 0.5));
+  // プレイルーム (テスト版) では、お金は減らさない
+  const lost = G.room ? 0 : Math.max(0, Math.floor((hero.gold - goldAtSave) * 0.5));
   hero.gold -= lost;
   const area = G.areas[G.curArea];
   // いたエリアの解放と、戦っていたボス戦は失敗で終わり。もう一度エリアに入ると失敗リトライになる
@@ -36,6 +37,7 @@ export function respawn() {
   if (area && !area.free && !area.def.town) spawnFiends(area);
   for (const n of G.nests) n.children = 0;
   for (const b of G.bosses) resetBoss(b);
+  if (G.roomSpawn) G.roomSpawn(); // プレイルーム: 中級悪魔を出し直す
   G.lock = null;
   G.bullets = [];
   G.ebullets = [];
@@ -67,5 +69,5 @@ export function respawn() {
   G.fade = 1;
   updateFlow();
   toast(lost > 0 ? tr('力尽きた…\n−{n}', { n: money(lost) }) : tr('力尽きた…'), 2.6);
-  writeSave();
+  if (!G.room) writeSave();
 }

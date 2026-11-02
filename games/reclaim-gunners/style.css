@@ -254,6 +254,8 @@ body:not(.compact) .pause-in { display: none; }
 .btn.back-btn { padding: 0.2em 0.6em; }
 .btn-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
 .btn-col { display: flex; flex-direction: column; gap: 8px; max-width: 280px; margin: 10px auto 0; }
+.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.room-grid .btn { text-align: left; font-size: 0.85em; padding: 6px 8px; }
 
 .muted { color: var(--panel-muted); }
 .gold { color: var(--gold); }
