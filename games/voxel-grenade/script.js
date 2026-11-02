@@ -12,14 +12,15 @@
     return;
   }
 
-  const { STAGES, MATERIALS, MATERIAL_NAMES } = window.VoxelStages;
+  const { STAGES, WORLDS, MATERIALS, MATERIAL_NAMES } = window.VoxelStages;
   const World = window.VoxelWorld;
+  const CELL = World.CELL; // ボクセル1つの大きさ
 
   const GOAL = 0.8; // こわせばクリアになる割合
   const GRAVITY = 22;
   const GRENADE_R = 0.22;
-  const DEBRIS_MAX = 2600;
-  const STARS_KEY = 'voxel-grenade-stars';
+  const DEBRIS_MAX = 4000;
+  const STARS_KEY = 'voxel-grenade-stars-50'; // 50ステージにしたときに、前の記録とは分けた
   const SOUND_KEY = 'voxel-grenade-sound';
 
   function track(name, params) {
@@ -93,28 +94,51 @@
   sun.position.set(-30, 45, 22);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.bias = -0.0008;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.04; // 小さなボクセルの階段に出る影のぎざぎざをおさえる
   scene.add(sun);
   scene.add(sun.target);
 
-  // 地面: 芝生の市松模様
+  // 地面: 市松模様。色はワールドごとに塗りなおす
+  const groundCanvas = document.createElement('canvas');
+  groundCanvas.width = groundCanvas.height = 64;
+  const groundTex = new THREE.CanvasTexture(groundCanvas);
+  groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+  groundTex.repeat.set(100, 100);
+  groundTex.magFilter = THREE.NearestFilter;
   {
-    const c = document.createElement('canvas');
-    c.width = c.height = 64;
-    const g = c.getContext('2d');
-    g.fillStyle = '#6f9a45';
-    g.fillRect(0, 0, 64, 64);
-    g.fillStyle = '#668f3f';
-    g.fillRect(0, 0, 32, 32);
-    g.fillRect(32, 32, 32, 32);
-    const tex = new THREE.CanvasTexture(c);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(100, 100);
-    tex.magFilter = THREE.NearestFilter;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ map: tex }));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ map: groundTex }));
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
+  }
+
+  // 橋のステージの川
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(1, 400), new THREE.MeshLambertMaterial({ color: 0x3f8fd0 }));
+  river.rotation.x = -Math.PI / 2;
+  river.position.y = 0.02;
+  river.receiveShadow = true;
+  river.visible = false;
+  scene.add(river);
+
+  // ワールドの空と地面の色、川
+  function applyTheme(stage) {
+    const theme = WORLDS[stage.world];
+    scene.background.setHex(theme.sky);
+    scene.fog.color.setHex(theme.sky);
+    document.body.style.background = '#' + theme.sky.toString(16).padStart(6, '0');
+    const g = groundCanvas.getContext('2d');
+    g.fillStyle = theme.ground[0];
+    g.fillRect(0, 0, 64, 64);
+    g.fillStyle = theme.ground[1];
+    g.fillRect(0, 0, 32, 32);
+    g.fillRect(32, 32, 32, 32);
+    groundTex.needsUpdate = true;
+    river.visible = !!stage.river;
+    if (stage.river) {
+      river.scale.x = stage.river;
+      river.position.x = stage.riverX || 0;
+    }
   }
 
   // ブロックの面に、うすい縁取りを描いておく (色はブロックごとに掛ける)
@@ -250,7 +274,7 @@
   let world = null;
   let house = null; // InstancedMesh
   let cellToInstance = null; // マスの番号 → インスタンスの番号
-  let ox = 0, oz = 0; // マス目の (0, 0, 0) の角の、ワールド座標
+  let ox = 0, oz = 0; // ボクセル (0, 0, 0) の角の、ワールド座標
 
   function buildHouse() {
     if (house) {
@@ -262,14 +286,14 @@
     house.receiveShadow = true;
     house.frustumCulled = false;
     cellToInstance = new Int32Array(world.cells.length).fill(-1);
-    ox = -world.w / 2;
-    oz = -world.d / 2;
+    ox = (-world.w * CELL) / 2;
+    oz = (-world.d * CELL) / 2;
     let n = 0;
     for (let i = 0; i < world.cells.length; i++) {
       const m = world.cells[i];
       if (!m) continue;
       const [x, y, z] = World.coords(world, i);
-      tmpMat.makeTranslation(ox + x + 0.5, y + 0.5, oz + z + 0.5);
+      tmpMat.makeScale(CELL, CELL, CELL).setPosition(ox + (x + 0.5) * CELL, (y + 0.5) * CELL, oz + (z + 0.5) * CELL);
       house.setMatrixAt(n, tmpMat);
       // 同じ材料でも少しずつ明るさを変えて、ボクセルらしくする
       const k = 0.9 + Math.random() * 0.14;
@@ -294,7 +318,7 @@
 
   function solidAtWorld(x, y, z) {
     if (!world) return false;
-    return World.solid(world, Math.floor(x - ox), Math.floor(y), Math.floor(z - oz));
+    return World.solid(world, Math.floor((x - ox) / CELL), Math.floor(y / CELL), Math.floor((z - oz) / CELL));
   }
 
   // ---------- 視点 ----------
@@ -302,7 +326,7 @@
   const view = { theta: 0.7, phi: 0.5, dist: 30, target: new THREE.Vector3(), shake: 0 };
 
   function frameStage() {
-    const size = Math.max(world.w, world.d, world.h);
+    const size = Math.max(world.w, world.d, world.h) * CELL;
     // 縦長の画面では、家が横にはみ出さないように少し離れる
     const far = camera.aspect < 1 ? 1 / Math.pow(camera.aspect, 0.4) : 1;
     view.dist = (size * 1.55 + 12) * far;
@@ -310,13 +334,16 @@
     view.maxDist = (size * 2.6 + 20) * far;
     view.theta = 0.7;
     view.phi = 0.42;
-    view.target.set(0, world.h * 0.32, 0);
-    const s = Math.max(world.w, world.d) * 0.9 + 8;
+    view.target.set(0, world.h * CELL * 0.32, 0);
+    const s = Math.max(world.w, world.d) * CELL * 0.9 + 8;
     Object.assign(sun.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 140 });
     sun.shadow.camera.updateProjectionMatrix();
   }
 
   function placeCamera() {
+    // 霧は、カメラから家までのきょりに合わせて遠ざける (大きなステージがかすまないように)
+    scene.fog.near = view.dist + 25;
+    scene.fog.far = view.dist * 2 + 90;
     const c = Math.cos(view.phi);
     camera.position.set(
       view.target.x + view.dist * c * Math.sin(view.theta),
@@ -358,8 +385,9 @@
       const t = -o.y / dir.y;
       if (t < 160) best = { t, normal: new THREE.Vector3(0, 1, 0) };
     }
-    const hit = traceGrid(o.x - ox, o.y, o.z - oz, dir.x, dir.y, dir.z, best ? best.t : 160);
-    if (hit) best = hit;
+    // マス目はボクセル単位で数えるので、たどる距離もボクセル単位にして、戻す
+    const hit = traceGrid((o.x - ox) / CELL, o.y / CELL, (o.z - oz) / CELL, dir.x, dir.y, dir.z, (best ? best.t : 160) / CELL);
+    if (hit) best = { t: hit.t * CELL, normal: hit.normal };
     if (!best) return null;
     const point = o.clone().addScaledVector(dir, best.t);
     return { point, normal: best.normal };
@@ -424,10 +452,22 @@
   arc.frustumCulled = false;
   scene.add(arc);
 
-  function throwOrigin() {
+  const THROW_REACH = 26; // 投げはじめる点から目標までの、いちばん遠いきょり
+
+  // 投げはじめる点。ふだんはカメラの少し前。大きなステージで遠いときは、目標から THROW_REACH の点まで近づける
+  function throwOrigin(target) {
     const fwd = tmpVec.subVectors(view.target, camera.position).normalize();
     const right = new THREE.Vector3().crossVectors(fwd, camera.up).normalize();
-    return camera.position.clone().addScaledVector(fwd, 2).addScaledVector(right, 0.8).add(new THREE.Vector3(0, -1.2, 0));
+    const origin = camera.position.clone().addScaledVector(fwd, 2).addScaledVector(right, 0.8).add(new THREE.Vector3(0, -1.2, 0));
+    const back = origin.clone().sub(target);
+    if (back.length() > THROW_REACH) {
+      back.setLength(THROW_REACH);
+      origin.copy(target).add(back);
+      // ブロックの中から投げないように、カメラの方へずらす
+      const step = camera.position.clone().sub(origin).normalize();
+      for (let k = 0; k < 80 && solidAtWorld(origin.x, origin.y, origin.z); k++) origin.add(step);
+    }
+    return origin;
   }
 
   // 目標に届く初速と、とぶ時間
@@ -456,7 +496,7 @@
     marker.visible = true;
     marker.position.copy(hit.point).addScaledVector(hit.normal, 0.03);
     marker.lookAt(tmpVec.copy(marker.position).add(hit.normal));
-    const origin = throwOrigin();
+    const origin = throwOrigin(target);
     const { v, T } = solveThrow(origin, target);
     const arr = arc.geometry.attributes.position.array;
     for (let k = 0; k < ARC_POINTS; k++) {
@@ -487,7 +527,7 @@
 
   function throwGrenade() {
     if (!aim || bombsLeft <= 0 || state !== 'play' || cleared) return;
-    const origin = throwOrigin();
+    const origin = throwOrigin(aim);
     const { v, T } = solveThrow(origin, aim);
     const group = new THREE.Group();
     const body = new THREE.Mesh(grenadeGeo, grenadeMat.clone());
@@ -584,30 +624,35 @@
 
   function explodeAt(pos) {
     lastBoom = clock;
-    const gx = pos.x - ox, gy = pos.y, gz = pos.z - oz;
+    const gx = (pos.x - ox) / CELL, gy = pos.y / CELL, gz = (pos.z - oz) / CELL;
     const { removed, fallen } = World.explode(world, gx, gy, gz);
 
+    // 破片が多すぎると重くなるので、こわれたボクセルが多いときは一部だけ破片にする
+    const chance = Math.min(1, 450 / Math.max(1, removed.length));
     for (const r of removed) {
       hideCell(r.i);
+      if (Math.random() > chance) continue;
       // こわれたブロックは、小さな破片になって外へ飛ぶ
-      const wx = ox + r.x + 0.5, wy = r.y + 0.5, wz = oz + r.z + 0.5;
+      const wx = ox + (r.x + 0.5) * CELL, wy = (r.y + 0.5) * CELL, wz = oz + (r.z + 0.5) * CELL;
       const dx = wx - pos.x, dy = wy - pos.y, dz = wz - pos.z;
       const len = Math.hypot(dx, dy, dz) || 1;
       const sp = (World.RADIUS - r.dist) * 3.2 + Math.random() * 4;
       const color = cellColor(r.i, r.mat);
-      spawnDebris(wx, wy, wz, (dx / len) * sp, (dy / len) * sp + 4 + Math.random() * 4, (dz / len) * sp, 0.55, color, 2.2 + Math.random() * 1.5);
-      if (Math.random() < 0.5) {
-        spawnDebris(wx, wy, wz, (dx / len) * sp * 1.2 + (Math.random() - 0.5) * 3, (dy / len) * sp + 6, (dz / len) * sp * 1.2 + (Math.random() - 0.5) * 3, 0.3, color, 1.8 + Math.random());
-      }
+      spawnDebris(wx, wy, wz, (dx / len) * sp, (dy / len) * sp + 4 + Math.random() * 4, (dz / len) * sp, CELL * (0.5 + Math.random() * 0.5), color, 2.2 + Math.random() * 1.5);
     }
+    // 支えを失ったブロックは、2 × 2 × 2 ボクセルずつのかたまりになってくずれ落ちる
+    const chunks = new Map();
     for (const f of fallen) {
       hideCell(f.i);
-      // 支えを失ったブロックは、そのままの大きさでくずれ落ちる
-      const wx = ox + f.x + 0.5, wy = f.y + 0.5, wz = oz + f.z + 0.5;
+      const key = (f.x >> 1) + ',' + (f.y >> 1) + ',' + (f.z >> 1);
+      if (!chunks.has(key)) chunks.set(key, f);
+    }
+    for (const f of chunks.values()) {
+      const wx = ox + ((f.x >> 1) * 2 + 1) * CELL, wy = ((f.y >> 1) * 2 + 1) * CELL, wz = oz + ((f.z >> 1) * 2 + 1) * CELL;
       const dx = wx - pos.x, dz = wz - pos.z;
       const len = Math.hypot(dx, dz) || 1;
       const push = Math.max(0, 6 - len) * 0.5;
-      spawnDebris(wx, wy, wz, (dx / len) * push + (Math.random() - 0.5) * 1.5, Math.random() * 1.5, (dz / len) * push + (Math.random() - 0.5) * 1.5, 0.92, cellColor(f.i, f.mat), 4 + Math.random() * 3);
+      spawnDebris(wx, wy, wz, (dx / len) * push + (Math.random() - 0.5) * 1.5, Math.random() * 1.5, (dz / len) * push + (Math.random() - 0.5) * 1.5, CELL * 1.9, cellColor(f.i, f.mat), 4 + Math.random() * 3);
     }
     house.instanceMatrix.needsUpdate = true;
     pushDebris(pos.x, pos.y, pos.z, 14);
@@ -639,24 +684,26 @@
       });
     }
     // 落ちたブロックが多いと、土ぼこりも立てる
-    const dust = Math.min(14, Math.floor(fallen.length / 25));
+    const dust = Math.min(14, Math.floor(chunks.size / 25));
     for (let k = 0; k < dust; k++) {
       const f = fallen[Math.floor(Math.random() * fallen.length)];
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0xcbb89a, transparent: true, opacity: 0.6, depthWrite: false }));
-      sp.position.set(ox + f.x + 0.5, 0.8, oz + f.z + 0.5);
+      sp.position.set(ox + (f.x + 0.5) * CELL, 0.8, oz + (f.z + 0.5) * CELL);
       sp.scale.setScalar(2);
       scene.add(sp);
       smokes.push({ sprite: sp, t: -0.3 - Math.random() * 0.4, life: 2.5, vel: new THREE.Vector3((Math.random() - 0.5) * 2, 0.8, (Math.random() - 0.5) * 2), grow: 4 });
     }
 
+    // 音やゆれの大きさは、以前の1マス (ボクセル8つ) を単位にして決める
+    const fallenUnits = fallen.length / 8, removedUnits = removed.length / 8;
     const camDist = camera.position.distanceTo(pos);
-    view.shake = Math.min(1.2, 0.5 + fallen.length / 300) * Math.min(1, 30 / camDist);
-    sound.boom(Math.min(1, 0.6 + fallen.length / 400));
-    if (fallen.length > 30) sound.crumble(Math.min(1, fallen.length / 300));
+    view.shake = Math.min(1.2, 0.5 + fallenUnits / 300) * Math.min(1, 30 / camDist);
+    sound.boom(Math.min(1, 0.6 + fallenUnits / 400));
+    if (fallenUnits > 30) sound.crumble(Math.min(1, fallenUnits / 300));
 
-    if (fallen.length > 150) callout('大崩壊!');
-    else if (fallen.length > 40) callout('ガラガラ!');
-    else if (removed.length > 25) callout('ドカーン!');
+    if (fallenUnits > 150) callout('大崩壊!');
+    else if (fallenUnits > 40) callout('ガラガラ!');
+    else if (removedUnits > 25) callout('ドカーン!');
     updateMeter();
   }
 
@@ -867,24 +914,49 @@
     return '★'.repeat(n) + '☆'.repeat(3 - n);
   }
 
+  function unlocked(k) {
+    return k === 0 || stars[k - 1] > 0;
+  }
+
+  // ワールドごとに、10ステージのタイルを並べる
   function renderMenu() {
     const list = $('stage-list');
     list.innerHTML = '';
-    STAGES.forEach((st, k) => {
-      const li = document.createElement('li');
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'stage-btn';
-      const locked = k > 0 && !(stars[k - 1] > 0);
-      btn.disabled = locked;
-      btn.innerHTML = `<span class="stage-no">${k + 1}</span><span class="stage-name"></span><span class="stage-stars"></span>`;
-      btn.querySelector('.stage-name').innerHTML = `${st.name}<span class="stage-sub"></span>`;
-      btn.querySelector('.stage-sub').textContent = locked ? '前のステージをクリアすると遊べます' : `${st.sub} ・ 手榴弾 ${st.grenades}個`;
-      btn.querySelector('.stage-stars').textContent = locked ? '🔒' : starText(stars[k] || 0);
-      btn.addEventListener('click', () => startStage(k));
-      li.appendChild(btn);
-      list.appendChild(li);
+    let next = null;
+    WORLDS.forEach((w, wi) => {
+      const ks = STAGES.map((st, k) => k).filter((k) => STAGES[k].world === wi);
+      const got = ks.reduce((n, k) => n + (stars[k] || 0), 0);
+      const sec = document.createElement('section');
+      sec.className = 'world';
+      sec.innerHTML = `<h3 class="world-head"><span class="world-no">ワールド${wi + 1}</span><span class="world-name"></span><span class="world-stars">★ ${got} / ${ks.length * 3}</span></h3><ol class="tiles"></ol>`;
+      sec.querySelector('.world-name').textContent = w.name;
+      const ol = sec.querySelector('.tiles');
+      for (const k of ks) {
+        const st = STAGES[k];
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tile';
+        const open = unlocked(k);
+        btn.disabled = !open;
+        btn.innerHTML = '<span class="tile-no"></span><span class="tile-name"></span><span class="tile-stars"></span>';
+        btn.querySelector('.tile-no').textContent = k + 1;
+        btn.querySelector('.tile-name').textContent = open ? st.name : '???';
+        btn.querySelector('.tile-stars').textContent = open ? starText(stars[k] || 0) : '🔒';
+        btn.title = open ? `${st.name}: ${st.sub} (手榴弾 ${st.grenades}個)` : '前のステージをクリアすると遊べます';
+        btn.setAttribute('aria-label', open ? `ステージ${k + 1} ${st.name} ${st.sub} 手榴弾${st.grenades}個 星${stars[k] || 0}` : `ステージ${k + 1} まだ遊べません`);
+        if (open && !(stars[k] > 0) && next === null) {
+          next = btn;
+          btn.classList.add('next');
+        }
+        btn.addEventListener('click', () => startStage(k));
+        li.appendChild(btn);
+        ol.appendChild(li);
+      }
+      list.appendChild(sec);
     });
+    // 次に遊ぶステージが見えるところまでスクロールする
+    if (next) requestAnimationFrame(() => next.scrollIntoView({ block: 'center' }));
   }
 
   function showMenu() {
@@ -903,6 +975,7 @@
     sound.unlock();
     stageIndex = k;
     world = World.createWorld(k);
+    applyTheme(STAGES[k]);
     clearGrenades();
     clearDebris();
     clearEffects();
@@ -1086,6 +1159,7 @@
   resize();
   // 最初の画面のうしろに、1つめの家を出しておく
   world = World.createWorld(0);
+  applyTheme(STAGES[0]);
   buildHouse();
   frameStage();
   showMenu();
@@ -1100,5 +1174,6 @@
       return World.destroyedRatio(world);
     },
     explodeAt: (x, y, z) => explodeAt(new THREE.Vector3(x, y, z)),
+    start: (k) => startStage(k),
   };
 })();
