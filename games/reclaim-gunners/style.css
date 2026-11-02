@@ -553,26 +553,68 @@ input[type="range"] { accent-color: var(--gold); }
 .langs .btn[lang="ko"] { font-family: "Nanum Myeongjo", serif; }
 .langs .btn.on { border-color: var(--gold); color: #fff3d0; box-shadow: inset 0 0 0 1px rgba(224, 184, 96, 0.5), 0 0 8px rgba(224, 184, 96, 0.25); }
 
-/* 武器の改造 (スキルツリー) */
-.mtree { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
-.mtl { font-family: var(--font-display); color: var(--gold); font-size: 0.85em; letter-spacing: 0.06em; margin-bottom: 4px; }
-.mrow { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
-.mnode {
-  position: relative;
-  display: flex; flex-direction: column; gap: 3px;
-  padding: 6px 8px;
-  border: 1px solid rgba(200, 160, 90, 0.35);
-  border-radius: 3px;
+/* 武器の改造 (迷路のスキルツリー) */
+.maze-wrap { margin-top: 8px; }
+.maze { display: block; width: 100%; height: auto; max-height: 52vh; user-select: none; -webkit-user-select: none; }
+.mz-bg { fill: #0e0806; stroke: rgba(200, 160, 90, 0.35); stroke-width: 2; }
+.mz-rock { fill: #1c1410; stroke: #2a1e16; stroke-width: 2; }
+.mz-halls line { stroke: #2e2018; stroke-width: 28; stroke-linecap: round; }
+.mz-lines line { stroke-linecap: round; }
+.mz-lines line.dark { stroke: #4a3628; stroke-width: 2; }
+.mz-lines line.open { stroke: rgba(224, 184, 96, 0.6); stroke-width: 3; stroke-dasharray: 4 6; }
+.mz-lines line.lit { stroke: #e0b860; stroke-width: 4; filter: drop-shadow(0 0 3px rgba(255, 216, 120, 0.7)); }
+.mz-node { cursor: pointer; }
+.mz-node > circle.mz-hit { fill: transparent; stroke: none; }
+@media (max-height: 520px) { .maze { max-height: 78vh; } }
+.mz-node > circle:not(.mz-ring):not(.mz-sel):not(.mz-hit), .mz-node > polygon { stroke: rgba(200, 160, 90, 0.5); stroke-width: 2; }
+.mz-node.uniq > polygon { stroke: rgba(200, 120, 255, 0.7); }
+.mz-node.treasure > polygon { stroke: rgba(110, 230, 210, 0.7); }
+.mz-node.root > circle:not(.mz-hit):not(.mz-sel) { stroke: #ffe9a8; stroke-width: 2.5; }
+.mz-node.locked { opacity: 0.38; }
+.mz-node.locked use { color: #9a8a78; }
+.mz-node.got > circle:not(.mz-ring):not(.mz-sel):not(.mz-hit), .mz-node.got > polygon { stroke: #e0b860; }
+.mz-node.max > circle:not(.mz-ring):not(.mz-sel):not(.mz-hit), .mz-node.max > polygon { stroke: #ffe9a8; stroke-width: 3; filter: drop-shadow(0 0 5px rgba(255, 216, 120, 0.8)); }
+.mz-node.can > circle:not(.mz-sel):not(.mz-hit):not(.mz-ring), .mz-node.can > polygon { animation: mzPulse 1.4s ease-in-out infinite; }
+@keyframes mzPulse { 50% { stroke: #fff3c0; stroke-width: 3.5; } }
+.mz-ring { fill: none; stroke: #ffd84a; stroke-width: 3; stroke-linecap: round; }
+.mz-sel { fill: none; stroke: #fff; stroke-width: 2; stroke-dasharray: 5 4; opacity: 0.85; }
+.mz-lv { fill: #ffe9a8; font-size: 12px; font-weight: 800; stroke: #120a06; stroke-width: 3; paint-order: stroke; text-anchor: middle; }
+.mdetail {
+  display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 10px; min-height: 76px;
+  border: 1px solid rgba(200, 160, 90, 0.35); border-radius: 3px;
   background: linear-gradient(180deg, rgba(48, 30, 22, 0.9), rgba(24, 14, 12, 0.9));
 }
-.mnode.uniq { border-color: rgba(200, 90, 255, 0.45); background: linear-gradient(180deg, rgba(44, 22, 48, 0.9), rgba(20, 10, 22, 0.9)); }
-.mnode.locked { opacity: 0.55; }
-.mnode.max { border-color: var(--gold); box-shadow: 0 0 8px rgba(224, 184, 96, 0.25); }
-.mreq { font-size: 0.72em; color: #c8a8e8; }
+.md-icon { flex: 0 0 44px; width: 44px; height: 44px; padding: 6px; border-radius: 50%; background: #2a1c12; color: #f0c878; fill: none; }
+.md-icon.uniq { background: #2e1640; color: #e0a8ff; }
+.md-icon.treasure { background: #103034; color: #8af0e0; }
+.md-icon.minor { color: #d8c4a0; }
+.md-body { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mkind { font-size: 0.72em; font-weight: 700; padding: 0 5px; border-radius: 3px; background: rgba(0, 0, 0, 0.4); color: #d8c4a0; }
+.mkind.base { color: #f0c878; } .mkind.uniq { color: #e0a8ff; } .mkind.treasure { color: #8af0e0; } .mkind.root { color: #ffe9a8; }
+.mhint { color: #c8a8e8; }
+.mlegend { font-size: 0.78em; margin: 6px 0 0; }
 .mname { font-weight: 800; color: #f0e0c0; }
 .mlv { float: right; font-size: 0.8em; color: var(--gold); font-weight: 700; }
-.pips { display: flex; gap: 2px; }
+.pips { display: flex; gap: 2px; max-width: 220px; }
 .pips i { flex: 1; height: 4px; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(200, 160, 90, 0.25); }
 .pips i.on { background: linear-gradient(90deg, #e0b860, #ffe9a8); border-color: #e0b860; }
-.mnode .s { font-size: 0.78em; line-height: 1.35; flex: 1; }
-.mbtn { display: flex; justify-content: flex-end; font-size: 0.78em; min-height: 1.6em; align-items: center; }
+.mdetail .s { font-size: 0.78em; line-height: 1.35; }
+.mbtn { display: flex; justify-content: flex-end; font-size: 0.78em; min-height: 1.6em; align-items: center; flex: 0 0 auto; }
+
+/* テストルーム */
+.test-room h3 { font-family: var(--font-display); color: var(--gold); font-size: 0.95em; margin: 10px 0 4px; letter-spacing: 0.06em; }
+.tr-group { margin-bottom: 4px; }
+.tr-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.tr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.tr-lv { display: inline-flex; align-items: center; gap: 3px; }
+.tr-lv b { min-width: 3.4em; text-align: center; color: #ffe9a8; }
+.chip {
+  font: inherit; font-size: 0.8em; color: #f0e0c0; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 12px;
+  border: 1px solid rgba(200, 160, 90, 0.35); background: rgba(30, 18, 12, 0.9);
+}
+.chip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.chip.on { border-color: var(--gold); color: #fff3d0; background: rgba(90, 60, 24, 0.9); box-shadow: 0 0 6px rgba(224, 184, 96, 0.35); }
+.tr-demon { font-size: 0.78em; color: #ff8aa8; }
+.mtl { font-family: var(--font-display); color: var(--gold); font-size: 0.85em; letter-spacing: 0.06em; margin-bottom: 4px; }

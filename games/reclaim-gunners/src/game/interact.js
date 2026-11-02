@@ -11,6 +11,7 @@ import { G, P, pointPos, spawnNests, stageDef, startStage, stoneActive } from '.
 import { touchMode } from '../input/input.js';
 import { showStoneMenu } from '../ui/pause.js';
 import { showShop } from '../ui/shop.js';
+import { showTestRoom } from '../ui/test-room.js';
 import { toast } from '../ui/toast.js';
 import { selStage, setSelStage } from '../ui/world-map.js';
 
@@ -34,7 +35,7 @@ export function updateInteract() {
     const d = dist2(P.x, P.y, s.x, s.y + 8);
     if (d < best) {
       best = d;
-      G.interact = { type: 'stone', s, label: stoneActive(s) ? tr('転移碑を調べる') : tr('転移碑（未起動）') };
+      G.interact = { type: 'stone', s, label: G.def.test ? tr('呼び出しの碑を調べる') : stoneActive(s) ? tr('転移碑を調べる') : tr('転移碑（未起動）') };
     }
   }
   for (const f of G.def.features) {
@@ -99,6 +100,11 @@ export function shopOpen(f) {
 export function useStone(s) {
   P.hp = maxHp();
   hero.potions = maxPotions();
+  if (G.def.test) {
+    sfx('pick');
+    showTestRoom();
+    return;
+  }
   hero.lastTravel = { difficulty: diffId, stage: G.def.id, point: s.id };
   for (let i = 0; i < 20; i++) addPart({ x: s.x + rnd(-10, 10), y: s.y + rnd(-6, 10), vx: 0, vy: rnd(-60, -20), life: 0.8, color: '#7fd8ff', size: 2.5, glow: true });
   sfx('pick');

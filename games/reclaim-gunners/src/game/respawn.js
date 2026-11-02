@@ -11,6 +11,7 @@ import { G, P, pointPos } from './stage.js';
 import { toast } from '../ui/toast.js';
 
 export function respawn() {
+  if (G.def.test) return respawnTest();
   const lost = Math.max(0, Math.floor((hero.gold - goldAtSave) * 0.5));
   hero.gold -= lost;
   const area = G.areas[G.curArea];
@@ -57,4 +58,34 @@ export function respawn() {
   updateFlow();
   toast(lost > 0 ? tr('力尽きた…\n所持金 −{g} G', { g: fmt(lost) }) : tr('力尽きた…'), 2.6);
   writeSave();
+}
+
+// テストルームで力尽きたとき: 呼び出した敵とボスを片付けて、入口に戻る (お金は減らない・セーブしない)
+function respawnTest() {
+  G.enemies = [];
+  G.bosses = [];
+  G.lock = null;
+  G.bullets = [];
+  G.ebullets = [];
+  G.teles = [];
+  G.hazards = [];
+  G.pickups = [];
+  later.length = 0;
+  P.slowT = 0;
+  P.pull = null;
+  const pt = pointPos(null);
+  P.x = pt.x;
+  P.y = pt.y;
+  P.hp = maxHp();
+  P.shownHp = P.hp;
+  P.inv = 1.5;
+  P.rollT = 0;
+  P.tackleT = 0;
+  hero.potions = maxPotions();
+  G.cam.x = P.x;
+  G.cam.y = P.y;
+  G.curArea = -1;
+  G.fade = 1;
+  updateFlow();
+  toast(tr('力尽きた…'), 2);
 }

@@ -13,6 +13,7 @@ export let G = null;
 export let P = null;
 
 export function stageDef(id) {
+  if (id === 'test') return RG.TEST_STAGE;
   return STAGES.find((s) => s.id === id);
 }
 
@@ -72,7 +73,7 @@ export function startStage(stageId, pointId, opt = {}) {
   }
   // エリア
   def.areas.forEach((a, i) => {
-    const free = prog.areas.includes(a.id);
+    const free = !!def.test || prog.areas.includes(a.id);
     const area = { def: a, i, free, reinvaded: false, fog: free ? 0 : 1, nests: [] };
     G.areas.push(area);
     if (!free) spawnNests(area);
@@ -124,6 +125,7 @@ export function pointPos(pointId) {
 }
 
 export function stoneActive(st) {
+  if (G && G.def.test) return true;
   return prog.travel.includes(st.id);
 }
 

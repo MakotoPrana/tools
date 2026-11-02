@@ -340,3 +340,30 @@ RG.SHOPS.lume = {
 RG.ITEMS = {
   potion: { name: '回復薬', price: 200, heal: 0.4, desc: '体力を 40% 回復' },
 };
+
+// テストルーム (全体図の「テストルーム」から入る)。敵やボスを選んで呼び出し、武器や改造を試す場所
+//   ここでの戦いでは、経験値・お金・素材・撃破の記録は手に入らない。力尽きてもお金は減らない
+RG.TEST_STAGE = {
+  id: 'test',
+  name: 'テストルーム',
+  desc: '敵やボスを選んで呼び出し、武器を試す場所',
+  test: true,
+  ready: true,
+  lv: [1, 99],
+  w: 64,
+  h: 40,
+  seed: 77,
+  layout: { scale: 4, warp: 0, key: { A: 'test' }, rows: Array.from({ length: 10 }, () => 'AAAAAAAAAAAAAAAA') },
+  links: [],
+  // 四すみの柱 (弾よけ)
+  walls: [[12, 8, 2, 2], [50, 8, 2, 2], [12, 30, 2, 2], [50, 30, 2, 2]],
+  features: [],
+  gates: [],
+  lairs: [],
+  entries: [],
+  areas: [
+    { id: 'test', name: 'テストルーム', town: true, start: true, lv: [1, 1], theme: 'fort', enemies: [], nests: [], stone: [6, 18] },
+  ],
+  scatter: [],
+};
+RG.i18nExtra.push(RG.TEST_STAGE);
