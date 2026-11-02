@@ -17,7 +17,7 @@ import { drawFeaturesLive, drawFog, drawHazard, drawLairs, drawLakeShimmer, draw
 import { screen } from '../ui/core.js';
 import { getMap, mapCache } from '../world/mapgen.js';
 import { drawTutorialWorld } from '../game/tutorial.js';
-import { drawCutin, drawSpecialWorld } from './special-fx.js';
+import { drawCutin, drawJustPop, drawSpecialWorld } from './special-fx.js';
 
 export function render() {
   resize();
@@ -129,6 +129,7 @@ export function renderPlay() {
   }
   drawHud();
   drawCutin();
+  drawJustPop();
   if (G.fade > 0) {
     ctx.fillStyle = `rgba(0,0,0,${G.fade})`;
     ctx.fillRect(0, 0, VW, VH);

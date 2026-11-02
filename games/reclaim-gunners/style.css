@@ -503,8 +503,8 @@ input[type="range"] { accent-color: var(--gold); }
    大きさは画面の短い辺 (cqmin) に合わせるので、縦持ちでも横持ちでも同じくらいの大きさ */
 .tbtn { font-size: 3.2cqmin; }
 .tbtn small { font-size: 2.6cqmin; }
-.t-special { left: calc(50% - 19cqmin); bottom: 4cqmin; width: 18cqmin; height: 18cqmin; opacity: 0.45; }
-.t-potion { left: calc(50% + 3cqmin); bottom: 5cqmin; width: 16cqmin; height: 16cqmin; }
+.t-potion { left: calc(50% - 19cqmin); bottom: 5cqmin; width: 16cqmin; height: 16cqmin; }
+.t-special { left: calc(50% + 1cqmin); bottom: 4cqmin; width: 18cqmin; height: 18cqmin; opacity: 0.45; }
 .t-interact { left: 50%; right: auto; transform: translateX(-50%); bottom: 26cqmin; width: auto; height: 11cqmin; min-width: 24cqmin; padding: 0 4cqmin; border-radius: 6cqmin; background: rgba(60, 120, 230, 0.75); }
 .t-potion.empty { opacity: 0.4; }
 /* 必殺技: ゲージがたまるまで暗く、満タンで金色に光る */
@@ -631,3 +631,11 @@ body.tall .tut { top: 46cqw; }
 .ehead h3 { margin: 0; font-size: 1em; }
 .ehead h3 .muted { font-size: 0.75em; font-weight: 400; }
 .ehead .muted { display: block; }
+
+/* 武器屋: 装備の画面と同じ 2 行の行。道具は名前と説明を 1 行ずつ */
+.irow { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name btns" "stats btns"; align-items: center; column-gap: 8px; row-gap: 2px; padding: 6px 10px; }
+.shint { margin: 2px 2px 0; font-size: 0.78em; line-height: 1.4; }
+.tabs { flex-wrap: nowrap; }
+.tabs .btn { flex: 1; }
+/* 見出しは 1 行 (長い店の名前は … で切る) */
+.panel-head h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

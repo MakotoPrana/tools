@@ -118,6 +118,22 @@ export function drawBullet(b) {
 }
 
 export function drawEBullet(b) {
+  // ジャスト回避できる大きな弾: 白く光る芯と、赤い尾
+  if (b.phys) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,90,130,0.6)';
+    ctx.lineWidth = b.r * 1.6;
+    ctx.beginPath();
+    ctx.moveTo(b.x - b.vx * 0.08, b.y - b.vy * 0.08);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.restore();
+    drawGlow(ctx, b.x, b.y, b.r * 4, '#ff5a8a', 0.8);
+    ctx.fillStyle = '#ffffff';
+    circle(ctx, b.x, b.y, b.r * (0.8 + Math.sin(G.t * 30) * 0.15));
+    return;
+  }
   drawGlow(ctx, b.x, b.y, b.r * 3.2, b.color, 0.7);
   ctx.fillStyle = b.color;
   circle(ctx, b.x, b.y, b.r);

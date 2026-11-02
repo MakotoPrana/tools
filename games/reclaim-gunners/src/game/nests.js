@@ -10,6 +10,7 @@ import { gainGold, spawnEnemy, spawnFromNest } from './enemies.js';
 import { addPart, showBanner } from './fx.js';
 import { D, prog, rank } from './hero.js';
 import { collectAllMats } from './pickups.js';
+import { physHit, physPos } from './player.js';
 import { addGauge } from './specials.js';
 import { G, P } from './stage.js';
 import { toast } from '../ui/toast.js';
@@ -24,6 +25,7 @@ export function updateNests(dt) {
     if (dp > 700 || G.dead) continue;
     n.spawnT -= dt;
     if (n.nd.attack && dp < 340) nestAttack(n, dt, dp);
+    nestJustAttack(n, dt, dp);
     const cap = Math.round(n.nd.cap * D.cap);
     if (n.spawnT <= 0 && n.children < cap) {
       spawnFromNest(n);
@@ -37,6 +39,49 @@ export function updateNests(dt) {
       moveCircle(P, Math.cos(a) * 2, Math.sin(a) * 2, P.r, MOVE_BLOCK, lockArea());
     }
   }
+}
+
+// どの魔巣もする、ジャスト回避できる攻撃 (予兆のあと、最後の 0.15 秒は白く光る)
+//   近く (90px まで): まわりに棘を突き出す / 少し離れている (110〜320px): ため撃ちの大きな弾 (当たる直前に回避するとジャスト回避)
+const JUST_CD = { small: 1.5, big: 0.75 };
+export function nestJustAttack(n, dt, dp) {
+  n.jT = (n.jT == null ? rnd(1.5, 3.5) : n.jT) - dt;
+  if (n.charge) {
+    // ため撃ち: ためている間は、主人公の方へ向きを合わせる (最後の 0.3 秒は固める)
+    const c = n.charge;
+    c.t -= dt;
+    if (c.t > 0.3) c.tele.a = Math.atan2(P.y - n.y, P.x - n.x);
+    if (c.t <= 0) {
+      n.charge = null;
+      const a = c.tele.a;
+      const dmg = 9 * lvMul.atk(n.lv);
+      G.ebullets.push({ x: n.x + Math.cos(a) * n.r, y: n.y + Math.sin(a) * n.r, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, dmg, lv: n.lv, color: '#ffe8f0', r: 6, life: 2.2, phys: true, src: n });
+      sfx('swing');
+    }
+    return;
+  }
+  if (n.jT > 0 || G.dead) return;
+  const cd = (JUST_CD[n.type] || 1) * rnd(3.2, 4.4);
+  if (dp < 90) {
+    n.jT = cd;
+    const R = n.r + 58;
+    G.teles.push({ type: 'circle', x: n.x, y: n.y, r: R, t: 0, dur: 0.95, just: true, onDone: () => {
+      if (n.dead) return;
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * TAU;
+        addPart({ x: n.x + Math.cos(a) * n.r, y: n.y + Math.sin(a) * n.r, x2: n.x + Math.cos(a) * R, y2: n.y + Math.sin(a) * R, vx: 0, vy: 0, life: 0.25, color: n.nd.colors[2], size: 3, line: true });
+      }
+      sfx('swing');
+      G.shake = Math.max(G.shake, 3);
+      const pp = physPos();
+      if (!G.dead && dist(n.x, n.y, pp.x, pp.y) < R + P.r) physHit(12 * lvMul.atk(n.lv), n.lv, n);
+    } });
+  } else if (dp > 110 && dp < 320 && lineClear(n.x, n.y, P.x, P.y)) {
+    n.jT = cd;
+    const tele = { type: 'line', x: n.x, y: n.y, a: Math.atan2(P.y - n.y, P.x - n.x), len: 320, w: 14, t: 0, dur: 0.9, just: true };
+    G.teles.push(tele);
+    n.charge = { t: 0.9, tele };
+  } else n.jT = 0.5;
 }
 
 // 魔巣の種類ごとの攻撃 (主人公が近くにいるときだけ)

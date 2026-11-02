@@ -6,7 +6,7 @@ import { tileAt } from './collision.js';
 import { chainLightning, damageTarget, explode, forAllTargets, forTargets } from './damage.js';
 import { addPart, addText } from './fx.js';
 import { powerLv, rank, recvMul } from './hero.js';
-import { hurtPlayer } from './player.js';
+import { hurtPlayer, physHit, physPos } from './player.js';
 import { G, P } from './stage.js';
 
 export function updateBullets(dt) {
@@ -87,6 +87,17 @@ export function updateBullets(dt) {
     b.y += b.vy * dt;
     b.life -= dt;
     if (b.life <= 0 || SHOT_BLOCK[tileAt(b.x, b.y)]) continue;
+    // ジャスト回避できる弾: 回避を始めた位置で当たりを見る (当たる直前に回避するとジャスト回避)
+    if (b.phys) {
+      const pp = physPos();
+      if (!G.dead && dist2(b.x, b.y, pp.x, pp.y) < (b.r + P.r) ** 2) {
+        physHit(b.dmg, b.lv, b.src);
+        continue;
+      }
+      if (Math.random() < 0.5) addPart({ x: b.x, y: b.y, vx: rnd(-20, 20), vy: rnd(-20, 20), life: 0.3, color: '#ff8aa8', size: 2.5 });
+      eout.push(b);
+      continue;
+    }
     if (!G.dead && dist2(b.x, b.y, P.x, P.y) < (b.r + P.r - 1) ** 2) {
       if (b.slow && P.inv <= 0) P.slowT = 2;
       hurtPlayer(b.dmg, b.lv);

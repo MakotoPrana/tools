@@ -37,29 +37,30 @@ export function showShop(shopId) {
         const owned = hero.weapons[id] != null;
         const can = canEquip(w);
         const ok = !owned && can && hero.gold >= w.price;
-        return `<div class="row wrow ${can ? '' : 'dim'}"><img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30"><div>
-          <div class="t"><span style="color:${CAT_COLORS[w.cat]}">${CATS[w.cat].name}</span> ${w.name} <span class="muted">T${w.tier}</span></div>
-          <div class="s">${weaponStats(w)} ・ ${w.desc}</div></div>
-          <button class="btn small ${ok ? 'primary' : ''}" data-act="buyW" data-id="${id}" ${ok ? '' : 'disabled'}>${owned ? tr('所持') : !can ? tr('この主人公は使えない') : money(w.price)}</button>
+        // 装備の画面と同じ 2 行の形: 1 行目に名前 (カテゴリの色)・格、2 行目に能力 (はみ出しは …。説明は長押し / マウスを重ねると出る)
+        return `<div class="row erow ${can ? '' : 'dim'}"><img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30">
+          <div class="einfo"><div class="t"><span style="color:${CAT_COLORS[w.cat]}">${w.name}</span> <span class="muted">T${w.tier} ${CATS[w.cat].name}</span></div>
+          <div class="s" title="${w.desc}">${weaponStats(w)}</div></div>
+          <div class="ebtns"><button class="btn small ${ok ? 'primary' : ''}" data-act="buyW" data-id="${id}" ${ok ? '' : 'disabled'}>${owned ? tr('所持') : !can ? tr('使えない') : money(w.price)}</button></div>
         </div>`;
       }).join('');
       const nextHint = phase === 1 ? tr('ステージのエリアを半分解放すると、品ぞろえが増える') : phase === 2 ? tr('ステージを全部解放してヌシを倒すと、目玉の品が並ぶ') : tr('品ぞろえは最大');
-      body += `<p class="muted" style="font-size:0.85em">${tr('品ぞろえ 第{n}段階 ・ {hint}', { n: phase, hint: nextHint })}</p>`;
+      body += `<p class="muted shint">${tr('品ぞろえ 第{n}段階 ・ {hint}', { n: phase, hint: nextHint })}</p>`;
     } else if (shopTab === 'up') {
       const owned = WEAPONS.filter((w) => hero.weapons[w.id] != null && canEquip(w));
-      body = owned.map((w) => `<div class="row wrow"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
-          <div class="t">${w.name} <span class="gold">★${modTotal(w.id)}</span><span class="muted"> / ${RG.modsOf(w).length * RG.MOD_MAX}</span></div>
+      body = owned.map((w) => `<div class="row erow"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30">
+          <div class="einfo"><div class="t"><span style="color:${CAT_COLORS[w.cat]}">${w.name}</span> <span class="gold">★${modTotal(w.id)}</span><span class="muted">/${RG.modsOf(w).length * RG.MOD_MAX}</span></div>
           <div class="s">${weaponStats(effW(w.id))}</div></div>
-          <button class="btn small primary" data-act="openMods" data-id="${w.id}">${tr('スキルツリー')}</button>
+          <div class="ebtns"><button class="btn small primary" data-act="openMods" data-id="${w.id}">${tr('強化')}</button></div>
         </div>`).join('') || `<p class="muted">${tr('改造できる武器がない')}</p>`;
-      body += `<p class="muted" style="font-size:0.85em">${tr('この店で上げられるのは、それぞれの改造の Lv{n} まで（お店の格による）', { n: max })}</p>`;
+      body += `<p class="muted shint">${tr('この店で上げられるのは、それぞれの改造の Lv{n} まで（お店の格による）', { n: max })}</p>`;
     } else {
       body = shop.items.map((id) => {
         const it = ITEMS[id];
         const full = hero.potions >= maxPotions();
         const ok = !full && hero.gold >= it.price;
-        return `<div class="row"><div><div class="t">${it.name} <span class="muted">${hero.potions}/${maxPotions()}</span></div><div class="s">${tr('{desc}（転移碑を使うと全回復する）', { desc: it.desc })}</div></div>
-          <button class="btn small ${ok ? 'primary' : ''}" data-act="buyItem" data-id="${id}" ${ok ? '' : 'disabled'}>${full ? tr('満タン') : money(it.price)}</button></div>`;
+        return `<div class="row irow"><div class="einfo"><div class="t">${it.name} <span class="muted">${hero.potions}/${maxPotions()}</span></div><div class="s">${it.desc}</div></div>
+          <div class="ebtns"><button class="btn small ${ok ? 'primary' : ''}" data-act="buyItem" data-id="${id}" ${ok ? '' : 'disabled'}>${full ? tr('満タン') : money(it.price)}</button></div></div>`;
       }).join('');
     }
     return `

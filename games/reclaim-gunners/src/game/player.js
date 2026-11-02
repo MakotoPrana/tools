@@ -243,6 +243,7 @@ export function hurtPlayer(raw, srcLv) {
   d = Math.max(1, Math.round(d));
   P.hp -= d;
   P.inv = 0.6;
+  G.justStreak = 0; // 攻撃を受けると、ジャスト回避の連続が切れる
   P.hurtT = 0.25;
   G.shake = Math.max(G.shake, 4);
   addText(P.x, P.y - 14, `-${d}`, '#ff6b6b', 11);

@@ -232,11 +232,13 @@ export function drawLairs() {
 export function drawTele(t) {
   const k = clamp(t.t / t.dur, 0, 1);
   ctx.save();
+  // ジャスト回避できる攻撃は、最後の 0.15 秒だけ白く光る (この少し前に回避するとジャスト回避)
+  const hot = t.just && t.dur - t.t < 0.15;
   if (t.type === 'circle') {
     // 自分の必殺技の爆発は金色、敵の攻撃は赤
-    ctx.fillStyle = t.mine ? `rgba(255,210,90,${0.1 + k * 0.15})` : `rgba(255,60,60,${0.12 + k * 0.18})`;
+    ctx.fillStyle = hot ? 'rgba(255,255,255,0.45)' : t.mine ? `rgba(255,210,90,${0.1 + k * 0.15})` : `rgba(255,60,60,${0.12 + k * 0.18})`;
     circle(ctx, t.x, t.y, t.r);
-    ctx.strokeStyle = t.mine ? 'rgba(255,220,120,0.85)' : 'rgba(255,90,90,0.8)';
+    ctx.strokeStyle = hot ? '#ffffff' : t.mine ? 'rgba(255,220,120,0.85)' : 'rgba(255,90,90,0.8)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(t.x, t.y, t.r * k, 0, TAU);
@@ -252,7 +254,7 @@ export function drawTele(t) {
   } else if (t.type === 'line') {
     ctx.translate(t.x, t.y);
     ctx.rotate(t.a);
-    ctx.fillStyle = `rgba(255,60,60,${0.1 + k * 0.2})`;
+    ctx.fillStyle = hot ? 'rgba(255,255,255,0.5)' : `rgba(255,60,60,${0.1 + k * 0.2})`;
     ctx.fillRect(0, -t.w / 2, t.len, t.w);
     ctx.fillStyle = 'rgba(255,90,90,0.7)';
     ctx.fillRect(0, -1, t.len * k, 2);

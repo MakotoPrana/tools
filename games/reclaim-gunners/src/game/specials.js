@@ -81,18 +81,26 @@ export function useSpecial() {
 }
 
 // ジャスト回避: 攻撃してきた相手へ、ゲージを使わずに 1 回出す
+//   続けて決めると「連続」が増え (8 秒あくか、攻撃を受けると 0 に戻る)、反撃の威力が 1 回ごとに +25% (最大 ×2)。
+//   ジャスト回避するたびに、必殺技ゲージも 10 たまる
 export function justDodge(src) {
   if (G.dead) return;
+  G.justStreak = G.t - (G.justAt || -99) < 8 ? (G.justStreak || 0) + 1 : 1;
+  G.justAt = G.t;
+  const mul = Math.min(2, 1 + 0.25 * (G.justStreak - 1));
   G.slowT = 0.45; // 少しのあいだ時間がゆっくりになる
+  G.justPop = { n: G.justStreak, mul, t: 0.9, max: 0.9 };
+  G.justFlash = 0.3;
   P.inv = Math.max(P.inv, 0.6);
   sfx('just');
-  addText(P.x, P.y - 24, tr('ジャスト回避!'), '#9ff0ff', 12);
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * TAU;
-    addPart({ x: P.x, y: P.y, vx: Math.cos(a) * 120, vy: Math.sin(a) * 120, life: 0.35, color: '#9ff0ff', size: 2.5, glow: true });
+  addGauge(10);
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * TAU;
+    addPart({ x: P.x, y: P.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, life: 0.4, color: i % 2 ? '#9ff0ff' : '#ffffff', size: 2.5, glow: true });
   }
+  addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.35, color: '#9ff0ff', size: 50, ring: true });
   const id = spWeaponId();
-  if (id) castSpecial(id, src);
+  if (id) castSpecial(id, src, mul);
 }
 
 // 向き: 相手が決まっていればその方へ。なければ近くの敵、いなければいま向いている方へ
@@ -112,10 +120,11 @@ function aimAt(src) {
   return { a: P.aim, x: P.x + Math.cos(P.aim) * 140, y: P.y + Math.sin(P.aim) * 140 };
 }
 
-export function castSpecial(id, src) {
+export function castSpecial(id, src, mul = 1) {
   const st = spState(id);
   const i = st.set;
   const p = spParams(id, i);
+  p.dmg *= mul;
   const w = effW(id);
   const elem = () => (w.elem === 'cycle' ? pick(['fire', 'ice', 'thunder']) : w.elem);
   const color = ELEMS[w.elem] ? ELEMS[w.elem].color : '#ffd84a';
@@ -234,6 +243,11 @@ export function updateSpecial(dt) {
     if (P.rapid.t <= 0) P.rapid = null;
   }
   G.spFlash = Math.max(0, (G.spFlash || 0) - dt);
+  G.justFlash = Math.max(0, (G.justFlash || 0) - dt);
+  if (G.justPop) {
+    G.justPop.t -= dt;
+    if (G.justPop.t <= 0) G.justPop = null;
+  }
   if (G.cutin) {
     G.cutin.t -= dt;
     if (G.cutin.t <= 0) G.cutin = null;
