@@ -1,6 +1,6 @@
 // 全体図
 import { LINKS, STAGES, money, tr } from '../core/config.js';
-import { loadSave, save, setSave } from '../core/save.js';
+import { allStagesOpen, loadSave, save, setSave } from '../core/save.js';
 import { D, hero, heroDef, prog } from '../game/hero.js';
 import { G, setG, stageDef } from '../game/stage.js';
 import { actions } from './actions.js';
@@ -30,7 +30,7 @@ export const WORLD = {
 export let selStage = 1;
 
 export function stageReachable(id) {
-  if (id === 1) return true;
+  if (id === 1 || allStagesOpen()) return true;
   return LINKS.some((l) => (l.a === id || l.b === id) && prog.bosses.includes(l.boss));
 }
 export function stageProgress(def) {

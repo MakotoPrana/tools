@@ -17,6 +17,8 @@ export const MAX_PARTS = 600;
 export const SAVE_KEY = 'reclaimGunners.v1';
 export const SETTINGS_KEY = 'reclaimGunners.settings';
 export const DEBUG = /[?&]debug=1/.test(location.search);
+// テスト版 (テストプレイ用のページは window.RG_TEST を立てる。?debug=1 でも同じ): 設定に「全ステージに行ける」が出る
+export const TEST = DEBUG || !!window.RG_TEST;
 // 言葉 (lang.js)。tr('日本語の文', { 差しこむ値 }) で、選んでいる言葉の文になる
 export const tr = RG.t;
 

@@ -1,5 +1,5 @@
 // セーブと設定: localStorage への読み書き
-import { HEROES, SAVE_KEY, SETTINGS_KEY } from './config.js';
+import { HEROES, SAVE_KEY, SETTINGS_KEY, TEST } from './config.js';
 import { hero } from '../game/hero.js';
 import { flashSaving } from '../ui/toast.js';
 
@@ -106,6 +106,9 @@ export function setGoldAtSave(v) {
 }
 
 // ほかのモジュールから save を入れかえるとき
+// テスト版で「全ステージに行ける」を ON にしているか
+export const allStagesOpen = () => TEST && !!settings.allStages;
+
 export function setSave(v) {
   save = v;
 }
