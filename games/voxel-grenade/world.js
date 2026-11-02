@@ -76,8 +76,8 @@
       }
     }
     world.alive -= removed.length;
-    const fallen = removed.length ? detach(world) : [];
-    return { removed, fallen };
+    const { fallen, pieces } = removed.length ? detach(world) : { fallen: [], pieces: [] };
+    return { removed, fallen, pieces };
   }
 
   // 6方向につながったブロックのかたまりに分ける。base は地面 (y = 0 の段) に接するブロックの数
@@ -117,20 +117,25 @@
     return list;
   }
 
-  // 地面につながっていないかたまりと、支えが足りなくなったかたまりを外して返す
+  // 地面につながっていないかたまりと、支えが足りなくなったかたまりを外して返す。
+  // pieces はかたまりごと (base はそのかたまりで地面に接していたボクセルの数。0 なら宙に浮いていた)
   function detach(world) {
     const fallen = [];
+    const pieces = [];
     for (const comp of components(world)) {
       const weak = comp.base < 8 || comp.base / comp.cells.length < world.baseRatio[comp.cells[0]] * world.collapse;
       if (comp.base > 0 && !weak) continue;
+      const cells = [];
       for (const i of comp.cells) {
         const [x, y, z] = coords(world, i);
-        fallen.push({ i, x, y, z, mat: world.cells[i] });
+        cells.push({ i, x, y, z, mat: world.cells[i] });
         world.cells[i] = 0;
       }
+      pieces.push({ cells, base: comp.base });
+      for (const c of cells) fallen.push(c);
     }
     world.alive -= fallen.length;
-    return fallen;
+    return { fallen, pieces };
   }
 
   function destroyedRatio(world) {

@@ -622,10 +622,190 @@
   })();
   const smokes = [];
 
+  // 土ぼこり (地面の点 (x, z) のまわりに n こ)
+  function spawnDust(x, z, n, spread) {
+    for (let k = 0; k < n; k++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0xcbb89a, transparent: true, opacity: 0.6, depthWrite: false }));
+      sp.position.set(x + (Math.random() - 0.5) * spread, 0.8, z + (Math.random() - 0.5) * spread);
+      sp.scale.setScalar(2);
+      scene.add(sp);
+      smokes.push({ sprite: sp, t: -Math.random() * 0.3, life: 2.5, vel: new THREE.Vector3((Math.random() - 0.5) * 3, 0.8, (Math.random() - 0.5) * 3), grow: 4 + spread * 0.1 });
+    }
+  }
+
+  // ボクセルを 2 × 2 × 2 ずつまとめた破片の、ワールドの中心と色
+  function chunksOf(cells) {
+    const map = new Map();
+    for (const f of cells) {
+      const key = (f.x >> 1) + ',' + (f.y >> 1) + ',' + (f.z >> 1);
+      if (!map.has(key)) {
+        map.set(key, {
+          x: ox + ((f.x >> 1) * 2 + 1) * CELL,
+          y: ((f.y >> 1) * 2 + 1) * CELL,
+          z: oz + ((f.z >> 1) * 2 + 1) * CELL,
+          color: cellColor(f.i, f.mat).clone(),
+        });
+      }
+    }
+    return [...map.values()];
+  }
+
+  // ---------- 折れて倒れるかたまり ----------
+  // 地面に足が残っているかたまりは、残った足の端を支点にして、重心の側へ倒れる。
+  // 宙に浮いたかたまりは、爆発した側へかたむきながら落ちる。
+  // 地面か、残っている建物にぶつかったところで、2 × 2 × 2 ボクセルずつの破片に砕ける。
+  // 足が残っていても、高さより横に広いかたまり (城壁ごとくずれたときなど) は倒さずに、その場でくずす
+
+  const PIECE_MIN = 48; // これより小さいかたまりは、すぐ破片にする
+  const SAMPLE_MAX = 260; // ぶつかったかを調べるボクセルの数
+  const UP = new THREE.Vector3(0, 1, 0);
+  let pieces = [];
+
+  // かたまりを動かしはじめる。その場でくずすほうがよいときは false を返す
+  function spawnPiece(piece, boom) {
+    const n = piece.cells.length;
+    if (piece.base > 0) {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, y1 = 0;
+      for (const f of piece.cells) {
+        x0 = Math.min(x0, f.x);
+        x1 = Math.max(x1, f.x);
+        z0 = Math.min(z0, f.z);
+        z1 = Math.max(z1, f.z);
+        y1 = Math.max(y1, f.y);
+      }
+      if (y1 + 1 < Math.max(x1 - x0 + 1, z1 - z0 + 1) * 0.7) return false;
+    }
+    const world0 = (f) => new THREE.Vector3(ox + (f.x + 0.5) * CELL, (f.y + 0.5) * CELL, oz + (f.z + 0.5) * CELL);
+    const com = new THREE.Vector3();
+    for (const f of piece.cells) com.add(world0(f));
+    com.divideScalar(n);
+
+    const p = { t: 0, angle: 0, omega: 0, vel: new THREE.Vector3(), axis: new THREE.Vector3(1, 0, 0), quat: new THREE.Quaternion() };
+    if (piece.base > 0) {
+      // 残った足の中心から、重心と爆発の側へ倒す
+      const feet = piece.cells.filter((f) => f.y === 0).map(world0);
+      const mid = feet.reduce((a, v) => a.add(v), new THREE.Vector3()).divideScalar(feet.length);
+      const dir = new THREE.Vector3(com.x - mid.x, 0, com.z - mid.z);
+      const toBoom = new THREE.Vector3(boom.x - mid.x, 0, boom.z - mid.z);
+      if (toBoom.lengthSq() > 1e-6) dir.addScaledVector(toBoom.normalize(), 0.5);
+      if (dir.lengthSq() < 1e-6) dir.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+      dir.normalize();
+      let reach = 0;
+      for (const v of feet) reach = Math.max(reach, (v.x - mid.x) * dir.x + (v.z - mid.z) * dir.z);
+      p.mode = 'topple';
+      p.pivot = new THREE.Vector3(mid.x + dir.x * (reach + CELL / 2), 0, mid.z + dir.z * (reach + CELL / 2));
+      p.axis.crossVectors(UP, dir).normalize();
+      p.arm = Math.max(1, com.distanceTo(p.pivot));
+      p.omega = 0.1;
+    } else {
+      // 爆発した側へかたむきながら落ちる
+      const dir = new THREE.Vector3(boom.x - com.x, 0, boom.z - com.z);
+      if (dir.lengthSq() < 1e-6) dir.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+      p.mode = 'fall';
+      p.pivot = com.clone();
+      p.axis.crossVectors(UP, dir.normalize()).normalize();
+      p.omega = 0.4 + Math.random() * 0.4;
+      const away = new THREE.Vector3(com.x - boom.x, 0, com.z - boom.z);
+      if (away.lengthSq() > 1e-6) p.vel.addScaledVector(away.normalize(), 1.2);
+    }
+
+    // 支点を原点にした、ボクセルの位置と色
+    p.mesh = new THREE.InstancedMesh(blockGeo, blockMat, n);
+    p.mesh.castShadow = true;
+    p.mesh.frustumCulled = false;
+    p.local = [];
+    piece.cells.forEach((f, k) => {
+      const v = world0(f).sub(p.pivot);
+      tmpMat.makeScale(CELL, CELL, CELL).setPosition(v);
+      p.mesh.setMatrixAt(k, tmpMat);
+      p.mesh.setColorAt(k, cellColor(f.i, f.mat));
+    });
+    p.mesh.position.copy(p.pivot);
+    scene.add(p.mesh);
+
+    // 砕けたときの破片 (支点を原点にした位置)
+    p.chunks = chunksOf(piece.cells).map((c) => ({ local: new THREE.Vector3(c.x, c.y, c.z).sub(p.pivot), color: c.color }));
+    // ぶつかったかを調べるボクセル。外側に近いものと、ばらばらに選んだもの
+    const all = piece.cells.map((f) => ({ local: world0(f).sub(p.pivot), h: (f.y + 0.5) * CELL }));
+    all.sort((a, b) => b.local.lengthSq() - a.local.lengthSq());
+    const outer = all.slice(0, SAMPLE_MAX / 2);
+    const rest = all.slice(SAMPLE_MAX / 2);
+    for (let k = 0; k < SAMPLE_MAX / 2 && rest.length; k++) outer.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
+    p.samples = outer;
+    p.size = n;
+    pieces.push(p);
+    return true;
+  }
+
+  const pieceVec = new THREE.Vector3();
+
+  function updatePieces(dt) {
+    for (let k = pieces.length - 1; k >= 0; k--) {
+      const p = pieces[k];
+      p.t += dt;
+      if (p.mode === 'topple') {
+        // 倒れはじめはゆっくり、だんだん速く (支点のまわりの振り子)
+        p.omega += (GRAVITY / p.arm) * Math.sin(p.angle + 0.12) * 0.8 * dt;
+        p.angle += p.omega * dt;
+      } else {
+        p.vel.y -= GRAVITY * dt;
+        p.mesh.position.addScaledVector(p.vel, dt);
+        p.angle += p.omega * dt;
+      }
+      p.quat.setFromAxisAngle(p.axis, p.angle);
+      p.mesh.quaternion.copy(p.quat);
+
+      let hit = p.t > 6 || (p.mode === 'topple' && p.angle > 1.5);
+      for (let j = 0; !hit && j < p.samples.length; j++) {
+        const s = p.samples[j];
+        pieceVec.copy(s.local).applyQuaternion(p.quat).add(p.mesh.position);
+        // 倒れるかたまりの足もとは、はじめから地面についているので数えない
+        if (pieceVec.y < CELL * 0.3 && (p.mode === 'fall' || s.h > 1.5)) hit = true;
+        // 残っている建物にぶつかったときは、少しめりこむまで待つ (落ちて、かたむくのが見えるように)
+        else if (p.t > (p.mode === 'fall' ? 0.35 : 0.2) && solidAtWorld(pieceVec.x, pieceVec.y, pieceVec.z)) hit = true;
+      }
+      if (hit) {
+        shatterPiece(p);
+        pieces.splice(k, 1);
+      }
+    }
+  }
+
+  // かたまりを破片にする。破片は、かたまりが動いていた速さを引きつぐ
+  function shatterPiece(p) {
+    const center = new THREE.Vector3();
+    const spin = p.axis.clone().multiplyScalar(p.omega);
+    for (const c of p.chunks) {
+      const r = c.local.clone().applyQuaternion(p.quat);
+      const wp = r.clone().add(p.mesh.position);
+      const v = new THREE.Vector3().crossVectors(spin, r).add(p.vel);
+      spawnDebris(wp.x, wp.y, wp.z, v.x * 0.6 + (Math.random() - 0.5) * 3, Math.abs(v.y) * 0.25 + Math.random() * 3, v.z * 0.6 + (Math.random() - 0.5) * 3, CELL * 1.9, c.color, 3.5 + Math.random() * 3);
+      center.add(wp);
+    }
+    center.divideScalar(Math.max(1, p.chunks.length));
+    scene.remove(p.mesh);
+    if (p.mesh.dispose) p.mesh.dispose();
+
+    const units = p.size / 8;
+    spawnDust(center.x, center.z, Math.min(14, 2 + Math.floor(units / 20)), Math.min(12, 2 + Math.sqrt(units)));
+    sound.crumble(Math.min(1, 0.3 + units / 300));
+    const camDist = camera.position.distanceTo(center);
+    view.shake = Math.max(view.shake, Math.min(1.2, 0.3 + units / 250) * Math.min(1, 30 / camDist));
+    pushDebris(center.x, 0.5, center.z, 4);
+  }
+
+  function clearPieces() {
+    for (const p of pieces) {
+      scene.remove(p.mesh);
+      if (p.mesh.dispose) p.mesh.dispose();
+    }
+    pieces = [];
+  }
+
   function explodeAt(pos) {
     lastBoom = clock;
     const gx = (pos.x - ox) / CELL, gy = pos.y / CELL, gz = (pos.z - oz) / CELL;
-    const { removed, fallen } = World.explode(world, gx, gy, gz);
+    const { removed, fallen, pieces: broken } = World.explode(world, gx, gy, gz);
 
     // 破片が多すぎると重くなるので、こわれたボクセルが多いときは一部だけ破片にする
     const chance = Math.min(1, 450 / Math.max(1, removed.length));
@@ -640,20 +820,19 @@
       const color = cellColor(r.i, r.mat);
       spawnDebris(wx, wy, wz, (dx / len) * sp, (dy / len) * sp + 4 + Math.random() * 4, (dz / len) * sp, CELL * (0.5 + Math.random() * 0.5), color, 2.2 + Math.random() * 1.5);
     }
-    // 支えを失ったブロックは、2 × 2 × 2 ボクセルずつのかたまりになってくずれ落ちる
-    const chunks = new Map();
-    for (const f of fallen) {
-      hideCell(f.i);
-      const key = (f.x >> 1) + ',' + (f.y >> 1) + ',' + (f.z >> 1);
-      if (!chunks.has(key)) chunks.set(key, f);
+    // 支えを失ったかたまりは、形のまま倒れたり落ちたりして、ぶつかったところで砕ける。
+    // 小さなかたまりは、すぐに 2 × 2 × 2 ボクセルずつの破片にする
+    for (const piece of broken) {
+      if (piece.cells.length < PIECE_MIN || !spawnPiece(piece, pos)) {
+        for (const c of chunksOf(piece.cells)) {
+          const dx = c.x - pos.x, dz = c.z - pos.z;
+          const len = Math.hypot(dx, dz) || 1;
+          const push = Math.max(0, 6 - len) * 0.5;
+          spawnDebris(c.x, c.y, c.z, (dx / len) * push + (Math.random() - 0.5) * 1.5, Math.random() * 1.5, (dz / len) * push + (Math.random() - 0.5) * 1.5, CELL * 1.9, c.color, 4 + Math.random() * 3);
+        }
+      }
     }
-    for (const f of chunks.values()) {
-      const wx = ox + ((f.x >> 1) * 2 + 1) * CELL, wy = ((f.y >> 1) * 2 + 1) * CELL, wz = oz + ((f.z >> 1) * 2 + 1) * CELL;
-      const dx = wx - pos.x, dz = wz - pos.z;
-      const len = Math.hypot(dx, dz) || 1;
-      const push = Math.max(0, 6 - len) * 0.5;
-      spawnDebris(wx, wy, wz, (dx / len) * push + (Math.random() - 0.5) * 1.5, Math.random() * 1.5, (dz / len) * push + (Math.random() - 0.5) * 1.5, CELL * 1.9, cellColor(f.i, f.mat), 4 + Math.random() * 3);
-    }
+    for (const f of fallen) hideCell(f.i);
     house.instanceMatrix.needsUpdate = true;
     pushDebris(pos.x, pos.y, pos.z, 14);
 
@@ -683,23 +862,12 @@
         grow: 3 + Math.random() * 3,
       });
     }
-    // 落ちたブロックが多いと、土ぼこりも立てる
-    const dust = Math.min(14, Math.floor(chunks.size / 25));
-    for (let k = 0; k < dust; k++) {
-      const f = fallen[Math.floor(Math.random() * fallen.length)];
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0xcbb89a, transparent: true, opacity: 0.6, depthWrite: false }));
-      sp.position.set(ox + (f.x + 0.5) * CELL, 0.8, oz + (f.z + 0.5) * CELL);
-      sp.scale.setScalar(2);
-      scene.add(sp);
-      smokes.push({ sprite: sp, t: -0.3 - Math.random() * 0.4, life: 2.5, vel: new THREE.Vector3((Math.random() - 0.5) * 2, 0.8, (Math.random() - 0.5) * 2), grow: 4 });
-    }
 
     // 音やゆれの大きさは、以前の1マス (ボクセル8つ) を単位にして決める
     const fallenUnits = fallen.length / 8, removedUnits = removed.length / 8;
     const camDist = camera.position.distanceTo(pos);
     view.shake = Math.min(1.2, 0.5 + fallenUnits / 300) * Math.min(1, 30 / camDist);
     sound.boom(Math.min(1, 0.6 + fallenUnits / 400));
-    if (fallenUnits > 30) sound.crumble(Math.min(1, fallenUnits / 300));
 
     if (fallenUnits > 150) callout('大崩壊!');
     else if (fallenUnits > 40) callout('ガラガラ!');
@@ -979,6 +1147,7 @@
     clearGrenades();
     clearDebris();
     clearEffects();
+    clearPieces();
     buildHouse();
     frameStage();
     bombsLeft = STAGES[k].grenades;
@@ -1148,6 +1317,7 @@
       if (state === 'menu') view.theta += dt * 0.12; // 選ぶ画面のうしろで、家をゆっくり回す
       updateGrenades(dt);
       updateDebris(dt);
+      updatePieces(dt);
       updateEffects(dt);
       checkEnd();
     }
