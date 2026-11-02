@@ -1,4 +1,5 @@
 // ステージ図と、プレイへの出入り
+import { areaTrack, bossTrack } from '../core/analytics.js';
 import { sfx } from '../audio/sound.js';
 import { BOSSES, TAU, TILE, tr } from '../core/config.js';
 import { D, diffId, hero, lvColor, powerLv, prog } from '../game/hero.js';
@@ -180,6 +181,8 @@ export function enterPlay(stageId, pointId) {
 }
 
 export function leaveToWorld() {
+  areaTrack.quit();
+  bossTrack.quit();
   collectAllMats();
   setG(null);
   showWorld();

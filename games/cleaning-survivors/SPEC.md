@@ -645,3 +645,7 @@
 ### テスト版
 
 - index.html に `<meta name="cs-test-unlock" content="1">` を入れると、全ステージ・全モード・全清掃員を最初から選べる（テストプレイ用。公開版には入れない）
+
+## アクセス解析
+
+- ステージの開始・結末・リトライを、全ゲーム共通のイベント (`stage_start` / `stage_end` / `stage_retry_fail` など) で送る。同じ中身で頭に `cs_` をつけたイベント (`cs_stage_start` / `cs_stage_end` / `cs_stage_retry_fail` など) も送り、このゲームだけを見たいときに使う。力尽きるたびに `cs_death` も送る (復活したぶんも数える)。中身は [games/ANALYTICS.md](../ANALYTICS.md)

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>スプライト作成</title>
+  <meta name="description" content="画像の背景を切り抜き、ドット絵にして、歩きのスプライトアニメまで作れるツール。3つの段階を1つの画面で進められ、それぞれ PNG で保存できます。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <p class="back"><a href="../">‹ ツール一覧</a></p>
+    <h1>スプライト作成</h1>
+    <p class="subtitle">背景を切り抜き、ドット絵にして、歩かせるまでを1つの画面で。<br />どの段階からでも始められます。画像はブラウザの外に送られません。</p>
+
+    <nav class="steps" role="tablist" aria-label="段階">
+      <button type="button" role="tab" id="tab-cutout" aria-controls="step-cutout"><b>1</b>背景を切り抜く</button>
+      <button type="button" role="tab" id="tab-pixel" aria-controls="step-pixel"><b>2</b>ドット絵にする</button>
+      <button type="button" role="tab" id="tab-walk" aria-controls="step-walk"><b>3</b>歩かせる</button>
+    </nav>
+
+    <div class="step" id="step-cutout" role="tabpanel" aria-labelledby="tab-cutout">
+
+    <section class="card">
+      <label id="c-drop" class="drop" for="c-file">
+        <input type="file" id="c-file" accept="image/*" />
+        <span id="c-drop-text" class="drop-text"><strong>画像を選ぶ</strong><br />ここにドラッグ、または貼り付け (Ctrl+V) もできます</span>
+      </label>
+      <p id="c-src-info" class="src-info"></p>
+    </section>
+
+    <section id="c-auto-card" class="card" hidden>
+      <h2>1. 自動で消す</h2>
+      <p class="hint">画像のふちに多い色 (市松模様なら 2 色) を背景とみなして消します。絵に囲まれた背景 (腕と体のすき間など) も、ある程度の大きさがあれば消します。</p>
+      <label for="c-tol">背景とみなす色の幅 <output id="c-tol-out">40</output></label>
+      <input type="range" id="c-tol" min="5" max="120" value="40" />
+      <label for="c-hole">囲まれた背景を消す大きさ <output id="c-hole-out">0.05</output>% 以上</label>
+      <input type="range" id="c-hole" min="0" max="2" step="0.01" value="0.05" />
+      <label class="check"><input type="checkbox" id="c-fringe" checked /> ふちに残った背景の色も消す</label>
+      <button type="button" id="c-auto" class="primary">背景を自動で消す</button>
+    </section>
+
+    <section id="c-edit-card" class="card" hidden>
+      <h2>2. 細かく直す</h2>
+      <div class="tools" role="radiogroup" aria-label="道具">
+        <label class="tool"><input type="radio" name="tool" value="wand-erase" checked /><span>クリックで消す</span></label>
+        <label class="tool"><input type="radio" name="tool" value="wand-keep" /><span>クリックで戻す</span></label>
+        <label class="tool"><input type="radio" name="tool" value="brush-erase" /><span>ブラシで消す</span></label>
+        <label class="tool"><input type="radio" name="tool" value="brush-keep" /><span>ブラシで戻す</span></label>
+      </div>
+      <p id="c-tool-hint" class="hint"></p>
+      <div id="c-wand-opts">
+        <label for="c-wand-tol">クリックした色に近いとみなす幅 <output id="c-wand-tol-out">30</output></label>
+        <input type="range" id="c-wand-tol" min="1" max="120" value="30" />
+        <label class="check"><input type="checkbox" id="c-wand-global" /> つながっていない同じ色もまとめて</label>
+      </div>
+      <div id="c-brush-opts" hidden>
+        <label for="c-brush">ブラシの大きさ (画面の px) <output id="c-brush-out">20</output></label>
+        <input type="range" id="c-brush" min="2" max="80" value="20" />
+      </div>
+
+      <div class="row">
+        <div class="row-left">
+          <label for="c-zoom" class="inline">拡大</label>
+          <select id="c-zoom">
+            <option value="1" selected>全体</option>
+            <option value="2">2倍</option>
+            <option value="4">4倍</option>
+            <option value="8">8倍</option>
+          </select>
+          <label for="c-bgview" class="inline">背景の表示</label>
+          <select id="c-bgview">
+            <option value="checker" selected>市松模様</option>
+            <option value="black">黒</option>
+            <option value="white">白</option>
+            <option value="magenta">マゼンタ</option>
+          </select>
+        </div>
+        <div class="row-right">
+          <button type="button" id="c-undo" class="link-button" disabled>1つ戻す</button>
+          <button type="button" id="c-reset" class="link-button">最初からやり直す</button>
+        </div>
+      </div>
+      <div id="c-stage" class="cut-stage checker">
+        <canvas id="c-view" class="view" aria-label="切り抜きの結果"></canvas>
+      </div>
+      <p id="c-out-info" class="out-info"></p>
+    </section>
+
+    <section id="c-save-card" class="card" hidden>
+      <h2>3. 保存する</h2>
+      <label class="check"><input type="checkbox" id="c-trim" checked /> まわりの透明な余白を切り詰める</label>
+      <button type="button" id="c-save" class="primary">透明な PNG で保存</button>
+      <p class="to-pixel"><button type="button" id="c-to-pixel" class="link-button">この画像をドット絵にする (2. ドット絵にするへ) ›</button></p>
+    </section>
+  
+    </div>
+
+    <div class="step" id="step-pixel" role="tabpanel" aria-labelledby="tab-pixel" hidden>
+
+    <section class="card">
+      <label id="p-drop" class="drop" for="p-file">
+        <input type="file" id="p-file" accept="image/*" />
+        <span id="p-drop-text" class="drop-text"><strong>画像を選ぶ</strong><br />ここにドラッグ、または貼り付け (Ctrl+V) もできます</span>
+      </label>
+      <p id="p-src-info" class="src-info"></p>
+    </section>
+
+    <section id="p-crop-card" class="card" hidden>
+      <div class="result-head">
+        <h2>トリミング</h2>
+        <button type="button" id="p-crop-reset" class="link-button">全体に戻す</button>
+      </div>
+      <p class="crop-hint">ドラッグで変換する範囲を選びます。枠の中をドラッグすると移動、角をドラッグすると大きさが変わります。</p>
+      <div class="crop-stage">
+        <canvas id="p-crop" class="crop" aria-label="トリミングの範囲"></canvas>
+      </div>
+      <p id="p-crop-info" class="out-info"></p>
+    </section>
+
+    <section id="p-shape-card" class="card" hidden>
+      <h2>等身</h2>
+      <label class="check"><input type="checkbox" id="p-shape" /> 頭と体の比率 (等身) を変える</label>
+      <div id="p-shape-opts" hidden>
+        <p class="hint">トリミングの画像の赤い横線が、頭と体の境目 (首) です。ずれていたら、線をドラッグして首に合わせます。頭はそのままで、体を縦に縮めて (または伸ばして) 等身を変えます。</p>
+        <p id="p-shape-now" class="out-info shape-now"></p>
+        <label for="p-heads">等身 <output id="p-heads-out">2.5</output></label>
+        <input type="range" id="p-heads" min="1.5" max="8" step="0.5" value="2.5" />
+        <label for="p-body-w">体の太さ <output id="p-body-w-out">110</output>%</label>
+        <input type="range" id="p-body-w" min="80" max="150" step="5" value="110" />
+        <button type="button" id="p-neck-auto" class="link-button">境目を自動で置き直す</button>
+      </div>
+    </section>
+
+    <section class="card settings">
+      <h2>設定</h2>
+      <div class="size-row">
+        <div>
+          <label for="p-w">横 (px)</label>
+          <input type="number" id="p-w" inputmode="numeric" min="1" max="512" value="48" />
+        </div>
+        <span class="times" aria-hidden="true">×</span>
+        <div>
+          <label for="p-h">縦 (px)</label>
+          <input type="number" id="p-h" inputmode="numeric" min="1" max="512" value="48" />
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="p-lock" checked /> 縦横比をトリミングの範囲に合わせる</label>
+
+      <label for="p-colors">色数 <output id="p-colors-out">16</output></label>
+      <input type="range" id="p-colors" min="2" max="64" value="16" />
+
+      <label for="p-sat">彩度 <output id="p-sat-out">1.2</output></label>
+      <input type="range" id="p-sat" min="0" max="2" step="0.1" value="1.2" />
+
+      <label for="p-mode">色の決め方</label>
+      <select id="p-mode">
+        <option value="dominant">マスの中で一番多い色 (くっきり)</option>
+        <option value="average">マスの平均の色 (なめらか)</option>
+      </select>
+
+      <label class="check"><input type="checkbox" id="p-dither" /> ディザリング (平均の色のときだけ)</label>
+
+      <label class="check"><input type="checkbox" id="p-bg" checked /> 背景を透明にする (画像のふちの色を背景とみなす)</label>
+      <div id="p-tol-wrap">
+        <label for="p-tol">背景とみなす色の幅 <output id="p-tol-out">40</output></label>
+        <input type="range" id="p-tol" min="5" max="120" value="40" />
+      </div>
+
+      <div class="outline-row">
+        <label class="check"><input type="checkbox" id="p-outline" /> 輪郭線を付ける</label>
+        <input type="color" id="p-outline-color" value="#1a1a1a" aria-label="輪郭線の色" />
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="result-head">
+        <h2>結果</h2>
+        <label class="check small"><input type="checkbox" id="p-grid" checked /> マス目を表示</label>
+      </div>
+      <div class="stage">
+        <canvas id="p-view" class="view"></canvas>
+        <p id="p-empty" class="empty">画像を選ぶと、ここにドット絵が表示されます</p>
+      </div>
+      <p id="p-out-info" class="out-info"></p>
+
+      <div class="erase">
+        <p class="erase-title">クリックで直す</p>
+        <div class="tools" role="radiogroup" aria-label="結果をクリックしたときにすること">
+          <label class="tool"><input type="radio" name="p-click" value="erase" checked /><span>色を透明にする</span></label>
+          <label class="tool"><input type="radio" name="p-click" value="eye" /><span>目に光を入れる</span></label>
+        </div>
+        <div id="p-erase-opts">
+          <p class="crop-hint">結果のマス、または下の色見本をクリックすると、その色を透明にします。</p>
+          <div class="erase-row">
+            <label for="p-erase-mode">消す範囲</label>
+            <select id="p-erase-mode">
+              <option value="fill">クリックしたところとつながった同じ色</option>
+              <option value="color">画像の中の同じ色すべて</option>
+            </select>
+          </div>
+        </div>
+        <div id="p-eye-opts" hidden>
+          <p class="crop-hint">結果の黒目のマスをクリックすると、黒目の中に光の点を入れます。3 マス以上の大きさの黒目に入れられます。</p>
+          <div class="erase-row">
+            <label for="p-eye-pos">光の位置</label>
+            <select id="p-eye-pos">
+              <option value="left">左上</option>
+              <option value="right">右上</option>
+            </select>
+            <input type="color" id="p-eye-color" value="#ffffff" aria-label="光の色" />
+          </div>
+          <label class="check"><input type="checkbox" id="p-eye-both" checked /> もう片方の目にも同じように入れる</label>
+        </div>
+        <div class="erase-row">
+          <button type="button" id="p-erase-undo" class="link-button" disabled>1つ戻す</button>
+          <button type="button" id="p-erase-clear" class="link-button" disabled>すべて元に戻す</button>
+          <span id="p-erase-info" class="erase-info"></span>
+        </div>
+      </div>
+
+      <ul id="p-palette" class="palette" aria-label="使っている色 (クリックで透明にする)"></ul>
+
+      <div class="save-row">
+        <label for="p-scale">保存する大きさ</label>
+        <select id="p-scale">
+          <option value="1">等倍 (1マス = 1px)</option>
+          <option value="2">2倍</option>
+          <option value="4">4倍</option>
+          <option value="8" selected>8倍</option>
+          <option value="16">16倍</option>
+        </select>
+        <button type="button" id="p-save" disabled>PNG で保存</button>
+      </div>
+      <p class="to-walk"><button type="button" id="p-to-walk" class="link-button" disabled>このドット絵を歩かせる (3. 歩かせるへ) ›</button></p>
+    </section>
+  
+    </div>
+
+    <div class="step" id="step-walk" role="tabpanel" aria-labelledby="tab-walk" hidden>
+
+    <section class="card">
+      <label id="w-drop" class="drop" for="w-file">
+        <input type="file" id="w-file" accept="image/*" />
+        <span id="w-drop-text" class="drop-text"><strong>ドット絵を選ぶ</strong><br />背景が透明な PNG がおすすめです。ドラッグや貼り付け (Ctrl+V) もできます</span>
+      </label>
+      <p id="w-src-info" class="src-info"></p>
+    </section>
+
+    <section id="w-setup" class="card" hidden>
+      <h2>向きと手足の位置</h2>
+      <label for="w-dir">絵の向き</label>
+      <select id="w-dir">
+        <option value="right">横 (右向き)</option>
+        <option value="left">横 (左向き)</option>
+        <option value="front">正面</option>
+        <option value="back">後ろ向き</option>
+      </select>
+
+      <p class="hint">丸をドラッグして、肩・手・腰・足の位置に合わせます。白い丸が付け根 (肩・腰)、色のついた丸が先 (手・足) です。</p>
+      <div class="stage">
+        <canvas id="w-edit" class="edit" aria-label="手足の位置"></canvas>
+      </div>
+      <ul id="w-legend" class="legend"></ul>
+      <div class="row">
+        <label class="check small"><input type="checkbox" id="w-show-parts" checked /> 動かす部分を色分けして表示</label>
+        <button type="button" id="w-auto" class="link-button">自動で置き直す</button>
+      </div>
+
+      <div class="two">
+        <div>
+          <label for="w-arm-w">腕の太さ <output id="w-arm-w-out">2</output></label>
+          <input type="range" id="w-arm-w" min="0.5" max="12" step="0.5" value="2" />
+        </div>
+        <div>
+          <label for="w-leg-w">脚の太さ <output id="w-leg-w-out">3</output></label>
+          <input type="range" id="w-leg-w" min="0.5" max="12" step="0.5" value="3" />
+        </div>
+      </div>
+    </section>
+
+    <section id="w-motion" class="card" hidden>
+      <h2>動き</h2>
+      <label for="w-frames">コマ数</label>
+      <select id="w-frames">
+        <option value="4" selected>4 コマ</option>
+        <option value="6">6 コマ</option>
+        <option value="8">8 コマ</option>
+      </select>
+      <label for="w-leg-amp">歩幅 <output id="w-leg-amp-out">25</output></label>
+      <input type="range" id="w-leg-amp" min="0" max="45" value="25" />
+      <label for="w-arm-amp">腕の振り <output id="w-arm-amp-out">30</output></label>
+      <input type="range" id="w-arm-amp" min="0" max="70" value="30" />
+      <label for="w-elbow">ひじの曲げ <output id="w-elbow-out">35</output></label>
+      <input type="range" id="w-elbow" min="0" max="90" value="35" />
+      <label for="w-bob">上下の揺れ (px) <output id="w-bob-out">1</output></label>
+      <input type="range" id="w-bob" min="0" max="4" value="1" />
+      <label class="check" id="w-shade-wrap"><input type="checkbox" id="w-shade" checked /> 奥の手足を少し暗くする</label>
+    </section>
+
+    <section id="w-out" class="card" hidden>
+      <div class="row">
+        <h2>結果</h2>
+        <label class="speed" for="w-fps">速さ <output id="w-fps-out">8</output> コマ/秒</label>
+      </div>
+      <input type="range" id="w-fps" min="2" max="16" value="8" />
+      <div class="stage">
+        <canvas id="w-anim" class="anim" aria-label="歩きアニメ"></canvas>
+      </div>
+      <p class="hint">スプライトシート (左から順にコマを並べたもの)</p>
+      <div class="sheet-wrap">
+        <canvas id="w-sheet" class="sheet"></canvas>
+      </div>
+      <p id="w-out-info" class="out-info"></p>
+
+      <label class="check" id="w-mirror-wrap"><input type="checkbox" id="w-mirror" /> 左右反転したコマも下の段に付ける (反対向きの歩き)</label>
+      <div class="save-row">
+        <label for="w-scale">保存する大きさ</label>
+        <select id="w-scale">
+          <option value="1" selected>等倍</option>
+          <option value="2">2倍</option>
+          <option value="4">4倍</option>
+          <option value="8">8倍</option>
+        </select>
+        <button type="button" id="w-save">スプライトシートを PNG で保存</button>
+      </div>
+    </section>
+  
+    </div>
+  </main>
+
+  <footer class="guide">
+    <div class="container">
+      <section class="card">
+        <h2>使い方</h2>
+        <ol class="guide-list">
+          <li><b>背景を切り抜く</b>: 画像を選ぶと、背景を自動で消します。消え残りや消えすぎは、クリックやブラシで直します。</li>
+          <li><b>ドット絵にする</b>: 横と縦のピクセル数と色数を決めて、ドット絵にします。必要ならトリミングし、等身も変えられます。残したくない色はクリックで透明にします。「目に光を入れる」を選んで黒目をクリックすると、目に光の点が入ります。</li>
+          <li><b>歩かせる</b>: 絵の向きを選び、肩・手・腰・足の丸を手足に合わせると、歩きのコマができます。コマを横に並べたスプライトシートを保存します。</li>
+          <li>各段階の下のボタンで、できた絵を次の段階へそのまま渡せます。手持ちの画像から、好きな段階で始めることもできます。</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>しくみ</h2>
+        <p><b>背景を切り抜く</b>: 画像のふちに多い色 (市松模様なら2色) を背景とみなし、ふちにつながる部分と、絵に囲まれた大きめの部分を消します。</p>
+        <p><b>ドット絵にする</b>: 画像を指定のマス目に分け、画像全体からよく使われている色を指定の数だけ選び (k-means 法)、それぞれのマスをその中で一番多い色 (または平均の色に一番近い色) で塗ります。等身を変えるときは、絵の上から 12〜60% のあいだで横幅がいちばん細い行を首とみなし、そこから上を頭、下を体とします。頭はそのままにして体だけを縦に縮め (太さも変えて)、つなぎ直してからドット絵にします。目の光は、クリックしたマスとつながった同じ色の範囲を黒目とみなし、そのいちばん上の行の端のマスに入れます (黒目が 4 × 4 マス以上なら 2 × 2 マス)。もう片方の目は、同じ色で大きさが近く、高さがそろった範囲を探します。</p>
+        <p><b>歩かせる</b>: 肩から手、腰から足までの線の近くを腕と脚として切り分けます。横向きは腕と脚を付け根から前後に振り、ひじから先を前へ曲げます。地面に足が付くように体も上下させます。正面・後ろ向きは片足ずつ持ち上げ、ひじを体の内側へ曲げます。横向きで手足が1本ずつしか見えない絵でも、手前と奥の2本として動かします。</p>
+        <p class="guide-note">※ 等身を変えるとき、首が見えない絵 (フードや肩にかかる髪など) は、境目を手で首に合わせてください。頭より上に上げた手は、頭と一緒に扱われます。※ 絵を切り分けて動かすしくみなので、ひざは曲がりません。持っている道具は、手の近くにあるものだけが手と一緒に動きます。画像はこのブラウザの中だけで処理され、どこにも送信されません。</p>
+      </section>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  <script src="cutout.js"></script>
+  <script src="pixel.js"></script>
+  <script src="walk.js"></script>
+</body>
+</html>

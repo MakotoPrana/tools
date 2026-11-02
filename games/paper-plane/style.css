@@ -514,6 +514,7 @@ input[type="range"]:focus-visible { outline: 3px solid var(--sky); outline-offse
   color: var(--sky-deep);
   font-variant-numeric: tabular-nums;
 }
+.result-crash { margin: 2px 0 0; font-size: 0.78rem; font-weight: 800; color: #c2410c; }
 .result-note { margin: 4px 0 10px; font-size: 0.85rem; font-weight: 800; color: var(--ink-soft); }
 .result-note.is-best { color: var(--sun-deep); }
 .share-preview {
