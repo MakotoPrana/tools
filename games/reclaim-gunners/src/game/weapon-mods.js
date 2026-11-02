@@ -3,7 +3,9 @@ import { WEAPON } from '../core/config.js';
 import { D, hero } from './hero.js';
 // ---------- 武器の改造 (data/mods.js) ----------
 export const modLv = (id, mid) => (hero.mods[id] && hero.mods[id][mid]) || 0;
-export const modTotal = (id) => Object.values(hero.mods[id] || {}).reduce((a, b) => a + b, 0);
+// ★ = 基礎と固有の改造の Lv の合計 (迷路の通路「n〇〇」と秘宝は数えない)
+export const modTotal = (id) => Object.entries(hero.mods[id] || {}).reduce((a, [k, v]) => a + (/^n\d\d$/.test(k) ? 0 : v), 0);
+export const modTotalMax = (w) => RG.modsOf(w).filter(RG.modMajor).reduce((a, m) => a + m.max, 0);
 // 改造 1 Lv の値段。もとにする値段は武器の値段 (隠し武器は 15 万)
 export const modCost = (w, m, lv) => Math.ceil(((w.price || w.basePrice || 150000) * 0.15 * m.cost * Math.pow(1.28, lv)) / 10) * 10;
 export const modValue = (m, lv) => (m.mode === 'step' ? Math.floor(lv / m.step) * m.per : m.per * lv);
@@ -14,7 +16,10 @@ export function modShow(m, lv) {
   if (m.show === 'sec') return v.toFixed(1);
   return String(Math.round(v * 100) / 100);
 }
-export const modReqOk = (id, m) => !m.req || modLv(id, m.req[0]) >= m.req[1];
+// 迷路のマスを通れるか (核 / Lv が gate 以上)
+export const modPass = (id, m) => m.kind === 'root' || modLv(id, m.id) >= m.gate;
+// 上げられるか: もう Lv があるか、となりに通れるマスがある
+export const modReqOk = (id, m) => m.kind !== 'root' && (modLv(id, m.id) > 0 || RG.modTree(WEAPON[id]).adj[m.id].some((n) => modPass(id, n)));
 // 改造を入れた武器 (もとの武器を継いで、変わった値だけ上書きする)。戦いではこれを使う
 export const effCache = {};
 export function effW(id) {

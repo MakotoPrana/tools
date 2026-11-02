@@ -48,6 +48,7 @@ import './ui/board.js';
 import './ui/equip.js';
 import './ui/shop.js';
 import './ui/mods.js';
+import './ui/test-room.js';
 import './ui/materials.js';
 import './ui/settings.js';
 import './ui/toast.js';

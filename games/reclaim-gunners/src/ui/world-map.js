@@ -105,6 +105,7 @@ export function showWorld() {
           ${sp ? `<span class="muted"> ・ ${tr('解放 {a}/{b} エリア', { a: sp.n, b: sp.total })}</span>` : ''}</div>
         <button class="btn small" data-act="openBoard">${tr('能力ボード')}</button>
         <button class="btn small" data-act="openEquip">${tr('装備')}</button>
+        <button class="btn small" data-act="goTest" title="${tr('敵やボスを選んで呼び出し、武器を試す場所')}">${tr('テストルーム')}</button>
         <button class="btn primary" data-act="goStage" ${s.ready && reach ? '' : 'disabled'}>${!s.ready ? tr('準備中') : reach ? tr('このステージへ') : tr('守護者を倒すと開く')}</button>
       </div>
     </div></div>`;

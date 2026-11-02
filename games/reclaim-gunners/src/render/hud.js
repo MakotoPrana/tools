@@ -65,7 +65,8 @@ export function drawHud() {
     const left = area.nests.filter((n) => !n.dead).length;
     const status = area.free ? tr('解放済み ✓') : tr('魔巣 {a}/{b}', { a: left, b: area.def.nests.length });
     txt(area.def.name, VW / 2, 12, 11, '#f0d890', 'center', 'display');
-    txt(`${tr('推奨 Lv{a}〜{b}', { a: lv0, b: lv1 })}  ・  ${status}`, VW / 2, 24, 7.5, area.free ? '#7dffb0' : lvColor(lv1 - pl), 'center');
+    if (G.def.test) txt(tr('碑を調べると、敵やボスを呼び出せる'), VW / 2, 24, 7.5, '#d8c090', 'center');
+    else txt(`${tr('推奨 Lv{a}〜{b}', { a: lv0, b: lv1 })}  ・  ${status}`, VW / 2, 24, 7.5, area.free ? '#7dffb0' : lvColor(lv1 - pl), 'center');
   }
 
   // ボスの体力

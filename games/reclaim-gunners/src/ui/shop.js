@@ -4,7 +4,7 @@ import { CATS, ITEMS, SHOPS, WEAPON, WEAPONS, tr } from '../core/config.js';
 import { fmt } from '../core/util.js';
 import { canEquip, hero, maxPotions, prog } from '../game/hero.js';
 import { P, ensureWs, stageDef } from '../game/stage.js';
-import { effW, modTotal } from '../game/weapon-mods.js';
+import { effW, modTotal, modTotalMax } from '../game/weapon-mods.js';
 import { CAT_COLORS } from '../render/hud.js';
 import { actions } from './actions.js';
 import { head, rerender, uiShow } from './core.js';
@@ -48,7 +48,7 @@ export function showShop(shopId) {
     } else if (shopTab === 'up') {
       const owned = WEAPONS.filter((w) => hero.weapons[w.id] != null && canEquip(w));
       body = owned.map((w) => `<div class="row wrow"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30"><div>
-          <div class="t">${w.name} <span class="gold">★${modTotal(w.id)}</span><span class="muted"> / ${RG.modsOf(w).length * RG.MOD_MAX}</span></div>
+          <div class="t">${w.name} <span class="gold">★${modTotal(w.id)}</span><span class="muted"> / ${modTotalMax(w)}</span></div>
           <div class="s">${weaponStats(effW(w.id))}</div></div>
           <button class="btn small primary" data-act="openMods" data-id="${w.id}">${tr('改造する')}</button>
         </div>`).join('') || `<p class="muted">${tr('改造できる武器がない')}</p>`;

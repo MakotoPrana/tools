@@ -25,6 +25,7 @@ export function showPause() {
       <div class="panel-head"><h2>${tr('メニュー')}</h2><span class="stat">${heroDef.name} ・ ${D.name}</span></div>
       <div class="btn-col">
         <button class="btn primary" data-act="close">${tr('再開')}</button>
+        ${G.def.test ? `<button class="btn" data-act="openTest">${tr('敵とボスを呼び出す')}</button>` : ''}
         <button class="btn" data-act="openEquip">${tr('装備')}</button>
         <button class="btn" data-act="openBoard">${tr('能力ボード')}</button>
         <button class="btn" data-act="openMap">${tr('マップ')}</button>

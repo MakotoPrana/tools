@@ -195,6 +195,160 @@ RG.MOD_UNIQUE = {
   ],
 };
 
-// その武器の改造の一覧 (基礎 → 固有の順)
-RG.modsOf = (w) => [...RG.MOD_BASE[w.cat], ...(RG.MOD_UNIQUE[w.id] || [])];
+// ---------- 迷路のツリー ----------
+//   改造は 9 × 5 のマスに並ぶ。まん中のマス (核) から、迷路の通り道でつながる
+//   核のとなり 4 つが基礎の改造。固有の改造は迷路の奥。ほかのマスは「通路」(小さな強化。Lv2 まで)
+//   行き止まりのマスは「秘宝」(Lv3 まで。基礎の改造と同じ強さ)
+//   上げられる改造 = Lv が 1 以上か、となりに「通れる」改造があるもの
+//   通れる = 核 / その改造の Lv が gate 以上 (基礎 Lv3・固有 Lv5・通路と秘宝 Lv1)
+//   マスの並びは武器の id から決まる (いつも同じ迷路になる)
+RG.MOD_GRID = { w: 9, h: 5 };
+const KIND = {
+  base: { max: 10, gate: 3 },
+  uniq: { max: 10, gate: 5 },
+  minor: { max: 2, gate: 1, mul: 0.5, cost: 0.5 },
+  treasure: { max: 3, gate: 1, mul: 1, cost: 0.9 },
+};
+RG.MOD_KIND = KIND;
+
+const rngOf = (str) => {
+  let a = 2166136261;
+  for (const ch of str) a = Math.imul(a ^ ch.charCodeAt(0), 16777619);
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+function buildTree(w) {
+  const { w: GW, h: GH } = RG.MOD_GRID;
+  const rng = rngOf('tree:' + w.id);
+  const ri = (n) => Math.floor(rng() * n);
+  const key = (x, y) => y * GW + x;
+  const RX = (GW - 1) >> 1;
+  const RY = (GH - 1) >> 1;
+  const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  const near = (k) => dirs.map(([dx, dy]) => [(k % GW) + dx, ((k / GW) | 0) + dy]).filter(([x, y]) => x >= 0 && y >= 0 && x < GW && y < GH).map(([x, y]) => key(x, y));
+  const root = key(RX, RY);
+  const bases = dirs.map(([dx, dy]) => key(RX + dx, RY + dy));
+  // 穴 (マスのない所)。残りがひとつながりになるまで選び直す
+  let holes;
+  for (let tries = 0; tries < 50; tries++) {
+    holes = new Set();
+    while (holes.size < 5) {
+      const k = ri(GW * GH);
+      if (k !== root && !bases.includes(k)) holes.add(k);
+    }
+    const seen = new Set([root]);
+    const q = [root];
+    while (q.length) for (const n of near(q.pop())) if (!holes.has(n) && !seen.has(n)) seen.add(n), q.push(n);
+    if (seen.size === GW * GH - holes.size) break;
+  }
+  // 迷路を掘る (核 → 基礎 4 つ → そこから枝分かれ。新しいマスから掘り進むことが多いので、長い通路になる)
+  const edges = new Set();
+  const ek = (a, b) => (a < b ? `${a}-${b}` : `${b}-${a}`);
+  const visited = new Set([root, ...bases]);
+  for (const b of bases) edges.add(ek(root, b));
+  const parent = { [root]: null };
+  for (const b of bases) parent[b] = root;
+  const active = [...bases];
+  while (active.length) {
+    const i = rng() < 0.75 ? active.length - 1 : ri(active.length);
+    const c = active[i];
+    const opts = near(c).filter((n) => !holes.has(n) && !visited.has(n));
+    if (!opts.length) {
+      active.splice(i, 1);
+      continue;
+    }
+    const n = opts[ri(opts.length)];
+    visited.add(n);
+    edges.add(ek(c, n));
+    parent[n] = c;
+    active.push(n);
+  }
+  // 抜け道を少しだけ足す (迷路に輪をつくる。核と基礎のまわりには足さない)
+  const cand = [];
+  for (const a of visited) {
+    for (const b of near(a)) {
+      if (b < a || !visited.has(b) || edges.has(ek(a, b))) continue;
+      if ([a, b].some((k) => k === root || bases.includes(k))) continue;
+      cand.push(ek(a, b));
+    }
+  }
+  for (let n = 0; n < 3 && cand.length; n++) edges.add(cand.splice(ri(cand.length), 1)[0]);
+  const adjK = {};
+  for (const k of visited) adjK[k] = [];
+  for (const e of edges) {
+    const [a, b] = e.split('-').map(Number);
+    adjK[a].push(b);
+    adjK[b].push(a);
+  }
+  // 核からの道のり
+  const depth = { [root]: 0 };
+  const q = [root];
+  for (let h = 0; h < q.length; h++) for (const n of adjK[q[h]]) if (depth[n] == null) depth[n] = depth[q[h]] + 1, q.push(n);
+  const maxD = Math.max(...Object.values(depth));
+  // 固有の改造を迷路の奥へ (前の改造が固有なら、もっと奥へ)。ほかの固有とはなるべく離す
+  const uniq = RG.MOD_UNIQUE[w.id] || [];
+  const byU = Object.fromEntries(uniq.map((m) => [m.id, m]));
+  const tier = (m) => (m.req && byU[m.req[0]] ? 1 + tier(byU[m.req[0]]) : 1);
+  const order = uniq.slice().sort((a, b) => tier(b) - tier(a));
+  const place = {};
+  const used = new Set([root, ...bases]);
+  const md = (a, b) => Math.abs((a % GW) - (b % GW)) + Math.abs(((a / GW) | 0) - ((b / GW) | 0));
+  for (const m of order) {
+    const t = tier(m);
+    const target = t >= 2 ? maxD : Math.max(3, Math.round(maxD * 0.55));
+    let best = null;
+    let bs = -1e9;
+    for (const k of visited) {
+      if (used.has(k)) continue;
+      let s = -Math.abs(depth[k] - target) + (adjK[k].length === 1 ? 0.6 : 0) + rng() * 0.4;
+      for (const u of Object.values(place)) {
+        const d = md(k, u);
+        if (d <= 1) s -= 5;
+        else if (d === 2) s -= 1.5;
+      }
+      if (s > bs) bs = s, best = k;
+    }
+    place[m.id] = best;
+    used.add(best);
+  }
+  // マスに改造を入れる
+  const baseMods = RG.MOD_BASE[w.cat];
+  const pool = (list) => list.filter((m) => m.mode !== 'step');
+  const nodeAt = {};
+  const mk = (src, kind, k, extra = {}) => {
+    const n = Object.create(src);
+    Object.assign(n, { kind, x: k % GW, y: (k / GW) | 0, max: KIND[kind].max, gate: KIND[kind].gate, req: null }, extra);
+    nodeAt[k] = n;
+    return n;
+  };
+  mk({ id: 'core', get name() { return w.name; }, desc: '', stat: null }, 'base', root, { kind: 'root', max: 0, gate: 0 });
+  baseMods.forEach((m, i) => mk(m, 'base', bases[i]));
+  for (const m of uniq) mk(m, 'uniq', place[m.id]);
+  const minorPool = pool(baseMods);
+  const treasurePool = pool([...baseMods, ...uniq]);
+  for (const k of visited) {
+    if (nodeAt[k]) continue;
+    const leaf = adjK[k].length === 1;
+    const kind = leaf ? 'treasure' : 'minor';
+    const src = leaf ? treasurePool[ri(treasurePool.length)] : minorPool[ri(minorPool.length)];
+    mk(src, kind, k, { id: `n${k % GW}${(k / GW) | 0}`, per: src.per * KIND[kind].mul, cost: KIND[kind].cost, src });
+  }
+  const nodes = Object.values(nodeAt);
+  const adj = {};
+  for (const k of visited) adj[nodeAt[k].id] = adjK[k].map((n) => nodeAt[n]);
+  const links = [...edges].map((e) => e.split('-').map((k) => nodeAt[k]));
+  return { nodes, adj, links, holes: Array.from({ length: GW * GH }, (_, k) => k).filter((k) => !visited.has(k)).map((k) => [k % GW, (k / GW) | 0]), root: nodeAt[root], byId: Object.fromEntries(nodes.map((n) => [n.id, n])) };
+}
+
+const trees = {};
+RG.modTree = (w) => trees[w.id] || (trees[w.id] = buildTree(w));
+// その武器の改造の一覧 (核をのぞく、ツリーのすべてのマス)
+RG.modsOf = (w) => RG.modTree(w).nodes.filter((n) => n.kind !== 'root');
+// ★ に数える改造 (基礎と固有。通路と秘宝は数えない)
+RG.modMajor = (m) => m.kind === 'base' || m.kind === 'uniq';
 })();

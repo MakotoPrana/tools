@@ -308,10 +308,13 @@ export function killEnemy(e, w, crumbled) {
   if (e.dead) return;
   e.dead = true;
   if (e.home) e.home.children--;
+  const test = G.def.test; // テストルーム: ごほうびなし
   const mul = D.reward * (e.elite ? 3 : 1) * (e.mini ? 0.3 : 1);
   const exp = Math.round(e.def.exp * lvMul.exp(e.lv) * mul);
-  gainExp(exp);
-  hero.kills++;
+  if (!test) {
+    gainExp(exp);
+    hero.kills++;
+  }
   for (let i = 0; i < 8; i++) addPart({ x: e.x, y: e.y, vx: rnd(-80, 80), vy: rnd(-80, 80), life: rnd(0.2, 0.45), color: crumbled ? '#4a2a5a' : e.def.color, size: rnd(2, 3.5) });
   if (crumbled) return;
   sfx('kill');
@@ -326,11 +329,13 @@ export function killEnemy(e, w, crumbled) {
       }
     }
   }
-  const gold = Math.max(1, Math.round(e.def.gold * lvMul.gold(e.lv) * mul * (1 + 0.03 * rank('gold'))));
-  dropGold(e.x, e.y, gold);
-  const matRate = 0.15 * (1 + 0.03 * rank('mat')) * (heroDef.id === 'mira' ? 1.2 : 1) * D.mat;
-  if (e.elite || Math.random() < matRate) G.pickups.push({ type: 'mat', id: e.def.mat, x: e.x, y: e.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 9999 });
-  if (Math.random() < 0.02) G.pickups.push({ type: 'heart', x: e.x, y: e.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 12 });
+  if (!test) {
+    const gold = Math.max(1, Math.round(e.def.gold * lvMul.gold(e.lv) * mul * (1 + 0.03 * rank('gold'))));
+    dropGold(e.x, e.y, gold);
+    const matRate = 0.15 * (1 + 0.03 * rank('mat')) * (heroDef.id === 'mira' ? 1.2 : 1) * D.mat;
+    if (e.elite || Math.random() < matRate) G.pickups.push({ type: 'mat', id: e.def.mat, x: e.x, y: e.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 9999 });
+    if (Math.random() < 0.02) G.pickups.push({ type: 'heart', x: e.x, y: e.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 12 });
+  }
   if (w && w.demonHeal && e.def.demon) P.hp = Math.min(maxHp(), P.hp + w.demonHeal);
 }
 

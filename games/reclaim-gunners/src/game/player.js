@@ -212,7 +212,7 @@ export function updatePlayer(dt) {
 }
 
 export function hurtPlayer(raw, srcLv) {
-  if (P.inv > 0 || G.dead) return;
+  if (P.inv > 0 || G.dead || G.god) return;
   let d = raw * recvMul(srcLv - powerLv()) * (1 - Math.min(0.45, 0.015 * rank('def')));
   if (heroDef.id === 'gald') d *= 0.9;
   if (P.tackleT > 0) d *= 0.3;

@@ -14,9 +14,10 @@ import { hurtPlayer } from './player.js';
 import { G, P, stageDef } from './stage.js';
 import { toast } from '../ui/toast.js';
 
-export function makeBoss(id, l) {
+// opt.lv: レベルを決めるとき (テストルーム)
+export function makeBoss(id, l, opt = {}) {
   const def = BOSSES[id];
-  const lv = Math.min(99, def.lv + D.lv);
+  const lv = Math.min(99, opt.lv || def.lv + D.lv);
   const total = def.hp * lvMul.hp(lv);
   const b = { id, def, lair: l, lv, total, state: 'sleep', t: 0, parts: [], atk: def.atk * lvMul.atk(lv), cx: tc(l.x), cy: tc(l.y), R: l.r * TILE, act: 0, step: 0 };
   // 戦うエリア: 決闘場 (円) に入ると戦いが始まり、そのあとはこのエリアの中を動ける
@@ -81,7 +82,7 @@ export function updateBosses(dt) {
       if (!G.dead && !G.lock && dp < b.R - 4) {
         b.state = 'fight';
         G.lock = b;
-        bossTrack.start(`boss_${b.id}`, { difficulty: diffId, hero: heroDef.id, boss_lv: b.lv, player_lv: powerLv() });
+        if (!G.def.test) bossTrack.start(`boss_${b.id}`, { difficulty: diffId, hero: heroDef.id, boss_lv: b.lv, player_lv: powerLv() });
         showBanner(b.def.name, `Lv${b.lv}  ・  ${tr('エリアの出口に結界が張られた!')}`, lvColor(b.lv - powerLv()) === '#ff5a5a' ? tr('危険!') : '', 3, '#ff8aa8');
         sfx('boss');
         G.shake = 6;
@@ -163,6 +164,14 @@ export function bossDefeated(b) {
   for (const e of G.enemies) if (e.lair === b) e.crumble = rnd(0.2, 1);
   G.ebullets = [];
   G.teles = [];
+  // テストルーム: ごほうびも記録もなし
+  if (G.def.test) {
+    showBanner(tr('{name} 撃破!', { name: b.def.name }), tr('テストルームなので、ごほうびはない'), '', 3.5, '#ffd84a');
+    sfx('liberate');
+    for (let i = 0; i < 40; i++) addPart({ x: b.cx + rnd(-b.R, b.R), y: b.cy + rnd(-b.R, b.R), vx: 0, vy: rnd(-50, -10), life: rnd(0.8, 1.6), color: pick(['#ffd84a', '#fff3b0']), size: rnd(1.5, 3), glow: true });
+    updateFlow();
+    return;
+  }
   const first = !prog.bosses.includes(b.id);
   let sub = '';
   if (first) {
