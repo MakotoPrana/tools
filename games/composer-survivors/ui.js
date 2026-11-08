@@ -345,7 +345,14 @@
     Game.start({ song, composer, mode: save.mode, up: { ...ups(composer.id) } }, (res) => onFinish(res));
     closeTowerPanel();
     updateStartBtn();
+    keepBoardInView();
     stageTrack.start(song.id, { mode: save.mode, character: composer.id });
+  }
+  // ゲーム画面がページの外にずれていたら戻す (下の遊び方を読んでスクロールしたあとなど)
+  function keepBoardInView() {
+    const wrap = document.getElementById('board-wrap');
+    const r = wrap.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight + 1) wrap.scrollIntoView({ block: 'start' });
   }
   function setPlaying(p) {
     if (!p) {
@@ -451,15 +458,21 @@
   }
   function showDock() {
     dock.hidden = false;
-    // 下のほうのマスを選んだら、パネルは上に出す (譜面をかくさないように)
+    updateStartBtn();
+    // 下のほうのマスを選んだら、パネルは上に出す (譜面をかくさないように)。
+    // 縦長の画面では譜面が上に寄っていて、下の空きにパネルが出るので動かさない
+    // (クラス名は at-top。ヘッダーの .top と重ならないように)
     const G = Game.G;
-    dock.classList.toggle('top', !!(G && G.sel && G.sel.r >= 5));
+    const board = document.getElementById('board');
+    const portrait = board.clientHeight > board.clientWidth * 0.8;
+    dock.classList.toggle('at-top', !portrait && !!(G && G.sel && G.sel.r >= 5));
     refreshPanel();
   }
   function closeTowerPanel() {
     panel = null;
     dock.hidden = true;
     dock.innerHTML = '';
+    updateStartBtn();
     const G = Game.G;
     if (G) G.sel = null;
   }
@@ -476,7 +489,8 @@
   }
   function updateStartBtn() {
     const G = Game.G;
-    startBtn.hidden = !(screen === 'play' && G && G.phase === 'prep');
+    // パネルを開いている間は隠す (縦長の画面でパネルと重なるため)
+    startBtn.hidden = !(screen === 'play' && G && G.phase === 'prep' && !panel);
   }
 
   function pauseScreen() {
@@ -561,6 +575,7 @@
 
   function resultScreen(res, unlocks) {
     screen = 'result';
+    keepBoardInView();
     setPlaying(false);
     const { song, composer } = current;
     const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;

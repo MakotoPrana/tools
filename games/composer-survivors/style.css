@@ -262,8 +262,8 @@ body.playing .overlay { background: rgba(14, 10, 20, 0.82); }
 .tactions .btn { min-height: 36px; font-size: 0.85rem; }
 .tactions kbd, .evo-btn kbd { font: 700 0.62rem system-ui; background: rgba(0,0,0,0.3); border-radius: 3px; padding: 0 3px; }
 .lvl-dock { bottom: 8px; }
-.lvl-dock.top { bottom: auto; top: 46px; }
-.lvl-dock.top.in { animation: none; }
+.lvl-dock.at-top { bottom: auto; top: 46px; }
+.lvl-dock.at-top.in { animation: none; }
 .start-btn {
   position: absolute; z-index: 6; right: 14px; bottom: 14px; min-height: 52px; padding: 8px 26px; border-radius: 14px;
   background: linear-gradient(#c79a4a, #9b6d26); border: 1px solid #e3bd72; color: #1c1308; font: inherit; font-size: 1.15rem; font-weight: 800; cursor: pointer;
@@ -287,6 +287,8 @@ body.playing .overlay { background: rgba(14, 10, 20, 0.82); }
 .bravo { font-size: 1.2rem; font-weight: 800; color: var(--rose); }
 .stats { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .stats th { text-align: left; color: var(--panel-muted); font-weight: 600; padding: 3px 0; }
+.stats th, .stats td { color: var(--panel-text); font-size: inherit; }
+.stats th { color: var(--panel-muted); }
 .stats td { text-align: right; font-weight: 700; }
 .stats .gold { color: var(--gold); }
 .unlock { background: #2e4a3a; border-radius: 8px; padding: 6px 10px; color: var(--mint); font-weight: 700; }
@@ -331,4 +333,19 @@ body.playing .overlay { background: rgba(14, 10, 20, 0.82); }
   .tchoice b { font-size: 0.6rem; }
   .tchoice canvas { width: 22px !important; height: 22px !important; }
   .start-btn { min-height: 42px; padding: 4px 18px; font-size: 1rem; right: 8px; bottom: 8px; }
+}
+
+/* 背の低い画面 (スマホの横向き): メニューを詰める */
+@media (max-height: 520px) {
+  .overlay { padding: 10px 16px; }
+  .title-screen { gap: 4px; }
+  .title-notes { font-size: 1.2rem; }
+  .game-title { font-size: 1.9rem; }
+  .subtitle { margin: 0; font-size: 0.85rem; }
+  .title-portraits canvas { width: 48px !important; height: 48px !important; }
+  .btn.big { min-height: 42px; font-size: 1rem; padding: 4px 22px; }
+  .row { margin: 4px 0; }
+  .menu-head { margin-bottom: 6px; }
+  .composer-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  .composer-card canvas { width: 48px !important; height: 48px !important; }
 }

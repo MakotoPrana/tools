@@ -76,7 +76,9 @@
     const hudH = 40;
     scale = Math.min(W / FW, (H - hudH) / FH);
     offX = (W - FW * scale) / 2;
-    offY = hudH + (H - hudH - FH * scale) / 2;
+    // 縦長の画面では譜面を上に寄せ、下の空きをパネルに使う
+    const portrait = H > W * 0.8;
+    offY = portrait ? hudH : hudH + (H - hudH - FH * scale) / 2;
   }
   // 画面の座標 → 譜面の座標
   function toField(px, py) {
@@ -1365,8 +1367,8 @@
       by += 42;
     }
     ctx.globalAlpha = 1;
-    // 準備中
-    if (G.phase === 'prep') {
+    // 準備中 (パネルを開いている間は出さない)
+    if (G.phase === 'prep' && !G.sel) {
       ctx.font = 'bold 15px system-ui, sans-serif';
       const s = T('prepHint');
       const w = Math.min(W - 20, ctx.measureText(s).width + 24);
@@ -1374,6 +1376,12 @@
       ctx.fillRect(W / 2 - w / 2, offY + 8, w, 28);
       ctx.fillStyle = '#ffe9a8';
       ctx.fillText(s, W / 2, offY + 22, W - 30);
+      // 縦長の画面では横向きをすすめる
+      if (H > W * 0.8) {
+        ctx.font = '13px system-ui, sans-serif';
+        ctx.fillStyle = '#cfc3ff';
+        ctx.fillText('📱↻ ' + T('landscape'), W / 2, offY + FH * scale + 24, W - 30);
+      }
     }
     ctx.restore();
   }
