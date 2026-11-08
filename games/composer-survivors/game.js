@@ -374,7 +374,8 @@
   }
 
   function xpReq(L) {
-    return Math.round(5 + L * 3.6 + Math.max(0, L - 20) * 3);
+    // 最初の数レベルは早く上がる (楽譜どおりの音数だと出だしから密度が高いため)
+    return Math.round(3 + L * 2.6 + Math.max(0, L - 5) * 1.2 + Math.max(0, L - 20) * 3);
   }
 
   // ---------- 武器とパッシブ ----------
@@ -517,7 +518,10 @@
     const hardMul = G.hard ? HARD.hp : 1;
     const encMul = Math.pow(1.15, G.encore);
     const o = (src.p - 60) / 12;
-    let hp = logInterp(HP_TABLE, src.d) * clamp(Math.pow(1.35, -o), 0.4, 2.5) * STAR_MUL[G.song.stars - 1] * hardMul * encMul;
+    // 曲の出だしは弱め (120 秒かけて本来の強さに)。伴奏の音符は旋律より少し脆い
+    const ramp = G.encore ? 1 : Math.min(1, 0.3 + (0.7 * G.t) / 120);
+    const accomp = src.melody ? 1 : 0.75;
+    let hp = logInterp(HP_TABLE, src.d) * clamp(Math.pow(1.35, -o), 0.4, 2.5) * STAR_MUL[G.song.stars - 1] * hardMul * encMul * ramp * accomp;
     let r = logInterp(R_TABLE, src.d);
     let spd = clamp(55 * Math.pow(1.4, o), 22, 150) * Math.pow(1.04, G.encore);
     const mk = src.mk || '';
@@ -571,7 +575,7 @@
     n.hp = n.maxHp = hp;
     n.r = r;
     n.spd = spd;
-    n.dmg = DYN_DMG[n.v] * (G.hard ? HARD.dmg : 1) * (n.fermata ? 1.6 : 1);
+    n.dmg = DYN_DMG[n.v] * (G.hard ? HARD.dmg : 1) * (n.fermata ? 1.6 : 1) * (0.4 + 0.6 * ramp);
     n.xp = G.xpPer * (src.w || 1) * (n.melody ? 1.5 : 1) * (n.elite ? 3 : 1);
     // 吐き出す向き: 主人公の方向 ± 60° (和音は扇に広がる)
     const p = G.player;
@@ -1484,7 +1488,7 @@
     const th = sc.theme || { part: 0, from: 0, len: G.parsed.barLen * 4, tempo: 100 };
     const mul = G.hard ? HARD.tempo : 1;
     const bpm = th.tempo * mul;
-    const { notes } = window.CSAudio.parsePart(sc.parts[th.part].src, 0, 'theme');
+    const { notes } = window.CSAudio.partNotes(sc.parts[th.part], 0, 'theme', sc.ppq);
     const list = [];
     for (const n of notes) {
       if (n.t < th.from - 1e-6 || n.t >= th.from + th.len - 1e-6) continue;
@@ -1499,7 +1503,7 @@
     b.maxHp = b.hp = 1250 * STAR_MUL[G.song.stars - 1] * (G.hard ? HARD.hp : 1);
     G.phase = 'battle';
     G.phaseT = 0;
-    G.hpAtBattle = Math.round(G.player.hp) + '/' + G.level;
+    G.hpAtBattle = Math.round(G.player.hp) + '/' + G.level + ' t=' + Math.round(G.t);
     G.btrack.start(0, 0.4);
     G.fireN = 0;
   }
@@ -1509,6 +1513,9 @@
     const b = G.boss;
     const p = G.player;
     const def = G.song.boss;
+    // 速い装飾音まで全部撃つと弾幕になるので、0.15 秒に 1 回まで
+    if (G.t - (G.lastFire || -1) < (def.pattern === 'aimed' ? 0.15 : 0.28)) return;
+    G.lastFire = G.t;
     G.fireN++;
     const sp = (110 + (n.p - 60) * 2) * (G.hard ? 1.15 : 1);
     const dmg = (4 + n.v * 1.2) * (G.hard ? HARD.dmg : 1) * Math.sqrt(STAR_MUL[G.song.stars - 1]);
@@ -2507,56 +2514,7 @@
     const S = G.stats;
     ctx.save();
     const pad = 10;
-    // 譜面プレビュー
-    const prevH = 54;
-    if (window.CSUI.settings.preview && (G.phase === 'song' || G.phase === 'battle')) {
-      const tr = G.phase === 'battle' ? G.btrack : G.track;
-      const pos = tr.pos();
-      const AHEAD = 4;
-      const x0 = pad + 36;
-      const x1 = W - pad;
-      ctx.fillStyle = 'rgba(250, 246, 235, 0.88)';
-      ctx.fillRect(pad, pad, W - pad * 2, prevH);
-      ctx.strokeStyle = 'rgba(40,30,20,0.5)';
-      ctx.lineWidth = 1;
-      const yOf = (pp) => pad + prevH - 6 - ((clamp(pp, 33, 96) - 33) / 63) * (prevH - 12);
-      for (const lp of [64, 67, 71, 74, 77, 43, 47, 50, 53, 57]) {
-        ctx.beginPath();
-        ctx.moveTo(x0, yOf(lp));
-        ctx.lineTo(x1, yOf(lp));
-        ctx.stroke();
-      }
-      ctx.fillStyle = '#333';
-      ctx.font = '22px serif';
-      ctx.fillText('𝄞', pad + 6, pad + 30);
-      // 演奏位置の線
-      ctx.strokeStyle = '#d33';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x0, pad + 2);
-      ctx.lineTo(x0, pad + prevH - 2);
-      ctx.stroke();
-      for (const [n, tt] of tr.upcoming(pos, AHEAD)) {
-        const x = x0 + ((tt - pos) / AHEAD) * (x1 - x0);
-        const y = yOf(n.p);
-        const rr = n.d >= 1.9 ? 4.5 : 3.5;
-        ctx.fillStyle = G.phase === 'battle' ? '#c33' : pitchColor(n.p, 45);
-        ctx.beginPath();
-        ctx.ellipse(x, y, rr * 1.2, rr, -0.3, 0, Math.PI * 2);
-        ctx.fill();
-        if (n.d >= 1.9) {
-          ctx.fillStyle = '#fbf6ea';
-          ctx.beginPath();
-          ctx.ellipse(x, y, rr * 0.6, rr * 0.4, -0.3, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        if (n.mk && (n.mk.includes('>') || n.mk.includes('^'))) {
-          ctx.fillStyle = '#c90';
-          ctx.fillText('★', x - 5, y - 6);
-        }
-      }
-    }
-    let y = pad + (window.CSUI.settings.preview ? prevH + 6 : 0);
+    let y = pad;
     // 曲の進み具合
     const P = G.parsed;
     const totalBars = Math.ceil(P.lengthBeats / P.barLen);
@@ -2690,6 +2648,12 @@
       const w = (b.dash ? 300 : 60) / (d2 + 400);
       fx += dx * w;
       fy += dy * w;
+      // 決戦では離れすぎない (攻撃が届く距離まで寄る)
+      if (G.phase === 'battle' && !b.dash && d2 > 260 * 260) {
+        const d = Math.sqrt(d2);
+        fx -= (dx / d) * 0.02;
+        fy -= (dy / d) * 0.02;
+      }
     }
     // 壁から離れる
     const wall = (v) => (v < 150 ? (150 - v) / 150 : 0);

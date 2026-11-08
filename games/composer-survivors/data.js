@@ -171,7 +171,7 @@
     piano: {
       name: { ja: 'ピアノ', en: 'Piano' }, reg: 'all', evo: 'hammer', passive: 'pedal',
       desc: { ja: '一番近い音符へ鍵盤の弾を撃つ', en: 'Fires key-shaped shots at the nearest note' },
-      lv: (L) => ({ dmg: 9 + L * 2, cd: 0.95 - L * 0.03, count: 1 + (L >= 3) + (L >= 5) + (L >= 8), pierce: 1 + (L >= 6), speed: 430 }),
+      lv: (L) => ({ dmg: 9 + L * 2, cd: 0.85 - L * 0.03, count: 1 + (L >= 3) + (L >= 5) + (L >= 8), pierce: 1 + (L >= 6), speed: 430 }),
     },
     baton: {
       name: { ja: '指揮棒', en: 'Baton' }, reg: 'mid', evo: 'maestro', passive: 'metronome',

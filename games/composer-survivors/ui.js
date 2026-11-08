@@ -42,7 +42,7 @@
     mode: 'normal',
   });
   let save = defaultSave();
-  const settings = { bgm: 0.8, se: 0.7, preview: true, shake: true };
+  const settings = { bgm: 0.8, se: 0.7, shake: true };
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY + 'save') || 'null');
@@ -484,7 +484,6 @@
     return `<div class="vol">
       <label>${T('bgmVol')} <input type="range" min="0" max="1" step="0.05" value="${settings.bgm}" data-vol="bgm" /></label>
       <label>${T('seVol')} <input type="range" min="0" max="1" step="0.05" value="${settings.se}" data-vol="se" /></label>
-      <label class="check"><input type="checkbox" data-set="preview" ${settings.preview ? 'checked' : ''} /> ${T('preview')}</label>
       <label class="check"><input type="checkbox" data-set="shake" ${settings.shake ? 'checked' : ''} /> ${T('shake')}</label>
     </div>`;
   }

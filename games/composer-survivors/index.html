@@ -51,7 +51,7 @@
 
       <h3>ステージの流れ</h3>
       <ol>
-        <li><b>演奏</b>: 曲が流れている間、ボスは「五線の結界」に守られていて、攻撃が効きません。ボスから離れて、出てくる音符を倒しましょう。画面の上の譜面プレビューで、これから来る音符が見えます。</li>
+        <li><b>演奏</b>: 曲が流れている間、ボスは「五線の結界」に守られていて、攻撃が効きません。ボスから離れて、出てくる音符を倒しましょう。</li>
         <li><b>終止</b>: 曲が終わったら、残った音符をすべて倒します。45 秒たっても残っていると「アンコール」で曲の最後がもう一度演奏され、音符が増えます。</li>
         <li><b>決戦</b>: 音符をすべて倒すと結界が割れ、ボスを倒せるようになります。曲の主題がボスの弾になって飛んできます。ボスを倒せばクリアです。</li>
       </ol>
@@ -69,7 +69,8 @@
           <tr><th>スマホ</th><td>画面に指を置いて動かすと、その位置が中心のスティックになります。右上の Ⅱ で一時停止</td></tr>
         </tbody>
       </table>
-      <p class="note">いまは「エリーゼのために」「きらきら星変奏曲」「ノクターン第 2 番」の 3 曲が遊べます。ほかの曲は準備中です。曲はすべて著作権の切れた作品を、このゲームのために編曲して合成音で鳴らしています。</p>
+      <p class="note">いまは「エリーゼのために」「きらきら星変奏曲」「ノクターン第 2 番」の 3 曲が遊べます。ほかの曲は準備中です。曲は省略せず、楽譜どおりの音 (繰り返しも含む) をすべて敵にして、合成音で鳴らしています。</p>
+      <p class="note">楽譜: <a href="https://www.mutopiaproject.org/">Mutopia Project</a> より。「エリーゼのために」(Stelios Samelis 浄書、パブリックドメイン)、「きらきら星変奏曲」(ギター二重奏版、パブリックドメイン。曲の順番と繰り返しは原曲の形に戻した)、「ノクターン第 2 番」(Renato Biolcati Rinaldi 浄書、<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>。このゲームの音符データ scores/nocturne.js も同じライセンス)。</p>
     </section>
 
     <section class="help" data-lang="en" hidden>
@@ -84,7 +85,7 @@
       </ul>
       <h3>Stage flow</h3>
       <ol>
-        <li><b>Performance</b>: while the music plays, the boss is protected by a barrier of staff lines. Keep your distance and defeat the notes. The score preview at the top shows what's coming.</li>
+        <li><b>Performance</b>: while the music plays, the boss is protected by a barrier of staff lines. Keep your distance and defeat the notes.</li>
         <li><b>Coda</b>: when the music ends, defeat every remaining note. If any remain after 45 seconds, the boss plays an <b>encore</b> of the last bars and more notes appear.</li>
         <li><b>Finale</b>: once every note is gone, the barrier shatters and you can fight the boss, whose bullets follow the piece's main theme.</li>
       </ol>
@@ -99,19 +100,20 @@
           <tr><th>Phone</th><td>Touch and drag anywhere: where you touch becomes the center of the stick. Ⅱ at the top right pauses.</td></tr>
         </tbody>
       </table>
-      <p class="note">Playable now: Für Elise, the "Twinkle" Variations and Nocturne Op. 9 No. 2. More pieces are coming. All pieces are in the public domain, arranged for this game and played with synthesized instruments.</p>
+      <p class="note">Playable now: Für Elise, the "Twinkle" Variations and Nocturne Op. 9 No. 2. More pieces are coming. Every note of the score (repeats included) becomes an enemy, played with synthesized instruments.</p>
+      <p class="note">Scores from the <a href="https://www.mutopiaproject.org/">Mutopia Project</a>: Für Elise (typeset by Stelios Samelis, public domain); Twelve Variations K. 265 (guitar-duo edition, public domain; Mozart's order and repeats restored); Nocturne Op. 9 No. 2 (typeset by Renato Biolcati Rinaldi, <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>; this game's note data in scores/nocturne.js is shared under the same license).</p>
     </section>
   </main>
 
   <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
   <script src="../origami-intro.js"></script>
   <script>window.introDone = OrigamiIntro.play();</script>
-  <script src="audio.js?v=1"></script>
-  <script src="scores/elise.js?v=1"></script>
-  <script src="scores/twinkle.js?v=1"></script>
-  <script src="scores/nocturne.js?v=1"></script>
+  <script src="audio.js?v=3"></script>
+  <script src="scores/elise.js?v=3"></script>
+  <script src="scores/twinkle.js?v=3"></script>
+  <script src="scores/nocturne.js?v=3"></script>
   <script src="data.js?v=2"></script>
-  <script src="game.js?v=2"></script>
-  <script src="ui.js?v=3"></script>
+  <script src="game.js?v=3"></script>
+  <script src="ui.js?v=4"></script>
 </body>
 </html>

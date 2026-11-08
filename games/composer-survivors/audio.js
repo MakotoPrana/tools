@@ -107,14 +107,40 @@
     return { notes: out, length: t };
   }
 
-  // score: { tempo: [[拍, bpm], ...], timeSig: [分子, 分母], parts: [{ inst, vol, melody, src }] }
+  // 楽譜から作ったデータ (tools/build_scores.py): 「前の音からの間,長さ,高さ,強弱[,記号]」を ; でつないだもの。単位は 1 拍 / ppq
+  function decodePart(data, ppq) {
+    const notes = [];
+    let t = 0;
+    let end = 0;
+    if (!data) return { notes, length: 0 };
+    for (const tok of data.split(';')) {
+      const f = tok.split(',');
+      t += +f[0];
+      const n = { t: t / ppq, d: +f[1] / ppq, p: +f[2], v: +f[3], mk: f[4] || '', chord: 1 };
+      notes.push(n);
+      end = Math.max(end, n.t + n.d);
+    }
+    // 同じ時刻に始まる音の数 (和音)
+    for (let i = 0; i < notes.length; ) {
+      let j = i;
+      while (j < notes.length && notes[j].t === notes[i].t) j++;
+      for (let k = i; k < j; k++) notes[k].chord = j - i;
+      i = j;
+    }
+    return { notes, length: end };
+  }
+  function partNotes(part, barLen, label, ppq) {
+    return part.data !== undefined ? decodePart(part.data, ppq || 96) : parsePart(part.src, barLen, label);
+  }
+
+  // score: { tempo: [[拍, bpm], ...], timeSig: [分子, 分母], parts: [{ inst, vol, melody, src | data }] }
   // 返すのは秒に直した音符の並び (時刻の順) と、曲の長さ (秒)
   function parseScore(score, tempoMul = 1) {
     const barLen = (score.timeSig[0] * 4) / score.timeSig[1];
     const all = [];
     let lengthBeats = 0;
     score.parts.forEach((part, pi) => {
-      const { notes, length } = parsePart(part.src, barLen, `${score.id}#${pi}`);
+      const { notes, length } = partNotes(part, barLen, `${score.id}#${pi}`, score.ppq);
       lengthBeats = Math.max(lengthBeats, length);
       for (const n of notes) {
         n.part = pi;
@@ -710,6 +736,6 @@
 
   const VEL = [0.35, 0.47, 0.58, 0.7, 0.85, 1];
 
-  window.CSAudio = { parseScore, parsePart, parsePitch, Synth, Track, mtof, VEL };
+  window.CSAudio = { parseScore, parsePart, partNotes, parsePitch, Synth, Track, mtof, VEL };
   window.CS_SCORES = window.CS_SCORES || {};
 })();
