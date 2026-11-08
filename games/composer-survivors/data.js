@@ -201,10 +201,14 @@
       },
     },
     {
-      id: 'winterwind', composer: 'chopin', no: 5, stars: 5,
+      id: 'winterwind', composer: 'chopin', no: 5, stars: 5, score: 'winterwind', hpMul: 1.5,
       title: { ja: '練習曲「木枯らし」', en: '"Winter Wind" Étude' },
-      boss: { id: 'wind', ja: '木枯らし', en: 'The Winter Wind' },
-      room: { id: 'forest', ja: '冬の森の館', en: 'A Manor in the Winter Woods' },
+      boss: { id: 'wind', ja: '木枯らし', en: 'The Winter Wind', pattern: 'spread', color: '#9cc9e8' },
+      room: { id: 'forest', ja: '冬の森の館', en: 'A Manor in the Winter Woods', floor: 'wood' },
+      trivia: {
+        ja: '静かな 4 小節の序奏のあと、右手が吹きすさぶ風のように上下に駆けめぐり、左手が行進曲のような主題を力強く鳴らす。',
+        en: 'After four quiet bars, the right hand whirls up and down like a gale while the left hand hammers out a march-like theme.',
+      },
     },
   ];
 

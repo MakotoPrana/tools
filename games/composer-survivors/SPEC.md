@@ -1,6 +1,6 @@
 # 作曲家サバイバー（Composer Survivors）仕様
 
-> 状態: 楽譜のタワーディフェンスとして作り直した版。遊べるのは 3 曲（各作曲家の #1）。ほかの曲は「準備中」。
+> 状態: 楽譜のタワーディフェンスとして作り直した版。15 曲すべて遊べる（解禁のルールに従う）。
 > 最初はヴァンサバ風（作曲家が動き回る）で作ったが、テストプレイを受けてタワーディフェンスに変えた（「決定事項」を参照）。
 
 ## 概要
@@ -140,7 +140,7 @@
 | 2 | 子犬のワルツ | 2 | 1:49 | 1348 | 子犬 |
 | 3 | 幻想即興曲（楽譜どおりに速さが変わる） | 3 | 4:14 | 3035 | 幻影 |
 | 4 | 練習曲「革命」 | 4 | 2:05 | 2081 | 革命の炎 |
-| 5 | 練習曲「木枯らし」 | 5 | — | — | 木枯らし（**準備中**: Mutopia に楽譜がない。piano-midi.de は証明書を確かめられず取れなかった） |
+| 5 | 練習曲「木枯らし」（序奏 Lento → Allegro con brio 2 分音符 = 69。m.68 rit.） | 5 | 2:59 | 3177 | 木枯らし（渦巻く風と枯れ葉） |
 
 - ブルグミュラー（初心者向け）は案に出したが、入れないことにした
 - 外した曲: 田園「雷雨」・第九・夜の女王・怒りの日（オーケストラ・声楽で 6 分を超えるかピアノ譜がない）、英雄ポロネーズ（約 7 分）、雨だれ、悲愴 第 2 楽章、月光 第 1 楽章
@@ -213,6 +213,7 @@
 - **曲は省略しない**。楽譜どおりの音（繰り返しも含む）をすべて敵にする（テストプレイで、B・C 部分のない編曲は不可とした）
 - 楽譜は [Mutopia Project](https://www.mutopiaproject.org/) の LilyPond の譜面（パブリックドメインか CC ライセンスのもの）から、`tools/build_scores.py` で作る。LilyPond は実行せず、`tools/ly2score.py` が文字として読む（音符・和音・長さ・タイ・相対音高・繰り返しと括弧・連符・装飾音・強弱・アクセント・スタッカート・フェルマータ・トリル）
   - 曲ごとの元の譜面（`ftp/` 以下）: elise `BeethovenLv/WoO59/fur_Elise_WoO59`・minuet `BeethovenLv/O49/LVB_Sonate_49no2_2`・pathetique3 `BeethovenLv/O13/pathetique-3`・fate `BeethovenLv/O67/beethoven_fifth_op67`（ピアノ編曲）・moonlight3 `BeethovenLv/O27/moonlight`（**CC BY-SA 2.5**）・twinkle `MozartWA/KV265/guitar-duo-complete`・turkish `MozartWA/KV331/KV331_3_RondoAllaTurca`・nacht `MozartWA/KV525/eine-kleine-nachtmusik-mvt1`・fantasia `MozartWA/KV397/Fantasia`・k457 `MozartWA/KV457/sonata3`・nocturne `ChopinFF/O9/chopin_nocturne_op9_n2`（**CC BY-SA 3.0**）・minute `ChopinFF/O64/chopin_valse_op64_no1`・fantaisie `ChopinFF/O66/chopin_fantaisie-impromptu`・revolution `ChopinFF/O10/op-10-12-wfi`。CC BY-SA の 2 曲は、`scores/*.js` も同じライセンスで公開し、遊び方の欄に出典を書く。ほかはパブリックドメイン
+  - 木枯らし（winterwind）だけは Mutopia に無いので、[Chopin Piano Score Data Set](https://github.com/mac-marg-pianist/chopin_piano_score_dataset)（KAIST MAC × SNU MARG、**MIT License**、MuseScore の譜面を集めたもの）の `scores_xml/Chopin_Etude_op_25_11.musicxml` を `tools/xml2score.py` で読む。全 96 小節が 4 拍ずつそろうこと、序奏の音が楽譜どおりなことを確かめた。小さい音符で書かれた m.95 の音階も音として数える。ライセンス文は `scores/LICENSE-winterwind.txt`。作り直しは `python3 -I tools/build_scores.py - <データセットのフォルダ>`
   - きらきら星はギター二重奏版（原調・原曲の音。ギターで出ない低音だけ変えてある）。その版は曲順を入れ替え、繰り返しを D.C. al Fine にしているので、主題 → 第 1〜12 変奏の順に戻し、各変奏を A B A' の 1 回ずつにする。第 10・11 変奏は音価が 2 倍に書かれているので、速さを 2 倍にして戻す
   - 読める書き方: 英語・ドイツ語の音名（`english.ly` / `deutsch.ly`）、`\include` した別ファイル、`\relative` の起点に変化記号（`\relative af'`）、変数の前の `\new Voice = "x"`、`\scaleDurations`、`\afterGrace`、和音の装飾音、`{ }` のない `\repeat tremolo`、`\ifemidi { 演奏用 } { 印刷用 }`（印刷用を読む）、`\tempo`（曲の途中の速さの変化に使う）
   - くり返しは、本体と `\alternative` を書かれた順に 1 回だけ読んで写す（相対音高と省いた長さを LilyPond と同じに決めるため）
@@ -267,7 +268,7 @@
   - `game.js`（プレイ中の動きと描画・自動プレイ）
   - `ui.js`（メニューの画面・タワーのパネル・保存・入力・ループ）
   - `scores/*.js`（曲ごとの譜面）
-  - `tools/ly2score.py`・`tools/build_scores.py`（Mutopia Project の LilyPond の譜面から `scores/*.js` を作る）
+  - `tools/ly2score.py`・`tools/build_scores.py`（Mutopia Project の LilyPond の譜面から `scores/*.js` を作る）・`tools/xml2score.py`（MusicXML を読む。木枯らし用）
 
 ## 決定事項
 
@@ -283,8 +284,8 @@
 
 ## 実装の状況
 
-- できているもの: 14 曲（「木枯らし」以外）とそのボス、作曲家 3 人、タワー 10 種と進化、準備 → 演奏 → 終止 → 決戦の流れ、演奏記号のギミック、拍に乗る攻撃、音域の相性、解禁のルール、練習室（作曲家ごと）、結果画面と評価、保存、設定、日本語と英語、アクセス解析
-- まだのもの: 「木枯らし」の譜面、楽譜庫（図鑑）、実績画面、9 言語、追加の作曲家、ボスごとの見せ場（ヴァンサバ版の突進・星の雨・暗転はなくした）
+- できているもの: 15 曲とそのボス、作曲家 3 人、タワー 10 種と進化、準備 → 演奏 → 終止 → 決戦の流れ、演奏記号のギミック、拍に乗る攻撃、音域の相性、解禁のルール、練習室（作曲家ごと）、結果画面と評価、保存、設定、日本語と英語、アクセス解析
+- まだのもの: 楽譜庫（図鑑）、実績画面、9 言語、追加の作曲家、ボスごとの見せ場（ヴァンサバ版の突進・星の雨・暗転はなくした）
 
 ## テスト版
 
@@ -312,8 +313,9 @@
 | 革命 | 4 | — | C | C |
 | 月光 第 3 楽章 | 5 | — | 1:22 で負け | C |
 | ソナタ K. 457 第 3 楽章 | 5 | — | C | A |
+| 木枯らし | 5 | — | 1:01 で負け | C |
 
 - 自動プレイは音符を通した高さに次のタワーを建てやすくする（人が見て対応するのと同じ）
-- 曲ごとの調整 `hpMul`: 運命 0.85・月光 0.65・K. 457 0.7・幻想即興曲 0.6・革命 0.7・ノクターン 0.74・きらきら星 1.05
+- 曲ごとの調整 `hpMul`: 運命 0.85・月光 0.65・K. 457 0.7・幻想即興曲 0.6・革命 0.7・ノクターン 0.74・きらきら星 1.05・木枯らし 1.5（最終曲なので一番きつく）
 
 - 押し戻しとしびれは、続けて受けるほど効きにくい（しびれのあと 1.5 秒はしびれない。押し戻しは受けるたびに弱まり、1 秒に 0.6 ずつ戻る）。ティンパニとチェロで音符をずっと止め続けられないように

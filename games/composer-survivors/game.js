@@ -2070,6 +2070,39 @@
         face(0, R * 0.2, 13);
         return true;
       }
+      case 'wind': {
+        // 木枯らし: 渦を巻く風と、舞う枯れ葉
+        ctx.save();
+        ctx.rotate(-T2 * 3);
+        ctx.lineCap = 'round';
+        for (let k = 0; k < 4; k++) {
+          ctx.strokeStyle = hurt ? '#fff' : ['#5d8fb5', '#7fb0d4', '#9cc9e8', '#e3f2fb'][k];
+          ctx.lineWidth = 7 - k * 1.2;
+          ctx.beginPath();
+          for (let i = 0; i <= 28; i++) {
+            const a = (i / 28) * Math.PI * 2.2 + k * (Math.PI / 2);
+            const rr = R * (0.15 + 0.85 * (i / 28)) * (1 + 0.06 * Math.sin(T2 * 7 + i));
+            if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+            else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+        for (let i = 0; i < 6; i++) {
+          const a = T2 * 2.4 + (i * Math.PI) / 3;
+          const rr = R * (1.05 + 0.15 * Math.sin(T2 * 3 + i));
+          ctx.save();
+          ctx.translate(Math.cos(a) * rr, Math.sin(a) * rr * 0.8);
+          ctx.rotate(a * 2 + i);
+          ctx.fillStyle = hurt ? '#fff' : ['#b5651d', '#d4a017', '#8b4513'][i % 3];
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 8, 4, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        face(0, 0, 13);
+        return true;
+      }
       default:
         return false;
     }
