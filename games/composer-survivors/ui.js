@@ -351,6 +351,49 @@
     document.body.classList.toggle('playing', p);
   }
 
+  // レベルアップの候補 (画面の下。プレイを続けたまま、タップか 1〜4 キーで選ぶ)
+  const dock = document.getElementById('lvl-dock');
+  function showLevelDock(list) {
+    const G = Game.G;
+    const keyHint = !matchMedia('(pointer: coarse)').matches;
+    const card = (c, i) => {
+      const k = keyHint ? `<kbd>${i + 1}</kbd>` : '';
+      if (c.kind === 'heal') return `<button type="button" class="dchoice" data-di="${i}">${k}<span class="ci">❤️</span><span class="dt"><b>${T('healOpt')}</b></span></button>`;
+      if (c.kind === 'gold') return `<button type="button" class="dchoice" data-di="${i}">${k}<span class="ci">🪙</span><span class="dt"><b>${T('goldOpt')}</b></span></button>`;
+      const isW = c.kind === 'weapon';
+      const def = isW ? D.WEAPONS[c.id] : D.PASSIVES[c.id];
+      const icon = isW ? `<span data-icon="${c.id}" data-size="30"></span>` : `<span class="ci">${def.icon}</span>`;
+      // 進化の組み合わせがそろうものに印
+      let evo = false;
+      if (isW) evo = !!G.passives[def.passive];
+      else evo = G.weapons.some((w) => D.WEAPONS[w.id].passive === c.id);
+      return `<button type="button" class="dchoice ${isW ? 'w' : 'p'} ${evo ? 'evo' : ''}" data-di="${i}">${k}${icon}<span class="dt">
+        <b>${esc(L(def.name))}</b>
+        <span class="dlv">${c.isNew ? `<em class="new">${T('newTag')}</em>` : 'Lv' + c.lv}${evo ? ' <i class="star">★</i>' : ''}</span>
+        <small>${esc(L(def.desc))}</small></span></button>`;
+    };
+    dock.innerHTML = `<div class="dhead"><b>${T('levelUp')}</b> <span class="dmore" id="dmore"></span>
+      ${G.rerolls > 0 ? `<button type="button" class="dreroll" data-dreroll>${T('reroll').replace('{n}', G.rerolls)}${keyHint ? ' <kbd>R</kbd>' : ''}</button>` : ''}</div>
+      <div class="dchoices">${list.map(card).join('')}</div>`;
+    dock.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(iconCanvas(el.dataset.icon, +el.dataset.size || 30)));
+    dock.querySelectorAll('[data-di]').forEach((el) => el.addEventListener('click', () => Game.pickChoice(+el.dataset.di)));
+    dock.querySelectorAll('[data-dreroll]').forEach((el) => el.addEventListener('click', () => Game.rerollChoices()));
+    dock.hidden = false;
+    dock.classList.remove('in');
+    void dock.offsetWidth;
+    dock.classList.add('in');
+    levelDockCount(G.pendingLevels);
+  }
+  function levelDockCount(n) {
+    const el = document.getElementById('dmore');
+    if (el) el.textContent = n > 0 ? T('moreLevels').replace('{n}', n) : '';
+  }
+  function hideLevelDock() {
+    dock.hidden = true;
+    dock.innerHTML = '';
+  }
+
+  // (以前の、ゲームを止めて重ねるレベルアップの画面。いまは使わない)
   function showLevelUp(choices, pick) {
     const G = Game.G;
     const render = (list) => {
@@ -610,12 +653,18 @@
       input[KEYMAP[e.code]] = true;
       if (screen === 'play') e.preventDefault();
     }
-    if (screen === 'play' && levelKeys && /^Digit[1-4]$/.test(e.code)) {
-      levelPick(+e.code.slice(5) - 1);
-      return;
+    if (screen === 'play' && !dock.hidden) {
+      if (/^(Digit|Numpad)[1-4]$/.test(e.code)) {
+        Game.pickChoice(+e.code.slice(-1) - 1);
+        return;
+      }
+      if (e.code === 'KeyR') {
+        Game.rerollChoices();
+        return;
+      }
     }
     if (e.code === 'Escape' || e.code === 'KeyP') {
-      if (screen === 'play' && !levelKeys) pauseScreen();
+      if (screen === 'play') pauseScreen();
       else if (screen === 'pause') resumeGame();
       else if (e.code === 'Escape' && backFn) backFn();
     }
@@ -664,7 +713,7 @@
     else if (screen === 'pause') resumeGame();
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && screen === 'play' && !levelKeys) pauseScreen();
+    if (document.hidden && screen === 'play') pauseScreen();
   });
   window.addEventListener('resize', () => Game.resize());
 
@@ -703,6 +752,9 @@
     },
     settings,
     showLevelUp,
+    showLevelDock,
+    hideLevelDock,
+    levelDockCount,
     songClearedByAnyone,
   };
 

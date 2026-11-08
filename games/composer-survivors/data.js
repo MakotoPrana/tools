@@ -311,6 +311,7 @@
     long: { ja: '長い音', en: 'Long' },
     levelUp: { ja: 'LEVEL UP!', en: 'LEVEL UP!' },
     reroll: { ja: '選び直す ({n})', en: 'Reroll ({n})' },
+    moreLevels: { ja: 'あと {n} 回', en: '+{n} more' },
     weaponTag: { ja: '楽器', en: 'Instrument' },
     passiveTag: { ja: 'パッシブ', en: 'Passive' },
     newTag: { ja: 'NEW', en: 'NEW' },

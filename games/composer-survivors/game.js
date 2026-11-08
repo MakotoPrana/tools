@@ -606,6 +606,7 @@
       G.level++;
       G.xpNext = xpReq(G.level);
       G.pendingLevels++;
+      if (G.choices) window.CSUI.levelDockCount(G.pendingLevels);
     }
   }
 
@@ -647,12 +648,13 @@
   }
 
   function applyChoice(c) {
+    // 候補を出してから選ぶまでの間に、楽譜ケースで上がっていることがあるので上限を守る
     if (c.kind === 'weapon') {
       const w = G.weapons.find((x) => x.id === c.id);
-      if (w) w.lv++;
-      else addWeapon(c.id);
+      if (w) w.lv = Math.min(8, w.lv + 1);
+      else if (G.weapons.length < 4) addWeapon(c.id);
     } else if (c.kind === 'passive') {
-      G.passives[c.id] = (G.passives[c.id] || 0) + 1;
+      if (c.id in G.passives || Object.keys(G.passives).length < 4) G.passives[c.id] = Math.min(D.PASSIVES[c.id].max, (G.passives[c.id] || 0) + 1);
     } else if (c.kind === 'heal') {
       G.player.hp = Math.min(G.stats.maxHp, G.player.hp + 30);
     } else if (c.kind === 'gold') {
@@ -902,10 +904,14 @@
     G.camX += (p.x - G.camX) * Math.min(1, dt * 10);
     G.camY += (p.y - G.camY) * Math.min(1, dt * 10);
 
-    // レベルアップ (メニューを重ねて、曲を止める)
-    if (G.pendingLevels > 0 && G.phase !== 'dead' && G.phase !== 'win') {
+    // レベルアップ: 曲もゲームも止めずに、画面の下に候補を出す (選ぶまで次の候補は待つ)
+    if (G.pendingLevels > 0 && !G.choices && G.phase !== 'dead' && G.phase !== 'win') {
       G.pendingLevels--;
       openLevelUp();
+    }
+    if ((G.phase === 'dead' || G.phase === 'win') && G.choices) {
+      G.choices = null;
+      window.CSUI.hideLevelDock();
     }
   }
 
@@ -1557,7 +1563,6 @@
   }
 
   function openLevelUp() {
-    const tr = G.phase === 'battle' ? G.btrack : G.track;
     Synth.sfx('level', { p: 72 });
     if (G.bot) {
       // 自動プレイ: 進化の組み合わせを優先
@@ -1566,19 +1571,30 @@
       applyChoice(ch[0]);
       return;
     }
-    tr.pause();
-    G.overlay = 'level';
-    const choices = makeChoices();
-    window.CSUI.showLevelUp(choices, (c) => {
-      if (c === 'reroll') {
-        G.rerolls--;
-        return makeChoices();
-      }
-      applyChoice(c);
-      G.overlay = null;
-      resumeMusic();
-      return null;
-    });
+    G.choices = makeChoices();
+    G.choicesLv = G.level - G.pendingLevels;
+    window.CSUI.showLevelDock(G.choices);
+  }
+
+  // 候補を選ぶ (i 番目)。プレイを続けたまま
+  function pickChoice(i) {
+    if (!G || !G.choices || !G.choices[i] || G.paused) return;
+    const c = G.choices[i];
+    G.choices = null;
+    window.CSUI.hideLevelDock();
+    applyChoice(c);
+    addText(G.player.x, G.player.y - 30, '♪ ' + choiceName(c), '#fff6a8', 1, 13);
+  }
+  function rerollChoices() {
+    if (!G || !G.choices || G.rerolls <= 0 || G.paused) return;
+    G.rerolls--;
+    G.choices = makeChoices();
+    window.CSUI.showLevelDock(G.choices);
+  }
+  function choiceName(c) {
+    if (c.kind === 'weapon') return L(D.WEAPONS[c.id].name) + ' Lv' + c.lv;
+    if (c.kind === 'passive') return L(D.PASSIVES[c.id].name) + ' Lv' + c.lv;
+    return c.kind === 'heal' ? T('healOpt') : T('goldOpt');
   }
 
   function resumeMusic() {
@@ -1593,18 +1609,19 @@
     if (!G || G.paused || G.result) return;
     G.paused = true;
     const tr = G.phase === 'battle' ? G.btrack : G.track;
-    if (!G.overlay && tr) tr.pause();
+    if (tr) tr.pause();
   }
   function resume() {
     if (!G || !G.paused) return;
     G.paused = false;
-    if (!G.overlay) resumeMusic();
+    resumeMusic();
   }
   function quit() {
     if (!G) return;
     G.track && G.track.stop();
     G.btrack && G.btrack.stop();
     Synth.hush(0.2);
+    window.CSUI.hideLevelDock();
     G = null;
   }
 
@@ -2763,6 +2780,8 @@
     pause,
     resume,
     quit,
+    pickChoice,
+    rerollChoices,
     simulate,
     drawComposer,
     drawIcon,

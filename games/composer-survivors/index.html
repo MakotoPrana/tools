@@ -17,7 +17,7 @@
   <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
   <main class="app">
@@ -32,6 +32,8 @@
 
     <div class="board-wrap" id="board-wrap">
       <canvas id="board" aria-label="ゲーム画面 / Game screen"></canvas>
+      <!-- レベルアップの候補 (プレイを続けたまま選ぶ) -->
+      <div class="lvl-dock" id="lvl-dock" hidden></div>
       <div class="overlay" id="overlay" hidden></div>
     </div>
 
@@ -108,8 +110,8 @@
   <script src="scores/elise.js?v=1"></script>
   <script src="scores/twinkle.js?v=1"></script>
   <script src="scores/nocturne.js?v=1"></script>
-  <script src="data.js?v=1"></script>
-  <script src="game.js?v=1"></script>
-  <script src="ui.js?v=1"></script>
+  <script src="data.js?v=2"></script>
+  <script src="game.js?v=2"></script>
+  <script src="ui.js?v=3"></script>
 </body>
 </html>
