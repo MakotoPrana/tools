@@ -343,112 +343,141 @@
     screen = 'play';
     setPlaying(true);
     Game.start({ song, composer, mode: save.mode, up: { ...ups(composer.id) } }, (res) => onFinish(res));
+    closeTowerPanel();
+    updateStartBtn();
     stageTrack.start(song.id, { mode: save.mode, character: composer.id });
   }
   function setPlaying(p) {
+    if (!p) {
+      startBtn.hidden = true;
+      closeTowerPanel();
+    }
     pauseBtn.style.visibility = p ? 'visible' : 'hidden';
     langSel.style.visibility = p ? 'hidden' : 'visible';
     document.body.classList.toggle('playing', p);
   }
 
-  // レベルアップの候補 (画面の下。プレイを続けたまま、タップか 1〜4 キーで選ぶ)
+  // ---------- タワーのパネル (画面の下。プレイを続けたまま、建てる・強化する・売る) ----------
   const dock = document.getElementById('lvl-dock');
-  function showLevelDock(list) {
+  const startBtn = document.getElementById('start-btn');
+  let panel = null; // { kind: 'build', c, r } | { kind: 'tower', t }
+  const REG_LABEL = () => ({ lo: T('low'), mid: T('mid'), hi: T('high'), all: '' });
+  function statLine(id, L1, evo) {
+    const P = D.TOWERS[id].lv(L1);
+    const out = [];
+    if (P.dmg) out.push(`⚔${Math.round(P.dmg)}`);
+    if (P.cd) out.push(`⏱${P.cd.toFixed(2)}s`);
+    if (P.range) out.push(`◎${Math.round(P.range)}`);
+    if (P.len) out.push(`→${Math.round(P.len)}`);
+    if (P.might) out.push(`+${Math.round(P.might * 100)}%`);
+    void evo;
+    return out.join(' ');
+  }
+  function openBuildMenu(c, r) {
     const G = Game.G;
+    panel = { kind: 'build', c, r };
     const keyHint = !matchMedia('(pointer: coarse)').matches;
-    const card = (c, i) => {
-      const k = keyHint ? `<kbd>${i + 1}</kbd>` : '';
-      if (c.kind === 'heal') return `<button type="button" class="dchoice" data-di="${i}">${k}<span class="ci">❤️</span><span class="dt"><b>${T('healOpt')}</b></span></button>`;
-      if (c.kind === 'gold') return `<button type="button" class="dchoice" data-di="${i}">${k}<span class="ci">🪙</span><span class="dt"><b>${T('goldOpt')}</b></span></button>`;
-      const isW = c.kind === 'weapon';
-      const def = isW ? D.WEAPONS[c.id] : D.PASSIVES[c.id];
-      const icon = isW ? `<span data-icon="${c.id}" data-size="30"></span>` : `<span class="ci">${def.icon}</span>`;
-      // 進化の組み合わせがそろうものに印
-      let evo = false;
-      if (isW) evo = !!G.passives[def.passive];
-      else evo = G.weapons.some((w) => D.WEAPONS[w.id].passive === c.id);
-      return `<button type="button" class="dchoice ${isW ? 'w' : 'p'} ${evo ? 'evo' : ''}" data-di="${i}">${k}${icon}<span class="dt">
-        <b>${esc(L(def.name))}</b>
-        <span class="dlv">${c.isNew ? `<em class="new">${T('newTag')}</em>` : 'Lv' + c.lv}${evo ? ' <i class="star">★</i>' : ''}</span>
-        <small>${esc(L(def.desc))}</small></span></button>`;
-    };
-    dock.innerHTML = `<div class="dhead"><b>${T('levelUp')}</b> <span class="dmore" id="dmore"></span>
-      ${G.rerolls > 0 ? `<button type="button" class="dreroll" data-dreroll>${T('reroll').replace('{n}', G.rerolls)}${keyHint ? ' <kbd>R</kbd>' : ''}</button>` : ''}</div>
-      <div class="dchoices">${list.map(card).join('')}</div>`;
+    const reg = REG_LABEL();
+    const ids = Object.keys(D.TOWERS);
+    dock.innerHTML = `<div class="dhead"><b>${T('build')}</b><span class="muted">${T('ink')} 🖋 <span data-ink></span></span><button type="button" class="dclose" data-close aria-label="${T('close')}">✕</button></div>
+      <div class="tchoices">${ids
+        .map((id, i) => {
+          const def = D.TOWERS[id];
+          const ok = Game.towerUnlocked(id);
+          const cost = Game.buildCost(id);
+          const fav = id === G.composer.weapon;
+          return `<button type="button" class="tchoice reg-${def.reg} ${ok ? '' : 'locked'}" data-build="${id}" data-cost="${ok ? cost : 999999}" title="${esc(L(def.desc))}">
+            ${keyHint && i < 9 ? `<kbd>${i + 1}</kbd>` : ''}<span data-icon="${id}" data-size="30"></span>
+            <b>${esc(L(def.name))}</b>
+            <small>${ok ? `🖋${cost}` : '🔒'}${fav ? ` <em class="fav">★</em>` : ''}</small></button>`;
+        })
+        .join('')}</div><p class="tdesc" data-desc>${T('prepHint')}</p>`;
     dock.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(iconCanvas(el.dataset.icon, +el.dataset.size || 30)));
-    dock.querySelectorAll('[data-di]').forEach((el) => el.addEventListener('click', () => Game.pickChoice(+el.dataset.di)));
-    dock.querySelectorAll('[data-dreroll]').forEach((el) => el.addEventListener('click', () => Game.rerollChoices()));
+    dock.querySelectorAll('[data-build]').forEach((el) => {
+      const id = el.dataset.build;
+      const showDesc = () => {
+        const def = D.TOWERS[id];
+        const lock = def.locked && !Game.towerUnlocked(id) ? ' 🔒 ' + T('lockedTower').replace('{s}', L(songById(def.locked).title)) : '';
+        const rg = REG_LABEL()[def.reg];
+        const fav = id === G.composer.weapon ? ` ★${T('favorite')}` : '';
+        dock.querySelector('[data-desc]').textContent = `${L(def.name)}${rg ? ` (${T('range')}: ${rg})` : ''}${fav}: ${L(def.desc)} [${statLine(id, 1)}]${lock}`;
+        if (G.sel) G.sel.preview = Game.towerUnlocked(id) ? id : null;
+      };
+      el.addEventListener('pointerenter', showDesc);
+      el.addEventListener('focus', showDesc);
+      el.addEventListener('click', () => {
+        if (!Game.towerUnlocked(id)) return showDesc();
+        const t = Game.build(id, c, r);
+        if (t) openTowerMenu(t);
+        else showDesc();
+      });
+    });
+    dock.querySelector('[data-close]').addEventListener('click', closeTowerPanel);
+    showDock();
+  }
+  function openTowerMenu(t) {
+    const G = Game.G;
+    panel = { kind: 'tower', t };
+    G.sel = { c: t.c, r: t.r, tower: t };
+    const def = D.TOWERS[t.id];
+    const evoDef = D.EVOS[def.evo];
+    const keyHint = !matchMedia('(pointer: coarse)').matches;
+    let action = '';
+    if (t.evo) action = `<span class="muted">★ ${esc(L(evoDef.name))}</span>`;
+    else if (t.lv >= 5) {
+      const cost = Game.evolveCost(t);
+      action = `<button type="button" class="btn primary evo-btn" data-up data-cost="${cost}">★ ${T('evolve')}: ${esc(L(evoDef.name))} 🖋${cost}${keyHint ? ' <kbd>U</kbd>' : ''}</button>`;
+    } else {
+      const cost = Game.upgradeCost(t);
+      action = `<button type="button" class="btn primary" data-up data-cost="${cost}">${T('upgrade')} Lv${t.lv + 1} 🖋${cost}${keyHint ? ' <kbd>U</kbd>' : ''}</button>`;
+    }
+    const refund = Math.round(t.spent * 0.7);
+    const name = t.evo ? L(evoDef.name) : L(def.name);
+    const now = statLine(t.id, t.lv);
+    const next = !t.evo && t.lv < 5 ? ` → ${statLine(t.id, t.lv + 1)}` : '';
+    dock.innerHTML = `<div class="dhead"><span data-icon="${t.evo ? def.evo : t.id}" data-size="28"></span><b>${esc(name)}</b><span class="lvtag">${t.evo ? '★' : 'Lv' + t.lv}</span>
+        <span class="muted">${T('ink')} 🖋 <span data-ink></span></span><button type="button" class="dclose" data-close aria-label="${T('close')}">✕</button></div>
+      <p class="tdesc">${esc(t.evo ? L(evoDef.desc) : L(def.desc))}<br><span class="stat">${now}${next}</span>${!t.evo && t.lv < 5 ? `<br><span class="muted">Lv5 → ★ ${esc(L(evoDef.name))}: ${esc(L(evoDef.desc))}</span>` : ''}</p>
+      <div class="row tactions">${action}<button type="button" class="btn" data-sell>${T('sell')} +🖋${refund}${keyHint ? ' <kbd>S</kbd>' : ''}</button></div>`;
+    dock.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(iconCanvas(el.dataset.icon, +el.dataset.size || 28)));
+    const upBtn = dock.querySelector('[data-up]');
+    if (upBtn) upBtn.addEventListener('click', () => Game.upgrade(t) && openTowerMenu(t));
+    dock.querySelector('[data-sell]').addEventListener('click', () => {
+      Game.sell(t);
+      closeTowerPanel();
+    });
+    dock.querySelector('[data-close]').addEventListener('click', closeTowerPanel);
+    showDock();
+  }
+  function showDock() {
     dock.hidden = false;
-    dock.classList.remove('in');
-    void dock.offsetWidth;
-    dock.classList.add('in');
-    levelDockCount(G.pendingLevels);
+    // 下のほうのマスを選んだら、パネルは上に出す (譜面をかくさないように)
+    const G = Game.G;
+    dock.classList.toggle('top', !!(G && G.sel && G.sel.r >= 5));
+    refreshPanel();
   }
-  function levelDockCount(n) {
-    const el = document.getElementById('dmore');
-    if (el) el.textContent = n > 0 ? T('moreLevels').replace('{n}', n) : '';
-  }
-  function hideLevelDock() {
+  function closeTowerPanel() {
+    panel = null;
     dock.hidden = true;
     dock.innerHTML = '';
-  }
-
-  // (以前の、ゲームを止めて重ねるレベルアップの画面。いまは使わない)
-  function showLevelUp(choices, pick) {
     const G = Game.G;
-    const render = (list) => {
-      const card = (c, i) => {
-        if (c.kind === 'heal') return `<button type="button" class="choice" data-i="${i}"><span class="ci">❤️</span><div><b>${T('healOpt')}</b></div></button>`;
-        if (c.kind === 'gold') return `<button type="button" class="choice" data-i="${i}"><span class="ci">🪙</span><div><b>${T('goldOpt')}</b></div></button>`;
-        const isW = c.kind === 'weapon';
-        const def = isW ? D.WEAPONS[c.id] : D.PASSIVES[c.id];
-        const icon = isW ? `<span data-icon="${c.id}" data-size="36"></span>` : `<span class="ci">${def.icon}</span>`;
-        let evo = '';
-        if (isW) {
-          const ev = D.EVOS[def.evo];
-          const pv = D.PASSIVES[def.passive];
-          const have = G.passives[def.passive];
-          evo = `<small class="evo ${have ? 'have' : ''}">${pv.icon} ${esc(L(pv.name))} → ${esc(L(ev.name))}</small>`;
-        } else {
-          const wid = Object.keys(D.WEAPONS).find((k) => D.WEAPONS[k].passive === c.id);
-          if (wid) {
-            const have = G.weapons.some((w) => w.id === wid);
-            evo = `<small class="evo ${have ? 'have' : ''}">${esc(L(D.WEAPONS[wid].name))} → ${esc(L(D.EVOS[D.WEAPONS[wid].evo].name))}</small>`;
-          }
-        }
-        const reg = isW ? { lo: T('low'), mid: T('mid'), hi: T('high'), all: '' }[def.reg] : '';
-        return `<button type="button" class="choice ${isW ? 'w' : 'p'}" data-i="${i}">${icon}<div>
-          <span class="tag">${isW ? T('weaponTag') : T('passiveTag')}${reg ? ' ・ ' + reg : ''}</span>
-          <b>${esc(L(def.name))} ${c.isNew ? `<em class="new">${T('newTag')}</em>` : 'Lv' + c.lv}</b>
-          <p>${esc(L(def.desc))}</p>${evo}</div></button>`;
-      };
-      const kit = `<div class="kit">${G.weapons.map((w) => `<span class="slot ${w.evo ? 'evo' : ''}"><span data-icon="${w.evo ? D.WEAPONS[w.id].evo : w.id}" data-size="22"></span>${w.evo ? '★' : w.lv}</span>`).join('')}${'<span class="slot empty"></span>'.repeat(4 - G.weapons.length)}
-        <span class="sep"></span>${Object.entries(G.passives).map(([id, lv]) => `<span class="slot">${D.PASSIVES[id].icon}${lv}</span>`).join('')}${'<span class="slot empty"></span>'.repeat(4 - Object.keys(G.passives).length)}</div>`;
-      overlay.hidden = false;
-      overlay.innerHTML = `<div class="levelup"><h2 class="lvl-title">${T('levelUp')} <small>Lv ${G.level}</small></h2>
-        <div class="choices">${list.map(card).join('')}</div>
-        ${G.rerolls > 0 ? `<button type="button" class="btn" data-reroll>${T('reroll').replace('{n}', G.rerolls)}</button>` : ''}
-        <p class="muted">${T('owned')}</p>${kit}</div>`;
-      placeIcons();
-      on('[data-i]', 'click', (el) => {
-        levelKeys = null;
-        hide();
-        pick(list[+el.dataset.i]);
-      });
-      on('[data-reroll]', 'click', () => render(pick('reroll')));
-      levelKeys = list;
-    };
-    render(choices);
-    levelPick = (i) => {
-      if (!levelKeys || !levelKeys[i]) return;
-      const c = levelKeys[i];
-      levelKeys = null;
-      hide();
-      pick(c);
-    };
+    if (G) G.sel = null;
   }
-  let levelKeys = null;
-  let levelPick = null;
+  // インクが増減したら、押せるボタンを変える
+  function refreshPanel() {
+    const G = Game.G;
+    if (!G || dock.hidden) return;
+    const ink = Math.floor(G.ink);
+    const el = dock.querySelector('[data-ink]');
+    if (el) el.textContent = ink;
+    dock.querySelectorAll('[data-cost]').forEach((b) => {
+      b.disabled = +b.dataset.cost > ink;
+    });
+  }
+  function updateStartBtn() {
+    const G = Game.G;
+    startBtn.hidden = !(screen === 'play' && G && G.phase === 'prep');
+  }
 
   function pauseScreen() {
     const G = Game.G;
@@ -525,8 +554,8 @@
     }
     save.ducats += res.gold;
     store();
-    if (res.win) stageTrack.clear({ mode, character: composer.id, level: res.level, rank: res.rank, encore: res.encore });
-    else stageTrack.fail({ mode, character: composer.id, level: res.level, progress_pct: Math.round(res.progress * 100) });
+    if (res.win) stageTrack.clear({ mode, character: composer.id, towers: res.towers, rank: res.rank, leaked: res.leaked });
+    else stageTrack.fail({ mode, character: composer.id, towers: res.towers, progress_pct: Math.round(res.progress * 100) });
     resultScreen(res, unlocks);
   }
 
@@ -545,7 +574,7 @@
       <table class="stats">
         <tr><th>${T('progress')}</th><td>${Math.round(res.progress * 100)}% (${T('bar')} ${Math.min(res.bar, res.bars)}/${res.bars})</td></tr>
         <tr><th>${T('defeated')}</th><td>${res.killed} / ${res.total}</td></tr>
-        <tr><th>${T('encores')}</th><td>${res.encore}</td></tr>
+        <tr><th>${T('leaked')}</th><td>${res.leaked}</td></tr>
         <tr><th>${T('damage')}</th><td>${res.dmg}</td></tr>
         <tr><th>${T('time')}</th><td>${fmt(res.time)}</td></tr>
         <tr><th>${T('ducats')}</th><td class="gold">+${res.gold} 🪙</td></tr>
@@ -645,20 +674,25 @@
   });
 
   // ---------- 入力 ----------
-  const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right' };
-  const input = Game.input;
   window.addEventListener('keydown', (e) => {
-    if (KEYMAP[e.code]) {
-      input[KEYMAP[e.code]] = true;
-      if (screen === 'play') e.preventDefault();
-    }
-    if (screen === 'play' && !dock.hidden) {
-      if (/^(Digit|Numpad)[1-4]$/.test(e.code)) {
-        Game.pickChoice(+e.code.slice(-1) - 1);
+    const G = Game.G;
+    if (screen === 'play' && G) {
+      if ((e.code === 'Space' || e.code === 'Enter') && G.phase === 'prep' && !panel) {
+        e.preventDefault();
+        startShow();
         return;
       }
-      if (e.code === 'KeyR') {
-        Game.rerollChoices();
+      if (panel && panel.kind === 'build' && /^(Digit|Numpad)[1-9]$/.test(e.code)) {
+        const b = dock.querySelectorAll('[data-build]')[+e.code.slice(-1) - 1];
+        if (b) b.click();
+        return;
+      }
+      if (panel && panel.kind === 'tower') {
+        if (e.code === 'KeyU') return dock.querySelector('[data-up]')?.click();
+        if (e.code === 'KeyS') return dock.querySelector('[data-sell]')?.click();
+      }
+      if (e.code === 'Escape' && panel) {
+        closeTowerPanel();
         return;
       }
     }
@@ -668,45 +702,27 @@
       else if (e.code === 'Escape' && backFn) backFn();
     }
   });
-  window.addEventListener('keyup', (e) => {
-    if (KEYMAP[e.code]) input[KEYMAP[e.code]] = false;
-  });
-  window.addEventListener('blur', () => {
-    for (const k of ['up', 'down', 'left', 'right']) input[k] = false;
-  });
-  // スマホ: 指を置いた位置が中心のスティック
+  // 譜面のマスを押す: 空きなら「建てる」、タワーなら「強化・売る」
   const board = document.getElementById('board');
   board.addEventListener('pointerdown', (e) => {
     if (screen !== 'play') return;
-    board.setPointerCapture(e.pointerId);
-    input.stick = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    const r = board.getBoundingClientRect();
+    const hit = Game.tapAt(e.clientX - r.left, e.clientY - r.top);
+    if (!hit) closeTowerPanel();
+    else if (hit.tower) openTowerMenu(hit.tower);
+    else openBuildMenu(hit.cell.c, hit.cell.r);
   });
   board.addEventListener('pointermove', (e) => {
-    const s = input.stick;
-    if (!s || s.id !== e.pointerId) return;
-    let dx = e.clientX - s.x;
-    let dy = e.clientY - s.y;
-    const d = Math.hypot(dx, dy);
-    if (d > 70) {
-      s.x += (dx / d) * (d - 70);
-      s.y += (dy / d) * (d - 70);
-      dx = e.clientX - s.x;
-      dy = e.clientY - s.y;
-    }
-    const k = Math.min(1, Math.hypot(dx, dy) / 50);
-    const dd = Math.hypot(dx, dy) || 1;
-    input.jx = (dx / dd) * k;
-    input.jy = (dy / dd) * k;
+    if (screen !== 'play' || e.pointerType !== 'mouse') return;
+    const r = board.getBoundingClientRect();
+    Game.hoverAt(e.clientX - r.left, e.clientY - r.top);
   });
-  const endStick = (e) => {
-    if (input.stick && input.stick.id === e.pointerId) {
-      input.stick = null;
-      input.jx = 0;
-      input.jy = 0;
-    }
-  };
-  board.addEventListener('pointerup', endStick);
-  board.addEventListener('pointercancel', endStick);
+  function startShow() {
+    closeTowerPanel();
+    Game.begin();
+    updateStartBtn();
+  }
+  startBtn.addEventListener('click', startShow);
   pauseBtn.addEventListener('click', () => {
     if (screen === 'play') pauseScreen();
     else if (screen === 'pause') resumeGame();
@@ -718,27 +734,19 @@
 
   // ---------- ループ ----------
   let last = performance.now();
+  let panelT = 0;
   function loop(now) {
     const dt = Math.min(1 / 30, (now - last) / 1000);
     last = now;
     Game.update(dt);
     Game.render();
-    // スティックの表示
-    if (input.stick && screen === 'play') {
-      const c = board.getContext('2d');
-      const r = board.getBoundingClientRect();
-      c.save();
-      c.globalAlpha = 0.35;
-      c.strokeStyle = '#fff';
-      c.lineWidth = 3;
-      c.beginPath();
-      c.arc(input.stick.x - r.left, input.stick.y - r.top, 50, 0, Math.PI * 2);
-      c.stroke();
-      c.fillStyle = '#fff';
-      c.beginPath();
-      c.arc(input.stick.x - r.left + input.jx * 50, input.stick.y - r.top + input.jy * 50, 18, 0, Math.PI * 2);
-      c.fill();
-      c.restore();
+    if (screen === 'play') {
+      panelT -= dt;
+      if (panelT <= 0) {
+        panelT = 0.2;
+        refreshPanel();
+        updateStartBtn();
+      }
     }
     requestAnimationFrame(loop);
   }
@@ -750,10 +758,7 @@
       return lang;
     },
     settings,
-    showLevelUp,
-    showLevelDock,
-    hideLevelDock,
-    levelDockCount,
+    closeTowerPanel,
     songClearedByAnyone,
   };
 

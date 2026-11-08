@@ -1,6 +1,8 @@
 /*
- * 作曲家サバイバー: ゲームの本体 (プレイ中の動き・描画)
- *   メニューの画面は ui.js。ここは「曲を流し、音符を出し、戦う」部分
+ * 作曲家サバイバー: ゲームの本体 (楽譜のタワーディフェンス)
+ *   音符は鳴った瞬間に右端 (ボス) から現れ、音の高さの位置を右から左へ流れていく。
+ *   左端の指揮台に届くと体力が減る。譜面の上にタワーを置いて止める。
+ *   メニューの画面は ui.js
  */
 (() => {
   'use strict';
@@ -9,15 +11,24 @@
   const D = window.CSData;
 
   // ---------- 定数 ----------
-  const ROOM = 1300; // 部屋の広さ (正方形)
-  const VIEW = 560; // 画面の短い辺に見える広さ
-  const MAX_NOTES = 350;
-  const STAR_MUL = [0.85, 1.3, 1.7, 2.2, 2.8];
-  const HARD = { tempo: 1.15, hp: 2.5, dmg: 2, gold: 1.6 };
-  const DYN_DMG = [3, 4, 5, 6, 8, 10];
+  const FW = 1280; // 譜面 (フィールド) の広さ
+  const FH = 720;
+  const CELL = 64;
+  const COLS = 20;
+  const ROWS = 11;
+  const TOP = (FH - ROWS * CELL) / 2;
+  const PODIUM_X = 96; // 指揮台 (ここに届くと体力が減る)
+  const SPAWN_X = FW - 56; // 音符が現れる位置 (ボスの前)
+  const BUILD_COL0 = 2; // 建てられる列 (左の 2 列は指揮台、右の 1 列はボス)
+  const BUILD_COL1 = COLS - 2;
+  const P_LO = 33; // 譜面の一番下 (A1)
+  const P_HI = 96; // 一番上 (C7)
+  const STAR_MUL = [0.6, 1, 1.4, 1.9, 2.5];
+  const HARD = { tempo: 1.15, hp: 2.2, leak: 1.5, gold: 1.6 };
+  const DYN_LEAK = [1, 1, 2, 2, 3, 4];
   const HP_TABLE = [[0.125, 3], [0.25, 6], [0.5, 10], [1, 18], [2, 32], [4, 55], [8, 80]];
-  const R_TABLE = [[0.125, 7], [0.25, 8], [0.5, 10], [1, 12], [2, 15], [4, 19], [8, 22]];
-  const ENCORE_WAIT = 45;
+  const R_TABLE = [[0.125, 7], [0.25, 8], [0.5, 9.5], [1, 11], [2, 13], [4, 16], [8, 18]];
+  const BLACK_KEYS = [1, 3, 6, 8, 10];
 
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -28,479 +39,300 @@
       const [x1, y1] = table[i];
       if (x <= x1) {
         const [x0, y0] = table[i - 1];
-        const f = Math.log(x / x0) / Math.log(x1 / x0);
-        return y0 + (y1 - y0) * f;
+        return y0 + ((y1 - y0) * Math.log(x / x0)) / Math.log(x1 / x0);
       }
     }
     return table[table.length - 1][1];
   };
-  // 音域: 低 (G3 より下)・中・高 (C5 以上)
   const regOf = (p) => (p < 55 ? 'lo' : p >= 72 ? 'hi' : 'mid');
   const pitchColor = (p, l = 55) => `hsl(${((p % 12) * 30 + 350) % 360}, 75%, ${l}%)`;
-  const BLACK_KEYS = [1, 3, 6, 8, 10];
+  const pitchY = (p) => TOP + ((P_HI - clamp(p, P_LO, P_HI)) / (P_HI - P_LO)) * (ROWS * CELL);
+  const yPitch = (y) => P_HI - ((y - TOP) / (ROWS * CELL)) * (P_HI - P_LO);
+  const cellCenter = (c, r) => [c * CELL + CELL / 2, TOP + r * CELL + CELL / 2];
 
   // ---------- 状態 ----------
-  let G = null; // 1 回のプレイの状態
+  let G = null;
   const canvas = document.getElementById('board');
   const ctx = canvas.getContext('2d');
   let W = 0;
   let H = 0;
   let scale = 1;
-  const input = { up: false, down: false, left: false, right: false, jx: 0, jy: 0, stick: null };
+  let offX = 0;
+  let offY = 0;
+  const input = {};
 
   function resize() {
     const wrap = canvas.parentElement;
     const rect = wrap.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     W = Math.max(300, rect.width);
-    H = Math.max(300, rect.height);
+    H = Math.max(240, rect.height);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    scale = clamp(Math.min(W, H) / VIEW, 0.6, 1.4);
+    // 上に HUD の帯 (40px)、下は余白なし。譜面全体が入るように縮める
+    const hudH = 40;
+    scale = Math.min(W / FW, (H - hudH) / FH);
+    offX = (W - FW * scale) / 2;
+    offY = hudH + (H - hudH - FH * scale) / 2;
   }
-
-  // ---------- 空間ハッシュ ----------
-  const CELL = 48;
-  const grid = new Map();
-  function gridBuild(list) {
-    grid.clear();
-    for (const n of list) {
-      const k = ((n.x / CELL) | 0) * 1000 + ((n.y / CELL) | 0);
-      let c = grid.get(k);
-      if (!c) grid.set(k, (c = []));
-      c.push(n);
-    }
+  // 画面の座標 → 譜面の座標
+  function toField(px, py) {
+    return [(px - offX) / scale, (py - offY) / scale];
   }
-  function gridQuery(x, y, r, fn) {
-    const x0 = ((x - r) / CELL) | 0;
-    const x1 = ((x + r) / CELL) | 0;
-    const y0 = ((y - r) / CELL) | 0;
-    const y1 = ((y + r) / CELL) | 0;
-    for (let i = x0; i <= x1; i++)
-      for (let j = y0; j <= y1; j++) {
-        const c = grid.get(i * 1000 + j);
-        if (c) for (const n of c) fn(n);
-      }
-  }
-
-  // ---------- 部屋 ----------
-  function makeRoom(room) {
-    const furn = [];
-    const add = (x, y, w, h, kind) => furn.push({ x, y, w, h, kind });
-    switch (room.floor) {
-      case 'wood':
-        add(260, 240, 190, 80, 'piano');
-        add(880, 930, 120, 120, 'table');
-        add(200, 1020, 60, 60, 'chair');
-        add(1050, 260, 60, 60, 'chair');
-        break;
-      case 'marble':
-        add(600, 250, 100, 100, 'column');
-        add(250, 900, 100, 100, 'column');
-        add(950, 900, 100, 100, 'column');
-        add(560, 980, 190, 80, 'piano');
-        break;
-      default:
-        add(560, 560, 190, 80, 'piano');
-        add(230, 230, 90, 90, 'table');
-        add(980, 980, 90, 90, 'table');
-        add(980, 230, 60, 60, 'chair');
-        add(230, 1010, 60, 60, 'chair');
-    }
-    // 床の絵 (1 回だけ描いておく)
-    const c = document.createElement('canvas');
-    c.width = ROOM;
-    c.height = ROOM;
-    const g = c.getContext('2d');
-    if (room.floor === 'wood') {
-      g.fillStyle = '#b98a5a';
-      g.fillRect(0, 0, ROOM, ROOM);
-      for (let y = 0; y < ROOM; y += 26) {
-        const off = ((y / 26) % 3) * 70;
-        for (let x = -off; x < ROOM; x += 210) {
-          g.fillStyle = `hsl(28, ${38 + ((x * 7 + y) % 9)}%, ${44 + ((x * 13 + y * 3) % 7)}%)`;
-          g.fillRect(x + 1, y + 1, 208, 24);
-        }
-      }
-    } else if (room.floor === 'marble') {
-      for (let y = 0; y < ROOM; y += 100)
-        for (let x = 0; x < ROOM; x += 100) {
-          g.fillStyle = ((x + y) / 100) % 2 ? '#e9e4da' : '#cfc6b6';
-          g.fillRect(x, y, 100, 100);
-        }
-      g.strokeStyle = 'rgba(120,110,95,0.25)';
-      for (let i = 0; i < 60; i++) {
-        g.beginPath();
-        const x = Math.random() * ROOM;
-        const y = Math.random() * ROOM;
-        g.moveTo(x, y);
-        g.bezierCurveTo(x + rand(-40, 40), y + rand(-40, 40), x + rand(-80, 80), y + rand(-80, 80), x + rand(-120, 120), y + rand(-120, 120));
-        g.stroke();
-      }
-    } else {
-      g.fillStyle = '#5a1f2c';
-      g.fillRect(0, 0, ROOM, ROOM);
-      g.strokeStyle = '#c9a04a';
-      g.lineWidth = 6;
-      g.strokeRect(60, 60, ROOM - 120, ROOM - 120);
-      g.lineWidth = 2;
-      g.strokeRect(80, 80, ROOM - 160, ROOM - 160);
-      g.fillStyle = 'rgba(201,160,74,0.18)';
-      for (let y = 140; y < ROOM - 100; y += 90)
-        for (let x = 140; x < ROOM - 100; x += 90) {
-          g.beginPath();
-          g.moveTo(x, y - 14);
-          g.lineTo(x + 14, y);
-          g.lineTo(x, y + 14);
-          g.lineTo(x - 14, y);
-          g.fill();
-        }
-    }
-    // 五線のもよう (うすく)
-    g.strokeStyle = 'rgba(255,255,255,0.06)';
-    g.lineWidth = 2;
-    for (let s = 0; s < 3; s++) {
-      const y0 = 300 + s * 350;
-      for (let i = 0; i < 5; i++) {
-        g.beginPath();
-        g.moveTo(0, y0 + i * 18);
-        g.lineTo(ROOM, y0 + i * 18);
-        g.stroke();
-      }
-    }
-    return { furn, floor: c };
-  }
-
-  // 円を家具と壁から押し出す
-  function collide(o, r) {
-    if (o.x < r) o.x = r;
-    if (o.y < r) o.y = r;
-    if (o.x > ROOM - r) o.x = ROOM - r;
-    if (o.y > ROOM - r) o.y = ROOM - r;
-    for (const f of G.room.furn) {
-      const cx = clamp(o.x, f.x, f.x + f.w);
-      const cy = clamp(o.y, f.y, f.y + f.h);
-      const dx = o.x - cx;
-      const dy = o.y - cy;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < r * r) {
-        if (d2 > 0.0001) {
-          const d = Math.sqrt(d2);
-          o.x = cx + (dx / d) * r;
-          o.y = cy + (dy / d) * r;
-        } else {
-          // 中に入りこんだ: 一番近い辺へ
-          const l = o.x - f.x;
-          const rr = f.x + f.w - o.x;
-          const t = o.y - f.y;
-          const b = f.y + f.h - o.y;
-          const m = Math.min(l, rr, t, b);
-          if (m === l) o.x = f.x - r;
-          else if (m === rr) o.x = f.x + f.w + r;
-          else if (m === t) o.y = f.y - r;
-          else o.y = f.y + f.h + r;
-        }
-      }
-    }
+  function toScreen(x, y) {
+    return [offX + x * scale, offY + y * scale];
   }
 
   // ---------- 能力値 ----------
   function computeStats() {
-    const P = G.passives;
     const up = G.up;
     const c = G.composer;
-    const lv = (id) => P[id] || 0;
-    const s = {};
-    s.maxHp = c.hp + 20 * lv('tailcoat') + 10 * (up.hp || 0);
-    s.might = (1 + 0.1 * lv('rosin')) * (1 + 0.05 * (up.might || 0)) * (G.own ? 1.1 : 1);
-    s.armor = lv('soundproof') + (up.armor || 0);
-    s.speed = 150 * c.speed * (1 + 0.03 * (up.speed || 0));
-    s.cd = (1 - 0.08 * lv('metronome')) * (1 - 0.03 * (up.cd || 0)) * (c.id === 'chopin' ? 0.9 : 1);
-    s.area = (1 + 0.1 * lv('stand')) * (1 + 0.05 * (up.area || 0));
-    s.dur = (1 + 0.1 * lv('pedal')) * (1 + 0.05 * (up.dur || 0));
-    s.amount = lv('pageturner');
-    s.pspeed = 1 + 0.1 * lv('lungs');
-    s.magnet = 70 * (1 + 0.2 * lv('applause')) * (1 + 0.1 * (up.magnet || 0));
-    s.growth = (1 + 0.08 * lv('quill')) * (1 + 0.05 * (up.growth || 0)) * (c.id === 'mozart' ? 1.2 : 1);
-    s.luck = (1 + 0.1 * lv('bouquet')) * (1 + 0.1 * (up.luck || 0));
-    s.regen = 0.25 * lv('coffee') + 0.1 * (up.regen || 0);
-    s.greed = 1 + 0.1 * (up.greed || 0);
-    const old = G.stats;
-    G.stats = s;
-    if (old && s.maxHp > old.maxHp) G.player.hp += s.maxHp - old.maxHp;
-    G.player.hp = Math.min(G.player.hp, s.maxHp);
+    G.stats = {
+      maxHp: c.hp + 10 * (up.hp || 0),
+      might: (1 + 0.05 * (up.might || 0)) * (G.own ? 1.1 : 1),
+      cd: (1 - 0.03 * (up.cd || 0)) * (c.id === 'chopin' ? 0.9 : 1),
+      area: 1 + 0.05 * (up.area || 0),
+      income: (1 + 0.05 * (up.income || 0)) * (c.id === 'mozart' ? 1.2 : 1),
+      discount: 1 - 0.03 * (up.discount || 0),
+      greed: 1 + 0.1 * (up.greed || 0),
+    };
   }
-  // いまの攻撃力 (ベートーヴェンの「不屈」を含む)
-  function might() {
+  function globalMight() {
     let m = G.stats.might;
-    if (G.composer.id === 'beethoven' && G.player.hp < G.stats.maxHp * 0.5) m *= 1.3;
+    if (G.composer.id === 'beethoven' && G.hp < G.stats.maxHp * 0.5) m *= 1.3;
     return m;
   }
 
+  // タワーの値段
+  function buildCost(id) {
+    const fav = id === G.composer.weapon ? 0.8 : 1;
+    return Math.round(D.TOWERS[id].cost * fav * G.stats.discount);
+  }
+  function upgradeCost(t) {
+    return Math.round(D.TOWERS[t.id].cost * 0.7 * t.lv * G.stats.discount);
+  }
+  function evolveCost(t) {
+    return Math.round(D.TOWERS[t.id].cost * 3 * G.stats.discount);
+  }
+  function towerUnlocked(id) {
+    const lock = D.TOWERS[id].locked;
+    return !lock || (window.CSUI && window.CSUI.songClearedByAnyone(lock));
+  }
+
   // ---------- 開始 ----------
-  // opt: { song, composer, mode, save (作曲家ごとの練習室の段階), sim }
   function start(opt) {
     const song = opt.song;
     const score = window.CS_SCORES[song.score];
     const hard = opt.mode === 'hard';
     const parsed = parseScore(score, hard ? HARD.tempo : 1);
-    const composer = opt.composer;
     G = {
       song,
       score,
       parsed,
-      composer,
+      composer: opt.composer,
       mode: opt.mode,
       hard,
-      own: song.composer === composer.id,
+      own: song.composer === opt.composer.id,
       up: opt.up || {},
       sim: !!opt.sim,
       t: 0,
-      phase: 'intro',
+      phase: 'prep', // prep (準備) → song → coda (曲が終わって残りを待つ) → boss → win / dead
       phaseT: 0,
       paused: false,
-      overlay: null, // 'level' などメニューを重ねている
-      player: { x: 0, y: 0, r: 13, hp: 100, inv: 0, fx: 1, fy: 0, face: 1, walk: 0, hurtT: 0 },
-      weapons: [],
-      passives: {},
-      stats: null,
-      level: 1,
-      xp: 0,
-      xpNext: 0,
+      hp: 100,
+      ink: 0,
+      towers: [],
+      grid: new Map(),
       notes: [],
       shots: [],
       fx: [],
-      inks: [],
-      items: [],
-      bullets: [],
-      zones: [],
-      timers: [],
       texts: [],
       boss: null,
-      track: null,
+      track: new Track(parsed.notes),
       btrack: null,
       beat: 0,
       tick: -1,
       bpm: parsed.bpmAt(0),
-      spawned: 0,
       killed: 0,
+      leaked: 0,
       total: parsed.notes.length,
-      encore: 0,
-      codaT: 0,
+      inkEarned: 0,
       dmgTaken: 0,
-      gold: 0,
-      chestsGiven: 0,
-      shake: 0,
       revived: false,
-      rerolls: (opt.up && opt.up.reroll) || 0,
-      pendingLevels: 0,
       result: null,
-      camX: 0,
-      camY: 0,
-      dark: 0,
-      lastPad: 0,
-      showsDone: new Set(),
-      resoT: 0,
-      codaPadT: 0,
+      sel: null, // 選んでいるマス { c, r }
+      hover: null,
+      shake: 0,
+      timers: [],
       songEnd: parsed.lengthSec,
     };
-    G.room = makeRoom(song.room);
-    G.player.x = ROOM * 0.5;
-    G.player.y = ROOM * 0.82;
+    computeStats();
+    G.hp = G.stats.maxHp;
+    G.ink = 320 + 25 * (G.up.ink || 0);
+    // 音符のインク: 曲全体で、だいたい決まった量になるように配る
+    let wsum = 0;
+    for (const n of parsed.notes) {
+      n.w = logInterp(HP_TABLE, n.d) * clamp(Math.pow(1.35, -(n.p - 60) / 12), 0.4, 2.5);
+      wsum += n.w;
+    }
+    const mins = parsed.lengthSec / 60;
+    G.inkPool = (1500 + 1100 * mins) * STAR_MUL[song.stars - 1] ** 0.5;
+    G.inkPer = G.inkPool / wsum;
+    markElites(parsed);
     G.boss = {
-      x: ROOM * 0.5,
-      y: ROOM * 0.28,
-      r: 34,
+      x: SPAWN_X + 20,
+      y: TOP + (ROWS * CELL) / 2,
+      r: 40,
       hp: 1,
       maxHp: 1,
       shield: true,
-      tx: ROOM * 0.5,
-      ty: ROOM * 0.3,
       pulse: 0,
-      dash: null,
       hurtT: 0,
       def: song.boss,
+      moving: false,
     };
-    // 武器
-    addWeapon(composer.weapon);
-    computeStats();
-    G.player.hp = G.stats.maxHp;
-    // 経験値の配分: 曲を最後まで弾くと、だいたい目標のレベルに届く
-    const mins = parsed.lengthSec / 60;
-    G.targetLv = clamp(Math.round(8 + mins * 5), 14, 30);
-    let need = 0;
-    for (let L = 1; L < G.targetLv; L++) need += xpReq(L);
-    let wsum = 0;
-    for (const n of parsed.notes) {
-      n.w = Math.sqrt(logInterp(HP_TABLE, n.d) * clamp(Math.pow(1.35, -(n.p - 60) / 12), 0.4, 2.5));
-      wsum += n.w;
-    }
-    G.xpPer = (need * 1.1) / wsum;
-    G.xpNext = xpReq(1);
-    markElites(parsed);
-    G.track = new Track(parsed.notes);
-    // 開演: 1 小節のカウントのあと曲が始まる
-    const beatSec = 60 / G.bpm;
-    const countBeats = Math.max(2, Math.min(4, Math.round(parsed.barLen)));
-    const clicks = [];
-    for (let i = 0; i < countBeats; i++) clicks.push([i * beatSec, i === 0]);
-    G.track.start(0, countBeats * beatSec + 0.6, clicks.map(([t, s]) => [t + 0.6, s]));
-    G.phase = 'song';
-    G.camX = G.player.x;
-    G.camY = G.player.y;
     return G;
   }
 
-  // 強い音符 (アクセント) が少ない曲は、旋律の長い音を何個かエリートにする (楽譜ケースを出すため)
+  // 強い音符 (アクセント) が少ない曲は、旋律の長い音を何個かエリートにする (インクが多い)
   function markElites(parsed) {
     const notes = parsed.notes;
-    let elites = notes.filter((n) => n.mk.includes('>')).length;
-    const want = Math.max(4, Math.round(parsed.lengthSec / 32));
+    const elites = notes.filter((n) => n.mk.includes('>')).length;
+    const want = Math.max(4, Math.round(parsed.lengthSec / 30));
     if (elites >= want) return;
     const span = parsed.lengthSec / (want - elites + 1);
     for (let k = 1; k <= want - elites; k++) {
-      const a = span * k - span * 0.4;
-      const b = span * k + span * 0.4;
       let best = null;
       for (const n of notes) {
-        if (n.sec < a || n.sec > b || !n.melody || n.mk.includes('^')) continue;
+        if (n.sec < span * k - span * 0.4 || n.sec > span * k + span * 0.4 || !n.melody || n.mk.includes('^')) continue;
         if (!best || n.d > best.d) best = n;
       }
       if (best && !best.mk.includes('>')) best.mk += '>';
     }
   }
 
-  function xpReq(L) {
-    // 最初の数レベルは早く上がる (楽譜どおりの音数だと出だしから密度が高いため)
-    return Math.round(3 + L * 2.6 + Math.max(0, L - 5) * 1.2 + Math.max(0, L - 20) * 3);
+  // 準備が終わって曲を始める
+  function begin() {
+    if (!G || G.phase !== 'prep') return;
+    const beatSec = 60 / G.bpm;
+    const countBeats = Math.max(2, Math.min(4, Math.round(G.parsed.barLen)));
+    const clicks = [];
+    for (let i = 0; i < countBeats; i++) clicks.push([0.3 + i * beatSec, i === 0]);
+    G.track.start(0, countBeats * beatSec + 0.3, clicks);
+    G.phase = 'song';
+    G.phaseT = 0;
+    G.sel = null;
+    if (window.CSUI) window.CSUI.closeTowerPanel();
   }
 
-  // ---------- 武器とパッシブ ----------
-  function addWeapon(id) {
-    const w = { id, lv: 1, evo: false, t: 0.5, ready: false, side: 1, a: 0, n: 0 };
-    G.weapons.push(w);
-    return w;
-  }
-  function wParams(w) {
-    return D.WEAPONS[w.id].lv(w.lv);
+  // ---------- 音符 ----------
+  function spawnNote(src) {
+    const o = (src.p - 60) / 12;
+    const hardMul = G.hard ? HARD.hp : 1;
+    const accomp = src.melody ? 1 : 0.8;
+    let hp = logInterp(HP_TABLE, src.d) * clamp(Math.pow(1.35, -o), 0.4, 2.5) * STAR_MUL[G.song.stars - 1] * hardMul * accomp;
+    let r = logInterp(R_TABLE, src.d);
+    const mk = src.mk || '';
+    const n = {
+      x: SPAWN_X,
+      y: pitchY(src.p) + rand(-2, 2),
+      p: src.p,
+      d: src.d,
+      reg: regOf(src.p),
+      col: pitchColor(src.p),
+      melody: src.melody,
+      v: src.v,
+      spd: clamp(65 * Math.pow(1.3, o), 32, 160),
+      kx: 0,
+      flash: 0,
+      slowT: 0,
+      slowF: 1,
+      stunT: 0,
+      charm: 0,
+      dead: false,
+      stacc: mk.includes("'"),
+      trill: mk.includes('~'),
+      elite: mk.includes('>'),
+      fermata: mk.includes('^'),
+      grace: mk.includes('g'),
+      sharp: BLACK_KEYS.includes(src.p % 12),
+      phase: Math.random() * 6.28,
+      dashT: rand(0, 1.2),
+      t: 0,
+      lastX: SPAWN_X,
+      harpHit: null,
+    };
+    if (n.v >= 4) r *= n.v === 5 ? 1.15 : 1.08;
+    if (n.elite) {
+      hp *= 3;
+      r *= 1.25;
+    }
+    if (n.fermata) {
+      hp *= 6;
+      r *= 1.5;
+      n.spd *= 0.7;
+    }
+    if (n.grace) {
+      hp = 1;
+      r = 5;
+    }
+    n.hp = n.maxHp = hp;
+    n.r = r;
+    n.leak = DYN_LEAK[n.v] * (G.hard ? HARD.leak : 1) * (n.fermata ? 2 : 1);
+    n.ink = G.inkPer * (src.w || 1) * (n.elite ? 4 : 1);
+    G.notes.push(n);
+    G.boss.pulse = 1;
+    return n;
   }
 
-  // 一番近い音符 (いなければ null)
-  function nearest(x, y, maxD = 600, skip) {
-    let best = null;
-    let bd = maxD * maxD;
-    for (const n of G.notes) {
-      if (n.dead || n.charm > 0 || n === skip) continue;
-      const d = dist2(x, y, n.x, n.y);
-      if (d < bd) {
-        bd = d;
-        best = n;
-      }
-    }
-    // 決戦ではボスも狙う
-    if (!best && G.phase === 'battle') {
-      const b = G.boss;
-      if (dist2(x, y, b.x, b.y) < maxD * maxD * 1.5) return b;
-    }
-    return best;
-  }
-
-  function aimAt(target) {
-    const p = G.player;
-    if (target) {
-      const a = Math.atan2(target.y - p.y, target.x - p.x);
-      return a;
-    }
-    return Math.atan2(p.fy, p.fx);
-  }
-
-  // 音符にダメージを与える。reg は楽器の得意な音域
-  function hitNote(n, dmg, opt = {}) {
-    if (n === G.boss) {
-      hitBoss(dmg, opt);
-      return;
-    }
+  function hitNote(n, dmg, reg) {
+    if (n === G.boss) return hitBoss(dmg);
     if (n.dead) return;
-    let d = dmg * might();
-    if (opt.reg && (opt.reg === 'all' || opt.reg === n.reg)) {
-      if (opt.reg !== 'all') {
-        d *= 1.5;
-        if (G.t - G.resoT > 0.6 && Math.random() < 0.15) {
-          G.resoT = G.t;
-          addText(n.x, n.y - n.r - 8, T('resonance'), '#fff6a8', 0.7, 12);
-        }
-      }
-    }
+    let d = dmg * globalMight();
+    if (reg && reg !== 'all' && reg === n.reg) d *= 1.5;
     n.hp -= d;
-    n.flash = 0.12;
-    if (opt.kb) {
-      const p = G.player;
-      const a = opt.kbFrom ? Math.atan2(n.y - opt.kbFrom.y, n.x - opt.kbFrom.x) : Math.atan2(n.y - p.y, n.x - p.x);
-      const k = opt.kb / (1 + n.d * 0.4);
-      n.kx += Math.cos(a) * k;
-      n.ky += Math.sin(a) * k;
-    }
-    if (opt.slow) {
-      n.slowT = Math.max(n.slowT, opt.slowT || 1);
-      n.slowF = Math.min(n.slowF || 1, 1 - opt.slow);
-    }
-    if (opt.stun) n.stunT = Math.max(n.stunT, opt.stun);
-    if (opt.charm && n.hp > 0 && !n.boss && !n.fermata && Math.random() < opt.charm) {
-      n.charm = 5;
-    }
+    n.flash = 0.1;
     if (n.hp <= 0) killNote(n);
   }
 
-  function hitBoss(dmg, opt = {}) {
+  function hitBoss(dmg) {
     const b = G.boss;
-    if (b.shield) {
-      if (G.t - (b.clangT || 0) > 0.25) {
-        b.clangT = G.t;
-        Synth.sfx('clang');
-      }
-      return;
-    }
-    if (G.phase !== 'battle') return;
-    b.hp -= dmg * might();
+    if (b.shield || G.phase !== 'boss') return;
+    b.hp -= dmg * globalMight();
     b.hurtT = 0.1;
     if (b.hp <= 0) {
       b.hp = 0;
       winStage();
     }
-    void opt;
   }
 
   function killNote(n) {
     if (n.dead) return;
     n.dead = true;
-    G.killed++;
-    // インク (経験値)
-    const xp = n.xp;
-    G.xpDropped = (G.xpDropped || 0) + xp;
-    G.inks.push({ x: n.x, y: n.y, v: xp, vx: rand(-30, 30), vy: rand(-30, 30), r: xp > G.xpPer * 6 ? 7 : xp > G.xpPer * 2.5 ? 5.5 : 4, col: n.col, pull: false });
-    // 落とし物
-    const L = G.stats.luck;
-    const r = Math.random();
-    if (n.elite || n.fermata) {
-      if (n.fermata || Math.random() < 0.6 * L) G.items.push({ x: n.x, y: n.y, kind: 'chest', t: 0 });
-    } else if (r < 0.004 * L) G.items.push({ x: n.x, y: n.y, kind: 'coffee', t: 0 });
-    else if (r < 0.0055 * L) G.items.push({ x: n.x, y: n.y, kind: 'applause', t: 0 });
-    else if (r < 0.0065 * L) G.items.push({ x: n.x, y: n.y, kind: 'rest', t: 0 });
-    else if (r < 0.0075 * L) G.items.push({ x: n.x, y: n.y, kind: 'ffff', t: 0 });
-    else if (r < 0.0175 * L) G.items.push({ x: n.x, y: n.y, kind: 'ducat', t: 0 });
-    // はじける
-    for (let i = 0; i < 5; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const s = rand(60, 160);
-      G.fx.push({ kind: 'spark', x: n.x, y: n.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 0, life: 0.35, col: n.col });
+    if (n.minion) {
+      gainInk(n.ink, n.x, n.y);
+      return;
     }
-    if (Math.random() < 0.35) Synth.sfx('pop', { p: scaleTone(n.p) });
+    G.killed++;
+    gainInk(n.ink, n.x, n.y);
+    for (let i = 0; i < 4; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = rand(60, 150);
+      G.fx.push({ kind: 'spark', x: n.x, y: n.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 0, life: 0.3, col: n.col });
+    }
+    if (Math.random() < 0.3) Synth.sfx('pop', { p: scaleTone(n.p) });
   }
 
-  // 曲の調の音階にそろえた効果音の高さ
+  function gainInk(v, x, y) {
+    const got = v * G.stats.income;
+    G.ink += got;
+    G.inkEarned += got;
+    if (got >= 3 && !G.sim) G.texts.push({ x, y: y - 10, s: '+' + Math.round(got), col: '#9ff3d0', t: 0, life: 0.7, size: 13, world: true });
+  }
+
   function scaleTone(p) {
     const key = G.score.key || { tonic: 0, minor: false };
     const sc = key.minor ? [0, 2, 3, 5, 7, 8, 11] : [0, 2, 4, 5, 7, 9, 11];
@@ -512,212 +344,374 @@
     return q;
   }
 
-  // ---------- 音符を出す ----------
-  function spawnNote(src) {
-    const b = G.boss;
-    const hardMul = G.hard ? HARD.hp : 1;
-    const encMul = Math.pow(1.15, G.encore);
-    const o = (src.p - 60) / 12;
-    // 曲の出だしは弱め (120 秒かけて本来の強さに)。伴奏の音符は旋律より少し脆い
-    const ramp = G.encore ? 1 : Math.min(1, 0.3 + (0.7 * G.t) / 120);
-    const accomp = src.melody ? 1 : 0.75;
-    let hp = logInterp(HP_TABLE, src.d) * clamp(Math.pow(1.35, -o), 0.4, 2.5) * STAR_MUL[G.song.stars - 1] * hardMul * encMul * ramp * accomp;
-    let r = logInterp(R_TABLE, src.d);
-    let spd = clamp(55 * Math.pow(1.4, o), 22, 150) * Math.pow(1.04, G.encore);
-    const mk = src.mk || '';
-    const n = {
-      x: b.x,
-      y: b.y,
-      p: src.p,
-      d: src.d,
-      reg: regOf(src.p),
-      col: pitchColor(src.p),
-      melody: src.melody,
-      v: src.v,
-      kx: 0,
-      ky: 0,
-      flash: 0,
-      slowT: 0,
-      slowF: 1,
-      stunT: 0,
-      charm: 0,
-      hitCD: 0,
-      dead: false,
-      launch: 0.4,
-      stacc: mk.includes("'"),
-      trill: mk.includes('~'),
-      elite: mk.includes('>'),
-      fermata: mk.includes('^'),
-      grace: mk.includes('g'),
-      sharp: BLACK_KEYS.includes(src.p % 12),
-      phase: Math.random() * 6.28,
-      dashT: rand(0, 1.2),
-      t: 0,
-    };
-    if (src.cr) {
-      hp *= 1 + 0.5 * src.cr;
-      r *= 1 + 0.15 * src.cr;
-    }
-    if (n.v >= 4) r *= n.v === 5 ? 1.2 : 1.1;
-    if (n.elite) {
-      hp *= 4;
-      r *= 1.25;
-    }
-    if (n.fermata) {
-      hp *= 8;
-      r *= 1.6;
-      spd *= 0.8;
-    }
-    if (n.grace) {
-      hp = 1;
-      r = 5;
-    }
-    n.hp = n.maxHp = hp;
-    n.r = r;
-    n.spd = spd;
-    n.dmg = DYN_DMG[n.v] * (G.hard ? HARD.dmg : 1) * (n.fermata ? 1.6 : 1) * (0.4 + 0.6 * ramp);
-    n.xp = G.xpPer * (src.w || 1) * (n.melody ? 1.5 : 1) * (n.elite ? 3 : 1);
-    // 吐き出す向き: 主人公の方向 ± 60° (和音は扇に広がる)
-    const p = G.player;
-    let a = Math.atan2(p.y - b.y, p.x - b.x) + rand(-1, 1) * 1.05;
-    if (src.chord > 1) a += ((src.p % 7) - 3) * 0.25;
-    n.lvx = Math.cos(a) * 190;
-    n.lvy = Math.sin(a) * 190;
-    n.x += Math.cos(a) * (b.r * 0.6);
-    n.y += Math.sin(a) * (b.r * 0.6);
-    if (G.notes.length >= MAX_NOTES) {
-      // 上限を超えたら、同じ高さの音符に重ねる
-      let host = null;
-      for (const m of G.notes) if (!m.dead && m.p === n.p) host = m;
-      if (!host) host = G.notes[(Math.random() * G.notes.length) | 0];
-      host.hp += n.hp * 0.7;
-      host.maxHp += n.hp * 0.7;
-      host.xp += n.xp;
-      host.r = Math.min(host.r * 1.04, 26);
-      G.killed++; // 数は合わせる (重ねた音符はいなくなった扱い)
-      return;
-    }
-    G.notes.push(n);
-    G.spawned++;
-    b.pulse = 1;
+  // ---------- タワー ----------
+  function canBuildAt(c, r) {
+    return c >= BUILD_COL0 && c <= BUILD_COL1 && r >= 0 && r < ROWS && !G.grid.has(c + ',' + r);
   }
-
-  // ---------- レベルアップ ----------
-  function gainXp(v) {
-    G.xp += v * G.stats.growth;
-    while (G.xp >= G.xpNext) {
-      G.xp -= G.xpNext;
-      G.level++;
-      G.xpNext = xpReq(G.level);
-      G.pendingLevels++;
-      if (G.choices) window.CSUI.levelDockCount(G.pendingLevels);
-    }
+  function build(id, c, r) {
+    if (!G || !canBuildAt(c, r) || !towerUnlocked(id)) return false;
+    const cost = buildCost(id);
+    if (G.ink < cost) return false;
+    G.ink -= cost;
+    const [x, y] = cellCenter(c, r);
+    const t = { id, c, r, x, y, lv: 1, evo: false, spent: cost, cdT: 0.3, ready: false, a: 0, side: 1, flash: 0 };
+    G.towers.push(t);
+    G.grid.set(c + ',' + r, t);
+    Synth.sfx('pick', { p: 79 });
+    return t;
   }
-
-  function weaponUnlocked(id) {
-    const lock = D.WEAPONS[id].locked;
-    return !lock || (window.CSUI && window.CSUI.songClearedByAnyone(lock));
-  }
-
-  // レベルアップの候補を作る
-  function makeChoices() {
-    const pool = [];
-    for (const w of G.weapons) if (!w.evo && w.lv < 8) pool.push({ kind: 'weapon', id: w.id, lv: w.lv + 1, weight: 3 });
-    for (const [id, lv] of Object.entries(G.passives)) if (lv < D.PASSIVES[id].max) pool.push({ kind: 'passive', id, lv: lv + 1, weight: 2.5 });
-    if (G.weapons.length < 4)
-      for (const id of Object.keys(D.WEAPONS))
-        if (!G.weapons.some((w) => w.id === id) && weaponUnlocked(id)) pool.push({ kind: 'weapon', id, lv: 1, weight: 1.6, isNew: true });
-    if (Object.keys(G.passives).length < 4)
-      for (const id of Object.keys(D.PASSIVES)) if (!(id in G.passives)) pool.push({ kind: 'passive', id, lv: 1, weight: 1.2, isNew: true });
-    const n = (G.up.choices ? 4 : 3);
-    const out = [];
-    while (out.length < n && pool.length) {
-      let sum = 0;
-      for (const c of pool) sum += c.weight;
-      let r = Math.random() * sum;
-      let idx = 0;
-      for (; idx < pool.length; idx++) {
-        r -= pool[idx].weight;
-        if (r <= 0) break;
-      }
-      idx = Math.min(idx, pool.length - 1);
-      out.push(pool[idx]);
-      pool.splice(idx, 1);
-    }
-    if (!out.length) {
-      out.push({ kind: 'heal' });
-      out.push({ kind: 'gold' });
-    }
-    return out;
-  }
-
-  function applyChoice(c) {
-    // 候補を出してから選ぶまでの間に、楽譜ケースで上がっていることがあるので上限を守る
-    if (c.kind === 'weapon') {
-      const w = G.weapons.find((x) => x.id === c.id);
-      if (w) w.lv = Math.min(8, w.lv + 1);
-      else if (G.weapons.length < 4) addWeapon(c.id);
-    } else if (c.kind === 'passive') {
-      if (c.id in G.passives || Object.keys(G.passives).length < 4) G.passives[c.id] = Math.min(D.PASSIVES[c.id].max, (G.passives[c.id] || 0) + 1);
-    } else if (c.kind === 'heal') {
-      G.player.hp = Math.min(G.stats.maxHp, G.player.hp + 30);
-    } else if (c.kind === 'gold') {
-      G.gold += 10;
-    }
-    computeStats();
-  }
-
-  // 楽譜ケース (宝箱): 進化できるものがあれば進化、なければ 1〜3 個レベルアップ
-  function openChest() {
-    Synth.sfx('chest', { p: 72 });
-    const evo = G.weapons.find((w) => !w.evo && w.lv >= 8 && G.passives[D.WEAPONS[w.id].passive]);
-    if (evo) {
-      evo.evo = true;
-      const name = L(D.EVOS[D.WEAPONS[evo.id].evo].name);
-      addBanner(T('evolved').replace('{w}', name), '#e7c3ff');
+  function upgrade(t) {
+    if (!t || t.evo) return false;
+    if (t.lv >= 5) {
+      const cost = evolveCost(t);
+      if (G.ink < cost) return false;
+      G.ink -= cost;
+      t.spent += cost;
+      t.evo = true;
       Synth.sfx('cymbal');
-      return;
+      G.texts.push({ s: '★ ' + L(D.EVOS[D.TOWERS[t.id].evo].name), col: '#e7c3ff', t: 0, life: 2.2, size: 20, world: false });
+      return true;
     }
-    const k = Math.random() < 0.1 * G.stats.luck ? 3 : 1;
-    const got = [];
-    for (let i = 0; i < k; i++) {
-      const opts = [];
-      for (const w of G.weapons) if (!w.evo && w.lv < 8) opts.push(() => (w.lv++, L(D.WEAPONS[w.id].name) + ' Lv' + w.lv));
-      for (const [id, lv] of Object.entries(G.passives)) if (lv < D.PASSIVES[id].max) opts.push(() => (G.passives[id]++, L(D.PASSIVES[id].name) + ' Lv' + G.passives[id]));
-      if (!opts.length) {
-        G.gold += 15;
-        got.push('+15 ' + T('ducats'));
+    const cost = upgradeCost(t);
+    if (G.ink < cost) return false;
+    G.ink -= cost;
+    t.spent += cost;
+    t.lv++;
+    t.flash = 0.4;
+    Synth.sfx('level', { p: 72 + t.lv * 2 });
+    return true;
+  }
+  function sell(t) {
+    if (!t) return;
+    G.ink += Math.round(t.spent * 0.7);
+    G.towers = G.towers.filter((x) => x !== t);
+    G.grid.delete(t.c + ',' + t.r);
+    Synth.sfx('pick', { p: 67 });
+  }
+  function tParams(t) {
+    const def = D.TOWERS[t.id];
+    const P = { ...def.lv(t.lv) };
+    const S = G.stats;
+    if (P.range) P.range *= S.area;
+    if (P.len) P.len *= S.area;
+    if (P.dmg) P.dmg *= t.id === G.composer.weapon ? 1.25 : 1;
+    if (P.cd) P.cd *= S.cd;
+    // 指揮棒の強化 (一番強いもの 1 つ)
+    if (def.kind !== 'buff') {
+      let mt = 0;
+      let hs = 0;
+      for (const b of G.towers) {
+        if (b.id !== 'baton') continue;
+        const BP = D.TOWERS.baton.lv(b.lv);
+        const range = BP.range * S.area * (b.evo ? 1.25 : 1);
+        if (dist2(b.x, b.y, t.x, t.y) <= range * range) {
+          mt = Math.max(mt, BP.might * (b.evo ? 1.6 : 1));
+          hs = Math.max(hs, BP.haste * (b.evo ? 1.6 : 1));
+        }
+      }
+      if (P.dmg) P.dmg *= 1 + mt;
+      if (P.cd) P.cd *= 1 - hs;
+      t.buffed = mt > 0;
+    }
+    return P;
+  }
+
+  // 範囲の中で一番先頭 (左) の音符
+  function firstInRange(x, y, range, skip) {
+    let best = null;
+    for (const n of G.notes) {
+      if (n.dead || n.charm > 0 || n === skip) continue;
+      if (dist2(n.x, n.y, x, y) > (range + n.r) * (range + n.r)) continue;
+      if (!best || n.x < best.x) best = n;
+    }
+    if (!best && G.phase === 'boss' && !G.boss.shield && dist2(G.boss.x, G.boss.y, x, y) < (range + G.boss.r) ** 2) return G.boss;
+    return best;
+  }
+  function inRadius(x, y, r, fn) {
+    for (const n of G.notes) if (!n.dead && dist2(n.x, n.y, x, y) <= (r + n.r) * (r + n.r)) fn(n);
+    if (G.phase === 'boss' && dist2(G.boss.x, G.boss.y, x, y) <= (r + G.boss.r) ** 2) fn(G.boss);
+  }
+
+  function updateTowers(dt, newTick) {
+    for (const t of G.towers) {
+      t.flash = Math.max(0, t.flash - dt);
+      const def = D.TOWERS[t.id];
+      const P = tParams(t);
+      t.P = P;
+      if (def.kind === 'aura') {
+        // チェロ: まわりを遅くし、少しずつ削る
+        const r = P.range * (t.evo ? 1.4 : 1);
+        const slow = Math.min(0.7, P.slow + (t.evo ? 0.15 : 0));
+        t.cdT -= dt;
+        const tickNow = t.cdT <= 0;
+        if (tickNow) t.cdT = P.cd;
+        inRadius(t.x, t.y, r, (n) => {
+          if (n === G.boss) {
+            if (tickNow) hitBoss(P.dmg);
+            return;
+          }
+          n.slowT = 0.2;
+          n.slowF = Math.min(n.slowF, 1 - slow);
+          if (tickNow) hitNote(n, P.dmg * (t.evo ? 1.5 : 1), def.reg);
+        });
         continue;
       }
-      got.push(opts[(Math.random() * opts.length) | 0]());
+      if (def.kind === 'buff') {
+        if (t.evo) {
+          inRadius(t.x, t.y, P.range * G.stats.area * 1.25, (n) => {
+            if (n === G.boss) return;
+            n.slowT = 0.2;
+            n.slowF = Math.min(n.slowF, 0.8);
+          });
+        }
+        continue;
+      }
+      if (def.kind === 'string') {
+        // ハープ: 縦の弦を通りぬけた音符に
+        const h = P.range * (t.evo ? 1.4 : 1);
+        const xs = t.evo ? [t.x - 18, t.x + 18] : [t.x];
+        for (const n of G.notes) {
+          if (n.dead || Math.abs(n.y - t.y) > h + n.r) continue;
+          for (const sx of xs) {
+            if (n.lastX > sx && n.x <= sx) {
+              hitNote(n, P.dmg, def.reg);
+              t.flash = 0.15;
+            }
+          }
+        }
+        if (G.phase === 'boss' && !G.boss.shield && Math.abs(G.boss.y - t.y) < h + G.boss.r) {
+          for (const sx of xs) if (G.boss.lastX > sx && G.boss.x <= sx) hitBoss(P.dmg * 6);
+        }
+        continue;
+      }
+      t.cdT -= dt;
+      if (t.cdT <= 0) t.ready = true;
+      if (!t.ready || !newTick) continue;
+      if (fireTower(t, def, P)) {
+        t.ready = false;
+        t.cdT = P.cd * (t.evo ? 0.85 : 1);
+      }
     }
-    computeStats();
-    addBanner('🎼 ' + got.join(' / '), '#ffe9a8');
   }
 
-  // ---------- テキストと演出 ----------
-  function addText(x, y, s, col, life = 0.9, size = 14) {
-    G.texts.push({ x, y, s, col, t: 0, life, size, world: true });
+  // 撃てたら true
+  function fireTower(t, def, P) {
+    const reg = def.reg;
+    switch (def.kind) {
+      case 'shot': {
+        const target = firstInRange(t.x, t.y, P.range);
+        if (!target) return false;
+        const cnt = 1 + (G.composer.id === 'chopin' ? 1 : 0);
+        const per = t.evo ? 3 : 1;
+        const base = Math.atan2(target.y - t.y, target.x - t.x);
+        for (let i = 0; i < cnt; i++)
+          for (let j = 0; j < per; j++) {
+            const a = base + (i - (cnt - 1) / 2) * 0.12 + (j - (per - 1) / 2) * 0.1;
+            G.shots.push({ kind: 'key', x: t.x, y: t.y, vx: Math.cos(a) * 620, vy: Math.sin(a) * 620, r: 6, dmg: P.dmg, pierce: t.evo ? 3 : 1, t: 0, life: (P.range + 60) / 620, hit: new Set(), reg, burst: t.evo, target });
+          }
+        Synth.sfx('shot', { p: scaleTone(84) });
+        return true;
+      }
+      case 'beam': {
+        const len = P.len * (t.evo ? 1.4 : 1);
+        const width = P.width * (t.evo ? 1.7 : 1);
+        let any = false;
+        for (const n of G.notes) if (!n.dead && n.x > t.x && n.x < t.x + len && Math.abs(n.y - t.y) < width / 2 + n.r) any = true;
+        if (G.phase === 'boss' && G.boss.x > t.x && G.boss.x < t.x + len + G.boss.r && Math.abs(G.boss.y - t.y) < width / 2 + G.boss.r) any = true;
+        if (!any) return false;
+        const beam = { kind: 'beam', x: t.x, y: t.y, len, width, t: 0, life: t.evo ? 0.6 : 0.18, tick: 0, dmg: P.dmg, reg, evo: t.evo };
+        beamHit(beam, P.dmg);
+        G.fx.push(beam);
+        return true;
+      }
+      case 'pulse': {
+        let any = false;
+        inRadius(t.x, t.y, P.range, () => (any = true));
+        if (!any) return false;
+        const pulse = (r, stun) => {
+          G.fx.push({ kind: 'ring', x: t.x, y: t.y, r, t: 0, life: 0.35, col: '#ffcf7a' });
+          inRadius(t.x, t.y, r, (n) => {
+            if (n === G.boss) return hitBoss(P.dmg);
+            hitNote(n, P.dmg, reg);
+            n.kx += P.kb * 4 / (1 + n.d * 0.3);
+            if (stun) n.stunT = Math.max(n.stunT, stun);
+          });
+        };
+        pulse(P.range, t.evo ? 0.5 : 0);
+        if (t.evo) G.timers.push({ t: 0.25, fn: () => pulse(P.range * 1.25, 0.5) });
+        Synth.sfx('boom');
+        return true;
+      }
+      case 'homing': {
+        const target = firstInRange(t.x, t.y, P.range);
+        if (!target) return false;
+        for (let i = 0; i < P.count; i++) {
+          const a = Math.PI + rand(-1.2, 1.2);
+          G.shots.push({ kind: 'wind', x: t.x, y: t.y, vx: Math.cos(a) * 340, vy: Math.sin(a) * 340, sp: 340, r: 5, dmg: P.dmg, pierce: 1, t: 0, life: 2.5, hit: new Set(), reg, homing: true, range: P.range, home: t, charm: t.evo ? 0.12 : 0 });
+        }
+        return true;
+      }
+      case 'cone': {
+        let any = false;
+        const half = 0.55;
+        const hitCone = (mul) => {
+          G.fx.push({ kind: 'cone', x: t.x, y: t.y, a: 0, half, r: P.range, t: 0, life: 0.25 });
+          inRadius(t.x, t.y, P.range, (n) => {
+            const a = Math.atan2(n.y - t.y, n.x - t.x);
+            if (Math.abs(a) > half + 0.2) return;
+            if (n === G.boss) return hitBoss(P.dmg * mul);
+            hitNote(n, P.dmg * mul, reg);
+            n.kx += (P.kb * 4 * mul) / (1 + n.d * 0.3);
+          });
+        };
+        inRadius(t.x, t.y, P.range, (n) => {
+          if (Math.abs(Math.atan2(n.y - t.y, n.x - t.x)) <= half + 0.2) any = true;
+        });
+        if (!any) return false;
+        hitCone(1);
+        if (t.evo) G.timers.push({ t: 0.3, fn: () => hitCone(1) });
+        return true;
+      }
+      case 'splash': {
+        const target = firstInRange(t.x, t.y, P.range);
+        if (!target) return false;
+        const throwAt = (tx, ty) => G.shots.push({ kind: 'cymbal', x: t.x, y: t.y, tx, ty, t: 0, life: 0.35, sx: t.x, sy: t.y, dmg: P.dmg, splash: P.splash * (t.evo ? 1.5 : 1), reg, lob: true, spin: 0 });
+        throwAt(target.x - 20, target.y);
+        if (t.evo) {
+          const t2 = firstInRange(t.x, t.y, P.range, target);
+          if (t2) throwAt(t2.x - 20, t2.y);
+        }
+        return true;
+      }
+      case 'pillar': {
+        // 一番硬い音符を狙う
+        let best = null;
+        for (const n of G.notes) {
+          if (n.dead || dist2(n.x, n.y, t.x, t.y) > P.range * P.range) continue;
+          if (!best || n.hp > best.hp) best = n;
+        }
+        if (!best && G.phase === 'boss' && dist2(G.boss.x, G.boss.y, t.x, t.y) < (P.range + G.boss.r) ** 2) best = G.boss;
+        if (!best) return false;
+        const spots = [[best.x - best.spd * 0.35 * (best === G.boss ? 0 : 1), best.y]];
+        if (t.evo) {
+          const others = G.notes.filter((n) => !n.dead && n !== best && dist2(n.x, n.y, t.x, t.y) < P.range * P.range);
+          for (let i = 0; i < 2 && others.length; i++) {
+            const o = others.splice((Math.random() * others.length) | 0, 1)[0];
+            spots.push([o.x - o.spd * 0.35, o.y]);
+          }
+        }
+        for (const [sx, sy] of spots) {
+          G.fx.push({ kind: 'pipeWarn', x: sx, y: sy, r: P.splash, t: 0, life: 0.35 });
+          G.timers.push({
+            t: 0.35,
+            fn: () => {
+              G.fx.push({ kind: 'pipe', x: sx, y: sy, r: P.splash, t: 0, life: 0.4 });
+              inRadius(sx, sy, P.splash, (n) => (n === G.boss ? hitBoss(P.dmg) : hitNote(n, P.dmg, reg)));
+            },
+          });
+        }
+        return true;
+      }
+      default:
+        return false;
+    }
   }
-  function addBanner(s, col = '#fff') {
-    G.texts.push({ s, col, t: 0, life: 2.6, size: 20, world: false });
+
+  function beamHit(b, dmg) {
+    for (const n of G.notes) if (!n.dead && n.x > b.x - n.r && n.x < b.x + b.len && Math.abs(n.y - b.y) < b.width / 2 + n.r) hitNote(n, dmg, b.reg);
+    const B = G.boss;
+    if (G.phase === 'boss' && B.x > b.x && B.x < b.x + b.len + B.r && Math.abs(B.y - b.y) < b.width / 2 + B.r) hitBoss(dmg);
+  }
+
+  function updateShots(dt) {
+    for (const s of G.shots) {
+      s.t += dt;
+      if (s.lob) {
+        // シンバル: 放物線で飛んで、着いたところで爆ぜる
+        const k = Math.min(1, s.t / s.life);
+        s.x = s.sx + (s.tx - s.sx) * k;
+        s.y = s.sy + (s.ty - s.sy) * k - Math.sin(k * Math.PI) * 40;
+        s.spin += dt * 20;
+        if (k >= 1) {
+          G.fx.push({ kind: 'ring', x: s.tx, y: s.ty, r: s.splash, t: 0, life: 0.3, col: '#ffe066' });
+          inRadius(s.tx, s.ty, s.splash, (n) => (n === G.boss ? hitBoss(s.dmg) : hitNote(n, s.dmg, s.reg)));
+          s.t = 99;
+          if (Math.random() < 0.3) Synth.sfx('cymbal');
+        }
+        continue;
+      }
+      if (s.homing) {
+        if (!s.target || s.target.dead) s.target = firstInRange(s.home.x, s.home.y, s.range + 60);
+        if (s.target) {
+          const a = Math.atan2(s.target.y - s.y, s.target.x - s.x);
+          const cur = Math.atan2(s.vy, s.vx);
+          let da = a - cur;
+          while (da > Math.PI) da -= Math.PI * 2;
+          while (da < -Math.PI) da += Math.PI * 2;
+          const na = cur + clamp(da, -7 * dt, 7 * dt);
+          s.vx = Math.cos(na) * s.sp;
+          s.vy = Math.sin(na) * s.sp;
+        }
+      } else if (s.target && !s.target.dead && s.target !== G.boss) {
+        // ピアノの弾は少しだけ追う
+        const a = Math.atan2(s.target.y - s.y, s.target.x - s.x);
+        const sp = Math.hypot(s.vx, s.vy);
+        const cur = Math.atan2(s.vy, s.vx);
+        let da = a - cur;
+        while (da > Math.PI) da -= Math.PI * 2;
+        while (da < -Math.PI) da += Math.PI * 2;
+        const na = cur + clamp(da, -4 * dt, 4 * dt);
+        s.vx = Math.cos(na) * sp;
+        s.vy = Math.sin(na) * sp;
+      }
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      for (const n of G.notes) {
+        if (n.dead || s.t >= s.life || s.hit.has(n) || n.charm > 0) continue;
+        if (dist2(n.x, n.y, s.x, s.y) < (s.r + n.r) ** 2) {
+          s.hit.add(n);
+          hitNote(n, s.dmg, s.reg);
+          if (s.charm && !n.dead && !n.fermata && Math.random() < s.charm) n.charm = 4;
+          if (s.burst) {
+            G.fx.push({ kind: 'ring', x: s.x, y: s.y, r: 36, t: 0, life: 0.2, col: '#bfe3ff' });
+            inRadius(s.x, s.y, 36, (m) => m !== n && m !== G.boss && hitNote(m, s.dmg * 0.5, null));
+          }
+          s.pierce--;
+          if (s.pierce <= 0) s.t = 99;
+        }
+      }
+      const B = G.boss;
+      if (G.phase === 'boss' && s.t < s.life && !s.hit.has(B) && dist2(B.x, B.y, s.x, s.y) < (s.r + B.r) ** 2) {
+        s.hit.add(B);
+        hitBoss(s.dmg);
+        s.t = 99;
+      }
+    }
+    G.shots = G.shots.filter((s) => s.t < s.life);
+    for (const f of G.fx) {
+      if (f.kind === 'beam' && f.evo) {
+        f.tick -= dt;
+        if (f.tick <= 0) {
+          f.tick = 0.1;
+          beamHit(f, f.dmg * 0.3);
+        }
+      }
+    }
   }
 
   // ---------- 1 フレーム ----------
   function update(dt) {
-    if (!G || G.paused || G.overlay) return;
+    if (!G || G.paused) return;
     G.t += dt;
     G.phaseT += dt;
-    const p = G.player;
-    const S = G.stats;
-    const tr = G.phase === 'battle' ? G.btrack : G.track;
+    const tr = G.phase === 'boss' ? G.btrack : G.track;
     const pos = tr ? tr.pos() : 0;
 
-    // 拍の時計 (楽器の攻撃は 16 分音符の刻みに合わせる)
+    // 拍の時計 (タワーの攻撃は 16 分音符の刻みに合わせる)
     if (G.phase === 'song' && pos >= 0) {
       G.beat = G.parsed.secToBeat(pos);
       G.bpm = G.parsed.bpmAt(G.beat);
-    } else if (G.phase === 'battle' && pos >= 0) {
+    } else if (G.phase === 'boss' && pos >= 0) {
       G.beat = (pos * G.bpm) / 60;
     } else {
       G.beat += (dt * G.bpm) / 60;
@@ -726,166 +720,57 @@
     const newTick = tick !== G.tick;
     G.tick = tick;
 
-    G.maxAlive = Math.max(G.maxAlive || 0, G.notes.length);
-    if (G.sim) {
-      G.lvAt = G.lvAt || {};
-      const k = Math.floor(G.t / 30) * 30;
-      if (!(k in G.lvAt)) G.lvAt[k] = G.level + '/' + Math.round(G.player.hp);
+    if (G.phase === 'prep') {
+      updateFx(dt);
+      return;
     }
+
     // --- 段階 ---
     if (G.phase === 'song') {
       for (const n of G.track.due(pos)) spawnNote(n);
-      runShows();
       if (pos > G.songEnd + 0.3 && G.track.remaining() === 0) {
         G.phase = 'coda';
         G.phaseT = 0;
-        G.codaT = 0;
-        // 曲が終わったら拍手: 部屋中のインクを集める
-        for (const k of G.inks) k.pull = true;
-        addBanner(T('remainNotes'), '#ffe9a8');
       }
     } else if (G.phase === 'coda') {
-      G.codaT += dt;
-      G.codaPadT -= dt;
-      if (G.codaPadT <= 0 && !G.sim) {
-        // 最後の和音を小さく鳴らし続ける
-        G.codaPadT = 3.2;
-        const last = G.parsed.notes.filter((n) => n.sec >= G.parsed.lengthSec - 3);
-        const t0 = Synth.now() + 0.02;
-        for (const n of last.slice(-4)) Synth.play('strings', n.p, t0, 3, 0.18);
-      }
-      if (!G.notes.length) {
-        G.phase = 'break';
-        G.phaseT = 0;
-        G.track.stop();
-        Synth.sfx('cymbal');
-        G.boss.shield = false;
-        G.shake = 0.5;
-        addBanner(T('shieldBreak'), '#ffd27a');
-        for (let i = 0; i < 5; i++) G.fx.push({ kind: 'line', x: G.boss.x, y: G.boss.y, a: (i / 5) * 6.28, t: 0, life: 0.9 });
-      } else if (G.codaT > ENCORE_WAIT) {
-        startEncore();
-      }
-    } else if (G.phase === 'break') {
-      if (G.phaseT > 1.4) startBattle();
-    } else if (G.phase === 'battle') {
-      for (const n of G.btrack.due(pos)) bossFire(n);
-      if (newTick && tick % (G.btrack.barTicks * 2) === 0) bossDash();
+      if (!G.notes.length) startBoss();
+    } else if (G.phase === 'boss') {
+      for (const n of G.btrack.due(pos)) spawnMinion(n);
     } else if (G.phase === 'win') {
       if (G.phaseT > 3 && !G.result) finish(true);
     } else if (G.phase === 'dead') {
       if (G.phaseT > 1.6 && !G.result) finish(false);
     }
 
-    // --- 主人公 ---
-    if (G.phase !== 'dead' && G.phase !== 'win') {
-      let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0) + input.jx;
-      let my = (input.down ? 1 : 0) - (input.up ? 1 : 0) + input.jy;
-      if (G.bot) [mx, my] = botMove();
-      const m = Math.hypot(mx, my);
-      if (m > 0.05) {
-        const k = Math.min(1, m) / m;
-        mx *= k;
-        my *= k;
-        p.fx = mx;
-        p.fy = my;
-        if (Math.abs(mx) > 0.1) p.face = mx > 0 ? 1 : -1;
-        p.walk += dt * 10;
-      }
-      p.x += mx * S.speed * dt;
-      p.y += my * S.speed * dt;
-      collide(p, p.r);
-      p.hp = Math.min(S.maxHp, p.hp + S.regen * dt);
-    }
-    p.inv -= dt;
-    p.hurtT -= dt;
-
-    // --- 楽器 ---
-    if (G.phase !== 'dead' && G.phase !== 'win') updateWeapons(dt, newTick);
-
     // --- 音符 ---
-    gridBuild(G.notes);
-    let fermataAlive = false;
-    for (const n of G.notes) if (n.fermata && !n.dead) fermataAlive = true;
-    for (const n of G.notes) updateNote(n, dt, fermataAlive);
+    for (const n of G.notes) updateNote(n, dt);
     G.notes = G.notes.filter((n) => !n.dead);
 
-    // --- 弾・ゾーン・遅れて出る攻撃 ---
-    updateShots(dt);
-    for (const z of G.zones) {
-      z.t += dt;
-      z.tick -= dt;
-      if (z.tick <= 0) {
-        z.tick = 0.45;
-        gridQuery(z.x, z.y, z.r + 20, (n) => {
-          if (!n.dead && dist2(n.x, n.y, z.x, z.y) < (z.r + n.r) * (z.r + n.r)) hitNote(n, z.dmg, { reg: 'lo', slow: z.slow, slowT: 0.6 });
-        });
-        if (G.phase === 'battle' && dist2(G.boss.x, G.boss.y, z.x, z.y) < (z.r + G.boss.r) ** 2) hitBoss(z.dmg);
+    // --- ボス ---
+    const B = G.boss;
+    B.pulse = Math.max(0, B.pulse - dt * 4);
+    B.hurtT -= dt;
+    B.lastX = B.x;
+    if (G.phase === 'boss') {
+      B.x -= B.spd * dt;
+      if (B.x - B.r < PODIUM_X) {
+        // 指揮台に届いた: 負け
+        damagePodium(9999);
       }
     }
-    G.zones = G.zones.filter((z) => z.t < z.life);
+
+    // --- タワーと弾 ---
+    if (G.phase !== 'dead' && G.phase !== 'win') updateTowers(dt, newTick);
+    updateShots(dt);
     for (const tm of G.timers) {
       tm.t -= dt;
       if (tm.t <= 0) tm.fn();
     }
     G.timers = G.timers.filter((tm) => tm.t > 0);
+    updateFx(dt);
+  }
 
-    // --- ボス ---
-    updateBoss(dt);
-
-    // --- 弾 (ボス) ---
-    for (const b of G.bullets) {
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      b.t += dt;
-      if (G.phase !== 'dead' && dist2(b.x, b.y, p.x, p.y) < (b.r + p.r - 3) ** 2) {
-        hurt(b.dmg);
-        b.t = 99;
-      }
-    }
-    G.bullets = G.bullets.filter((b) => b.t < 6 && b.x > -20 && b.y > -20 && b.x < ROOM + 20 && b.y < ROOM + 20);
-
-    // --- インクと落とし物 ---
-    const mag = S.magnet;
-    for (const k of G.inks) {
-      const d2 = dist2(k.x, k.y, p.x, p.y);
-      if (k.pull || d2 < mag * mag) {
-        k.pull = true;
-        const d = Math.sqrt(d2) || 1;
-        const sp = 420 + (k.sp || 0);
-        k.sp = (k.sp || 0) + dt * 600;
-        k.x += ((p.x - k.x) / d) * sp * dt;
-        k.y += ((p.y - k.y) / d) * sp * dt;
-        if (d < p.r + 6) {
-          k.got = true;
-          G.xpGot = (G.xpGot || 0) + k.v;
-          gainXp(k.v);
-          if (Math.random() < 0.3) Synth.sfx('pick', { p: 84 + ((G.level * 2) % 12) });
-        }
-      } else {
-        // 近くのインクは、ゆっくり作曲家に寄ってくる
-        if (d2 < (mag * 3.2) ** 2) {
-          const d = Math.sqrt(d2) || 1;
-          k.vx += ((p.x - k.x) / d) * 90 * dt;
-          k.vy += ((p.y - k.y) / d) * 90 * dt;
-        }
-        k.x += k.vx * dt;
-        k.y += k.vy * dt;
-        k.vx *= 0.96;
-        k.vy *= 0.96;
-      }
-    }
-    G.inks = G.inks.filter((k) => !k.got);
-    for (const it of G.items) {
-      it.t += dt;
-      if (dist2(it.x, it.y, p.x, p.y) < (p.r + 16) ** 2) {
-        it.got = true;
-        pickItem(it);
-      }
-    }
-    G.items = G.items.filter((it) => !it.got);
-
-    // --- 演出 ---
+  function updateFx(dt) {
     for (const f of G.fx) {
       f.t += dt;
       if (f.vx !== undefined) {
@@ -898,651 +783,126 @@
     G.fx = G.fx.filter((f) => f.t < f.life);
     for (const t of G.texts) {
       t.t += dt;
-      if (t.world) t.y -= 20 * dt;
+      if (t.world) t.y -= 18 * dt;
     }
     G.texts = G.texts.filter((t) => t.t < t.life);
     G.shake = Math.max(0, G.shake - dt);
-    if (G.dark > 0) G.dark = Math.max(0, G.dark - dt * 0.05);
-
-    // カメラ
-    G.camX += (p.x - G.camX) * Math.min(1, dt * 10);
-    G.camY += (p.y - G.camY) * Math.min(1, dt * 10);
-
-    // レベルアップ: 曲もゲームも止めずに、画面の下に候補を出す (選ぶまで次の候補は待つ)
-    if (G.pendingLevels > 0 && !G.choices && G.phase !== 'dead' && G.phase !== 'win') {
-      G.pendingLevels--;
-      openLevelUp();
-    }
-    if ((G.phase === 'dead' || G.phase === 'win') && G.choices) {
-      G.choices = null;
-      window.CSUI.hideLevelDock();
-    }
   }
 
-  function hurt(dmg) {
-    const p = G.player;
-    if (p.inv > 0 || G.phase === 'dead' || G.phase === 'win') return;
-    const d = Math.max(1, dmg - G.stats.armor);
-    p.hp -= d;
-    G.dmgTaken += d;
-    p.inv = 0.5;
-    p.hurtT = 0.2;
-    G.shake = Math.max(G.shake, 0.18);
-    Synth.sfx('hurt');
-    if (p.hp <= 0) {
-      if (G.up.revive && !G.revived) {
-        G.revived = true;
-        p.hp = G.stats.maxHp * 0.5;
-        p.inv = 2;
-        addBanner(T('revived'), '#ffe9a8');
-        for (const n of G.notes) {
-          const a = Math.atan2(n.y - p.y, n.x - p.x);
-          n.kx += Math.cos(a) * 600;
-          n.ky += Math.sin(a) * 600;
-        }
-        return;
-      }
-      p.hp = 0;
-      G.phase = 'dead';
-      G.phaseT = 0;
-      (G.phase === 'battle' ? G.btrack : G.track)?.stop();
-      if (G.btrack) G.btrack.stop();
-      G.track.stop();
-    }
-  }
-
-  function updateNote(n, dt, fermataAlive) {
-    const p = G.player;
+  function updateNote(n, dt) {
     n.t += dt;
     n.flash -= dt;
-    n.hitCD -= dt;
     n.slowT -= dt;
     if (n.slowT <= 0) n.slowF = 1;
     n.stunT -= dt;
-    if (n.launch > 0) {
-      n.launch -= dt;
-      n.x += n.lvx * dt;
-      n.y += n.lvy * dt;
-      n.lvx *= 0.94;
-      n.lvy *= 0.94;
-      collide(n, n.r);
+    n.lastX = n.x;
+    let sp = n.spd * n.slowF;
+    if (n.stunT > 0) sp = 0;
+    if (n.stacc) {
+      // スタッカート: 止まっては、ぴょんと進む
+      n.dashT -= dt;
+      if (n.dashT < 0) n.dashT = 1.0;
+      sp *= n.dashT < 0.25 ? 2.6 : 0.5;
+    }
+    if (n.charm > 0) {
+      // 魅了: 右へ戻りながら、ぶつかった音符を攻撃する
+      n.charm -= dt;
+      n.x += n.spd * 0.8 * dt;
+      for (const m of G.notes) {
+        if (m === n || m.dead || m.charm > 0) continue;
+        if (dist2(m.x, m.y, n.x, n.y) < (m.r + n.r) ** 2) {
+          hitNote(m, 12, null);
+          n.charm -= 0.6;
+        }
+      }
+      if (n.charm <= 0 || n.x > SPAWN_X) killNote(n);
       return;
     }
-    let tx = p.x;
-    let ty = p.y;
-    if (n.charm > 0) {
-      // 魅了: ほかの音符を追いかけて体当たりする
-      n.charm -= dt;
-      const t = nearest(n.x, n.y, 500, n);
-      if (t && t !== G.boss) {
-        tx = t.x;
-        ty = t.y;
-        if (dist2(n.x, n.y, t.x, t.y) < (n.r + t.r) ** 2 && n.hitCD <= 0) {
-          n.hitCD = 0.3;
-          hitNote(t, 10, {});
-        }
-      }
-      if (n.charm <= 0) killNote(n);
-    }
-    let sp = n.spd * n.slowF * (fermataAlive && !n.fermata ? 0.7 : 1);
-    if (n.stunT > 0) sp = 0;
-    if (G.restT > G.t) sp = 0;
-    if (n.stacc) {
-      n.dashT -= dt;
-      if (n.dashT < 0) n.dashT = 1.2;
-      if (n.dashT < 0.25) sp *= 3;
-      else sp *= 0.6;
-    }
-    let dx = tx - n.x;
-    let dy = ty - n.y;
-    const d = Math.hypot(dx, dy) || 1;
-    dx /= d;
-    dy /= d;
-    if (n.trill) {
-      const w = Math.sin(n.t * 14 + n.phase) * 0.9;
-      const ox = -dy * w;
-      const oy = dx * w;
-      dx += ox;
-      dy += oy;
-    }
-    n.x += (dx * sp + n.kx) * dt;
-    n.y += (dy * sp + n.ky) * dt;
-    n.kx *= Math.pow(0.002, dt);
-    n.ky *= Math.pow(0.002, dt);
-    // 押し合い
-    gridQuery(n.x, n.y, n.r + 22, (m) => {
-      if (m === n || m.dead) return;
-      const rr = n.r + m.r;
-      const ddx = n.x - m.x;
-      const ddy = n.y - m.y;
-      const dd = ddx * ddx + ddy * ddy;
-      if (dd < rr * rr && dd > 0.01) {
-        const q = Math.sqrt(dd);
-        const push = ((rr - q) / q) * 0.25;
-        n.x += ddx * push;
-        n.y += ddy * push;
-      }
-    });
-    collide(n, n.r);
-    // 主人公に当たる
-    if (n.charm <= 0 && G.phase !== 'dead') {
-      const hr = n.r * (n.trill ? 0.8 : 1) + p.r - 4;
-      if (dist2(n.x, n.y, p.x, p.y) < hr * hr) hurt(n.dmg);
+    n.x -= sp * dt;
+    n.x += n.kx * dt;
+    n.kx *= Math.pow(0.02, dt);
+    if (n.x > SPAWN_X) n.x = SPAWN_X;
+    if (n.trill) n.y += Math.sin(n.t * 16 + n.phase) * 0.6;
+    if (n.x - n.r < PODIUM_X) {
+      n.dead = true;
+      if (!n.minion) G.leaked++;
+      damagePodium(n.leak);
     }
   }
 
-  // ---------- 楽器の動き ----------
-  function updateWeapons(dt, newTick) {
-    const S = G.stats;
-    for (const w of G.weapons) {
-      const P = wParams(w);
-      if (w.id === 'harp') {
-        updateHarp(w, P, dt);
-        continue;
+  function damagePodium(d) {
+    if (G.phase === 'dead' || G.phase === 'win') return;
+    G.hp -= d;
+    G.dmgTaken += d;
+    G.shake = Math.max(G.shake, 0.15);
+    G.hurtT = 0.25;
+    Synth.sfx('hurt');
+    if (G.hp <= 0) {
+      if (G.up.revive && !G.revived) {
+        G.revived = true;
+        G.hp = G.stats.maxHp * 0.5;
+        G.texts.push({ s: T('revived'), col: '#ffe9a8', t: 0, life: 2.4, size: 20, world: false });
+        for (const n of G.notes) n.kx += 500;
+        if (G.phase === 'boss') G.boss.x = Math.min(SPAWN_X, G.boss.x + 300);
+        return;
       }
-      w.t -= dt;
-      if (w.t <= 0) w.ready = true;
-      // 攻撃は 16 分音符の刻みに合わせる
-      if (w.ready && newTick) {
-        w.ready = false;
-        w.t = P.cd * S.cd * (w.evo ? 0.85 : 1);
-        // 最初の楽器はその作曲家の得意な楽器 (攻撃力 +25%)
-        if (w.id === G.composer.weapon) P.dmg *= 1.25;
-        fire(w, P);
-      }
+      G.hp = 0;
+      G.phase = 'dead';
+      G.phaseT = 0;
+      G.track.stop();
+      if (G.btrack) G.btrack.stop();
     }
   }
 
-  function fire(w, P) {
-    const p = G.player;
-    const S = G.stats;
-    const reg = D.WEAPONS[w.id].reg;
-    switch (w.id) {
-      case 'piano': {
-        const t = nearest(p.x, p.y, 520);
-        const base = aimAt(t);
-        const cnt = P.count + S.amount + (G.composer.id === 'chopin' ? 1 : 0);
-        const per = w.evo ? 3 : 1;
-        for (let i = 0; i < cnt; i++) {
-          for (let j = 0; j < per; j++) {
-            const a = base + (i - (cnt - 1) / 2) * 0.16 + (j - (per - 1) / 2) * 0.09;
-            const sp = P.speed * S.pspeed;
-            G.shots.push({ kind: 'key', x: p.x, y: p.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 7, dmg: P.dmg, pierce: P.pierce + (w.evo ? 2 : 0), t: 0, life: 1.1 * S.pspeed, hit: new Set(), reg, burst: w.evo });
-          }
-        }
-        Synth.sfx('shot', { p: scaleTone(84) });
-        break;
-      }
-      case 'baton': {
-        const t = nearest(p.x, p.y, 300);
-        const base = t ? aimAt(t) : Math.atan2(p.fy, p.fx);
-        const range = P.range * S.area * (w.evo ? 1.2 : 1);
-        const sides = w.evo ? [0] : P.both ? [0, Math.PI] : [w.side > 0 ? 0 : Math.PI];
-        w.side = -w.side;
-        const half = w.evo ? Math.PI : 1.15;
-        for (const s of sides) {
-          const dir = base + s;
-          G.fx.push({ kind: 'arc', x: p.x, y: p.y, a: dir, half, r: range, t: 0, life: 0.22, col: w.evo ? '#ffe28a' : '#fff' });
-          sweep(p.x, p.y, range, dir, half, (n) => hitNote(n, P.dmg, { reg, kb: 80, slow: w.evo ? 0.5 : 0, slowT: 2 }));
-        }
-        break;
-      }
-      case 'timpani': {
-        const r = P.radius * S.area;
-        const ring = (rr, stun) => {
-          G.fx.push({ kind: 'ring', x: p.x, y: p.y, r: rr, t: 0, life: 0.35, col: '#ffcf7a' });
-          G.shake = Math.max(G.shake, 0.08);
-          gridQuery(p.x, p.y, rr + 30, (n) => {
-            if (!n.dead && dist2(n.x, n.y, p.x, p.y) < (rr + n.r) ** 2) hitNote(n, P.dmg, { reg, kb: P.kb, stun });
-          });
-          if (G.phase === 'battle' && dist2(G.boss.x, G.boss.y, p.x, p.y) < (rr + G.boss.r) ** 2) hitBoss(P.dmg);
-        };
-        ring(r, w.evo ? 0.4 : 0);
-        if (w.evo) G.timers.push({ t: 0.25, fn: () => ring(r * 1.3, 0.4) });
-        Synth.sfx('boom');
-        break;
-      }
-      case 'violin': {
-        const cnt = P.count + S.amount;
-        let skip = null;
-        for (let i = 0; i < cnt; i++) {
-          const t = nearest(p.x, p.y, 600, skip);
-          skip = t;
-          const a = t ? aimAt(t) : Math.atan2(p.fy, p.fx) + i * Math.PI;
-          const len = P.len * S.area * (w.evo ? 1.5 : 1) * S.pspeed;
-          const width = P.width * (w.evo ? 2 : 1) * S.area;
-          const beam = { kind: 'beam', x: p.x, y: p.y, a, len, width, t: 0, life: w.evo ? 0.6 * S.dur : 0.2, tick: 0, dmg: P.dmg, evo: w.evo, follow: w.evo };
-          G.fx.push(beam);
-          beamHit(beam, P.dmg, reg);
-          if (w.evo) beam.repeat = (b) => beamHit(b, P.dmg * 0.35, reg);
-        }
-        break;
-      }
-      case 'cello': {
-        const r = P.radius * S.area * (w.evo ? 2.2 : 1);
-        G.zones.push({ x: p.x, y: p.y, r, t: 0, life: P.life * S.dur, tick: 0, dmg: P.dmg * (w.evo ? 1.6 : 1), slow: w.evo ? 0.4 : P.slow });
-        break;
-      }
-      case 'flute': {
-        const cnt = P.count + S.amount;
-        for (let i = 0; i < cnt; i++) {
-          const a = Math.random() * Math.PI * 2;
-          const sp = P.speed * S.pspeed;
-          G.shots.push({ kind: 'wind', x: p.x, y: p.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, sp, r: 6, dmg: P.dmg, pierce: 1, t: 0, life: 2.4 * S.dur, hit: new Set(), reg, homing: true, charm: w.evo ? 0.1 : 0 });
-        }
-        break;
-      }
-      case 'trumpet': {
-        const t = nearest(p.x, p.y, 300);
-        const moving = Math.hypot(input.jx + (input.right - input.left), input.jy + (input.down - input.up)) > 0.1;
-        const base = moving ? Math.atan2(p.fy, p.fx) : aimAt(t);
-        const range = P.range * S.area * S.pspeed;
-        const blast = (dir) => {
-          G.fx.push({ kind: 'cone', x: p.x, y: p.y, a: dir, half: P.arc / 2, r: range, t: 0, life: 0.25 });
-          sweep(p.x, p.y, range, dir, P.arc / 2, (n) => hitNote(n, P.dmg, { reg, kb: P.kb }));
-        };
-        const dirs = w.evo ? [base, base + Math.PI] : [base];
-        for (const d of dirs) blast(d);
-        if (w.evo) G.timers.push({ t: 0.3, fn: () => dirs.forEach(blast) });
-        break;
-      }
-      case 'cymbal': {
-        const cnt = P.count + S.amount;
-        const t = nearest(p.x, p.y, 500);
-        const base = aimAt(t);
-        const throwOne = (a) => {
-          const sp = 380 * S.pspeed;
-          G.shots.push({ kind: 'cymbal', x: p.x, y: p.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, sp, r: 13 * S.area, dmg: P.dmg, pierce: 999, t: 0, life: 4, hit: new Set(), reg, boomer: true, dist: P.dist * S.pspeed, out: 0, back: false, evo: w.evo, spin: 0 });
-        };
-        for (let i = 0; i < cnt; i++) {
-          const a = base + (i - (cnt - 1) / 2) * 0.5;
-          throwOne(a);
-          if (w.evo) throwOne(a + Math.PI);
-        }
-        break;
-      }
-      case 'organ': {
-        const cnt = P.count + S.amount + (w.evo ? 3 : 0);
-        const r = P.radius * S.area * (w.evo ? 1.5 : 1);
-        const vis = G.notes.filter((n) => Math.abs(n.x - G.camX) < W / scale / 2 && Math.abs(n.y - G.camY) < H / scale / 2);
-        for (let i = 0; i < cnt; i++) {
-          let tx;
-          let ty;
-          if (vis.length) {
-            const n = vis[(Math.random() * vis.length) | 0];
-            tx = n.x;
-            ty = n.y;
-          } else if (G.phase === 'battle') {
-            tx = G.boss.x + rand(-30, 30);
-            ty = G.boss.y + rand(-30, 30);
-          } else {
-            tx = p.x + rand(-200, 200);
-            ty = p.y + rand(-200, 200);
-          }
-          G.fx.push({ kind: 'pipeWarn', x: tx, y: ty, r, t: 0, life: 0.35 });
-          G.timers.push({
-            t: 0.35,
-            fn: () => {
-              G.fx.push({ kind: 'pipe', x: tx, y: ty, r, t: 0, life: 0.4 });
-              gridQuery(tx, ty, r + 30, (n) => {
-                if (!n.dead && dist2(n.x, n.y, tx, ty) < (r + n.r) ** 2) hitNote(n, P.dmg, { reg });
-              });
-              if (G.phase === 'battle' && dist2(G.boss.x, G.boss.y, tx, ty) < (r + G.boss.r) ** 2) hitBoss(P.dmg);
-            },
-          });
-        }
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  // 扇形の範囲の音符に fn
-  function sweep(x, y, r, dir, half, fn) {
-    gridQuery(x, y, r + 30, (n) => {
-      if (n.dead) return;
-      const dx = n.x - x;
-      const dy = n.y - y;
-      const d = Math.hypot(dx, dy);
-      if (d > r + n.r) return;
-      let da = Math.atan2(dy, dx) - dir;
-      while (da > Math.PI) da -= Math.PI * 2;
-      while (da < -Math.PI) da += Math.PI * 2;
-      if (Math.abs(da) <= half + n.r / Math.max(d, 1)) fn(n);
-    });
-    if (G.phase === 'battle') {
-      const b = G.boss;
-      const d = Math.hypot(b.x - x, b.y - y);
-      let da = Math.atan2(b.y - y, b.x - x) - dir;
-      while (da > Math.PI) da -= Math.PI * 2;
-      while (da < -Math.PI) da += Math.PI * 2;
-      if (d < r + b.r && Math.abs(da) <= half + 0.4) fn(b);
-    }
-  }
-
-  function beamHit(b, dmg, reg) {
-    const ex = b.x + Math.cos(b.a) * b.len;
-    const ey = b.y + Math.sin(b.a) * b.len;
-    const test = (n) => {
-      const vx = ex - b.x;
-      const vy = ey - b.y;
-      const l2 = vx * vx + vy * vy;
-      const tt = clamp(((n.x - b.x) * vx + (n.y - b.y) * vy) / l2, 0, 1);
-      const px = b.x + vx * tt;
-      const py = b.y + vy * tt;
-      return dist2(n.x, n.y, px, py) < (b.width / 2 + n.r) ** 2;
-    };
-    for (const n of G.notes) if (!n.dead && test(n)) hitNote(n, dmg, { reg });
-    if (G.phase === 'battle' && test(G.boss)) hitBoss(dmg);
-  }
-
-  function updateHarp(w, P, dt) {
-    const p = G.player;
-    if (w.id === G.composer.weapon) P.dmg *= 1.25;
-    const S = G.stats;
-    const cnt = (P.count + S.amount) * (w.evo ? 2 : 1);
-    const rad = (P.radius + (w.evo ? 30 : 0)) * S.area;
-    w.a += P.spin * dt;
-    w.pts = [];
-    for (let i = 0; i < cnt; i++) {
-      const a = w.a + (i / cnt) * Math.PI * 2;
-      const x = p.x + Math.cos(a) * rad;
-      const y = p.y + Math.sin(a) * rad;
-      w.pts.push([x, y, a]);
-      gridQuery(x, y, 40, (n) => {
-        if (n.dead || n.harpT > G.t) return;
-        if (dist2(n.x, n.y, x, y) < (14 + n.r) ** 2) {
-          n.harpT = G.t + 0.45;
-          hitNote(n, P.dmg, { reg: 'all', kb: 40, kbFrom: p });
-        }
-      });
-      if (G.phase === 'battle' && dist2(G.boss.x, G.boss.y, x, y) < (14 + G.boss.r) ** 2 && (G.boss.harpT || 0) < G.t) {
-        G.boss.harpT = G.t + 0.45;
-        hitBoss(P.dmg);
-      }
-    }
-  }
-
-  function updateShots(dt) {
-    const p = G.player;
-    for (const s of G.shots) {
-      s.t += dt;
-      if (s.homing) {
-        if (!s.target || s.target.dead) s.target = nearest(s.x, s.y, 500);
-        if (s.target && s.t > 0.15) {
-          const a = Math.atan2(s.target.y - s.y, s.target.x - s.x);
-          const cur = Math.atan2(s.vy, s.vx);
-          let da = a - cur;
-          while (da > Math.PI) da -= Math.PI * 2;
-          while (da < -Math.PI) da += Math.PI * 2;
-          const na = cur + clamp(da, -6 * dt, 6 * dt);
-          s.vx = Math.cos(na) * s.sp;
-          s.vy = Math.sin(na) * s.sp;
-        }
-      }
-      if (s.boomer) {
-        s.spin += dt * 20;
-        if (!s.back) {
-          s.out += Math.hypot(s.vx, s.vy) * dt;
-          if (s.out >= s.dist) {
-            s.back = true;
-            s.hit = new Set();
-          }
-        } else {
-          const a = Math.atan2(p.y - s.y, p.x - s.x);
-          s.vx = Math.cos(a) * s.sp * 1.1;
-          s.vy = Math.sin(a) * s.sp * 1.1;
-          if (dist2(s.x, s.y, p.x, p.y) < 20 * 20) {
-            s.t = 99;
-            if (s.evo) {
-              // 戻ってきて打ち合わせる: 爆発
-              G.fx.push({ kind: 'ring', x: p.x, y: p.y, r: 90 * G.stats.area, t: 0, life: 0.35, col: '#ffe066' });
-              gridQuery(p.x, p.y, 120, (n) => {
-                if (!n.dead && dist2(n.x, n.y, p.x, p.y) < (90 * G.stats.area + n.r) ** 2) hitNote(n, s.dmg * 1.5, { reg: s.reg, kb: 120 });
-              });
-              if (Math.random() < 0.5) Synth.sfx('cymbal');
-            }
-          }
-        }
-      }
-      s.x += s.vx * dt;
-      s.y += s.vy * dt;
-      if (s.x < 0 || s.y < 0 || s.x > ROOM || s.y > ROOM) {
-        if (s.boomer) s.back = true;
-        else s.t = 99;
-      }
-      gridQuery(s.x, s.y, s.r + 26, (n) => {
-        if (n.dead || s.t >= s.life || s.hit.has(n)) return;
-        if (dist2(n.x, n.y, s.x, s.y) < (s.r + n.r) ** 2) {
-          s.hit.add(n);
-          hitNote(n, s.dmg, { reg: s.reg, charm: s.charm, kb: s.kind === 'key' ? 30 : 0 });
-          if (s.burst) {
-            G.fx.push({ kind: 'ring', x: s.x, y: s.y, r: 40, t: 0, life: 0.2, col: '#bfe3ff' });
-            gridQuery(s.x, s.y, 60, (m) => {
-              if (m !== n && !m.dead && dist2(m.x, m.y, s.x, s.y) < (40 + m.r) ** 2) hitNote(m, s.dmg * 0.6, {});
-            });
-          }
-          s.pierce--;
-          if (s.pierce <= 0) s.t = 99;
-        }
-      });
-      if (G.phase === 'battle' && !s.hit.has(G.boss) && dist2(G.boss.x, G.boss.y, s.x, s.y) < (s.r + G.boss.r) ** 2) {
-        s.hit.add(G.boss);
-        hitBoss(s.dmg);
-        if (!s.boomer) s.t = 99;
-      }
-    }
-    G.shots = G.shots.filter((s) => s.t < s.life);
-    // ヴァイオリンの進化: 光線が残って当たり続ける
-    for (const f of G.fx) {
-      if (f.kind === 'beam' && f.repeat) {
-        f.tick -= dt;
-        if (f.follow) {
-          f.x = p.x;
-          f.y = p.y;
-        }
-        if (f.tick <= 0) {
-          f.tick = 0.1;
-          f.repeat(f);
-        }
-      }
-    }
-  }
-
-  function pickItem(it) {
-    const p = G.player;
-    switch (it.kind) {
-      case 'chest':
-        openChest();
-        break;
-      case 'coffee':
-        p.hp = Math.min(G.stats.maxHp, p.hp + 30);
-        addText(p.x, p.y - 20, '+30', '#9effa1');
-        break;
-      case 'applause':
-        for (const k of G.inks) k.pull = true;
-        Synth.sfx('applause');
-        addBanner('👏', '#fff');
-        break;
-      case 'rest':
-        G.restT = G.t + 4;
-        addBanner('𝄻 ' + (window.CSUI.lang === 'ja' ? '全休符! 音符が止まった' : 'Whole rest! Notes freeze'), '#cfe8ff');
-        break;
-      case 'ffff':
-        G.shake = 0.4;
-        Synth.sfx('boom');
-        G.fx.push({ kind: 'flash', t: 0, life: 0.3 });
-        for (const n of G.notes) {
-          if (Math.abs(n.x - G.camX) < W / scale / 2 + 40 && Math.abs(n.y - G.camY) < H / scale / 2 + 40) hitNote(n, 30 / might(), {});
-        }
-        break;
-      case 'ducat': {
-        const v = 1 + ((Math.random() * 5) | 0);
-        G.gold += v;
-        addText(p.x, p.y - 20, '+' + v, '#ffd84a');
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  // ---------- ボス ----------
-  function updateBoss(dt) {
-    const b = G.boss;
-    const p = G.player;
-    b.pulse = Math.max(0, b.pulse - dt * 4);
-    b.hurtT -= dt;
-    if (b.dash) {
-      const d = b.dash;
-      d.t += dt;
-      if (d.t < d.warn) {
-        // 予告
-      } else if (d.t < d.warn + d.len) {
-        b.x += Math.cos(d.a) * d.sp * dt;
-        b.y += Math.sin(d.a) * d.sp * dt;
-        b.x = clamp(b.x, b.r, ROOM - b.r);
-        b.y = clamp(b.y, b.r, ROOM - b.r);
-      } else b.dash = null;
-    } else if (G.phase === 'song' || G.phase === 'battle') {
-      // ゆっくり動き回る (中央寄り)
-      if (dist2(b.x, b.y, b.tx, b.ty) < 30 * 30) {
-        b.tx = rand(ROOM * 0.25, ROOM * 0.75);
-        b.ty = rand(ROOM * 0.25, ROOM * 0.75);
-        if (G.phase === 'battle' && Math.random() < 0.5) {
-          b.tx = (b.tx + p.x) / 2;
-          b.ty = (b.ty + p.y) / 2;
-        }
-      }
-      const a = Math.atan2(b.ty - b.y, b.tx - b.x);
-      const sp = G.phase === 'battle' ? 55 : 32;
-      b.x += Math.cos(a) * sp * dt;
-      b.y += Math.sin(a) * sp * dt;
-    }
-    collide(b, b.r * 0.8);
-    if (G.phase !== 'dead' && G.phase !== 'win' && G.phase !== 'break' && dist2(b.x, b.y, p.x, p.y) < (b.r + p.r - 6) ** 2) {
-      hurt(12 * (G.hard ? HARD.dmg : 1) * STAR_MUL[G.song.stars - 1] ** 0.5);
-    }
-  }
-
-  function bossDash() {
-    const b = G.boss;
-    if (b.dash) return;
-    const p = G.player;
-    const a = Math.atan2(p.y - b.y, p.x - b.x);
-    b.dash = { a, t: 0, warn: 0.75, len: 0.55, sp: 560 };
-  }
-
-  // 曲の決まった小節で「見せ場」
-  function runShows() {
-    const shows = G.song.shows || [];
-    const bar = Math.floor(G.beat / G.parsed.barLen);
-    for (const s of shows) {
-      if (G.showsDone.has(s) || bar < s.bar) continue;
-      G.showsDone.add(s);
-      if (s.type === 'dash') bossDash();
-      else if (s.type === 'rain') {
-        const p = G.player;
-        for (let i = 0; i < 9; i++) {
-          const x = clamp(p.x + rand(-260, 260), 40, ROOM - 40);
-          const y = clamp(p.y + rand(-220, 220), 40, ROOM - 40);
-          const delay = 0.6 + i * 0.12;
-          G.fx.push({ kind: 'starWarn', x, y, r: 42, t: 0, life: delay });
-          G.timers.push({
-            t: delay,
-            fn: () => {
-              G.fx.push({ kind: 'starHit', x, y, r: 42, t: 0, life: 0.35 });
-              if (dist2(x, y, G.player.x, G.player.y) < (42 + G.player.r) ** 2) hurt(10 * (G.hard ? HARD.dmg : 1));
-            },
-          });
-        }
-      } else if (s.type === 'dark') {
-        G.dark = 1;
-      }
-    }
-  }
-
-  function startEncore() {
-    const P = G.parsed;
-    const fromBeat = Math.max(0, P.lengthBeats - 8 * P.barLen);
-    const from = P.beatToSec(fromBeat);
-    const base = G.track.pos() + 1.2;
-    const add = [];
-    for (const n of P.notes) {
-      if (n.sec < from) continue;
-      add.push({ ...n, sec: n.sec - from + base, mk: n.mk.replace('>', '') });
-    }
-    G.track.append(add);
-    G.songEnd = base + (P.lengthSec - from);
-    G.encore++;
-    G.phase = 'song';
-    G.phaseT = 0;
-    G.total += add.length;
-    addBanner('👏 ' + T('encore'), '#ffb3b3');
-    Synth.sfx('applause');
-  }
-
-  function startBattle() {
+  // 曲が終わり、音符がいなくなった: ボスが主題を鳴らしながら流れてくる
+  function startBoss() {
     const sc = G.score;
     const th = sc.theme || { part: 0, from: 0, len: G.parsed.barLen * 4, tempo: 100 };
-    const mul = G.hard ? HARD.tempo : 1;
-    const bpm = th.tempo * mul;
+    const bpm = th.tempo * (G.hard ? HARD.tempo : 1);
     const { notes } = window.CSAudio.partNotes(sc.parts[th.part], 0, 'theme', sc.ppq);
     const list = [];
     for (const n of notes) {
       if (n.t < th.from - 1e-6 || n.t >= th.from + th.len - 1e-6) continue;
-      list.push({ ...n, sec: ((n.t - th.from) * 60) / bpm, dur: (n.d * 60) / bpm, inst: sc.parts[th.part].inst, vol: 1, velMul: 1 });
+      list.push({ ...n, sec: ((n.t - th.from) * 60) / bpm, dur: (n.d * 60) / bpm, inst: sc.parts[th.part].inst, vol: 1 });
     }
     list.sort((a, b) => a.sec - b.sec);
-    const loopLen = (th.len * 60) / bpm;
-    G.btrack = new Track(list, { loopLen });
-    G.btrack.barTicks = Math.round(G.parsed.barLen * 4);
+    G.track.stop();
+    G.btrack = new Track(list, { loopLen: (th.len * 60) / bpm });
     G.bpm = bpm;
-    const b = G.boss;
-    b.maxHp = b.hp = 1250 * STAR_MUL[G.song.stars - 1] * (G.hard ? HARD.hp : 1);
-    G.phase = 'battle';
+    const B = G.boss;
+    B.shield = false;
+    B.maxHp = B.hp = 2000 * STAR_MUL[G.song.stars - 1] * (G.hard ? HARD.hp : 1);
+    B.spd = 20;
+    B.y = TOP + (ROWS * CELL) / 2;
+    G.phase = 'boss';
     G.phaseT = 0;
-    G.hpAtBattle = Math.round(G.player.hp) + '/' + G.level + ' t=' + Math.round(G.t);
-    G.btrack.start(0, 0.4);
-    G.fireN = 0;
+    G.lastMinion = -1;
+    G.btrack.start(0, 0.6);
+    Synth.sfx('cymbal');
+    G.texts.push({ s: T('bossIncoming'), col: '#ffd27a', t: 0, life: 3, size: 20, world: false });
   }
 
-  // 決戦: 主題の音が弾になって飛んでくる
-  function bossFire(n) {
-    const b = G.boss;
-    const p = G.player;
-    const def = G.song.boss;
-    // 速い装飾音まで全部撃つと弾幕になるので、0.15 秒に 1 回まで
-    if (G.t - (G.lastFire || -1) < (def.pattern === 'aimed' ? 0.15 : 0.28)) return;
-    G.lastFire = G.t;
-    G.fireN++;
-    const sp = (110 + (n.p - 60) * 2) * (G.hard ? 1.15 : 1);
-    const dmg = (4 + n.v * 1.2) * (G.hard ? HARD.dmg : 1) * Math.sqrt(STAR_MUL[G.song.stars - 1]);
-    const col = pitchColor(n.p);
-    const shoot = (a) => G.bullets.push({ x: b.x, y: b.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 7, dmg, col, t: 0 });
-    const aim = Math.atan2(p.y - b.y, p.x - b.x);
-    if (def.pattern === 'radial') {
-      const k = 5;
-      for (let i = 0; i < k; i++) shoot(G.fireN * 0.35 + (i / k) * Math.PI * 2);
-    } else if (def.pattern === 'spread') {
-      for (let i = -1; i <= 1; i++) shoot(aim + i * 0.28 + ((n.p % 5) - 2) * 0.05);
-    } else {
-      shoot(aim + ((n.p % 7) - 3) * 0.06);
-      if (n.melody && G.fireN % 3 === 0) shoot(aim + Math.PI);
-    }
-    b.pulse = 1;
+  // 決戦: 主題の音が、ボスから小さな音符になって流れ出す (倒すとインク。数には入れない)
+  function spawnMinion(src) {
+    if (G.t - G.lastMinion < 0.22) return;
+    G.lastMinion = G.t;
+    const n = spawnNote(src);
+    n.x = G.boss.x - G.boss.r;
+    n.minion = true;
+    n.hp = n.maxHp = n.hp * 0.6;
+    n.ink *= 0.3;
+    n.leak *= 0.7;
   }
 
   function winStage() {
     if (G.phase === 'win') return;
     G.phase = 'win';
     G.phaseT = 0;
-    G.btrack.stop();
-    G.bullets = [];
+    if (G.btrack) G.btrack.stop();
+    for (const n of G.notes) n.dead = true;
     Synth.sfx('cymbal');
     Synth.sfx('applause');
-    G.shake = 0.6;
+    G.shake = 0.5;
     for (let i = 0; i < 40; i++) {
       const a = Math.random() * 6.28;
       const s = rand(80, 320);
@@ -1555,222 +915,159 @@
     const pos = Math.min(G.track.pos(), P.lengthSec);
     const progress = win ? 1 : clamp(pos / P.lengthSec, 0, 1);
     const time = G.t;
-    // 評価
-    let score = 100 - G.encore * 15 - (G.dmgTaken / G.stats.maxHp) * 18 - Math.max(0, time - P.lengthSec - 20) * 0.3;
-    const rank = !win ? '-' : score >= 85 ? 'S' : score >= 70 ? 'A' : score >= 50 ? 'B' : 'C';
-    // 金貨
-    let gold = G.killed * 0.12 * G.song.stars + progress * 25 * G.song.stars;
+    const leakRate = G.leaked / Math.max(1, G.total);
+    const hpRate = G.hp / G.stats.maxHp;
+    const rank = !win ? '-' : G.leaked === 0 ? 'S' : leakRate < 0.02 && hpRate > 0.6 ? 'A' : hpRate > 0.3 ? 'B' : 'C';
+    let gold = G.killed * 0.1 * G.song.stars + progress * 25 * G.song.stars;
     if (win) gold += 40 * G.song.stars;
     if (G.hard) gold *= HARD.gold;
     if (!G.own) gold *= 1.2;
-    gold *= G.stats.greed;
-    gold = Math.round(gold + G.gold);
-    G.result = { win, progress, killed: G.killed, total: G.total, encore: G.encore, dmg: Math.round(G.dmgTaken), time, rank, gold, level: G.level, bar: Math.floor(G.parsed.secToBeat(pos) / P.barLen) + 1, bars: Math.ceil(P.lengthBeats / P.barLen) };
+    gold = Math.round(gold * G.stats.greed);
+    G.result = { win, progress, killed: G.killed, total: G.total, leaked: G.leaked, dmg: Math.round(G.dmgTaken), time, rank, gold, towers: G.towers.length, bar: Math.floor(G.parsed.secToBeat(pos) / P.barLen) + 1, bars: Math.ceil(P.lengthBeats / P.barLen) };
     if (G.onFinish) G.onFinish(G.result);
-  }
-
-  function openLevelUp() {
-    Synth.sfx('level', { p: 72 });
-    if (G.bot) {
-      // 自動プレイ: 進化の組み合わせを優先
-      const ch = makeChoices();
-      ch.sort((a, b) => botScore(b) - botScore(a));
-      applyChoice(ch[0]);
-      return;
-    }
-    G.choices = makeChoices();
-    G.choicesLv = G.level - G.pendingLevels;
-    window.CSUI.showLevelDock(G.choices);
-  }
-
-  // 候補を選ぶ (i 番目)。プレイを続けたまま
-  function pickChoice(i) {
-    if (!G || !G.choices || !G.choices[i] || G.paused) return;
-    const c = G.choices[i];
-    G.choices = null;
-    window.CSUI.hideLevelDock();
-    applyChoice(c);
-    addText(G.player.x, G.player.y - 30, '♪ ' + choiceName(c), '#fff6a8', 1, 13);
-  }
-  function rerollChoices() {
-    if (!G || !G.choices || G.rerolls <= 0 || G.paused) return;
-    G.rerolls--;
-    G.choices = makeChoices();
-    window.CSUI.showLevelDock(G.choices);
-  }
-  function choiceName(c) {
-    if (c.kind === 'weapon') return L(D.WEAPONS[c.id].name) + ' Lv' + c.lv;
-    if (c.kind === 'passive') return L(D.PASSIVES[c.id].name) + ' Lv' + c.lv;
-    return c.kind === 'heal' ? T('healOpt') : T('goldOpt');
-  }
-
-  function resumeMusic() {
-    const tr = G.phase === 'battle' ? G.btrack : G.track;
-    if (!tr || G.phase === 'break' || G.phase === 'win' || G.phase === 'dead') return;
-    const beatSec = 60 / G.bpm;
-    const pos = tr.pausedPos;
-    tr.start(Math.max(0, pos - beatSec), beatSec * 2, [[0, true], [beatSec, false]]);
   }
 
   function pause() {
     if (!G || G.paused || G.result) return;
     G.paused = true;
-    const tr = G.phase === 'battle' ? G.btrack : G.track;
-    if (tr) tr.pause();
+    const tr = G.phase === 'boss' ? G.btrack : G.track;
+    if (tr && G.phase !== 'prep') tr.pause();
   }
   function resume() {
     if (!G || !G.paused) return;
     G.paused = false;
-    resumeMusic();
+    const tr = G.phase === 'boss' ? G.btrack : G.track;
+    if (!tr || G.phase === 'prep' || G.phase === 'win' || G.phase === 'dead' || G.phase === 'coda') return;
+    const beatSec = 60 / G.bpm;
+    tr.start(Math.max(0, tr.pausedPos - beatSec), beatSec * 2, [[0, true], [beatSec, false]]);
   }
   function quit() {
     if (!G) return;
     G.track && G.track.stop();
     G.btrack && G.btrack.stop();
     Synth.hush(0.2);
-    window.CSUI.hideLevelDock();
+    if (window.CSUI) window.CSUI.closeTowerPanel();
     G = null;
   }
 
+  // ---------- 入力 (マスを押す) ----------
+  function tapAt(px, py) {
+    if (!G || G.result) return null;
+    const [x, y] = toField(px, py);
+    const c = Math.floor(x / CELL);
+    const r = Math.floor((y - TOP) / CELL);
+    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) {
+      G.sel = null;
+      return null;
+    }
+    const t = G.grid.get(c + ',' + r);
+    if (t) {
+      G.sel = { c, r, tower: t };
+      return { tower: t };
+    }
+    if (canBuildAt(c, r)) {
+      G.sel = { c, r };
+      return { cell: { c, r } };
+    }
+    G.sel = null;
+    return null;
+  }
+  function hoverAt(px, py) {
+    if (!G) return;
+    const [x, y] = toField(px, py);
+    const c = Math.floor(x / CELL);
+    const r = Math.floor((y - TOP) / CELL);
+    G.hover = c >= 0 && c < COLS && r >= 0 && r < ROWS ? { c, r } : null;
+  }
+
   // ---------- 描画 ----------
+  const STAFF_LINES = [64, 67, 71, 74, 77, 43, 47, 50, 53, 57];
   function render() {
     ctx.save();
-    ctx.fillStyle = '#0d0f14';
+    ctx.fillStyle = '#14101a';
     ctx.fillRect(0, 0, W, H);
     if (!G) {
       ctx.restore();
       return;
     }
-    const p = G.player;
     let sx = 0;
     let sy = 0;
     if (G.shake > 0 && window.CSUI.settings.shake) {
-      sx = rand(-1, 1) * G.shake * 18;
-      sy = rand(-1, 1) * G.shake * 18;
+      sx = rand(-1, 1) * G.shake * 10;
+      sy = rand(-1, 1) * G.shake * 10;
     }
-    ctx.translate(W / 2 + sx, H / 2 + sy);
+    ctx.translate(offX + sx, offY + sy);
     ctx.scale(scale, scale);
-    ctx.translate(-G.camX, -G.camY);
-    const vw = W / scale / 2 + 60;
-    const vh = H / scale / 2 + 60;
-    const vis = (x, y) => Math.abs(x - G.camX) < vw && Math.abs(y - G.camY) < vh;
-
-    // 床と壁
-    ctx.drawImage(G.room.floor, 0, 0);
-    ctx.strokeStyle = '#3a2a1e';
-    ctx.lineWidth = 24;
-    ctx.strokeRect(-12, -12, ROOM + 24, ROOM + 24);
-    ctx.strokeStyle = '#c9a04a';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(-1, -1, ROOM + 2, ROOM + 2);
-    for (const f of G.room.furn) drawFurniture(f);
-
-    // ゾーン (チェロ)
-    for (const z of G.zones) {
-      const k = 1 - z.t / z.life;
-      ctx.fillStyle = `rgba(120, 90, 200, ${0.18 * k + 0.05})`;
-      ctx.beginPath();
-      ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = `rgba(180, 150, 255, ${0.5 * k})`;
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.arc(z.x, z.y, z.r * (((z.t * 0.8 + i / 3) % 1) * 0.9 + 0.1), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-
-    // インク
-    for (const k of G.inks) {
-      if (!vis(k.x, k.y)) continue;
-      ctx.fillStyle = '#1a1030';
-      ctx.beginPath();
-      ctx.arc(k.x, k.y, k.r + 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = k.r > 6 ? '#d2a8ff' : k.r > 5 ? '#8fc8ff' : '#7ef0c8';
-      ctx.beginPath();
-      ctx.moveTo(k.x, k.y - k.r * 1.3);
-      ctx.quadraticCurveTo(k.x + k.r, k.y, k.x, k.y + k.r);
-      ctx.quadraticCurveTo(k.x - k.r, k.y, k.x, k.y - k.r * 1.3);
-      ctx.fill();
-    }
-    // 落とし物
-    for (const it of G.items) drawItem(it);
-
-    // 予告など (下に描くもの)
-    for (const f of G.fx) {
-      if (f.kind === 'starWarn' || f.kind === 'pipeWarn') {
-        const k = f.t / f.life;
-        ctx.fillStyle = f.kind === 'starWarn' ? `rgba(255, 220, 80, ${0.15 + k * 0.25})` : `rgba(160, 200, 255, ${0.15 + k * 0.3})`;
-        ctx.beginPath();
-        ctx.arc(f.x, f.y, f.r * (0.4 + 0.6 * k), 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    // ボスの突進の予告
-    const b = G.boss;
-    if (b.dash && b.dash.t < b.dash.warn) {
+    drawField();
+    // 選んでいるマス・カーソル
+    const showRange = (t) => {
+      const P = t.P || tParams(t);
+      const def = D.TOWERS[t.id];
       ctx.save();
-      ctx.translate(b.x, b.y);
-      ctx.rotate(b.dash.a);
-      ctx.fillStyle = `rgba(255, 60, 60, ${0.15 + 0.2 * Math.sin(G.t * 30)})`;
-      ctx.fillRect(0, -b.r, b.dash.sp * b.dash.len, b.r * 2);
-      ctx.restore();
-    }
-
-    // 音符
-    for (const n of G.notes) if (vis(n.x, n.y)) drawNote(ctx, n);
-
-    // ボス
-    drawBoss(b);
-
-    // 主人公
-    drawComposer(ctx, G.composer, p.x, p.y, 1, p.face, p.walk, p.inv > 0 && Math.floor(G.t * 20) % 2 === 0);
-    // 体力のゲージ (足元)
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(p.x - 18, p.y + 22, 36, 5);
-    ctx.fillStyle = p.hp / G.stats.maxHp < 0.3 ? '#ff5e5e' : '#5ee08a';
-    ctx.fillRect(p.x - 18, p.y + 22, 36 * clamp(p.hp / G.stats.maxHp, 0, 1), 5);
-
-    // ハープの弦
-    for (const w of G.weapons) {
-      if (w.id !== 'harp' || !w.pts) continue;
-      for (const [x, y, a] of w.pts) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(a);
-        ctx.strokeStyle = w.evo ? '#fff3b0' : '#e8d7a0';
-        ctx.lineWidth = 3;
-        ctx.shadowColor = '#ffe9a0';
-        ctx.shadowBlur = 8;
+      ctx.fillStyle = 'rgba(255, 230, 150, 0.12)';
+      ctx.strokeStyle = 'rgba(255, 230, 150, 0.6)';
+      ctx.lineWidth = 2;
+      if (def.kind === 'beam') {
+        const w = P.width * (t.evo ? 1.7 : 1);
+        ctx.fillRect(t.x, t.y - w / 2, P.len * (t.evo ? 1.4 : 1), w);
+        ctx.strokeRect(t.x, t.y - w / 2, P.len * (t.evo ? 1.4 : 1), w);
+      } else if (def.kind === 'string') {
+        const h = P.range * (t.evo ? 1.4 : 1);
+        ctx.fillRect(t.x - 10, t.y - h, 20, h * 2);
+        ctx.strokeRect(t.x - 10, t.y - h, 20, h * 2);
+      } else {
+        const r = (P.range || 0) * (def.kind === 'buff' ? G.stats.area * (t.evo ? 1.25 : 1) : def.kind === 'aura' && t.evo ? 1.4 : 1);
         ctx.beginPath();
-        ctx.moveTo(-12, 0);
-        ctx.lineTo(12, 0);
+        ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
-        ctx.restore();
+      }
+      ctx.restore();
+    };
+    if (G.sel) {
+      const [x, y] = cellCenter(G.sel.c, G.sel.r);
+      if (G.sel.tower) showRange(G.sel.tower);
+      else if (G.sel.preview) showRange({ id: G.sel.preview, x, y, lv: 1, evo: false });
+      ctx.strokeStyle = '#ffd84a';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x - CELL / 2 + 2, y - CELL / 2 + 2, CELL - 4, CELL - 4);
+    } else if (G.hover && canBuildAt(G.hover.c, G.hover.r)) {
+      const [x, y] = cellCenter(G.hover.c, G.hover.r);
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
+    }
+    for (const t of G.towers) drawTower(t);
+    // チェロの範囲 (いつも薄く)
+    for (const t of G.towers) {
+      if (D.TOWERS[t.id].kind !== 'aura') continue;
+      const P = t.P || tParams(t);
+      ctx.fillStyle = 'rgba(140, 100, 220, 0.10)';
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, P.range * (t.evo ? 1.4 : 1), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // ハープの弦
+    for (const t of G.towers) {
+      if (D.TOWERS[t.id].kind !== 'string') continue;
+      const P = t.P || tParams(t);
+      const h = P.range * (t.evo ? 1.4 : 1);
+      for (const x of t.evo ? [t.x - 18, t.x + 18] : [t.x]) {
+        ctx.strokeStyle = t.flash > 0 ? '#fffbe0' : 'rgba(240, 220, 150, 0.85)';
+        ctx.lineWidth = t.flash > 0 ? 3 : 2;
+        ctx.shadowColor = '#ffe9a0';
+        ctx.shadowBlur = t.flash > 0 ? 10 : 4;
+        ctx.beginPath();
+        ctx.moveTo(x, t.y - h);
+        ctx.lineTo(x, t.y + h);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
       }
     }
-    // 弾
+    for (const f of G.fx) if (f.kind === 'pipeWarn') drawFx(f);
+    for (const n of G.notes) drawNote(ctx, n);
+    drawBoss(G.boss);
     for (const s of G.shots) drawShot(s);
-    for (const bl of G.bullets) {
-      if (!vis(bl.x, bl.y)) continue;
-      ctx.fillStyle = '#1a0010';
-      ctx.beginPath();
-      ctx.arc(bl.x, bl.y, bl.r + 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = bl.col;
-      ctx.beginPath();
-      ctx.arc(bl.x, bl.y, bl.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(bl.x - 2, bl.y - 2, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // 演出
-    for (const f of G.fx) drawFx(f);
-    // 文字 (部屋の中)
+    for (const f of G.fx) if (f.kind !== 'pipeWarn') drawFx(f);
     ctx.textAlign = 'center';
     for (const t of G.texts) {
       if (!t.world) continue;
@@ -1784,94 +1081,121 @@
     }
     ctx.globalAlpha = 1;
     ctx.restore();
-
-    // 暗転 (ノクターンの見せ場)
-    if (G.dark > 0) {
-      ctx.save();
-      const g = ctx.createRadialGradient(W / 2, H / 2, 60 * scale, W / 2, H / 2, 260 * scale);
-      g.addColorStop(0, 'rgba(0,0,0,0)');
-      g.addColorStop(1, `rgba(0,0,10,${0.85 * Math.min(1, G.dark * 3)})`);
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, W, H);
-      ctx.restore();
-    }
     drawHud();
   }
 
-  function drawFurniture(f) {
-    ctx.save();
-    if (f.kind === 'piano') {
-      ctx.fillStyle = '#111';
-      ctx.fillRect(f.x, f.y, f.w, f.h);
-      ctx.fillStyle = '#2a2a2a';
-      ctx.fillRect(f.x + 6, f.y + 6, f.w - 12, f.h * 0.45);
-      ctx.fillStyle = '#f4f1ea';
-      ctx.fillRect(f.x + 4, f.y + f.h - 22, f.w - 8, 18);
-      ctx.fillStyle = '#111';
-      for (let x = f.x + 10; x < f.x + f.w - 10; x += 12) if ((x / 12) % 7 !== 2 && (x / 12) % 7 !== 6) ctx.fillRect(x, f.y + f.h - 22, 6, 10);
-    } else if (f.kind === 'column') {
-      ctx.fillStyle = '#bfb6a5';
-      ctx.fillRect(f.x, f.y, f.w, f.h);
-      ctx.fillStyle = '#e8e2d4';
+  function drawField() {
+    // 五線紙
+    const g = ctx.createLinearGradient(0, 0, 0, FH);
+    g.addColorStop(0, '#f6efdf');
+    g.addColorStop(1, '#eadfc6');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, FW, FH);
+    // 建てられるマス
+    ctx.strokeStyle = 'rgba(120, 95, 60, 0.13)';
+    ctx.lineWidth = 1;
+    for (let c = BUILD_COL0; c <= BUILD_COL1 + 1; c++) {
       ctx.beginPath();
-      ctx.arc(f.x + f.w / 2, f.y + f.h / 2, f.w * 0.42, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#9d9483';
-      ctx.lineWidth = 3;
+      ctx.moveTo(c * CELL, TOP);
+      ctx.lineTo(c * CELL, TOP + ROWS * CELL);
       ctx.stroke();
-    } else if (f.kind === 'table') {
-      ctx.fillStyle = '#6b4226';
-      ctx.fillRect(f.x, f.y, f.w, f.h);
-      ctx.fillStyle = '#8a5a36';
-      ctx.fillRect(f.x + 6, f.y + 6, f.w - 12, f.h - 12);
-      // 燭台
-      ctx.fillStyle = '#e8c35a';
-      ctx.fillRect(f.x + f.w / 2 - 3, f.y + f.h / 2 - 10, 6, 14);
-      ctx.fillStyle = '#ffdd88';
+    }
+    for (let r = 0; r <= ROWS; r++) {
       ctx.beginPath();
-      ctx.arc(f.x + f.w / 2, f.y + f.h / 2 - 14, 4 + Math.sin(performance.now() / 120) * 0.8, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(BUILD_COL0 * CELL, TOP + r * CELL);
+      ctx.lineTo((BUILD_COL1 + 1) * CELL, TOP + r * CELL);
+      ctx.stroke();
+    }
+    // 大譜表の線
+    ctx.strokeStyle = 'rgba(40, 30, 20, 0.55)';
+    ctx.lineWidth = 2;
+    for (const p of STAFF_LINES) {
+      const y = pitchY(p);
+      ctx.beginPath();
+      ctx.moveTo(PODIUM_X - 10, y);
+      ctx.lineTo(FW - 10, y);
+      ctx.stroke();
+    }
+    // ト音記号とヘ音記号
+    ctx.fillStyle = 'rgba(40, 30, 20, 0.7)';
+    ctx.font = `${Math.round(pitchY(64) - pitchY(77) + 26)}px serif`;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('𝄞', PODIUM_X - 4, pitchY(62));
+    ctx.font = `${Math.round(pitchY(43) - pitchY(57) + 6)}px serif`;
+    ctx.fillText('𝄢', PODIUM_X - 4, pitchY(46));
+    // オクターブの目盛り (左端)
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    for (let p = 36; p <= 96; p += 12) {
+      ctx.fillStyle = 'rgba(90, 70, 50, 0.55)';
+      ctx.fillText('C' + (p / 12 - 1), 4, pitchY(p) + 4);
+    }
+    // 指揮台 (左端)
+    ctx.fillStyle = 'rgba(80, 40, 30, 0.12)';
+    ctx.fillRect(0, 0, PODIUM_X, FH);
+    ctx.strokeStyle = G.hurtT > 0 ? '#ff5050' : '#8b3a2e';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(PODIUM_X, TOP);
+    ctx.lineTo(PODIUM_X, TOP + ROWS * CELL);
+    ctx.stroke();
+    G.hurtT = Math.max(0, (G.hurtT || 0) - 1 / 60);
+    // 指揮台に立つ作曲家
+    const cy = FH / 2;
+    ctx.fillStyle = '#5a2f1f';
+    ctx.fillRect(18, cy + 30, 60, 22);
+    drawComposer(ctx, G.composer, 48, cy + 8, 1.6, 1, G.phase === 'song' ? G.beat * Math.PI : 0, false);
+    // 右端 (ボスの側)
+    ctx.fillStyle = 'rgba(60, 20, 60, 0.10)';
+    ctx.fillRect(SPAWN_X, 0, FW - SPAWN_X, FH);
+  }
+
+  function drawTower(t) {
+    const def = D.TOWERS[t.id];
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    const s = 1 + t.flash * 0.25;
+    ctx.scale(s, s);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(0, 22, 22, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = t.evo ? '#3a2a10' : '#2c2433';
+    roundRect(-25, -25, 50, 50, 10);
+    ctx.fill();
+    ctx.strokeStyle = t.evo ? '#ffd84a' : t.buffed ? '#7ef0c8' : regColor(def.reg);
+    ctx.lineWidth = t.evo ? 3.5 : 2.5;
+    roundRect(-25, -25, 50, 50, 10);
+    ctx.stroke();
+    ctx.fillStyle = '#f4efe0';
+    roundRect(-19, -21, 38, 34, 7);
+    ctx.fill();
+    drawIcon(ctx, t.evo ? def.evo : t.id, 0, -4, 30);
+    // レベル
+    if (t.evo) {
+      ctx.fillStyle = '#ffd84a';
+      ctx.font = 'bold 12px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('★', 0, 22);
     } else {
-      ctx.fillStyle = '#7a4a2a';
-      ctx.fillRect(f.x, f.y, f.w, f.h);
-      ctx.fillStyle = '#9b2c3a';
-      ctx.fillRect(f.x + 6, f.y + 6, f.w - 12, f.h - 12);
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = i < t.lv ? '#ffd84a' : 'rgba(255,255,255,0.2)';
+        ctx.fillRect(-17 + i * 7, 16, 5, 5);
+      }
     }
     ctx.restore();
   }
-
-  function drawItem(it) {
-    const bob = Math.sin(it.t * 4) * 3;
-    ctx.save();
-    ctx.translate(it.x, it.y + bob);
-    if (it.kind === 'chest') {
-      ctx.shadowColor = '#ffd84a';
-      ctx.shadowBlur = 14;
-      ctx.fillStyle = '#3a2416';
-      ctx.fillRect(-15, -10, 30, 20);
-      ctx.fillStyle = '#c9a04a';
-      ctx.fillRect(-15, -10, 30, 5);
-      ctx.fillRect(-3, -5, 6, 8);
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = '#fff';
-      ctx.font = '12px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('♪', 8, 7);
-    } else {
-      const icon = { coffee: '☕', applause: '👏', rest: '𝄻', ffff: 'ffff', ducat: '🪙' }[it.kind];
-      ctx.font = it.kind === 'ffff' ? 'bold italic 14px serif' : '18px serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      if (it.kind === 'ffff' || it.kind === 'rest') {
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.beginPath();
-        ctx.arc(0, 0, 14, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#ffe9a8';
-      }
-      ctx.fillText(icon, 0, 0);
-    }
-    ctx.restore();
+  function regColor(reg) {
+    return { lo: '#d08a4a', mid: '#6fb5ff', hi: '#ff8ad0', all: '#b9b0c8' }[reg];
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
   }
 
   function drawShot(s) {
@@ -1887,30 +1211,26 @@
       ctx.fillRect(-1, -4, 2, 5);
     } else if (s.kind === 'wind') {
       ctx.rotate(Math.atan2(s.vy, s.vx));
-      ctx.strokeStyle = s.charm ? '#ffb3f0' : '#bff6ff';
+      ctx.strokeStyle = s.charm ? '#d6338f' : '#2a8fb0';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(-14, 0);
-      ctx.quadraticCurveTo(-6, -6, 0, 0);
-      ctx.quadraticCurveTo(6, 6, 10, 0);
+      ctx.moveTo(-12, 0);
+      ctx.quadraticCurveTo(-5, -5, 0, 0);
+      ctx.quadraticCurveTo(5, 5, 9, 0);
       ctx.stroke();
       ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.arc(8, 0, 3.5, 0, Math.PI * 2);
+      ctx.arc(8, 0, 3, 0, Math.PI * 2);
       ctx.fill();
     } else if (s.kind === 'cymbal') {
       ctx.rotate(s.spin);
       ctx.fillStyle = '#5a4210';
       ctx.beginPath();
-      ctx.ellipse(0, 0, s.r + 2, (s.r + 2) * 0.55, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 13, 7, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = s.evo ? '#ffe680' : '#e6c04a';
+      ctx.fillStyle = '#e6c04a';
       ctx.beginPath();
-      ctx.ellipse(0, 0, s.r, s.r * 0.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#fff6c8';
-      ctx.beginPath();
-      ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 11, 5.5, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
@@ -1921,40 +1241,30 @@
     ctx.save();
     switch (f.kind) {
       case 'spark':
-        ctx.globalAlpha = 1 - k;
-        ctx.fillStyle = f.col;
-        ctx.beginPath();
-        ctx.arc(f.x, f.y, 3 * (1 - k) + 1, 0, Math.PI * 2);
-        ctx.fill();
-        break;
       case 'petal':
         ctx.globalAlpha = 1 - k;
         ctx.fillStyle = f.col;
-        ctx.translate(f.x, f.y);
-        ctx.rotate(f.t * 5);
         ctx.beginPath();
-        ctx.ellipse(0, 0, 6, 3, 0, 0, Math.PI * 2);
+        ctx.arc(f.x, f.y, f.kind === 'petal' ? 5 : 3 * (1 - k) + 1, 0, Math.PI * 2);
         ctx.fill();
         break;
       case 'ring':
         ctx.globalAlpha = 1 - k;
         ctx.strokeStyle = '#2a1600';
-        ctx.lineWidth = 9;
+        ctx.lineWidth = 8;
         ctx.beginPath();
         ctx.arc(f.x, f.y, f.r * (0.3 + 0.7 * k), 0, Math.PI * 2);
         ctx.stroke();
         ctx.strokeStyle = f.col;
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 4;
         ctx.stroke();
         break;
-      case 'arc':
       case 'cone':
         ctx.globalAlpha = (1 - k) * 0.8;
         ctx.translate(f.x, f.y);
-        ctx.rotate(f.a);
-        ctx.fillStyle = f.kind === 'cone' ? 'rgba(255, 210, 120, 0.55)' : 'rgba(255,255,255,0.5)';
-        ctx.strokeStyle = f.kind === 'cone' ? '#7a4a00' : '#1d2b4a';
-        ctx.lineWidth = 3;
+        ctx.fillStyle = 'rgba(255, 190, 80, 0.5)';
+        ctx.strokeStyle = '#7a4a00';
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.arc(0, 0, f.r * (0.6 + 0.4 * k), -f.half, f.half);
@@ -1964,54 +1274,186 @@
         break;
       case 'beam': {
         ctx.globalAlpha = f.evo ? 0.85 : 1 - k;
-        ctx.translate(f.x, f.y);
-        ctx.rotate(f.a);
-        ctx.fillStyle = '#2a0f00';
-        ctx.fillRect(0, -f.width / 2 - 2, f.len, f.width + 4);
-        const g = ctx.createLinearGradient(0, -f.width / 2, 0, f.width / 2);
-        g.addColorStop(0, '#ffb35a');
+        ctx.fillStyle = '#5a1f00';
+        ctx.fillRect(f.x, f.y - f.width / 2 - 2, f.len, f.width + 4);
+        const g = ctx.createLinearGradient(0, f.y - f.width / 2, 0, f.y + f.width / 2);
+        g.addColorStop(0, '#ff9d3a');
         g.addColorStop(0.5, '#fff7d6');
-        g.addColorStop(1, '#ffb35a');
+        g.addColorStop(1, '#ff9d3a');
         ctx.fillStyle = g;
-        ctx.fillRect(0, -f.width / 2, f.len, f.width);
+        ctx.fillRect(f.x, f.y - f.width / 2, f.len, f.width);
         break;
       }
+      case 'pipeWarn':
+        ctx.fillStyle = `rgba(80, 120, 200, ${0.15 + k * 0.3})`;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.r * (0.4 + 0.6 * k), 0, Math.PI * 2);
+        ctx.fill();
+        break;
       case 'pipe': {
         ctx.globalAlpha = 1 - k;
-        const h = 90 * (1 - Math.abs(k - 0.3));
-        ctx.fillStyle = '#5a6a7a';
-        ctx.fillRect(f.x - f.r * 0.5 - 2, f.y - h - 2, f.r + 4, h + 4);
+        const h = 80 * (1 - Math.abs(k - 0.3));
         const g = ctx.createLinearGradient(f.x - f.r / 2, 0, f.x + f.r / 2, 0);
-        g.addColorStop(0, '#c9d6e3');
+        g.addColorStop(0, '#9fb3c8');
         g.addColorStop(0.5, '#ffffff');
-        g.addColorStop(1, '#93a5b8');
+        g.addColorStop(1, '#7c90a6');
+        ctx.fillStyle = '#4a5a6a';
+        ctx.fillRect(f.x - f.r * 0.5 - 2, f.y - h - 2, f.r + 4, h + 4);
         ctx.fillStyle = g;
         ctx.fillRect(f.x - f.r * 0.5, f.y - h, f.r, h);
-        ctx.strokeStyle = '#dfe9f5';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(f.x, f.y, f.r * (0.6 + k), 0, Math.PI * 2);
-        ctx.stroke();
         break;
       }
-      case 'starHit':
-        ctx.globalAlpha = 1 - k;
-        ctx.fillStyle = '#ffe14a';
-        drawStar(ctx, f.x, f.y, f.r * (0.6 + 0.4 * k), 5);
-        break;
-      case 'line':
-        ctx.globalAlpha = 1 - k;
-        ctx.strokeStyle = '#ffe9b0';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(f.x + Math.cos(f.a) * 40 * (1 + k * 6), f.y + Math.sin(f.a) * 40 * (1 + k * 6));
-        ctx.lineTo(f.x + Math.cos(f.a) * 80 * (1 + k * 6), f.y + Math.sin(f.a) * 80 * (1 + k * 6));
-        ctx.stroke();
-        break;
       default:
         break;
     }
     ctx.restore();
+  }
+
+  // 画面の上の帯
+  function drawHud() {
+    ctx.save();
+    const S = G.stats;
+    ctx.fillStyle = 'rgba(20, 14, 28, 0.92)';
+    ctx.fillRect(0, 0, W, 40);
+    const P = G.parsed;
+    const prog = G.phase === 'prep' ? 0 : G.phase === 'song' ? clamp(G.track.pos() / G.songEnd, 0, 1) : 1;
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(0, 36, W, 4);
+    ctx.fillStyle = '#ffd84a';
+    ctx.fillRect(0, 36, W * prog, 4);
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    let x = 10;
+    const put = (s, col) => {
+      ctx.fillStyle = col;
+      ctx.fillText(s, x, 19);
+      x += ctx.measureText(s).width + 16;
+    };
+    put('🖋 ' + Math.floor(G.ink), '#9ff3d0');
+    // 体力
+    const hpw = Math.min(140, W * 0.18);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(x, 12, hpw, 14);
+    ctx.fillStyle = G.hp / S.maxHp < 0.3 ? '#ff5e5e' : '#5ee08a';
+    ctx.fillRect(x, 12, hpw * clamp(G.hp / S.maxHp, 0, 1), 14);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillText(`${Math.ceil(G.hp)}/${S.maxHp}`, x + 4, 19);
+    x += hpw + 14;
+    ctx.font = 'bold 14px system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    const bar = clamp(Math.floor(G.beat / P.barLen) + 1, 1, 9999);
+    const totalBars = Math.ceil(P.lengthBeats / P.barLen);
+    let right = G.hard ? 'HARD  ' : '';
+    if (G.phase === 'song') right += `${T('bar')} ${Math.min(bar, totalBars)}/${totalBars}  ♪ ${G.track.remaining()}  `;
+    if (G.leaked) right += `↯ ${G.leaked}`;
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(right, W - 54, 19);
+    // バナー
+    const banners = G.texts.filter((t) => !t.world);
+    let by = H * 0.32;
+    ctx.textAlign = 'center';
+    for (const t of banners.slice(-3)) {
+      ctx.globalAlpha = Math.min(1, (t.life - t.t) * 2, t.t * 6);
+      ctx.font = `bold ${t.size}px system-ui, sans-serif`;
+      const w = Math.min(W - 20, ctx.measureText(t.s).width + 30);
+      ctx.fillStyle = 'rgba(10, 10, 20, 0.8)';
+      ctx.fillRect(W / 2 - w / 2, by - 18, w, 36);
+      ctx.fillStyle = t.col;
+      ctx.fillText(t.s, W / 2, by);
+      by += 42;
+    }
+    ctx.globalAlpha = 1;
+    // 準備中
+    if (G.phase === 'prep') {
+      ctx.font = 'bold 15px system-ui, sans-serif';
+      const s = T('prepHint');
+      const w = Math.min(W - 20, ctx.measureText(s).width + 24);
+      ctx.fillStyle = 'rgba(20, 14, 28, 0.85)';
+      ctx.fillRect(W / 2 - w / 2, offY + 8, w, 28);
+      ctx.fillStyle = '#ffe9a8';
+      ctx.fillText(s, W / 2, offY + 22, W - 30);
+    }
+    ctx.restore();
+  }
+
+  // ---------- 自動プレイ (バランスの確認用) ----------
+  // 曲の音の高さの分布を見て、音符の多い高さにタワーを建て、強化していく
+  function botThink() {
+    if (!G.botRows) {
+      const rows = new Array(ROWS).fill(0);
+      for (const n of G.parsed.notes) rows[clamp(Math.floor((pitchY(n.p) - TOP) / CELL), 0, ROWS - 1)] += 1 + n.w * 0.2;
+      G.botRows = rows;
+      G.botCol = 0;
+    }
+    const rows = G.botRows;
+    const order = rows.map((w, r) => [w, r]).sort((a, b) => b[0] - a[0]);
+    // 強化できるなら、音符の多い高さのタワーから
+    const up = G.towers.filter((t) => !t.evo && t.id !== 'baton').sort((a, b) => rows[b.r] / (b.lv + 1) - rows[a.r] / (a.lv + 1))[0];
+    const towersInRow = (r) => G.towers.filter((t) => Math.abs(t.r - r) <= 1).length;
+    // 建てる高さ: 音符の重さ ÷ (そこにあるタワー + 1)
+    let bestR = order[0][1];
+    let bestV = -1;
+    for (const [w, r] of order) {
+      const v = w / (towersInRow(r) + 1);
+      if (v > bestV) {
+        bestV = v;
+        bestR = r;
+      }
+    }
+    const reg = regOf(Math.round(yPitch(TOP + bestR * CELL + CELL / 2)));
+    const picks = { lo: ['cello', 'timpani', 'piano', 'organ'], hi: ['flute', 'violin', 'piano', 'harp'], mid: ['piano', 'harp', 'violin', 'cymbal', 'trumpet'] }[reg].filter(towerUnlocked);
+    const id = G.towers.length >= 6 && !G.towers.some((t) => t.id === 'baton') ? 'baton' : picks[G.towers.length % picks.length];
+    const upCost = up ? (up.lv >= 5 ? evolveCost(up) : upgradeCost(up)) : Infinity;
+    const wantUp = up && G.towers.length >= 12 && G.towers.length % 3 !== 0;
+    if (!wantUp && (G.towers.length < 4 || (G.ink >= buildCost(id) && (G.towers.length < 14 || upCost > G.ink)))) {
+      if (G.ink < buildCost(id)) return;
+      const cols = [8, 10, 6, 12, 4, 14, 9, 11, 7, 13, 5, 15, 3, 16, 17, 2];
+      for (const c of cols) {
+        for (const dr of [0, 1, -1]) {
+          const r = bestR + dr;
+          if (canBuildAt(c, r)) {
+            build(id, c, r);
+            return;
+          }
+        }
+      }
+    } else if (up && G.ink >= upCost) upgrade(up);
+  }
+
+  function simulate(opt, maxSec = 1500) {
+    Synth.fake = true;
+    Synth.fakeTime = 0;
+    const g = start({ ...opt, sim: true });
+    const dt = 1 / 30;
+    let think = 0;
+    for (let i = 0; i < 6; i++) botThink();
+    begin();
+    while (!g.result && g.t < maxSec) {
+      Synth.fakeTime += dt;
+      update(dt);
+      think -= dt;
+      if (think <= 0) {
+        think = 0.5;
+        botThink();
+      }
+    }
+    const r = g.result || { timeout: true, phase: g.phase };
+    r.towersList = g.towers.map((t) => t.id + t.lv + (t.evo ? '*' : '')).join(',');
+    r.bossHp = Math.round(g.boss.hp);
+    r.inkLeft = Math.round(g.ink);
+    r.inkEarned = Math.round(g.inkEarned);
+    Synth.fake = false;
+    G = null;
+    return r;
+  }
+
+  function T(k) {
+    return window.CSUI.T(k);
+  }
+  function L(o) {
+    return window.CSUI.L(o);
   }
 
   function drawStar(c, x, y, r, n) {
@@ -2025,10 +1467,9 @@
     c.fill();
   }
 
-  // 音符を描く (形 = 長さ、色 = 高さ)
   function drawNote(c, n) {
     const r = n.r;
-    const p = G ? G.player : { x: n.x, y: n.y + 1 };
+    const p = { x: n.x - 100, y: n.y }; // 目は進む方向 (左) を見る
     c.save();
     c.translate(n.x, n.y);
     if (n.elite || n.fermata) {
@@ -2238,7 +1679,7 @@
     }
     ctx.restore();
     // 決戦の体力
-    if (G.phase === 'battle' || G.phase === 'win') {
+    if (G.phase === 'boss' || G.phase === 'win') {
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(b.x - 40, b.y - b.r - 30, 80, 7);
       ctx.fillStyle = '#ff5e7a';
@@ -2258,7 +1699,6 @@
     }
   }
 
-  // 作曲家 (2 頭身)。s は大きさ
   function drawComposer(c, comp, x, y, s, face = 1, walk = 0, blink = false) {
     const col = comp.colors;
     c.save();
@@ -2357,7 +1797,6 @@
     c.restore();
   }
 
-  // 楽器のアイコン
   function drawIcon(c, id, x, y, s) {
     c.save();
     c.translate(x, y);
@@ -2508,225 +1947,6 @@
     c.restore();
   }
 
-  // ---------- 画面の上の表示 ----------
-  function drawHud() {
-    const p = G.player;
-    const S = G.stats;
-    ctx.save();
-    const pad = 10;
-    let y = pad;
-    // 曲の進み具合
-    const P = G.parsed;
-    const totalBars = Math.ceil(P.lengthBeats / P.barLen);
-    const bar = clamp(Math.floor(G.beat / P.barLen) + 1, 1, 9999);
-    const prog = G.phase === 'song' ? clamp(G.track.pos() / G.songEnd, 0, 1) : 1;
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(pad, y, W - pad * 2, 5);
-    ctx.fillStyle = '#ffd84a';
-    ctx.fillRect(pad, y, (W - pad * 2) * prog, 5);
-    y += 9;
-    // 経験値
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(pad, y, W - pad * 2, 8);
-    ctx.fillStyle = '#7ef0c8';
-    ctx.fillRect(pad, y, (W - pad * 2) * clamp(G.xp / G.xpNext, 0, 1), 8);
-    y += 12;
-    ctx.font = 'bold 14px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    const shadowText = (s, x, yy, col = '#fff') => {
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-      ctx.strokeText(s, x, yy);
-      ctx.fillStyle = col;
-      ctx.fillText(s, x, yy);
-    };
-    shadowText(`Lv ${G.level}${G.hard ? '  HARD' : ''}`, pad, y);
-    shadowText(`HP ${Math.ceil(p.hp)}/${Math.round(S.maxHp)}`, pad, y + 18, p.hp / S.maxHp < 0.3 ? '#ff8080' : '#9effb0');
-    ctx.textAlign = 'right';
-    if (G.phase === 'song') shadowText(`${T('bar')} ${Math.min(bar, totalBars)}/${totalBars}`, W - pad, y);
-    const unseen = G.phase === 'song' ? G.track.remaining() : 0;
-    if (G.phase === 'song' || G.phase === 'coda') shadowText(`♪ ${T('unseen')} ${unseen} / ${T('onField')} ${G.notes.length}`, W - pad, y + 18, '#ffe9a8');
-    if (G.phase === 'coda') {
-      const left = Math.max(0, Math.ceil(ENCORE_WAIT - G.codaT));
-      shadowText(T('encoreIn').replace('{s}', left), W - pad, y + 36, left < 10 ? '#ff9090' : '#fff');
-    }
-    if (G.encore) shadowText(`👏×${G.encore}`, W - pad, y + 54, '#ffb3b3');
-    // 持ち物 (左下)
-    let ix = pad;
-    const iy = H - pad - 30;
-    for (const w of G.weapons) {
-      ctx.fillStyle = w.evo ? 'rgba(90, 60, 10, 0.85)' : 'rgba(0,0,0,0.55)';
-      ctx.fillRect(ix, iy, 30, 30);
-      if (w.evo) {
-        ctx.strokeStyle = '#ffd84a';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(ix, iy, 30, 30);
-      }
-      ctx.fillStyle = '#f4efe0';
-      ctx.fillRect(ix + 2, iy + 2, 26, 26);
-      drawIcon(ctx, w.evo ? D.WEAPONS[w.id].evo : w.id, ix + 15, iy + 14, 24);
-      ctx.font = 'bold 10px system-ui';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'bottom';
-      shadowText(w.evo ? '★' : String(w.lv), ix + 29, iy + 31, w.evo ? '#ffd84a' : '#fff');
-      ix += 33;
-    }
-    ix += 6;
-    for (const [id, lv] of Object.entries(G.passives)) {
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(ix, iy + 4, 26, 26);
-      ctx.font = '16px serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#fff';
-      ctx.fillText(D.PASSIVES[id].icon, ix + 13, iy + 17);
-      ctx.font = 'bold 10px system-ui';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'bottom';
-      shadowText(String(lv), ix + 25, iy + 31);
-      ix += 29;
-    }
-    // バナー
-    const banners = G.texts.filter((t) => !t.world);
-    let by = H * 0.3;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (const t of banners.slice(-3)) {
-      const a = Math.min(1, (t.life - t.t) * 2, t.t * 6);
-      ctx.globalAlpha = a;
-      ctx.font = `bold ${t.size}px system-ui, sans-serif`;
-      const w = Math.min(W - 20, ctx.measureText(t.s).width + 30);
-      ctx.fillStyle = 'rgba(10, 10, 20, 0.75)';
-      ctx.fillRect(W / 2 - w / 2, by - 18, w, 36);
-      shadowText(t.s, W / 2, by, t.col);
-      by += 42;
-    }
-    ctx.globalAlpha = 1;
-    // フラッシュ
-    for (const f of G.fx) {
-      if (f.kind === 'flash') {
-        ctx.fillStyle = `rgba(255,255,255,${0.6 * (1 - f.t / f.life)})`;
-        ctx.fillRect(0, 0, W, H);
-      }
-    }
-    if (G.player.hurtT > 0) {
-      ctx.fillStyle = `rgba(255,0,0,${G.player.hurtT * 0.6})`;
-      ctx.fillRect(0, 0, W, H);
-    }
-    ctx.restore();
-  }
-
-  // ---------- 自動プレイ (バランスの確認用) ----------
-  function botMove() {
-    const p = G.player;
-    let fx = 0;
-    let fy = 0;
-    for (const n of G.notes) {
-      const dx = p.x - n.x;
-      const dy = p.y - n.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 > 260 * 260) continue;
-      const w = (n.dmg + 2) / (d2 + 400);
-      fx += dx * w;
-      fy += dy * w;
-    }
-    for (const bl of G.bullets) {
-      const dx = p.x - bl.x;
-      const dy = p.y - bl.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 > 160 * 160) continue;
-      const w = 20 / (d2 + 200);
-      fx += dx * w;
-      fy += dy * w;
-    }
-    const b = G.boss;
-    {
-      const dx = p.x - b.x;
-      const dy = p.y - b.y;
-      const d2 = dx * dx + dy * dy;
-      const w = (b.dash ? 300 : 60) / (d2 + 400);
-      fx += dx * w;
-      fy += dy * w;
-      // 決戦では離れすぎない (攻撃が届く距離まで寄る)
-      if (G.phase === 'battle' && !b.dash && d2 > 260 * 260) {
-        const d = Math.sqrt(d2);
-        fx -= (dx / d) * 0.02;
-        fy -= (dy / d) * 0.02;
-      }
-    }
-    // 壁から離れる
-    const wall = (v) => (v < 150 ? (150 - v) / 150 : 0);
-    fx += wall(p.x) * 0.05 - wall(ROOM - p.x) * 0.05;
-    fy += wall(p.y) * 0.05 - wall(ROOM - p.y) * 0.05;
-    // インクと落とし物に寄る
-    let best = null;
-    let bd = 1e9;
-    for (const k of G.items.length ? G.items : G.inks) {
-      const d = dist2(k.x, k.y, p.x, p.y);
-      if (d < bd) {
-        bd = d;
-        best = k;
-      }
-    }
-    if (best && bd < 700 * 700) {
-      const d = Math.sqrt(bd) || 1;
-      const w = G.items.length ? 0.06 : 0.035;
-      fx += ((best.x - p.x) / d) * w;
-      fy += ((best.y - p.y) / d) * w;
-    }
-    const m = Math.hypot(fx, fy);
-    return m > 0.001 ? [fx / m, fy / m] : [0, 0];
-  }
-  function botScore(c) {
-    if (c.kind !== 'weapon' && c.kind !== 'passive') return 0;
-    let s = Math.random();
-    if (c.kind === 'weapon') {
-      s += 2;
-      const pv = D.WEAPONS[c.id].passive;
-      if (G.passives[pv]) s += 1.5;
-    } else {
-      for (const w of G.weapons) if (D.WEAPONS[w.id].passive === c.id) s += 2.5;
-      if (c.id === 'rosin' || c.id === 'tailcoat' || c.id === 'metronome') s += 1;
-    }
-    return s;
-  }
-
-  // 音を出さずに速く進める (?sim で使う)
-  function simulate(opt, maxSec = 900) {
-    Synth.fake = true;
-    Synth.fakeTime = 0;
-    W = 900;
-    H = 600;
-    scale = 1;
-    const g = start({ ...opt, sim: true });
-    g.bot = true;
-    const dt = 1 / 30;
-    while (!g.result && g.t < maxSec) {
-      Synth.fakeTime += dt;
-      update(dt);
-    }
-    const r = g.result || { timeout: true };
-    r.levelEnd = g.level;
-    r.xpRate = Math.round(((g.xpGot || 0) / (g.xpDropped || 1)) * 100);
-    r.maxAlive = g.maxAlive;
-    r.lvAt = g.lvAt;
-    r.hpAtBattle = g.hpAtBattle;
-    r.weapons = g.weapons.map((w) => w.id + w.lv + (w.evo ? '*' : '')).join(',');
-    r.phase = g.phase;
-    r.bossHp = Math.round(g.boss.hp);
-    Synth.fake = false;
-    G = null;
-    return r;
-  }
-
-  // ---------- 共通 ----------
-  function T(k) {
-    return window.CSUI.T(k);
-  }
-  function L(o) {
-    return window.CSUI.L(o);
-  }
 
   window.CSGame = {
     start(opt, onFinish) {
@@ -2738,14 +1958,22 @@
     get G() {
       return G;
     },
+    begin,
     update,
     render,
     resize,
     pause,
     resume,
     quit,
-    pickChoice,
-    rerollChoices,
+    tapAt,
+    hoverAt,
+    build,
+    upgrade,
+    sell,
+    buildCost,
+    upgradeCost,
+    evolveCost,
+    towerUnlocked,
     simulate,
     drawComposer,
     drawIcon,

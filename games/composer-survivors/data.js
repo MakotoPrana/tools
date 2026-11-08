@@ -8,12 +8,12 @@
       id: 'beethoven',
       name: { ja: 'ベートーヴェン', en: 'Beethoven' },
       weapon: 'timpani',
-      hp: 120,
+      hp: 150,
       speed: 0.95,
-      trait: { ja: '不屈: 体力が半分を切ると攻撃力 +30%', en: 'Indomitable: +30% power while below half HP' },
+      trait: { ja: '不屈: 指揮台の体力が半分を切ると、全タワーの攻撃力 +30%', en: 'Indomitable: all towers +30% power while the podium is below half HP' },
       bio: {
-        ja: '耳が聞こえなくなっても作曲をやめなかった、ドイツの大作曲家。ティンパニの響きで音符を押し返す。',
-        en: 'The German master who kept composing even after losing his hearing. Pushes notes back with the boom of the timpani.',
+        ja: '耳が聞こえなくなっても作曲をやめなかった、ドイツの大作曲家。得意なタワーはティンパニ。',
+        en: 'The German master who kept composing even after losing his hearing. Favorite tower: Timpani.',
       },
       colors: { coat: '#2d4a7a', hair: '#3b3330', scarf: '#c0392b', skin: '#f2c9a0' },
     },
@@ -21,12 +21,12 @@
       id: 'mozart',
       name: { ja: 'モーツァルト', en: 'Mozart' },
       weapon: 'violin',
-      hp: 80,
+      hp: 120,
       speed: 1.1,
-      trait: { ja: '神童: もらえる経験値 +20%', en: 'Child Prodigy: +20% experience' },
+      trait: { ja: '神童: 倒した音符のインク +20%', en: 'Child Prodigy: +20% ink from notes' },
       bio: {
-        ja: '5 歳で作曲を始めた天才。35 年の生涯で 600 を超える曲を残した。ヴァイオリンの光線で音符を貫く。',
-        en: 'A genius who began composing at five and wrote over 600 works in 35 years. Pierces notes with violin beams.',
+        ja: '5 歳で作曲を始めた天才。35 年の生涯で 600 を超える曲を残した。得意なタワーはヴァイオリン。',
+        en: 'A genius who began composing at five and wrote over 600 works in 35 years. Favorite tower: Violin.',
       },
       colors: { coat: '#b8323c', hair: '#f4f1ea', scarf: '#f5e6b8', skin: '#f6d2b0' },
     },
@@ -34,12 +34,12 @@
       id: 'chopin',
       name: { ja: 'ショパン', en: 'Chopin' },
       weapon: 'piano',
-      hp: 70,
+      hp: 110,
       speed: 1,
-      trait: { ja: 'ピアノの詩人: 攻撃間隔 −10%、ピアノの弾が 1 つ多い', en: 'Poet of the Piano: −10% cooldown, +1 piano shot' },
+      trait: { ja: 'ピアノの詩人: 全タワーの攻撃間隔 −10%、ピアノは弾が 1 つ多い', en: 'Poet of the Piano: all towers −10% cooldown, pianos fire +1 shot' },
       bio: {
-        ja: 'ポーランド生まれ、パリで活躍した「ピアノの詩人」。作品のほとんどがピアノ曲。体は弱いが手数で勝負。',
-        en: 'The Polish-born "Poet of the Piano" who shone in Paris. Frail, but fights with sheer number of shots.',
+        ja: 'ポーランド生まれ、パリで活躍した「ピアノの詩人」。作品のほとんどがピアノ曲。得意なタワーはピアノ。',
+        en: 'The Polish-born "Poet of the Piano" who shone in Paris. Favorite tower: Piano.',
       },
       colors: { coat: '#20232b', hair: '#7a5236', scarf: '#ffffff', skin: '#f3d6bd' },
     },
@@ -165,116 +165,113 @@
     },
   ];
 
-  // ---------- 楽器 (武器) ----------
-  // reg: 得意な音域 (lo / mid / hi / all)。lv(L) はレベル L の値 (1〜8)
-  const WEAPONS = {
+  // ---------- タワー (楽器) ----------
+  // 譜面の上に置く。reg: 得意な音域 (lo / mid / hi / all。得意な音域の音符には 1.5 倍)。
+  // cost: 建てる値段 (インク)。lv(L): レベル 1〜5 の値。evo: レベル 5 から進化 (値段は cost × 3)
+  // kind: 攻撃のしかた。shot (弾) / beam (右へ水平の光線) / aura (まわりを遅く) / pulse (衝撃波で右へ押し戻す) /
+  //       homing (追いかける弾) / string (縦の弦を通った音符に) / cone (右へ扇) / buff (まわりのタワーを強化) /
+  //       splash (投げて範囲) / pillar (遠くに重い一撃)
+  const TOWERS = {
     piano: {
-      name: { ja: 'ピアノ', en: 'Piano' }, reg: 'all', evo: 'hammer', passive: 'pedal',
-      desc: { ja: '一番近い音符へ鍵盤の弾を撃つ', en: 'Fires key-shaped shots at the nearest note' },
-      lv: (L) => ({ dmg: 9 + L * 2, cd: 0.85 - L * 0.03, count: 1 + (L >= 3) + (L >= 5) + (L >= 8), pierce: 1 + (L >= 6), speed: 430 }),
-    },
-    baton: {
-      name: { ja: '指揮棒', en: 'Baton' }, reg: 'mid', evo: 'maestro', passive: 'metronome',
-      desc: { ja: '左右を交互になぎ払う', en: 'Slashes left and right in turn' },
-      lv: (L) => ({ dmg: 13 + L * 3, cd: 1.15 - L * 0.03, range: 100 + L * 6, both: L >= 4 }),
-    },
-    timpani: {
-      name: { ja: 'ティンパニ', en: 'Timpani' }, reg: 'lo', evo: 'thunder', passive: 'tailcoat',
-      desc: { ja: 'まわりに衝撃波の輪を出して押し返す', en: 'Sends out a shockwave ring that pushes notes back' },
-      lv: (L) => ({ dmg: 8 + L * 2.5, cd: 1.5 - L * 0.04, radius: 90 + L * 8, kb: 160 + L * 10 }),
+      name: { ja: 'ピアノ', en: 'Piano' }, reg: 'all', kind: 'shot', cost: 60, evo: 'hammer',
+      desc: { ja: '一番先頭の音符を撃つ。どの音域にも効く基本のタワー', en: 'Shoots the leading note. A solid all-rounder' },
+      lv: (L) => ({ dmg: 9 + L * 4, cd: 0.9 - L * 0.06, range: 150 + L * 15 }),
     },
     violin: {
-      name: { ja: 'ヴァイオリン', en: 'Violin' }, reg: 'hi', evo: 'strad', passive: 'rosin',
-      desc: { ja: '一番近い音符へ貫通する光線を放つ', en: 'Fires a piercing beam at the nearest note' },
-      lv: (L) => ({ dmg: 14 + L * 3, cd: 1.5 - L * 0.04, len: 300 + L * 15, width: 8 + L, count: 1 + (L >= 4) + (L >= 7) }),
+      name: { ja: 'ヴァイオリン', en: 'Violin' }, reg: 'hi', kind: 'beam', cost: 80, evo: 'strad',
+      desc: { ja: '右へまっすぐ光線。同じ高さを流れる旋律をまとめて貫く', en: 'Fires a beam straight right, piercing a whole melodic line at its pitch' },
+      lv: (L) => ({ dmg: 10 + L * 5, cd: 1.5 - L * 0.1, len: 300 + L * 40, width: 26 + L * 3 }),
     },
     cello: {
-      name: { ja: 'チェロ', en: 'Cello' }, reg: 'lo', evo: 'contrabass', passive: 'soundproof',
-      desc: { ja: '足元に低い音の波を広げ、音符を遅くする', en: 'Spreads a low wave underfoot that slows notes' },
-      lv: (L) => ({ dmg: 4 + L * 1.5, cd: 2.4 - L * 0.06, radius: 70 + L * 7, life: 2 + L * 0.15, slow: 0.3 }),
+      name: { ja: 'チェロ', en: 'Cello' }, reg: 'lo', kind: 'aura', cost: 70, evo: 'contrabass',
+      desc: { ja: 'まわりの音符を遅くし、少しずつ削る', en: 'Slows and wears down notes around it' },
+      lv: (L) => ({ dmg: 3 + L * 2, cd: 0.5, range: 90 + L * 10, slow: 0.25 + L * 0.03 }),
+    },
+    timpani: {
+      name: { ja: 'ティンパニ', en: 'Timpani' }, reg: 'lo', kind: 'pulse', cost: 90, evo: 'thunder',
+      desc: { ja: '衝撃波で、まわりの音符を右へ押し戻す', en: 'A shockwave that knocks nearby notes back to the right' },
+      lv: (L) => ({ dmg: 9 + L * 5, cd: 2.0 - L * 0.12, range: 90 + L * 10, kb: 40 + L * 8 }),
     },
     flute: {
-      name: { ja: 'フルート', en: 'Flute' }, reg: 'hi', evo: 'magicflute', passive: 'quill',
-      desc: { ja: '追いかける風の弾を撃つ', en: 'Fires homing wind notes' },
-      lv: (L) => ({ dmg: 6 + L * 1.8, cd: 1.25 - L * 0.03, count: 2 + (L >= 3) + (L >= 5) + (L >= 7), speed: 300 }),
-    },
-    trumpet: {
-      name: { ja: 'トランペット', en: 'Trumpet' }, reg: 'mid', evo: 'fanfare', passive: 'lungs',
-      desc: { ja: '進む方向に扇形の音を吹き、強く押し返す', en: 'Blasts a cone of sound ahead with strong knockback' },
-      lv: (L) => ({ dmg: 11 + L * 3, cd: 1.6 - L * 0.04, range: 130 + L * 8, arc: 0.9 + L * 0.03, kb: 240 }),
+      name: { ja: 'フルート', en: 'Flute' }, reg: 'hi', kind: 'homing', cost: 70, evo: 'magicflute',
+      desc: { ja: '射程が長く、追いかける弾を何発も撃つ。速い高音に強い', en: 'Long range, several homing shots. Great against fast high notes' },
+      lv: (L) => ({ dmg: 4 + L * 2.5, cd: 1.0 - L * 0.06, range: 230 + L * 15, count: 2 + (L >= 3) + (L >= 5) }),
     },
     harp: {
-      name: { ja: 'ハープ', en: 'Harp' }, reg: 'all', evo: 'celestial', passive: 'stand',
-      desc: { ja: 'まわりを弦が回る', en: 'Strings orbit around you' },
-      lv: (L) => ({ dmg: 6 + L * 2, count: 2 + (L >= 3) + (L >= 5) + (L >= 7), radius: 78 + L * 3, spin: 2.6 + L * 0.1 }),
+      name: { ja: 'ハープ', en: 'Harp' }, reg: 'all', kind: 'string', cost: 100, evo: 'celestial',
+      desc: { ja: '縦に弦を張る。弦を通りぬける音符すべてにダメージ', en: 'Strings a vertical line; every note passing through takes damage' },
+      lv: (L) => ({ dmg: 10 + L * 5, range: 70 + L * 12 }),
+    },
+    baton: {
+      name: { ja: '指揮棒', en: 'Baton' }, reg: 'mid', kind: 'buff', cost: 120, evo: 'maestro',
+      desc: { ja: '攻撃しない。まわりのタワーの攻撃力と攻撃の速さを上げる', en: 'No attack. Boosts the power and speed of nearby towers' },
+      lv: (L) => ({ range: 110 + L * 10, might: 0.12 + L * 0.04, haste: 0.08 + L * 0.03 }),
+    },
+    trumpet: {
+      name: { ja: 'トランペット', en: 'Trumpet' }, reg: 'mid', kind: 'cone', cost: 110, evo: 'fanfare', locked: 'fate',
+      desc: { ja: '右へ扇形に吹き、音符を強く押し戻す', en: 'Blasts a cone to the right with strong knockback' },
+      lv: (L) => ({ dmg: 12 + L * 5, cd: 1.6 - L * 0.1, range: 160 + L * 15, kb: 70 + L * 10 }),
     },
     cymbal: {
-      name: { ja: 'シンバル', en: 'Cymbals' }, reg: 'mid', evo: 'janissary', passive: 'pageturner', locked: 'turkish',
-      desc: { ja: 'ブーメランのように投げる', en: 'Thrown like a boomerang' },
-      lv: (L) => ({ dmg: 11 + L * 3, cd: 1.8 - L * 0.05, dist: 200 + L * 12, count: 1 + (L >= 4) + (L >= 7) }),
+      name: { ja: 'シンバル', en: 'Cymbals' }, reg: 'mid', kind: 'splash', cost: 100, evo: 'janissary', locked: 'turkish',
+      desc: { ja: '先頭の音符へ投げ、まわりにも当たる', en: 'Thrown at the leading note, hitting those around it' },
+      lv: (L) => ({ dmg: 10 + L * 5, cd: 1.5 - L * 0.08, range: 180 + L * 12, splash: 50 + L * 5 }),
     },
     organ: {
-      name: { ja: 'パイプオルガン', en: 'Pipe Organ' }, reg: 'lo', evo: 'cathedral', passive: 'coffee', locked: 'diesirae',
-      desc: { ja: '音符の足元からパイプが突き上がる', en: 'Pipes burst up beneath random notes' },
-      lv: (L) => ({ dmg: 16 + L * 4, cd: 1.5 - L * 0.04, count: 1 + (L >= 3) + (L >= 5) + (L >= 7), radius: 26 + L * 1.5 }),
+      name: { ja: 'パイプオルガン', en: 'Pipe Organ' }, reg: 'lo', kind: 'pillar', cost: 140, evo: 'cathedral', locked: 'diesirae',
+      desc: { ja: '遠くの硬い音符に、重い一撃', en: 'A heavy blow on tough notes far away' },
+      lv: (L) => ({ dmg: 30 + L * 14, cd: 2.4 - L * 0.12, range: 300 + L * 20, splash: 36 }),
     },
   };
-  // トランペットは「運命」で解禁
-  WEAPONS.trumpet.locked = 'fate';
+  // 旧い名前で参照しているところのため
+  const WEAPONS = TOWERS;
 
   const EVOS = {
     hammer: { name: { ja: 'ハンマークラヴィーア', en: 'Hammerklavier' }, desc: { ja: '3 発の和音が貫通し、当たると爆ぜる', en: 'Triple chord shots that pierce and burst' } },
-    maestro: { name: { ja: 'マエストロのタクト', en: "Maestro's Baton" }, desc: { ja: '360° をなぎ払い、音符を遅くする', en: 'Sweeps all around and slows notes' } },
-    thunder: { name: { ja: '雷鳴のティンパニ', en: 'Thunder Timpani' }, desc: { ja: '輪が 2 重になり、音符をしびれさせる', en: 'Double rings that stun' } },
-    strad: { name: { ja: 'ストラディヴァリウス', en: 'Stradivarius' }, desc: { ja: '太く長い光線を出し続ける', en: 'A thick, long, lingering beam' } },
-    contrabass: { name: { ja: '大地のコントラバス', en: 'Earthshaking Contrabass' }, desc: { ja: '大波で音符を大きく遅くする', en: 'A huge wave that greatly slows notes' } },
-    magicflute: { name: { ja: '魔笛', en: 'The Magic Flute' }, desc: { ja: '当てた音符をときどき味方にする', en: 'Sometimes charms notes to fight for you' } },
-    fanfare: { name: { ja: '凱旋のファンファーレ', en: 'Triumphal Fanfare' }, desc: { ja: '前後に吹き、もう一度ダメージ', en: 'Blasts front and back, then hits again' } },
-    celestial: { name: { ja: '天上のハープ', en: 'Celestial Harp' }, desc: { ja: '弦が倍になり、輪が広がる', en: 'Twice the strings in a wider ring' } },
-    janissary: { name: { ja: '軍楽隊の大シンバル', en: 'Janissary Cymbals' }, desc: { ja: '2 枚を投げ、戻って打ち合わせると爆発', en: 'Throws two that crash together in an explosion' } },
-    cathedral: { name: { ja: '大聖堂のオルガン', en: 'Cathedral Organ' }, desc: { ja: '何本ものパイプが広く突き上がる', en: 'Many wide pipes at once' } },
-  };
-
-  // ---------- パッシブ ----------
-  const PASSIVES = {
-    pedal: { name: { ja: 'ペダル', en: 'Sustain Pedal' }, icon: '🦶', desc: { ja: '効果時間 +10%', en: '+10% duration' }, max: 5 },
-    metronome: { name: { ja: 'メトロノーム', en: 'Metronome' }, icon: '⏱️', desc: { ja: '攻撃間隔 −8%', en: '−8% cooldown' }, max: 5 },
-    tailcoat: { name: { ja: '燕尾服', en: 'Tailcoat' }, icon: '🤵', desc: { ja: '最大体力 +20', en: '+20 max HP' }, max: 5 },
-    rosin: { name: { ja: '松脂', en: 'Rosin' }, icon: '🟧', desc: { ja: '攻撃力 +10%', en: '+10% power' }, max: 5 },
-    soundproof: { name: { ja: '防音材', en: 'Soundproofing' }, icon: '🧱', desc: { ja: '受けるダメージ −1', en: '−1 damage taken' }, max: 5 },
-    quill: { name: { ja: '羽ペン', en: 'Quill Pen' }, icon: '🪶', desc: { ja: '経験値 +8%', en: '+8% experience' }, max: 5 },
-    lungs: { name: { ja: '肺活量', en: 'Lung Power' }, icon: '💨', desc: { ja: '弾の速さ・射程 +10%', en: '+10% projectile speed and reach' }, max: 5 },
-    stand: { name: { ja: '譜面台', en: 'Music Stand' }, icon: '🎼', desc: { ja: '攻撃範囲 +10%', en: '+10% area' }, max: 5 },
-    pageturner: { name: { ja: '楽譜めくり係', en: 'Page Turner' }, icon: '📖', desc: { ja: '弾の数 +1', en: '+1 projectile' }, max: 2 },
-    coffee: { name: { ja: 'コーヒー豆', en: 'Coffee Beans' }, icon: '☕', desc: { ja: '毎秒 0.25 回復', en: 'Recover 0.25 HP/s' }, max: 5 },
-    applause: { name: { ja: '拍手喝采', en: 'Applause' }, icon: '👏', desc: { ja: 'インクの回収範囲 +20%', en: '+20% pickup range' }, max: 5 },
-    bouquet: { name: { ja: '花束', en: 'Bouquet' }, icon: '💐', desc: { ja: '運 +10%', en: '+10% luck' }, max: 5 },
+    strad: { name: { ja: 'ストラディヴァリウス', en: 'Stradivarius' }, desc: { ja: '太い光線を出し続ける', en: 'A thick, lingering beam' } },
+    contrabass: { name: { ja: '大地のコントラバス', en: 'Earthshaking Contrabass' }, desc: { ja: '広い範囲を大きく遅くする', en: 'Greatly slows a wide area' } },
+    thunder: { name: { ja: '雷鳴のティンパニ', en: 'Thunder Timpani' }, desc: { ja: '2 重の衝撃波で、音符をしびれさせる', en: 'Double shockwaves that stun' } },
+    magicflute: { name: { ja: '魔笛', en: 'The Magic Flute' }, desc: { ja: '当てた音符をときどき魅了し、逆向きに流して仲間を攻撃させる', en: 'Sometimes charms notes to flow backward and strike their friends' } },
+    celestial: { name: { ja: '天上のハープ', en: 'Celestial Harp' }, desc: { ja: '弦が 2 本になり、高く張る', en: 'Two taller strings' } },
+    maestro: { name: { ja: 'マエストロのタクト', en: "Maestro's Baton" }, desc: { ja: '強化が大きくなり、まわりの音符も遅くする', en: 'Bigger boosts, and slows nearby notes' } },
+    fanfare: { name: { ja: '凱旋のファンファーレ', en: 'Triumphal Fanfare' }, desc: { ja: '2 回吹いて、大きく押し戻す', en: 'Blasts twice with huge knockback' } },
+    janissary: { name: { ja: '軍楽隊の大シンバル', en: 'Janissary Cymbals' }, desc: { ja: '2 枚を投げ、大きく爆ぜる', en: 'Throws two with a big crash' } },
+    cathedral: { name: { ja: '大聖堂のオルガン', en: 'Cathedral Organ' }, desc: { ja: '一度に 3 か所へ重い一撃', en: 'Three heavy blows at once' } },
   };
 
   // ---------- 練習室 (恒久アップグレード。作曲家ごと) ----------
   const UPGRADES = [
-    { id: 'hp', name: { ja: '体力', en: 'Health' }, desc: { ja: '最大体力 +10', en: '+10 max HP' }, max: 10, base: 40 },
-    { id: 'might', name: { ja: '攻撃力', en: 'Power' }, desc: { ja: '+5%', en: '+5%' }, max: 10, base: 60 },
-    { id: 'armor', name: { ja: '防御', en: 'Defense' }, desc: { ja: '受けるダメージ −1', en: '−1 damage taken' }, max: 3, base: 300 },
-    { id: 'speed', name: { ja: '移動速度', en: 'Move Speed' }, desc: { ja: '+3%', en: '+3%' }, max: 5, base: 80 },
-    { id: 'cd', name: { ja: '攻撃間隔', en: 'Cooldown' }, desc: { ja: '−3%', en: '−3%' }, max: 5, base: 100 },
-    { id: 'area', name: { ja: '攻撃範囲', en: 'Area' }, desc: { ja: '+5%', en: '+5%' }, max: 5, base: 80 },
-    { id: 'dur', name: { ja: '効果時間', en: 'Duration' }, desc: { ja: '+5%', en: '+5%' }, max: 5, base: 80 },
-    { id: 'magnet', name: { ja: '回収範囲', en: 'Pickup Range' }, desc: { ja: '+10%', en: '+10%' }, max: 5, base: 40 },
-    { id: 'growth', name: { ja: '経験値', en: 'Experience' }, desc: { ja: '+5%', en: '+5%' }, max: 10, base: 80 },
-    { id: 'regen', name: { ja: '自然回復', en: 'Regeneration' }, desc: { ja: '毎秒 0.1 回復', en: '+0.1 HP/s' }, max: 5, base: 150 },
-    { id: 'luck', name: { ja: '運', en: 'Luck' }, desc: { ja: '+10%', en: '+10%' }, max: 5, base: 100 },
+    { id: 'hp', name: { ja: '指揮台の体力', en: 'Podium HP' }, desc: { ja: '+10', en: '+10' }, max: 10, base: 40 },
+    { id: 'might', name: { ja: '攻撃力', en: 'Power' }, desc: { ja: 'タワーの攻撃力 +5%', en: 'Tower power +5%' }, max: 10, base: 60 },
+    { id: 'cd', name: { ja: '攻撃の速さ', en: 'Attack Speed' }, desc: { ja: '攻撃間隔 −3%', en: '−3% cooldown' }, max: 5, base: 100 },
+    { id: 'area', name: { ja: '射程', en: 'Range' }, desc: { ja: '+5%', en: '+5%' }, max: 5, base: 80 },
+    { id: 'ink', name: { ja: '最初のインク', en: 'Starting Ink' }, desc: { ja: '+25', en: '+25' }, max: 8, base: 50 },
+    { id: 'income', name: { ja: 'インクの量', en: 'Ink Income' }, desc: { ja: '倒した音符のインク +5%', en: '+5% ink from notes' }, max: 10, base: 80 },
+    { id: 'discount', name: { ja: '値引き', en: 'Discount' }, desc: { ja: '建てる・強化する値段 −3%', en: '−3% build and upgrade cost' }, max: 5, base: 120 },
     { id: 'greed', name: { ja: '金貨', en: 'Ducats' }, desc: { ja: 'もらえる金貨 +10%', en: '+10% ducats' }, max: 5, base: 100 },
-    { id: 'reroll', name: { ja: 'リロール', en: 'Reroll' }, desc: { ja: 'レベルアップの選び直し +1 回', en: '+1 level-up reroll' }, max: 3, base: 300 },
-    { id: 'choices', name: { ja: '選択肢の数', en: 'Choices' }, desc: { ja: '候補 3 → 4', en: '3 → 4 choices' }, max: 1, base: 1000 },
-    { id: 'revive', name: { ja: 'カーテンコール', en: 'Curtain Call' }, desc: { ja: '1 回だけ、力尽きても体力半分で復活', en: 'Revive once with half HP' }, max: 1, base: 2000 },
+    { id: 'revive', name: { ja: 'カーテンコール', en: 'Curtain Call' }, desc: { ja: '1 回だけ、体力が 0 になっても半分で立ち直る', en: 'Once, recover to half HP instead of falling' }, max: 1, base: 2000 },
   ];
 
   // ---------- 画面の文言 ----------
   const TEXT = {
     gameTitle: { ja: '作曲家サバイバー', en: 'Composer Survivors' },
+    ink: { ja: 'インク', en: 'Ink' },
+    build: { ja: '建てる', en: 'Build' },
+    upgrade: { ja: '強化', en: 'Upgrade' },
+    evolve: { ja: '進化', en: 'Evolve' },
+    sell: { ja: '売る', en: 'Sell' },
+    close: { ja: '閉じる', en: 'Close' },
+    maxLv: { ja: '最大', en: 'Max' },
+    prepHint: { ja: '譜面にタワーを置いてから「開演」。音符は右から左へ流れてくる', en: 'Place towers on the score, then start. Notes flow from right to left' },
+    startShow: { ja: '▶ 開演', en: '▶ Start' },
+    leaked: { ja: '通した音符', en: 'Notes let through' },
+    bossIncoming: { ja: 'ボスが流れてくる! 指揮台に届く前に倒せ', en: 'The boss is coming! Stop it before it reaches the podium' },
+    landscape: { ja: '横向きにすると遊びやすくなります', en: 'Turn your device sideways for a better view' },
+    lockedTower: { ja: '「{s}」をクリアすると使える', en: 'Clear "{s}" to unlock' },
+    favorite: { ja: '得意', en: 'Favorite' },
+    towerUnlocked: { ja: '新しいタワー「{w}」を使えるようになりました', en: 'New tower unlocked: {w}' },
     backToGames: { ja: '‹ ゲーム一覧', en: '‹ Games' },
-    subtitle: { ja: '曲の音符が、すべて敵になる。', en: 'Every note of the music is an enemy.' },
+    subtitle: { ja: '楽譜を流れてくる音符を、楽器のタワーで止めろ。', en: 'Stop the notes flowing across the score with instrument towers.' },
     start: { ja: 'はじめる', en: 'Start' },
     practice: { ja: '🎹 練習室', en: '🎹 Practice Room' },
     settings: { ja: '⚙ 設定', en: '⚙ Settings' },
@@ -284,9 +281,9 @@
     chooseComposer: { ja: '作曲家をえらぶ', en: 'Choose a Composer' },
     chooseSong: { ja: '曲をえらぶ', en: 'Choose a Piece' },
     withThis: { ja: 'この作曲家で曲をえらぶ', en: 'Choose a piece with this composer' },
-    startWeapon: { ja: '最初の楽器', en: 'Starting instrument' },
+    startWeapon: { ja: '得意なタワー (攻撃力 +25%・2 割引き)', en: 'Favorite tower (+25% power, 20% off)' },
     trait: { ja: '個性', en: 'Trait' },
-    hp: { ja: '体力', en: 'HP' },
+    hp: { ja: '指揮台の体力', en: 'Podium HP' },
     comingSoon: { ja: '準備中', en: 'Coming soon' },
     futureComposer: { ja: 'あとの版で登場', en: 'Coming in a later update' },
     cleared: { ja: 'クリアした曲', en: 'Pieces cleared' },
@@ -334,7 +331,7 @@
     rank: { ja: '評価', en: 'Rank' },
     ducats: { ja: 'ダカット金貨', en: 'Ducats' },
     unlockedFor: { ja: '解禁! 「{s}」をほかの作曲家でも遊べるようになりました', en: 'Unlocked! "{s}" can now be played by other composers' },
-    unlockedWeapon: { ja: '新しい楽器「{w}」がレベルアップの候補に出るようになりました', en: 'New instrument "{w}" can now appear at level-up' },
+    unlockedWeapon: { ja: '新しいタワー「{w}」を使えるようになりました', en: 'New tower unlocked: {w}' },
     canBuy: { ja: '練習室で {n} 個強化できる', en: '{n} upgrades available in the Practice Room' },
     practiceTitle: { ja: '練習室', en: 'Practice Room' },
     practiceNote: { ja: '強化は作曲家ごと。金貨は全員共通', en: 'Upgrades are per composer. Ducats are shared.' },
@@ -369,5 +366,5 @@
     tapToStart: { ja: 'タップ / クリックで音が鳴ります', en: 'Tap / click to enable sound' },
   };
 
-  window.CSData = { COMPOSERS, FUTURE_COMPOSERS, SONGS, WEAPONS, EVOS, PASSIVES, UPGRADES, TEXT };
+  window.CSData = { COMPOSERS, FUTURE_COMPOSERS, SONGS, TOWERS, WEAPONS, EVOS, UPGRADES, TEXT };
 })();
