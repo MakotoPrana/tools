@@ -10,6 +10,12 @@ Mutopia Project の LilyPond の譜面から、ゲームの譜面 (scores/*.js) 
   - きらきら星変奏曲 K.265: ftp/MozartWA/KV265/guitar-duo-complete (Public Domain。ギター二重奏の版。
     音は Mozart の原曲どおり (原調) で、ギターで出ない低音だけが変えてある。繰り返しは省かれているので、ここで元の形に戻す)
 LilyPond は実行せず、ly2score.py で文字として読む。
+
+  python3 -I build_scores.py <ftp フォルダ> <chopin_piano_score_dataset のフォルダ>
+
+木枯らしだけは Mutopia に無いので、MusicXML から作る (xml2score.py で読む):
+  - 練習曲 Op.25-11: https://github.com/mac-marg-pianist/chopin_piano_score_dataset
+    scores_xml/Chopin_Etude_op_25_11.musicxml (KAIST MAC × SNU MARG, MIT License。MuseScore の譜面から集めたもの)
 """
 import json
 import os
@@ -19,6 +25,7 @@ from fractions import Fraction as F
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ly2score as L  # noqa: E402
+import xml2score as X  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scores')
 
@@ -317,9 +324,44 @@ def more(ftp):
             {'timeSig': '[4, 4]', 'key': '{ tonic: 0, minor: true }', 'theme': '{ part: 0, from: 0, len: 16, tempo: 160 }'}, piano2(), [[0, 160]], use_marks=True)
 
 
+def winterwind(dataset):
+    r = X.read(os.path.join(dataset, 'scores_xml', 'Chopin_Etude_op_25_11.musicxml'))
+    up, dn = r['staves']['1'], r['staves']['2']
+    # 速さ: 序奏 Lento (楽譜に数字が無いので MusicXML の 48、rit. で 42)、
+    # Allegro con brio は楽譜の metronome (2 分音符 = 69) で 4 分音符 = 138。m.68 rit. / m.69 a tempo
+    marks = {'Lento': 48, 'rit.': None, 'Allegro con brio.': 138, 'a tempo': 138}
+    tempo = []
+    for b0, bpm, bar, words in r['tempos']:
+        bpm = marks.get(words) or bpm
+        if words == 'rit.' and bar == '68':
+            bpm = 120
+        tempo.append([float(b0), bpm])
+    write_js(
+        'winterwind',
+        '// 練習曲 イ短調「木枯らし」(ショパン, Op. 25-11)。全曲\n'
+        '// 元の譜面: Chopin Piano Score Data Set (KAIST MAC × SNU MARG, MIT License)\n'
+        '//   https://github.com/mac-marg-pianist/chopin_piano_score_dataset scores_xml/Chopin_Etude_op_25_11.musicxml\n'
+        '// tools/build_scores.py (xml2score.py) で作ったファイル。手で直さない',
+        {
+            'id': "'winterwind'",
+            'timeSig': '[4, 4]',
+            'key': '{ tonic: 9, minor: true }',
+            'theme': '{ part: 1, from: 16, len: 16, tempo: 138 }',
+            'tempo': '[' + ', '.join(f'[{b:g}, {t:g}]' for b, t in tempo) + ']',
+        },
+        [
+            {'inst': 'piano', 'vol': 0.8, 'melody': False, 'notes': up},
+            {'inst': 'piano', 'vol': 1, 'melody': True, 'notes': dn},
+        ],
+    )
+
+
 if __name__ == '__main__':
     ftp = sys.argv[1]
-    elise(ftp)
-    nocturne(ftp)
-    twinkle(ftp)
-    more(ftp)
+    if ftp != '-':
+        elise(ftp)
+        nocturne(ftp)
+        twinkle(ftp)
+        more(ftp)
+    if len(sys.argv) > 2:
+        winterwind(sys.argv[2])
