@@ -386,7 +386,8 @@
     const keyHint = !matchMedia('(pointer: coarse)').matches;
     const reg = REG_LABEL();
     const ids = Object.keys(D.TOWERS);
-    dock.innerHTML = `<div class="dhead"><b>${T('build')}</b><span class="muted">${T('ink')} 🖋 <span data-ink></span></span><button type="button" class="dclose" data-close aria-label="${T('close')}">✕</button></div>
+    const full = G.towers.length >= Game.MAX_TOWERS;
+    dock.innerHTML = `<div class="dhead"><b>${T('build')}</b><span class="muted">${T('ink')} 🖋 <span data-ink></span> ・ 🎻 ${G.towers.length}/${Game.MAX_TOWERS}</span><button type="button" class="dclose" data-close aria-label="${T('close')}">✕</button></div>
       <div class="tchoices">${ids
         .map((id, i) => {
           const def = D.TOWERS[id];
@@ -398,7 +399,7 @@
             <b>${esc(L(def.name))}</b>
             <small>${ok ? `🖋${cost}` : '🔒'}${fav ? ` <em class="fav">★</em>` : ''}</small></button>`;
         })
-        .join('')}</div><p class="tdesc" data-desc>${T('prepHint')}</p>`;
+        .join('')}</div><p class="tdesc" data-desc>${full ? T('towersFull').replace('{n}', Game.MAX_TOWERS) : T('prepHint')}</p>`;
     dock.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(iconCanvas(el.dataset.icon, +el.dataset.size || 30)));
     dock.querySelectorAll('[data-build]').forEach((el) => {
       const id = el.dataset.build;
@@ -431,6 +432,7 @@
     const keyHint = !matchMedia('(pointer: coarse)').matches;
     let action = '';
     if (t.evo) action = `<span class="muted">★ ${esc(L(evoDef.name))}</span>`;
+    else if (t.lv >= 5 && Game.evoCount() >= Game.MAX_EVOS) action = `<span class="muted">★ ${T('evosFull').replace('{n}', Game.MAX_EVOS)}</span>`;
     else if (t.lv >= 5) {
       const cost = Game.evolveCost(t);
       action = `<button type="button" class="btn primary evo-btn" data-up data-cost="${cost}">★ ${T('evolve')}: ${esc(L(evoDef.name))} 🖋${cost}${keyHint ? ' <kbd>U</kbd>' : ''}</button>`;
@@ -483,8 +485,9 @@
     const ink = Math.floor(G.ink);
     const el = dock.querySelector('[data-ink]');
     if (el) el.textContent = ink;
+    const full = G.towers.length >= Game.MAX_TOWERS;
     dock.querySelectorAll('[data-cost]').forEach((b) => {
-      b.disabled = +b.dataset.cost > ink;
+      b.disabled = +b.dataset.cost > ink || (full && b.dataset.build !== undefined);
     });
   }
   function updateStartBtn() {

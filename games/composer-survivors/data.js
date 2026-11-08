@@ -55,6 +55,7 @@
   // ---------- 曲 (ステージ) ----------
   // score: scores/*.js にある譜面の id (ないものは「準備中」)
   // openToAll: 最初からどの作曲家でも遊べる (作曲家本人がクリアしなくても)
+  // hpMul: 曲ごとの音符の硬さの調整 (ふつうは 1)
   const SONGS = [
     // ベートーヴェン
     {
@@ -94,7 +95,7 @@
     },
     // モーツァルト
     {
-      id: 'twinkle', composer: 'mozart', no: 1, stars: 1, score: 'twinkle', openToAll: true,
+      id: 'twinkle', composer: 'mozart', no: 1, stars: 1, score: 'twinkle', openToAll: true, hpMul: 1.05,
       title: { ja: 'きらきら星変奏曲', en: 'Twelve Variations on "Ah vous dirai-je, Maman"' },
       boss: { id: 'star', ja: 'きらきら星', en: 'The Twinkling Star', pattern: 'radial', color: '#f1c40f' },
       room: { id: 'salon', ja: 'パリのサロン', en: 'A Paris Salon', floor: 'marble', tint: '#d8cfc0' },
@@ -130,7 +131,7 @@
     },
     // ショパン
     {
-      id: 'nocturne', composer: 'chopin', no: 1, stars: 1, score: 'nocturne', openToAll: true,
+      id: 'nocturne', composer: 'chopin', no: 1, stars: 1, score: 'nocturne', openToAll: true, hpMul: 0.74,
       title: { ja: 'ノクターン第2番', en: 'Nocturne Op. 9 No. 2' },
       boss: { id: 'candle', ja: 'サロンの燭台', en: 'The Salon Candelabra', pattern: 'spread', color: '#e67e22' },
       room: { id: 'salonP', ja: 'パリのサロン', en: 'A Paris Salon', floor: 'carpet', tint: '#6b2737' },
@@ -186,7 +187,7 @@
     cello: {
       name: { ja: 'チェロ', en: 'Cello' }, reg: 'lo', kind: 'aura', cost: 70, evo: 'contrabass',
       desc: { ja: 'まわりの音符を遅くし、少しずつ削る', en: 'Slows and wears down notes around it' },
-      lv: (L) => ({ dmg: 3 + L * 2, cd: 0.5, range: 90 + L * 10, slow: 0.25 + L * 0.03 }),
+      lv: (L) => ({ dmg: 3 + L * 2, cd: 0.5, range: 90 + L * 10, slow: 0.2 + L * 0.02 }),
     },
     timpani: {
       name: { ja: 'ティンパニ', en: 'Timpani' }, reg: 'lo', kind: 'pulse', cost: 90, evo: 'thunder',
@@ -257,6 +258,8 @@
   const TEXT = {
     gameTitle: { ja: '作曲家サバイバー', en: 'Composer Survivors' },
     ink: { ja: 'インク', en: 'Ink' },
+    evosFull: { ja: '進化できるのは {n} 基まで (ほかの進化したタワーを売ると空く)', en: 'Only {n} towers can evolve (sell an evolved one to free a slot)' },
+    towersFull: { ja: 'タワーは {n} 基まで。売るか、強化・進化で強くしよう', en: 'Up to {n} towers. Sell one, or upgrade and evolve instead' },
     build: { ja: '建てる', en: 'Build' },
     upgrade: { ja: '強化', en: 'Upgrade' },
     evolve: { ja: '進化', en: 'Evolve' },

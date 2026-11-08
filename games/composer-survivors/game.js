@@ -23,12 +23,14 @@
   const BUILD_COL1 = COLS - 2;
   const P_LO = 33; // 譜面の一番下 (A1)
   const P_HI = 96; // 一番上 (C7)
-  const STAR_MUL = [0.6, 1, 1.4, 1.9, 2.5];
+  const STAR_MUL = [1.5, 1.8, 2.4, 3.1, 4];
   const HARD = { tempo: 1.15, hp: 2.2, leak: 1.5, gold: 1.6 };
-  const DYN_LEAK = [1, 1, 2, 2, 3, 4];
+  const DYN_LEAK = [3, 3, 4, 5, 6, 8];
   const HP_TABLE = [[0.125, 3], [0.25, 6], [0.5, 10], [1, 18], [2, 32], [4, 55], [8, 80]];
   const R_TABLE = [[0.125, 7], [0.25, 8], [0.5, 9.5], [1, 11], [2, 13], [4, 16], [8, 18]];
   const BLACK_KEYS = [1, 3, 6, 8, 10];
+  const MAX_TOWERS = 14; // 楽団の人数 (建てられるタワーの数) の上限
+  const MAX_EVOS = 3; // 進化できるタワー (ソリスト) の数の上限
 
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -173,7 +175,7 @@
     };
     computeStats();
     G.hp = G.stats.maxHp;
-    G.ink = 320 + 25 * (G.up.ink || 0);
+    G.ink = 260 + 25 * (G.up.ink || 0);
     // 音符のインク: 曲全体で、だいたい決まった量になるように配る
     let wsum = 0;
     for (const n of parsed.notes) {
@@ -181,7 +183,7 @@
       wsum += n.w;
     }
     const mins = parsed.lengthSec / 60;
-    G.inkPool = (1500 + 1100 * mins) * STAR_MUL[song.stars - 1] ** 0.5;
+    G.inkPool = (1100 + 900 * Math.pow(mins, 0.85)) * [1, 1.2, 1.4, 1.6, 1.8][song.stars - 1];
     G.inkPer = G.inkPool / wsum;
     markElites(parsed);
     G.boss = {
@@ -235,7 +237,10 @@
     const o = (src.p - 60) / 12;
     const hardMul = G.hard ? HARD.hp : 1;
     const accomp = src.melody ? 1 : 0.8;
-    let hp = logInterp(HP_TABLE, src.d) * clamp(Math.pow(1.35, -o), 0.4, 2.5) * STAR_MUL[G.song.stars - 1] * hardMul * accomp;
+    // 曲が進むほど音符は硬くなる (出だし ×0.75 → 最後 ×2.4)。タワーが育つのに合わせて、終盤まで気が抜けないように
+    // 長い曲はタワーが育ちきるので、3 分を過ぎたら経過した分数でもさらに硬くする (1 分ごとに +2)
+    const grow = 0.75 + 1.65 * clamp((src.sec || 0) / G.parsed.lengthSec, 0, 1) + 4.5 * Math.max(0, (src.sec || 0) / 60 - 3);
+    let hp = logInterp(HP_TABLE, src.d) * clamp(Math.pow(1.35, -o), 0.4, 2.5) * STAR_MUL[G.song.stars - 1] * (G.song.hpMul || 1) * hardMul * accomp * grow;
     let r = logInterp(R_TABLE, src.d);
     const mk = src.mk || '';
     const n = {
@@ -247,7 +252,7 @@
       col: pitchColor(src.p),
       melody: src.melody,
       v: src.v,
-      spd: clamp(65 * Math.pow(1.3, o), 32, 160),
+      spd: clamp(72 * Math.pow(1.3, o), 36, 175),
       kx: 0,
       flash: 0,
       slowT: 0,
@@ -283,11 +288,23 @@
     }
     n.hp = n.maxHp = hp;
     n.r = r;
+    if (G.sim) G.dbgHp = Math.max(G.dbgHp || 0, hp);
     n.leak = DYN_LEAK[n.v] * (G.hard ? HARD.leak : 1) * (n.fermata ? 2 : 1);
     n.ink = G.inkPer * (src.w || 1) * (n.elite ? 4 : 1);
     G.notes.push(n);
     G.boss.pulse = 1;
     return n;
+  }
+
+  // 押し戻しとしびれは、続けて受けるほど効きにくい (同じ音符をずっと止め続けられないように)
+  function knock(n, v) {
+    n.kx += v / (1 + (n.kbRes || 0));
+    n.kbRes = (n.kbRes || 0) + 1;
+  }
+  function stunNote(n, t) {
+    if ((n.stunImm || 0) > 0) return;
+    n.stunT = Math.max(n.stunT, t);
+    n.stunImm = t + 1.5;
   }
 
   function hitNote(n, dmg, reg) {
@@ -351,7 +368,7 @@
     return c >= BUILD_COL0 && c <= BUILD_COL1 && r >= 0 && r < ROWS && !G.grid.has(c + ',' + r);
   }
   function build(id, c, r) {
-    if (!G || !canBuildAt(c, r) || !towerUnlocked(id)) return false;
+    if (!G || !canBuildAt(c, r) || !towerUnlocked(id) || G.towers.length >= MAX_TOWERS) return false;
     const cost = buildCost(id);
     if (G.ink < cost) return false;
     G.ink -= cost;
@@ -362,11 +379,14 @@
     Synth.sfx('pick', { p: 79 });
     return t;
   }
+  function evoCount() {
+    return G.towers.filter((x) => x.evo).length;
+  }
   function upgrade(t) {
     if (!t || t.evo) return false;
     if (t.lv >= 5) {
       const cost = evolveCost(t);
-      if (G.ink < cost) return false;
+      if (G.ink < cost || evoCount() >= MAX_EVOS) return false;
       G.ink -= cost;
       t.spent += cost;
       t.evo = true;
@@ -443,7 +463,7 @@
       if (def.kind === 'aura') {
         // チェロ: まわりを遅くし、少しずつ削る
         const r = P.range * (t.evo ? 1.4 : 1);
-        const slow = Math.min(0.7, P.slow + (t.evo ? 0.15 : 0));
+        const slow = Math.min(0.4, P.slow + (t.evo ? 0.1 : 0));
         t.cdT -= dt;
         const tickNow = t.cdT <= 0;
         if (tickNow) t.cdT = P.cd;
@@ -463,7 +483,7 @@
           inRadius(t.x, t.y, P.range * G.stats.area * 1.25, (n) => {
             if (n === G.boss) return;
             n.slowT = 0.2;
-            n.slowF = Math.min(n.slowF, 0.8);
+            n.slowF = Math.min(n.slowF, 0.85);
           });
         }
         continue;
@@ -535,8 +555,8 @@
           inRadius(t.x, t.y, r, (n) => {
             if (n === G.boss) return hitBoss(P.dmg);
             hitNote(n, P.dmg, reg);
-            n.kx += P.kb * 4 / (1 + n.d * 0.3);
-            if (stun) n.stunT = Math.max(n.stunT, stun);
+            knock(n, P.kb * 4 / (1 + n.d * 0.3));
+            if (stun) stunNote(n, stun);
           });
         };
         pulse(P.range, t.evo ? 0.5 : 0);
@@ -563,7 +583,7 @@
             if (Math.abs(a) > half + 0.2) return;
             if (n === G.boss) return hitBoss(P.dmg * mul);
             hitNote(n, P.dmg * mul, reg);
-            n.kx += (P.kb * 4 * mul) / (1 + n.d * 0.3);
+            knock(n, (P.kb * 4 * mul) / (1 + n.d * 0.3));
           });
         };
         inRadius(t.x, t.y, P.range, (n) => {
@@ -745,6 +765,7 @@
     }
 
     // --- 音符 ---
+    if (G.sim) G.dbgAlive = Math.max(G.dbgAlive || 0, G.notes.length);
     for (const n of G.notes) updateNote(n, dt);
     G.notes = G.notes.filter((n) => !n.dead);
 
@@ -797,6 +818,8 @@
     n.slowT -= dt;
     if (n.slowT <= 0) n.slowF = 1;
     n.stunT -= dt;
+    n.stunImm = (n.stunImm || 0) - dt;
+    n.kbRes = Math.max(0, (n.kbRes || 0) - dt * 0.6);
     n.lastX = n.x;
     let sp = n.spd * n.slowF;
     if (n.stunT > 0) sp = 0;
@@ -827,7 +850,10 @@
     if (n.trill) n.y += Math.sin(n.t * 16 + n.phase) * 0.6;
     if (n.x - n.r < PODIUM_X) {
       n.dead = true;
-      if (!n.minion) G.leaked++;
+      if (!n.minion) {
+        G.leaked++;
+        if (G.sim) (G.dbgLeak = G.dbgLeak || []).push(Math.round(G.t));
+      }
       damagePodium(n.leak);
     }
   }
@@ -873,8 +899,8 @@
     G.bpm = bpm;
     const B = G.boss;
     B.shield = false;
-    B.maxHp = B.hp = 2000 * STAR_MUL[G.song.stars - 1] * (G.hard ? HARD.hp : 1);
-    B.spd = 20;
+    B.maxHp = B.hp = 3200 * STAR_MUL[G.song.stars - 1] * (G.hard ? HARD.hp : 1);
+    B.spd = 24;
     B.y = TOP + (ROWS * CELL) / 2;
     G.phase = 'boss';
     G.phaseT = 0;
@@ -1333,6 +1359,7 @@
       x += ctx.measureText(s).width + 16;
     };
     put('🖋 ' + Math.floor(G.ink), '#9ff3d0');
+    put('🎻 ' + G.towers.length + '/' + MAX_TOWERS, G.towers.length >= MAX_TOWERS ? '#ffb3b3' : '#cfc3ff');
     // 体力
     const hpw = Math.min(140, W * 0.18);
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
@@ -1398,7 +1425,7 @@
     const rows = G.botRows;
     const order = rows.map((w, r) => [w, r]).sort((a, b) => b[0] - a[0]);
     // 強化できるなら、音符の多い高さのタワーから
-    const up = G.towers.filter((t) => !t.evo && t.id !== 'baton').sort((a, b) => rows[b.r] / (b.lv + 1) - rows[a.r] / (a.lv + 1))[0];
+    const up = G.towers.filter((t) => !t.evo && t.id !== 'baton' && (t.lv < 5 || evoCount() < MAX_EVOS)).sort((a, b) => rows[b.r] / (b.lv + 1) - rows[a.r] / (a.lv + 1))[0];
     const towersInRow = (r) => G.towers.filter((t) => Math.abs(t.r - r) <= 1).length;
     // 建てる高さ: 音符の重さ ÷ (そこにあるタワー + 1)
     let bestR = order[0][1];
@@ -1414,7 +1441,7 @@
     const picks = { lo: ['cello', 'timpani', 'piano', 'organ'], hi: ['flute', 'violin', 'piano', 'harp'], mid: ['piano', 'harp', 'violin', 'cymbal', 'trumpet'] }[reg].filter(towerUnlocked);
     const id = G.towers.length >= 6 && !G.towers.some((t) => t.id === 'baton') ? 'baton' : picks[G.towers.length % picks.length];
     const upCost = up ? (up.lv >= 5 ? evolveCost(up) : upgradeCost(up)) : Infinity;
-    const wantUp = up && G.towers.length >= 12 && G.towers.length % 3 !== 0;
+    const wantUp = up && ((G.towers.length >= 12 && G.towers.length % 3 !== 0) || G.towers.length >= MAX_TOWERS);
     if (!wantUp && (G.towers.length < 4 || (G.ink >= buildCost(id) && (G.towers.length < 14 || upCost > G.ink)))) {
       if (G.ink < buildCost(id)) return;
       const cols = [8, 10, 6, 12, 4, 14, 9, 11, 7, 13, 5, 15, 3, 16, 17, 2];
@@ -1452,6 +1479,10 @@
     r.bossHp = Math.round(g.boss.hp);
     r.inkLeft = Math.round(g.ink);
     r.inkEarned = Math.round(g.inkEarned);
+    r.maxNoteHp = Math.round(g.dbgHp || 0);
+    r.leakTimes = (g.dbgLeak || []).join(',');
+    r.alivePeak = g.dbgAlive || 0;
+    r.towerDps = g.towers.map((t) => (t.P && t.P.dmg ? Math.round(t.P.dmg / (t.P.cd || 1)) : 0)).join(',');
     Synth.fake = false;
     G = null;
     return r;
@@ -1982,6 +2013,9 @@
     upgradeCost,
     evolveCost,
     towerUnlocked,
+    MAX_TOWERS,
+    MAX_EVOS,
+    evoCount,
     simulate,
     drawComposer,
     drawIcon,
