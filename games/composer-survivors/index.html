@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>作曲家サバイバー</title>
+  <meta name="description" content="楽譜の上を流れてくる曲の音符を、楽器のタワーで止めるタワーディフェンス。ベートーヴェン・モーツァルト・ショパンを指揮者に、名曲を最後まで守り切ろう。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css?v=21" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../" data-i18n="backToGames">‹ ゲーム一覧</a>
+      <h1 data-i18n="gameTitle">作曲家サバイバー</h1>
+      <div class="top-btns">
+        <select id="lang-btn" class="lang-select" aria-label="言語 / Language"></select>
+        <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止 / Pause" tabindex="-1" style="visibility: hidden">Ⅱ</button>
+      </div>
+    </header>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="ゲーム画面 / Game screen"></canvas>
+      <!-- タワーを建てる・強化するパネル (プレイを続けたまま) -->
+      <div class="lvl-dock" id="lvl-dock" hidden></div>
+      <button type="button" class="start-btn" id="start-btn" hidden data-i18n="startShow">▶ 開演</button>
+      <div class="overlay" id="overlay" hidden></div>
+    </div>
+
+    <section class="help" data-lang="ja">
+      <h2>遊び方</h2>
+      <p>楽譜の上で戦うタワーディフェンスです。<b>1 ステージ = 1 曲</b>。曲が流れると、<b>曲の中の音符がすべて敵</b>になって、鳴った瞬間に右端のボスのところから現れ、<b>自分の音の高さの位置を右から左へ</b>流れてきます。左端の指揮台に届くと体力が減り、0 になると負けです。譜面のマスに楽器のタワーを建てて、音符を止めましょう。</p>
+
+      <h3>遊び方の流れ</h3>
+      <ol>
+        <li><b>準備</b>: 曲が始まる前に、インクでタワーを置きます。開演前の画面の「音域」のグラフで、どの高さに音符が多いかを見ておきましょう。</li>
+        <li><b>演奏</b>: 「▶ 開演」で曲が始まります。音符を倒すとインクがもらえるので、プレイしながらタワーを増やし、強化します (ゲームも曲も止まりません)。</li>
+        <li><b>決戦</b>: 曲が終わって音符がいなくなると、ボスが主題を鳴らしながら譜面のまん中の高さを流れてきます。指揮台に届く前に倒せばクリアです。</li>
+      </ol>
+
+      <h3>音符の強さ</h3>
+      <ul>
+        <li><b>高い音</b>は速くて脆い。<b>低い音</b>は遅くて硬い。<b>短い音</b>は脆く、<b>長い音</b>は硬い。</li>
+        <li>色は音の高さ、形は音の長さ。金色に光る音符 (アクセント) は硬いかわりにインクが多い。スタッカートはぴょんと進み、フェルマータは中ボスです。</li>
+      </ul>
+
+      <h3>タワー</h3>
+      <p>空いているマスを押すとタワーを建てられ、タワーを押すと強化 (Lv1〜5)・進化 (Lv5 から)・売ることができます。タワーには得意な音域 (枠の色: 低音 = 橙・中音 = 青・高音 = 桃) があり、得意な音域の音符には 1.5 倍のダメージを与えます。<b>建てられるのは 14 基まで、進化できるのは 3 基まで</b>なので、どこに置き、どれを育てるかが大事です。曲が進むほど音符は硬くなります。</p>
+      <ul>
+        <li>ピアノ: どの音域にも効く基本のタワー。ヴァイオリン: 右へ水平の光線で、同じ高さの旋律をまとめて貫く。フルート: 射程が長く、速い高音に強い。</li>
+        <li>チェロ: まわりを遅くする。ティンパニ: 衝撃波で右へ押し戻す。ハープ: 縦の弦を通った音符すべてにダメージ。指揮棒: まわりのタワーを強化する。</li>
+        <li>トランペット・シンバル・パイプオルガンは、決まった曲をクリアすると使えるようになります。</li>
+      </ul>
+
+      <h3>作曲家と曲の解禁・練習室</h3>
+      <p>作曲家は指揮者として左端に立ち、得意なタワー (攻撃力 +25%・2 割引き) と個性があります。作曲家は最初、自分の曲だけを順番に遊べます。<b>作曲家本人が自分の曲をクリアすると、ほかの作曲家でも遊べるように</b>なります。プレイで手に入るダカット金貨で、「練習室」で作曲家ごとに強化できます。ノーマルをクリアするとハード「プレスト」(テンポが速い) が開きます。</p>
+
+      <h3>操作</h3>
+      <table>
+        <tbody>
+          <tr><th>共通</th><td>マスやタワーを押してパネルを開く。パネルの外の譜面を押すか ✕ で閉じる</td></tr>
+          <tr><th>パソコン</th><td>建てるパネルで 1〜9 キー、タワーのパネルで U (強化・進化)・S (売る)。Esc でパネルを閉じる・一時停止。準備中は Space で開演</td></tr>
+          <tr><th>スマホ</th><td>横向きがおすすめです。右上の Ⅱ で一時停止</td></tr>
+        </tbody>
+      </table>
+      <p class="note">作曲家ごとに 5 曲、全 15 曲 (ショパンの「木枯らし」は準備中)。曲は省略せず、楽譜どおりの音 (繰り返しも含む) をすべて敵にして、ピアノの録音で鳴らしています。</p>
+      <p class="note">楽譜: <a href="https://www.mutopiaproject.org/">Mutopia Project</a> より。「エリーゼのために」(Stelios Samelis 浄書、パブリックドメイン)、「きらきら星変奏曲」(ギター二重奏版、パブリックドメイン。曲の順番は原曲の形に戻し、6 分に収めるため繰り返しは省いた)、「ノクターン第 2 番」(Renato Biolcati Rinaldi 浄書、<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>。このゲームの音符データ scores/nocturne.js も同じライセンス)、「月光」第 3 楽章 (Chris Sawer・Stewart Holmes 浄書、<a href="https://creativecommons.org/licenses/by-sa/2.5/">CC BY-SA 2.5</a>。scores/moonlight3.js も同じライセンス)。ほかの曲はパブリックドメインの楽譜から。</p>
+      <p class="note">ピアノの音: Salamander Grand Piano V3 (Alexander Holm、<a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>)。このゲーム用に短く切って変換しています。</p>
+    </section>
+
+    <section class="help" data-lang="en" hidden>
+      <h2>How to Play</h2>
+      <p>A tower defense played on sheet music. <b>Each stage is one piece.</b> As the music plays, <b>every note of the piece becomes an enemy</b>: it appears at the right edge the moment it sounds and flows <b>right to left at its own pitch height</b>. Notes that reach the conductor's podium on the left cost HP; at 0 you lose. Build instrument towers on the score to stop them.</p>
+      <h3>Flow</h3>
+      <ol>
+        <li><b>Setup</b>: place towers with your starting ink. Check the range chart on the briefing screen to see which heights are busiest.</li>
+        <li><b>Performance</b>: press "▶ Start". Defeated notes give ink; build and upgrade while the music keeps playing.</li>
+        <li><b>Finale</b>: when the music ends and the notes are gone, the boss walks along the middle of the score playing its theme. Defeat it before it reaches the podium.</li>
+      </ol>
+      <h3>Notes</h3>
+      <ul>
+        <li><b>High notes</b> are fast and fragile, <b>low notes</b> slow and tough. <b>Short notes</b> are fragile, <b>long notes</b> tough.</li>
+        <li>Color shows pitch, shape shows length. Golden (accented) notes are tough but give lots of ink. Staccato notes hop, fermata notes are mini-bosses.</li>
+      </ul>
+      <h3>Towers</h3>
+      <p>Tap an empty square to build; tap a tower to upgrade (Lv1–5), evolve (from Lv5) or sell. Each tower has a favorite register (frame color: low = orange, mid = blue, high = pink) and deals 1.5× damage to notes in it. <b>You can have up to 14 towers and evolve only 3</b>, so choose where to build and what to grow. Notes get tougher as the piece goes on. The Violin fires a horizontal beam along its pitch line, the Harp strings a vertical line that damages everything crossing it, the Timpani knocks notes back, the Cello slows them, and the Baton boosts nearby towers.</p>
+      <h3>Composers, unlocking and the Practice Room</h3>
+      <p>Your composer conducts from the podium and has a favorite tower (+25% power, 20% off) and a trait. Each composer starts with their own pieces; <b>when a composer clears their own piece, every other composer can play it too</b>. Spend ducats in the Practice Room to upgrade each composer. Clearing Normal unlocks Hard "Presto".</p>
+      <h3>Controls</h3>
+      <table>
+        <tbody>
+          <tr><th>All</th><td>Tap a square or tower to open its panel; tap elsewhere on the score or ✕ to close.</td></tr>
+          <tr><th>PC</th><td>1–9 to pick a tower to build, U to upgrade/evolve, S to sell, Esc to close or pause, Space to start during setup.</td></tr>
+          <tr><th>Phone</th><td>Landscape recommended. Ⅱ at the top right pauses.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Five pieces per composer, 15 in all (Chopin's "Winter Wind" is coming soon). Every note of the score (repeats included) becomes an enemy, played with a recorded piano.</p>
+      <p class="note">Scores from the <a href="https://www.mutopiaproject.org/">Mutopia Project</a>: Für Elise (typeset by Stelios Samelis, public domain); Twelve Variations K. 265 (guitar-duo edition, public domain; Mozart's order restored, repeats omitted to fit six minutes); Nocturne Op. 9 No. 2 (typeset by Renato Biolcati Rinaldi, <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>; this game's note data in scores/nocturne.js is shared under the same license); Moonlight Sonata III (typeset by Chris Sawer and Stewart Holmes, <a href="https://creativecommons.org/licenses/by-sa/2.5/">CC BY-SA 2.5</a>; scores/moonlight3.js is shared under the same license). All other pieces come from public-domain editions.</p>
+      <p class="note">Piano sound: Salamander Grand Piano V3 by Alexander Holm (<a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>), trimmed and re-encoded for this game.</p>
+    </section>
+  </main>
+
+  <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
+  <script src="../origami-intro.js"></script>
+  <script>window.introDone = OrigamiIntro.play();</script>
+  <script src="audio.js?v=20"></script>
+  <script src="scores/elise.js?v=20"></script>
+  <script src="scores/minuet.js?v=20"></script>
+  <script src="scores/pathetique3.js?v=20"></script>
+  <script src="scores/fate.js?v=20"></script>
+  <script src="scores/moonlight3.js?v=20"></script>
+  <script src="scores/twinkle.js?v=20"></script>
+  <script src="scores/turkish.js?v=20"></script>
+  <script src="scores/nacht.js?v=20"></script>
+  <script src="scores/fantasia.js?v=20"></script>
+  <script src="scores/k457.js?v=20"></script>
+  <script src="scores/nocturne.js?v=20"></script>
+  <script src="scores/minute.js?v=20"></script>
+  <script src="scores/fantaisie.js?v=20"></script>
+  <script src="scores/revolution.js?v=20"></script>
+  <script src="data.js?v=21"></script>
+  <script src="game.js?v=20"></script>
+  <script src="ui.js?v=21"></script>
+</body>
+</html>
