@@ -78,7 +78,7 @@
       if (prev && cleared(cid, prev.id)) return { ok: true };
       return { ok: false, why: T('lockedPrev') };
     }
-    if (save.open[song.id]) return { ok: true };
+    if (save.open[song.id] || song.openToAll) return { ok: true };
     return { ok: false, why: T('lockedOwn').replace('{c}', L(composerById(song.composer).name)) };
   }
   function songClearedByAnyone(sid) {
@@ -557,7 +557,7 @@
         rank: !prev.rank || order.indexOf(res.rank) < order.indexOf(prev.rank) ? res.rank : prev.rank,
         time: prev.time ? Math.min(prev.time, res.time) : res.time,
       };
-      if (song.composer === composer.id && !save.open[song.id]) {
+      if (song.composer === composer.id && !save.open[song.id] && !song.openToAll) {
         save.open[song.id] = true;
         unlocks.push(T('unlockedFor').replace('{s}', L(song.title)));
       }

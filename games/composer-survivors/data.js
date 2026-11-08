@@ -54,6 +54,7 @@
 
   // ---------- 曲 (ステージ) ----------
   // score: scores/*.js にある譜面の id (ないものは「準備中」)
+  // openToAll: 最初からどの作曲家でも遊べる (作曲家本人がクリアしなくても)
   const SONGS = [
     // ベートーヴェン
     {
@@ -93,7 +94,7 @@
     },
     // モーツァルト
     {
-      id: 'twinkle', composer: 'mozart', no: 1, stars: 1, score: 'twinkle',
+      id: 'twinkle', composer: 'mozart', no: 1, stars: 1, score: 'twinkle', openToAll: true,
       title: { ja: 'きらきら星変奏曲', en: 'Twelve Variations on "Ah vous dirai-je, Maman"' },
       boss: { id: 'star', ja: 'きらきら星', en: 'The Twinkling Star', pattern: 'radial', color: '#f1c40f' },
       room: { id: 'salon', ja: 'パリのサロン', en: 'A Paris Salon', floor: 'marble', tint: '#d8cfc0' },
@@ -129,7 +130,7 @@
     },
     // ショパン
     {
-      id: 'nocturne', composer: 'chopin', no: 1, stars: 1, score: 'nocturne',
+      id: 'nocturne', composer: 'chopin', no: 1, stars: 1, score: 'nocturne', openToAll: true,
       title: { ja: 'ノクターン第2番', en: 'Nocturne Op. 9 No. 2' },
       boss: { id: 'candle', ja: 'サロンの燭台', en: 'The Salon Candelabra', pattern: 'spread', color: '#e67e22' },
       room: { id: 'salonP', ja: 'パリのサロン', en: 'A Paris Salon', floor: 'carpet', tint: '#6b2737' },
