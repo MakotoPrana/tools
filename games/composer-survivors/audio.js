@@ -204,7 +204,7 @@
     se: null,
     noise: null,
     voices: [],
-    maxVoices: 26,
+    maxVoices: 40,
     init() {
       if (this.ctx) return this.ctx;
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -226,9 +226,9 @@
       this.se.connect(this.master);
       // 部屋の響き (短い残響)
       const conv = ctx.createConvolver();
-      conv.buffer = this.makeReverb(1.6);
+      conv.buffer = this.makeReverb(2.6);
       const wet = ctx.createGain();
-      wet.gain.value = 0.22;
+      wet.gain.value = 0.3;
       conv.connect(wet);
       wet.connect(this.master);
       this.reverb = conv;
@@ -236,15 +236,32 @@
       const d = n.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       this.noise = n;
+      this.loadSamples();
       return ctx;
     },
+    // 響き (ホールの残響)。左右で別の雑音、はじめに少し間 (プリディレイ) と初期反射、
+    // 後ろの尾は高い音から先に消える (時間とともに低域通過を強める)
     makeReverb(sec) {
       const ctx = this.ctx;
-      const len = Math.floor(ctx.sampleRate * sec);
-      const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+      const sr = ctx.sampleRate;
+      const len = Math.floor(sr * sec);
+      const pre = Math.floor(sr * 0.018);
+      const buf = ctx.createBuffer(2, len, sr);
       for (let c = 0; c < 2; c++) {
         const d = buf.getChannelData(c);
-        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+        let lp = 0;
+        for (let i = pre; i < len; i++) {
+          const k = (i - pre) / (len - pre);
+          const env = Math.pow(1 - k, 2.2) * Math.exp(-k * 2.5);
+          const a = 0.55 + 0.4 * k; // 後ろほど丸く
+          lp = lp * a + (Math.random() * 2 - 1) * (1 - a);
+          d[i] = lp * env * 2.2;
+        }
+        // 初期反射
+        for (const [ms, g] of [[11, 0.5], [19, 0.35], [27, 0.3], [37, 0.22], [53, 0.16]]) {
+          const j = pre + Math.floor((sr * (ms + c * 3)) / 1000);
+          if (j < len) d[j] += g * (c ? -1 : 1);
+        }
       }
       return buf;
     },
@@ -263,6 +280,89 @@
       if (this.fake) return this.fakeTime;
       return this.ctx ? this.ctx.currentTime : 0;
     },
+    // ---------- ピアノの録音 (Salamander Grand Piano V3, Alexander Holm, CC BY 3.0) ----------
+    // samples/piano/ に、3 半音おき (C・D#・F#・A) の音を 2 つの強さ (v8・v13) で置いてある。
+    // 読みこみ終わるまでは合成の音で鳴らす
+    samples: { v8: new Map(), v13: new Map() },
+    samplesBase: 'samples/piano/',
+    samplesLoading: false,
+    samplesReady: false,
+    loadSamples() {
+      if (this.samplesLoading || !this.ctx || this.fake) return;
+      this.samplesLoading = true;
+      const names = ['C', 'Ds', 'Fs', 'A'];
+      const pcs = [0, 3, 6, 9];
+      const jobs = [];
+      for (let oct = 0; oct <= 8; oct++) {
+        for (let k = 0; k < 4; k++) {
+          const midi = (oct + 1) * 12 + pcs[k];
+          if (midi < 21 || midi > 108) continue;
+          for (const v of ['v8', 'v13']) {
+            const url = `${this.samplesBase}${names[k]}${oct}-${v}.mp3`;
+            jobs.push(
+              fetch(url)
+                .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+                .then((ab) => new Promise((res, rej) => this.ctx.decodeAudioData(ab, res, rej)))
+                .then((buf) => this.samples[v].set(midi, buf))
+                .catch(() => {}),
+            );
+          }
+        }
+      }
+      Promise.all(jobs).then(() => {
+        this.samplesReady = this.samples.v8.size > 20;
+      });
+    },
+    // 一番近い録音 (半音 2 つ以内)
+    nearestSample(layer, p) {
+      const m = this.samples[layer];
+      for (let d = 0; d <= 2; d++) {
+        if (m.has(p - d)) return [m.get(p - d), p - d];
+        if (m.has(p + d)) return [m.get(p + d), p + d];
+      }
+      return null;
+    },
+    playSample(p, t, dur, vel, dest) {
+      const ctx = this.ctx;
+      const layer = vel > 0.66 ? 'v13' : 'v8';
+      const hit = this.nearestSample(layer, p) || this.nearestSample(layer === 'v13' ? 'v8' : 'v13', p);
+      if (!hit) return false;
+      const [buf, sp] = hit;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.setValueAtTime(Math.pow(2, (p - sp) / 12), t);
+      const g = ctx.createGain();
+      // 強い層は少し抑え、弱い層は少し持ち上げて、強弱がなめらかにつながるように
+      const level = (layer === 'v13' ? 0.62 + vel * 0.38 : 0.45 + vel * 0.75) * 0.9;
+      g.gain.setValueAtTime(level, t);
+      // 鍵盤を離したら (音の長さが終わったら) ダンパーで消える。低い音ほどゆっくり
+      const off = t + Math.max(0.08, dur);
+      const rel = p < 48 ? 0.35 : p < 72 ? 0.22 : 0.15;
+      g.gain.setTargetAtTime(0, off, rel);
+      const end = Math.min(off + rel * 6, t + buf.duration / src.playbackRate.value);
+      src.connect(g);
+      // 高さで左右に少し振る (低音は左、高音は右。客席から見たピアノのように)
+      let node = g;
+      if (ctx.createStereoPanner) {
+        const pan = ctx.createStereoPanner();
+        pan.pan.value = Math.max(-0.6, Math.min(0.6, (p - 64) / 40));
+        g.connect(pan);
+        node = pan;
+      }
+      node.connect(dest);
+      const send = ctx.createGain();
+      send.gain.value = 0.45;
+      node.connect(send);
+      send.connect(this.reverb);
+      src.start(t);
+      src.stop(end + 0.05);
+      if (dest === this.bgm) {
+        this.addVoice(g, [src], end);
+        this.limit(t);
+      }
+      return true;
+    },
+
     // 鳴っている音を管理する (一時停止で消す・同時に鳴らす数を抑える)
     addVoice(g, nodes, end) {
       const v = { g, nodes, end };
@@ -315,6 +415,7 @@
       if (!this.ctx) return;
       const ctx = this.ctx;
       dest = dest || this.bgm;
+      if (inst === 'piano' && this.samplesReady && this.playSample(p, t, dur, vel, dest)) return;
       const f = mtof(p);
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, t);

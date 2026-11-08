@@ -1,0 +1,8 @@
+Salamander Grand Piano V3
+Author: Alexander Holm
+License: Creative Commons Attribution 3.0 (https://creativecommons.org/licenses/by/3.0/)
+Source: https://archive.org/details/SalamanderGrandPianoV3
+MP3 conversion: @audio-samples/piano-mp3-velocity8 / velocity13 by Jan Forst (https://github.com/darosh/samples-piano-mp3)
+
+このゲーム用に、長さを切りつめ (低音 6 秒・中音 4.5 秒・高音 3.2 秒、最後の 1 秒でフェードアウト)、96 kbps で変換し直した。
+ファイル名の s はシャープ (Ds4 = D#4)。v8 は中くらいの強さ、v13 は強い打鍵。
