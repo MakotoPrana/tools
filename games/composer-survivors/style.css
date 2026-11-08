@@ -258,7 +258,11 @@ body.playing .overlay { background: rgba(14, 10, 20, 0.82); }
 .fav { font-style: normal; color: var(--gold); }
 .tdesc { margin: 6px 4px 2px; font-size: 0.8rem; color: var(--panel-text); line-height: 1.4; }
 .tdesc .stat { color: var(--mint); font-weight: 700; }
-.tactions { justify-content: flex-start; margin: 6px 0 0; }
+.tactions { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; }
+.tact-main { flex: 1; display: flex; min-width: 0; }
+/* 売るボタンは強化ボタンから離して右端に。押すと赤くなり、もう一度で売る */
+.sell-btn { margin-left: auto; flex: none; background: transparent; border-color: #7a5060; color: #e8b8c4; }
+.sell-btn.armed { background: #7a1f30; border-color: #ff6b81; color: #fff; animation: pop 0.2s ease-out; }
 .tactions .btn { min-height: 36px; font-size: 0.85rem; }
 .tactions kbd, .evo-btn kbd { font: 700 0.62rem system-ui; background: rgba(0,0,0,0.3); border-radius: 3px; padding: 0 3px; }
 .lvl-dock { bottom: 8px; }

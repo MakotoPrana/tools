@@ -264,6 +264,7 @@
     upgrade: { ja: '強化', en: 'Upgrade' },
     evolve: { ja: '進化', en: 'Evolve' },
     sell: { ja: '売る', en: 'Sell' },
+    sellConfirm: { ja: 'もう一度押すと売る', en: 'Tap again to sell' },
     close: { ja: '閉じる', en: 'Close' },
     maxLv: { ja: '最大', en: 'Max' },
     prepHint: { ja: '譜面にタワーを置いてから「開演」。音符は右から左へ流れてくる', en: 'Place towers on the score, then start. Notes flow from right to left' },

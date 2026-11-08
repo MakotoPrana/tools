@@ -368,6 +368,7 @@
   const dock = document.getElementById('lvl-dock');
   const startBtn = document.getElementById('start-btn');
   let panel = null; // { kind: 'build', c, r } | { kind: 'tower', t }
+  let sellLockUntil = 0;
   const REG_LABEL = () => ({ lo: T('low'), mid: T('mid'), hi: T('high'), all: '' });
   function statLine(id, L1, evo) {
     const P = D.TOWERS[id].lv(L1);
@@ -447,11 +448,33 @@
     dock.innerHTML = `<div class="dhead"><span data-icon="${t.evo ? def.evo : t.id}" data-size="28"></span><b>${esc(name)}</b><span class="lvtag">${t.evo ? '★' : 'Lv' + t.lv}</span>
         <span class="muted">${T('ink')} 🖋 <span data-ink></span></span><button type="button" class="dclose" data-close aria-label="${T('close')}">✕</button></div>
       <p class="tdesc">${esc(t.evo ? L(evoDef.desc) : L(def.desc))}<br><span class="stat">${now}${next}</span>${!t.evo && t.lv < 5 ? `<br><span class="muted">Lv5 → ★ ${esc(L(evoDef.name))}: ${esc(L(evoDef.desc))}</span>` : ''}</p>
-      <div class="row tactions">${action}<button type="button" class="btn" data-sell>${T('sell')} +🖋${refund}${keyHint ? ' <kbd>S</kbd>' : ''}</button></div>`;
+      <div class="tactions"><div class="tact-main">${action}</div><button type="button" class="btn sell-btn" data-sell>${T('sell')} +🖋${refund}${keyHint ? ' <kbd>S</kbd>' : ''}</button></div>`;
     dock.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(iconCanvas(el.dataset.icon, +el.dataset.size || 28)));
     const upBtn = dock.querySelector('[data-up]');
-    if (upBtn) upBtn.addEventListener('click', () => Game.upgrade(t) && openTowerMenu(t));
-    dock.querySelector('[data-sell]').addEventListener('click', () => {
+    if (upBtn)
+      upBtn.addEventListener('click', () => {
+        if (Game.upgrade(t)) {
+          sellLockUntil = performance.now() + 900; // 強化を連打した勢いで売らないように
+          openTowerMenu(t);
+        }
+      });
+    // 売るのは 2 回押し (1 回目で「本当に売る?」、3 秒以内にもう一度)。強化・進化の直後 0.9 秒は押せない
+    const sellBtn = dock.querySelector('[data-sell]');
+    let armed = false;
+    sellBtn.addEventListener('click', () => {
+      if (performance.now() < sellLockUntil) return;
+      if (!armed) {
+        armed = true;
+        sellBtn.classList.add('armed');
+        sellBtn.innerHTML = `${T('sellConfirm')} +🖋${refund}`;
+        setTimeout(() => {
+          if (!sellBtn.isConnected) return;
+          armed = false;
+          sellBtn.classList.remove('armed');
+          sellBtn.innerHTML = `${T('sell')} +🖋${refund}${keyHint ? ' <kbd>S</kbd>' : ''}`;
+        }, 3000);
+        return;
+      }
       Game.sell(t);
       closeTowerPanel();
     });

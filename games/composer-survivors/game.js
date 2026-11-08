@@ -342,6 +342,7 @@
       const s = rand(60, 150);
       G.fx.push({ kind: 'spark', x: n.x, y: n.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 0, life: 0.3, col: n.col });
     }
+    if (G.fx.length < FX_CAP) G.fx.push({ kind: 'glyph', s: n.d >= 1.9 ? '𝅗𝅥' : n.d >= 0.9 ? '♩' : '♪', x: n.x, y: n.y, vx: rand(-15, 15), vy: -70, t: 0, life: 0.8, col: n.col, size: 12 + n.r * 0.8, noDamp: true });
     if (Math.random() < 0.3) Synth.sfx('pop', { p: scaleTone(n.p) });
   }
 
@@ -457,6 +458,7 @@
   function updateTowers(dt, newTick) {
     for (const t of G.towers) {
       t.flash = Math.max(0, t.flash - dt);
+      t.anim = Math.max(0, (t.anim || 0) - dt * 4);
       const def = D.TOWERS[t.id];
       const P = tParams(t);
       t.P = P;
@@ -510,10 +512,34 @@
       if (t.cdT <= 0) t.ready = true;
       if (!t.ready || !newTick) continue;
       if (fireTower(t, def, P)) {
+        fireFx(t, def);
         t.ready = false;
         t.cdT = P.cd * (t.evo ? 0.85 : 1);
       }
     }
+  }
+
+  // 撃った瞬間の演出: タワーが弾んで反動、楽器の口から音符が飛び出す
+  const FX_CAP = 520;
+  function fireFx(t, def) {
+    t.anim = 1;
+    if (t.aim === undefined) t.aim = 0;
+    if (G.fx.length > FX_CAP) return;
+    const col = { lo: '#e09a50', mid: '#7fc0ff', hi: '#ff9ad8', all: '#e8d6ff' }[def.reg];
+    for (let i = 0; i < (t.evo ? 3 : 2); i++) {
+      const a = t.aim + rand(-0.7, 0.7);
+      const sp = rand(50, 110);
+      G.fx.push({ kind: 'glyph', s: Math.random() < 0.5 ? '♪' : '♫', x: t.x + Math.cos(t.aim) * 20, y: t.y - 6 + Math.sin(t.aim) * 20, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30, t: 0, life: 0.6, col, size: 13 });
+    }
+  }
+  function sparkAt(x, y, col, n = 5, sp = 140) {
+    if (G.fx.length > FX_CAP) return;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = rand(sp * 0.4, sp);
+      G.fx.push({ kind: 'spark', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: rand(0.2, 0.35), col });
+    }
+    G.fx.push({ kind: 'star', x, y, t: 0, life: 0.18, col, r: 10 });
   }
 
   // 撃てたら true
@@ -526,6 +552,7 @@
         const cnt = 1 + (G.composer.id === 'chopin' ? 1 : 0);
         const per = t.evo ? 3 : 1;
         const base = Math.atan2(target.y - t.y, target.x - t.x);
+        t.aim = base;
         for (let i = 0; i < cnt; i++)
           for (let j = 0; j < per; j++) {
             const a = base + (i - (cnt - 1) / 2) * 0.12 + (j - (per - 1) / 2) * 0.1;
@@ -541,7 +568,10 @@
         for (const n of G.notes) if (!n.dead && n.x > t.x && n.x < t.x + len && Math.abs(n.y - t.y) < width / 2 + n.r) any = true;
         if (G.phase === 'boss' && G.boss.x > t.x && G.boss.x < t.x + len + G.boss.r && Math.abs(G.boss.y - t.y) < width / 2 + G.boss.r) any = true;
         if (!any) return false;
-        const beam = { kind: 'beam', x: t.x, y: t.y, len, width, t: 0, life: t.evo ? 0.6 : 0.18, tick: 0, dmg: P.dmg, reg, evo: t.evo };
+        t.aim = 0;
+        const beam = { kind: 'beam', x: t.x, y: t.y, len, width, t: 0, life: t.evo ? 0.6 : 0.22, tick: 0, dmg: P.dmg, reg, evo: t.evo };
+        // 光線にそって、きらきら
+        if (G.fx.length < FX_CAP) for (let i = 0; i < 6; i++) G.fx.push({ kind: 'spark', x: t.x + rand(20, len), y: t.y + rand(-width / 2, width / 2), vx: rand(-20, 60), vy: rand(-40, 40), t: 0, life: rand(0.2, 0.4), col: '#fff3c0' });
         beamHit(beam, P.dmg);
         G.fx.push(beam);
         return true;
@@ -550,8 +580,14 @@
         let any = false;
         inRadius(t.x, t.y, P.range, () => (any = true));
         if (!any) return false;
+        t.aim = -Math.PI / 2;
         const pulse = (r, stun) => {
           G.fx.push({ kind: 'ring', x: t.x, y: t.y, r, t: 0, life: 0.35, col: '#ffcf7a' });
+          G.fx.push({ kind: 'ring', x: t.x, y: t.y, r: r * 0.7, t: -0.08, life: 0.42, col: '#fff0c8' });
+          if (G.fx.length < FX_CAP) for (let i = 0; i < 10; i++) {
+            const a = (i / 10) * Math.PI * 2;
+            G.fx.push({ kind: 'spark', x: t.x + Math.cos(a) * 20, y: t.y + Math.sin(a) * 20, vx: Math.cos(a) * r * 2.2, vy: Math.sin(a) * r * 2.2, t: 0, life: 0.3, col: '#d8b080' });
+          }
           inRadius(t.x, t.y, r, (n) => {
             if (n === G.boss) return hitBoss(P.dmg);
             hitNote(n, P.dmg, reg);
@@ -567,6 +603,7 @@
       case 'homing': {
         const target = firstInRange(t.x, t.y, P.range);
         if (!target) return false;
+        t.aim = Math.atan2(target.y - t.y, target.x - t.x);
         for (let i = 0; i < P.count; i++) {
           const a = Math.PI + rand(-1.2, 1.2);
           G.shots.push({ kind: 'wind', x: t.x, y: t.y, vx: Math.cos(a) * 340, vy: Math.sin(a) * 340, sp: 340, r: 5, dmg: P.dmg, pierce: 1, t: 0, life: 2.5, hit: new Set(), reg, homing: true, range: P.range, home: t, charm: t.evo ? 0.12 : 0 });
@@ -590,6 +627,7 @@
           if (Math.abs(Math.atan2(n.y - t.y, n.x - t.x)) <= half + 0.2) any = true;
         });
         if (!any) return false;
+        t.aim = 0;
         hitCone(1);
         if (t.evo) G.timers.push({ t: 0.3, fn: () => hitCone(1) });
         return true;
@@ -597,6 +635,7 @@
       case 'splash': {
         const target = firstInRange(t.x, t.y, P.range);
         if (!target) return false;
+        t.aim = Math.atan2(target.y - t.y, target.x - t.x);
         const throwAt = (tx, ty) => G.shots.push({ kind: 'cymbal', x: t.x, y: t.y, tx, ty, t: 0, life: 0.35, sx: t.x, sy: t.y, dmg: P.dmg, splash: P.splash * (t.evo ? 1.5 : 1), reg, lob: true, spin: 0 });
         throwAt(target.x - 20, target.y);
         if (t.evo) {
@@ -614,6 +653,7 @@
         }
         if (!best && G.phase === 'boss' && dist2(G.boss.x, G.boss.y, t.x, t.y) < (P.range + G.boss.r) ** 2) best = G.boss;
         if (!best) return false;
+        t.aim = Math.atan2(best.y - t.y, best.x - t.x);
         const spots = [[best.x - best.spd * 0.35 * (best === G.boss ? 0 : 1), best.y]];
         if (t.evo) {
           const others = G.notes.filter((n) => !n.dead && n !== best && dist2(n.x, n.y, t.x, t.y) < P.range * P.range);
@@ -654,8 +694,11 @@
         s.x = s.sx + (s.tx - s.sx) * k;
         s.y = s.sy + (s.ty - s.sy) * k - Math.sin(k * Math.PI) * 40;
         s.spin += dt * 20;
+        (s.trail = s.trail || []).push(s.x, s.y);
+        if (s.trail.length > 12) s.trail.splice(0, 2);
         if (k >= 1) {
           G.fx.push({ kind: 'ring', x: s.tx, y: s.ty, r: s.splash, t: 0, life: 0.3, col: '#ffe066' });
+          sparkAt(s.tx, s.ty, '#ffe680', 8, 200);
           inRadius(s.tx, s.ty, s.splash, (n) => (n === G.boss ? hitBoss(s.dmg) : hitNote(n, s.dmg, s.reg)));
           s.t = 99;
           if (Math.random() < 0.3) Synth.sfx('cymbal');
@@ -688,10 +731,13 @@
       }
       s.x += s.vx * dt;
       s.y += s.vy * dt;
+      (s.trail = s.trail || []).push(s.x, s.y);
+      if (s.trail.length > 16) s.trail.splice(0, 2);
       for (const n of G.notes) {
         if (n.dead || s.t >= s.life || s.hit.has(n) || n.charm > 0) continue;
         if (dist2(n.x, n.y, s.x, s.y) < (s.r + n.r) ** 2) {
           s.hit.add(n);
+          sparkAt(s.x, s.y, s.kind === 'wind' ? '#bff6ff' : '#fff6d0', 4, 120);
           hitNote(n, s.dmg, s.reg);
           if (s.charm && !n.dead && !n.fermata && Math.random() < s.charm) n.charm = 4;
           if (s.burst) {
@@ -796,11 +842,13 @@
   function updateFx(dt) {
     for (const f of G.fx) {
       f.t += dt;
-      if (f.vx !== undefined) {
+      if (f.vx !== undefined && f.t >= 0) {
         f.x += f.vx * dt;
         f.y += f.vy * dt;
-        f.vx *= 0.92;
-        f.vy *= 0.92;
+        if (!f.noDamp) {
+          f.vx *= 0.92;
+          f.vy *= 0.92;
+        }
       }
     }
     G.fx = G.fx.filter((f) => f.t < f.life);
@@ -1064,6 +1112,41 @@
       ctx.fillStyle = 'rgba(255,255,255,0.08)';
       ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
     }
+    // 指揮棒が強化しているタワーへの金色の線 (拍に合わせて流れる)
+    for (const b of G.towers) {
+      if (b.id !== 'baton') continue;
+      const BP = D.TOWERS.baton.lv(b.lv);
+      const range = BP.range * G.stats.area * (b.evo ? 1.25 : 1);
+      ctx.save();
+      ctx.setLineDash([6, 8]);
+      ctx.lineDashOffset = -G.beat * 14;
+      ctx.strokeStyle = 'rgba(255, 210, 90, 0.55)';
+      ctx.lineWidth = 2;
+      for (const t of G.towers) {
+        if (t === b || t.id === 'baton' || dist2(b.x, b.y, t.x, t.y) > range * range) continue;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(t.x, t.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // チェロの波紋
+    for (const t of G.towers) {
+      if (D.TOWERS[t.id].kind !== 'aura') continue;
+      const P = t.P || tParams(t);
+      const R = P.range * (t.evo ? 1.4 : 1);
+      ctx.strokeStyle = 'rgba(150, 110, 230, 0.35)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 2; i++) {
+        const k = (G.t * 0.6 + i * 0.5) % 1;
+        ctx.globalAlpha = 1 - k;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, R * k, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
     for (const t of G.towers) drawTower(t);
     // チェロの範囲 (いつも薄く)
     for (const t of G.towers) {
@@ -1180,10 +1263,26 @@
 
   function drawTower(t) {
     const def = D.TOWERS[t.id];
+    const an = t.anim || 0;
+    const aim = t.aim || 0;
+    // 拍の頭でちょっと弾む (曲に合わせてタワーが揺れる)
+    const bf = G.phase === 'song' || G.phase === 'boss' ? Math.pow(Math.max(0, 1 - (G.beat % 1) * 3), 2) : 0;
     ctx.save();
-    ctx.translate(t.x, t.y);
-    const s = 1 + t.flash * 0.25;
-    ctx.scale(s, s);
+    // 撃った瞬間の反動 (狙った向きの反対へ)
+    ctx.translate(t.x - Math.cos(aim) * 5 * an, t.y - Math.sin(aim) * 5 * an);
+    // 発射の光
+    if (an > 0) {
+      ctx.save();
+      ctx.globalAlpha = an * 0.8;
+      ctx.strokeStyle = t.evo ? '#ffe88a' : regColor(def.reg);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 26 + (1 - an) * 16, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    const s = 1 + t.flash * 0.25 + bf * 0.05;
+    ctx.scale(s * (1 + an * 0.12), s * (1 - an * 0.1));
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.beginPath();
     ctx.ellipse(0, 22, 22, 6, 0, 0, Math.PI * 2);
@@ -1198,7 +1297,34 @@
     ctx.fillStyle = '#f4efe0';
     roundRect(-19, -21, 38, 34, 7);
     ctx.fill();
-    drawIcon(ctx, t.evo ? def.evo : t.id, 0, -4, 30);
+    // 楽器ごとの動き
+    ctx.save();
+    ctx.translate(0, -4);
+    switch (t.id) {
+      case 'baton': // 拍に合わせて指揮する
+        ctx.rotate(Math.sin(G.beat * Math.PI) * 0.45);
+        break;
+      case 'violin':
+      case 'cello': // 弓を弾く
+        ctx.rotate(-0.35 * an + Math.sin(G.t * 3 + t.c) * 0.04);
+        break;
+      case 'timpani': // 叩いて跳ねる
+        ctx.translate(0, -6 * an);
+        ctx.scale(1 + 0.15 * an, 1 - 0.15 * an);
+        break;
+      case 'flute':
+      case 'trumpet': // 吹く向きに傾く
+        ctx.rotate(Math.max(-0.5, Math.min(0.5, aim)) * 0.5 * an);
+        ctx.scale(1 + 0.12 * an, 1 + 0.12 * an);
+        break;
+      case 'harp':
+        ctx.rotate(Math.sin(G.t * 30) * 0.08 * Math.min(1, t.flash * 6));
+        break;
+      default:
+        ctx.scale(1 + 0.15 * an, 1 + 0.15 * an);
+    }
+    drawIcon(ctx, t.evo ? def.evo : t.id, 0, 0, 30);
+    ctx.restore();
     // レベル
     if (t.evo) {
       ctx.fillStyle = '#ffd84a';
@@ -1227,6 +1353,22 @@
   }
 
   function drawShot(s) {
+    // 尾を引く
+    if (s.trail && s.trail.length >= 4) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      const col = s.kind === 'wind' ? (s.charm ? '255,140,210' : '120,220,255') : s.kind === 'cymbal' ? '255,220,90' : '255,250,220';
+      for (let i = 2; i < s.trail.length; i += 2) {
+        const k = i / s.trail.length;
+        ctx.strokeStyle = `rgba(${col},${k * 0.6})`;
+        ctx.lineWidth = (s.kind === 'key' ? 6 : 4) * k;
+        ctx.beginPath();
+        ctx.moveTo(s.trail[i - 2], s.trail[i - 1]);
+        ctx.lineTo(s.trail[i], s.trail[i + 1]);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     ctx.save();
     ctx.translate(s.x, s.y);
     if (s.kind === 'key') {
@@ -1265,9 +1407,39 @@
   }
 
   function drawFx(f) {
+    if (f.t < 0) return;
     const k = f.t / f.life;
     ctx.save();
     switch (f.kind) {
+      case 'glyph':
+        ctx.globalAlpha = Math.min(1, (1 - k) * 1.6);
+        ctx.font = `bold ${Math.round(f.size)}px serif`;
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(30,20,40,0.6)';
+        ctx.strokeText(f.s, f.x, f.y);
+        ctx.fillStyle = f.col;
+        ctx.fillText(f.s, f.x, f.y);
+        break;
+      case 'star': {
+        ctx.globalAlpha = 1 - k;
+        ctx.translate(f.x, f.y);
+        ctx.rotate(k * 1.5);
+        ctx.fillStyle = '#fff';
+        const r = f.r * (0.6 + k);
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          const rr = i % 2 ? r * 0.35 : r;
+          ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = f.col;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+      }
       case 'spark':
       case 'petal':
         ctx.globalAlpha = 1 - k;
@@ -1301,7 +1473,9 @@
         ctx.stroke();
         break;
       case 'beam': {
-        ctx.globalAlpha = f.evo ? 0.85 : 1 - k;
+        ctx.globalAlpha = f.evo ? 0.85 * (0.85 + 0.15 * Math.sin(f.t * 60)) : 1 - k;
+        ctx.shadowColor = '#ffb050';
+        ctx.shadowBlur = 16;
         ctx.fillStyle = '#5a1f00';
         ctx.fillRect(f.x, f.y - f.width / 2 - 2, f.len, f.width + 4);
         const g = ctx.createLinearGradient(0, f.y - f.width / 2, 0, f.y + f.width / 2);
