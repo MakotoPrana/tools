@@ -299,6 +299,7 @@
   const TEXT = {
     gameTitle: { ja: '作曲家サバイバー', en: 'Composer Survivors' },
     ink: { ja: 'インク', en: 'Ink' },
+    testMode: { ja: 'テスト版: 全曲・ハード・全タワーを選べます', en: 'Test build: all pieces, Hard and all towers unlocked' },
     evosFull: { ja: '進化できるのは {n} 基まで (ほかの進化したタワーを売ると空く)', en: 'Only {n} towers can evolve (sell an evolved one to free a slot)' },
     towersFull: { ja: 'タワーは {n} 基まで。売るか、強化・進化で強くしよう', en: 'Up to {n} towers. Sell one, or upgrade and evolve instead' },
     build: { ja: '建てる', en: 'Build' },

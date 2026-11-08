@@ -70,8 +70,11 @@
   const ups = (cid) => (save.up[cid] = save.up[cid] || {});
 
   // 曲を遊べるか。理由も返す
+  // テスト版: index.html に <meta name="cps-test-unlock" content="1"> があると、全曲・ハード・全タワーを最初から選べる (公開版には入れない)
+  const TEST_UNLOCK = !!document.querySelector('meta[name="cps-test-unlock"][content="1"]');
   function songState(song, cid) {
     if (!song.score) return { ok: false, why: T('comingSoon'), soon: true };
+    if (TEST_UNLOCK) return { ok: true };
     if (song.composer === cid) {
       if (song.no === 1) return { ok: true };
       const prev = D.SONGS.find((s) => s.composer === cid && s.no === song.no - 1);
@@ -82,6 +85,7 @@
     return { ok: false, why: T('lockedOwn').replace('{c}', L(composerById(song.composer).name)) };
   }
   function songClearedByAnyone(sid) {
+    if (TEST_UNLOCK) return true;
     return Object.values(save.rec).some((r) => r[sid] && r[sid].n && r[sid].n.clear);
   }
   function completion() {
@@ -192,6 +196,7 @@
     show(`
       <div class="title-screen">
         <div class="title-notes" aria-hidden="true">♪ ♫ ♩ ♬</div>
+        ${TEST_UNLOCK ? `<p class="test-badge">${T('testMode')}</p>` : ''}
         <h1 class="game-title">${T('gameTitle')}</h1>
         <p class="subtitle">${T('subtitle')}</p>
         <div class="title-portraits">${D.COMPOSERS.map((c) => `<span data-portrait="${c.id}" data-size="72"></span>`).join('')}</div>
@@ -288,7 +293,7 @@
     const me = composerById(cid);
     const score = window.CS_SCORES[song.score];
     const parsed = window.CSAudio.parseScore(score);
-    const hardOk = cleared(cid, song.id, 'n');
+    const hardOk = TEST_UNLOCK || cleared(cid, song.id, 'n');
     if (!hardOk) save.mode = 'normal';
     const cnt = { lo: 0, mid: 0, hi: 0, s: 0, l: 0 };
     for (const n of parsed.notes) {
