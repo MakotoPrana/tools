@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>作曲家サバイバー</title>
+  <meta name="description" content="曲の音符がすべて敵になるヴァンサバ風アクション。ベートーヴェン・モーツァルト・ショパンを選び、楽器で迫り来る音符を倒して名曲を最後まで弾き切ろう。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../" data-i18n="backToGames">‹ ゲーム一覧</a>
+      <h1 data-i18n="gameTitle">作曲家サバイバー</h1>
+      <div class="top-btns">
+        <select id="lang-btn" class="lang-select" aria-label="言語 / Language"></select>
+        <button type="button" id="pause-btn" class="icon-btn" aria-label="一時停止 / Pause" tabindex="-1" style="visibility: hidden">Ⅱ</button>
+      </div>
+    </header>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="ゲーム画面 / Game screen"></canvas>
+      <div class="overlay" id="overlay" hidden></div>
+    </div>
+
+    <section class="help" data-lang="ja">
+      <h2>遊び方</h2>
+      <p>名曲の楽譜からあふれ出した音符を、楽器で倒していくゲームです。<b>1 ステージ = 1 曲</b>。曲が BGM として流れ、<b>曲の中の音符がすべて敵</b>になって、音が鳴る瞬間にボスの体から吐き出されます。操作するのは移動だけで、楽器は曲の拍に合わせて自動で攻撃します。倒した音符が落とす「インク」を拾うと経験値になり、レベルアップで楽器やパッシブを選んで強くなります。</p>
+
+      <h3>音符の強さ</h3>
+      <ul>
+        <li><b>高い音</b>は速くて脆い。<b>低い音</b>は遅くて硬い。</li>
+        <li><b>短い音</b> (16 分音符など) は脆い。<b>長い音</b> (全音符など) は硬い。</li>
+        <li>色は音の高さ (ド = 赤 … シ = 紫)。形は音の長さ。金色に光る音符 (アクセント) は強いかわりに「楽譜ケース」を落とします。</li>
+        <li>スタッカートの音符は突進し、トリルの音符は震えて攻撃が当たりにくくなります。フェルマータの音符は中ボスです。</li>
+      </ul>
+
+      <h3>ステージの流れ</h3>
+      <ol>
+        <li><b>演奏</b>: 曲が流れている間、ボスは「五線の結界」に守られていて、攻撃が効きません。ボスから離れて、出てくる音符を倒しましょう。画面の上の譜面プレビューで、これから来る音符が見えます。</li>
+        <li><b>終止</b>: 曲が終わったら、残った音符をすべて倒します。45 秒たっても残っていると「アンコール」で曲の最後がもう一度演奏され、音符が増えます。</li>
+        <li><b>決戦</b>: 音符をすべて倒すと結界が割れ、ボスを倒せるようになります。曲の主題がボスの弾になって飛んできます。ボスを倒せばクリアです。</li>
+      </ol>
+
+      <h3>楽器と進化</h3>
+      <p>楽器は 4 つ、パッシブも 4 つまで持てます。楽器には得意な音域があり、得意な音域の音符には 1.5 倍のダメージ (共鳴) を与えます。楽器をレベル 8 にして、対応するパッシブを持った状態で楽譜ケースを開けると進化します (例: ヴァイオリン + 松脂 → ストラディヴァリウス)。シンバル・トランペット・パイプオルガンは、決まった曲をクリアすると候補に出るようになります。</p>
+
+      <h3>曲の解禁と練習室</h3>
+      <p>作曲家は最初、自分の曲だけを順番に遊べます。<b>作曲家本人が自分の曲をクリアすると、その曲をほかの作曲家でも遊べるように</b>なります (共演すると金貨 1.2 倍。本人が弾くと攻撃力 +10%)。プレイで手に入るダカット金貨で、「練習室」で作曲家ごとに能力を強化できます (金貨は全員共通)。ノーマルをクリアするとハード「プレスト」(テンポが速い) が開きます。</p>
+
+      <h3>操作</h3>
+      <table>
+        <tbody>
+          <tr><th>パソコン</th><td>WASD / 矢印キーで移動。P / Esc で一時停止。レベルアップは 1〜4 キーでも選べます</td></tr>
+          <tr><th>スマホ</th><td>画面に指を置いて動かすと、その位置が中心のスティックになります。右上の Ⅱ で一時停止</td></tr>
+        </tbody>
+      </table>
+      <p class="note">いまは「エリーゼのために」「きらきら星変奏曲」「ノクターン第 2 番」の 3 曲が遊べます。ほかの曲は準備中です。曲はすべて著作権の切れた作品を、このゲームのために編曲して合成音で鳴らしています。</p>
+    </section>
+
+    <section class="help" data-lang="en" hidden>
+      <h2>How to Play</h2>
+      <p>Defeat the notes spilling out of famous scores with your instruments. <b>Each stage is one piece of music.</b> The piece plays as the soundtrack, and <b>every note in it is an enemy</b>, spat out of the boss the instant it sounds. You only move; your instruments attack automatically on the beat. Pick up the ink that defeated notes drop to gain experience, and choose instruments and passives as you level up.</p>
+      <h3>Note strength</h3>
+      <ul>
+        <li><b>High notes</b> are fast and fragile. <b>Low notes</b> are slow and tough.</li>
+        <li><b>Short notes</b> (sixteenths…) are fragile. <b>Long notes</b> (whole notes…) are tough.</li>
+        <li>Color shows pitch, shape shows length. Golden (accented) notes are tough but drop Score Cases.</li>
+        <li>Staccato notes dash, trilled notes wobble and are harder to hit, and fermata notes are mini-bosses.</li>
+      </ul>
+      <h3>Stage flow</h3>
+      <ol>
+        <li><b>Performance</b>: while the music plays, the boss is protected by a barrier of staff lines. Keep your distance and defeat the notes. The score preview at the top shows what's coming.</li>
+        <li><b>Coda</b>: when the music ends, defeat every remaining note. If any remain after 45 seconds, the boss plays an <b>encore</b> of the last bars and more notes appear.</li>
+        <li><b>Finale</b>: once every note is gone, the barrier shatters and you can fight the boss, whose bullets follow the piece's main theme.</li>
+      </ol>
+      <h3>Instruments and evolution</h3>
+      <p>Carry up to 4 instruments and 4 passives. Each instrument has a favorite register and deals 1.5× damage (resonance) to notes in it. Open a Score Case with a level-8 instrument and its matching passive to evolve it (e.g. Violin + Rosin → Stradivarius).</p>
+      <h3>Unlocking pieces and the Practice Room</h3>
+      <p>Each composer starts with their own pieces, in order. <b>When a composer clears their own piece, every other composer can play it too</b> (guest performances earn 1.2× ducats; playing your own piece gives +10% power). Spend ducats in the Practice Room to upgrade each composer (ducats are shared). Clearing Normal unlocks Hard "Presto" (faster tempo).</p>
+      <h3>Controls</h3>
+      <table>
+        <tbody>
+          <tr><th>PC</th><td>WASD / arrow keys to move. P / Esc to pause. Keys 1–4 pick level-up choices.</td></tr>
+          <tr><th>Phone</th><td>Touch and drag anywhere: where you touch becomes the center of the stick. Ⅱ at the top right pauses.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Playable now: Für Elise, the "Twinkle" Variations and Nocturne Op. 9 No. 2. More pieces are coming. All pieces are in the public domain, arranged for this game and played with synthesized instruments.</p>
+    </section>
+  </main>
+
+  <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
+  <script src="../origami-intro.js"></script>
+  <script>window.introDone = OrigamiIntro.play();</script>
+  <script src="audio.js?v=1"></script>
+  <script src="scores/elise.js?v=1"></script>
+  <script src="scores/twinkle.js?v=1"></script>
+  <script src="scores/nocturne.js?v=1"></script>
+  <script src="data.js?v=1"></script>
+  <script src="game.js?v=1"></script>
+  <script src="ui.js?v=1"></script>
+</body>
+</html>
