@@ -46,6 +46,12 @@
     }
     return table[table.length - 1][1];
   };
+  // 角度を -π〜π に (おかしな値は 0。くり返し引き算で止まらなくならないように)
+  const wrapAngle = (a) => {
+    if (!Number.isFinite(a)) return 0;
+    a = ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+    return a;
+  };
   const regOf = (p) => (p < 55 ? 'lo' : p >= 72 ? 'hi' : 'mid');
   const pitchColor = (p, l = 55) => `hsl(${((p % 12) * 30 + 350) % 360}, 75%, ${l}%)`;
   const pitchY = (p) => TOP + ((P_HI - clamp(p, P_LO, P_HI)) / (P_HI - P_LO)) * (ROWS * CELL);
@@ -186,8 +192,12 @@
     G.inkPool = (1100 + 900 * Math.pow(mins, 0.85)) * [1, 1.2, 1.4, 1.6, 1.8][song.stars - 1];
     G.inkPer = G.inkPool / wsum;
     markElites(parsed);
+    // 音符の多い曲ほど、1 つ 1 つを脆くする (1 秒あたりの硬さの合計は ♪ で決まるように)。基準はエリーゼ (約 6.7 音/秒)
+    const dens = parsed.notes.length / Math.max(30, parsed.lengthSec);
+    G.densHp = clamp(Math.pow(6.7 / dens, 0.9), 0.3, 1.2);
+    G.densLeak = clamp(Math.pow(6.7 / dens, 0.6), 0.4, 1);
     G.boss = {
-      x: SPAWN_X + 20,
+      x: FW - 44,
       y: TOP + (ROWS * CELL) / 2,
       r: 40,
       hp: 1,
@@ -240,7 +250,7 @@
     // 曲が進むほど音符は硬くなる (出だし ×0.75 → 最後 ×2.4)。タワーが育つのに合わせて、終盤まで気が抜けないように
     // 長い曲はタワーが育ちきるので、3 分を過ぎたら経過した分数でもさらに硬くする (1 分ごとに +2)
     const grow = 0.75 + 1.65 * clamp((src.sec || 0) / G.parsed.lengthSec, 0, 1) + 4.5 * Math.max(0, (src.sec || 0) / 60 - 3);
-    let hp = logInterp(HP_TABLE, src.d) * clamp(Math.pow(1.35, -o), 0.4, 2.5) * STAR_MUL[G.song.stars - 1] * (G.song.hpMul || 1) * hardMul * accomp * grow;
+    let hp = logInterp(HP_TABLE, src.d) * clamp(Math.pow(1.35, -o), 0.4, 2.5) * STAR_MUL[G.song.stars - 1] * (G.song.hpMul || 1) * G.densHp * hardMul * accomp * grow;
     let r = logInterp(R_TABLE, src.d);
     const mk = src.mk || '';
     const n = {
@@ -289,7 +299,7 @@
     n.hp = n.maxHp = hp;
     n.r = r;
     if (G.sim) G.dbgHp = Math.max(G.dbgHp || 0, hp);
-    n.leak = DYN_LEAK[n.v] * (G.hard ? HARD.leak : 1) * (n.fermata ? 2 : 1);
+    n.leak = DYN_LEAK[n.v] * (G.hard ? HARD.leak : 1) * (n.fermata ? 2 : 1) * G.densLeak;
     n.ink = G.inkPer * (src.w || 1) * (n.elite ? 4 : 1);
     G.notes.push(n);
     G.boss.pulse = 1;
@@ -711,8 +721,7 @@
           const a = Math.atan2(s.target.y - s.y, s.target.x - s.x);
           const cur = Math.atan2(s.vy, s.vx);
           let da = a - cur;
-          while (da > Math.PI) da -= Math.PI * 2;
-          while (da < -Math.PI) da += Math.PI * 2;
+          da = wrapAngle(da);
           const na = cur + clamp(da, -7 * dt, 7 * dt);
           s.vx = Math.cos(na) * s.sp;
           s.vy = Math.sin(na) * s.sp;
@@ -723,8 +732,7 @@
         const sp = Math.hypot(s.vx, s.vy);
         const cur = Math.atan2(s.vy, s.vx);
         let da = a - cur;
-        while (da > Math.PI) da -= Math.PI * 2;
-        while (da < -Math.PI) da += Math.PI * 2;
+        da = wrapAngle(da);
         const na = cur + clamp(da, -4 * dt, 4 * dt);
         s.vx = Math.cos(na) * sp;
         s.vy = Math.sin(na) * sp;
@@ -900,7 +908,11 @@
       n.dead = true;
       if (!n.minion) {
         G.leaked++;
-        if (G.sim) (G.dbgLeak = G.dbgLeak || []).push(Math.round(G.t));
+        if (G.sim) {
+          (G.dbgLeak = G.dbgLeak || []).push(Math.round(G.t) + ':' + n.p);
+          // 自動プレイ: 音符を通した高さに、次のタワーを建てやすくする (人が見て対応するのと同じ)
+          if (G.botRows) G.botRows[clamp(Math.floor((n.y - TOP) / CELL), 0, ROWS - 1)] += 40;
+        }
       }
       damagePodium(n.leak);
     }
@@ -936,11 +948,17 @@
     const th = sc.theme || { part: 0, from: 0, len: G.parsed.barLen * 4, tempo: 100 };
     const bpm = th.tempo * (G.hard ? HARD.tempo : 1);
     const { notes } = window.CSAudio.partNotes(sc.parts[th.part], 0, 'theme', sc.ppq);
-    const list = [];
-    for (const n of notes) {
-      if (n.t < th.from - 1e-6 || n.t >= th.from + th.len - 1e-6) continue;
-      list.push({ ...n, sec: ((n.t - th.from) * 60) / bpm, dur: (n.d * 60) / bpm, inst: sc.parts[th.part].inst, vol: 1 });
-    }
+    const pick = (from) => {
+      const out = [];
+      for (const n of notes) {
+        if (n.t < from - 1e-6 || n.t >= from + th.len - 1e-6) continue;
+        out.push({ ...n, sec: ((n.t - from) * 60) / bpm, dur: (n.d * 60) / bpm, inst: sc.parts[th.part].inst, vol: 1 });
+      }
+      return out;
+    };
+    let list = pick(th.from);
+    // 主題の範囲に音がない (右手が遅れて入る曲) ときは、そのパートの最初の音から
+    if (!list.length && notes.length) list = pick(Math.min(...notes.map((n) => n.t)));
     list.sort((a, b) => a.sec - b.sec);
     G.track.stop();
     G.btrack = new Track(list, { loopLen: (th.len * 60) / bpm });
@@ -1648,7 +1666,7 @@
         botThink();
       }
     }
-    const r = g.result || { timeout: true, phase: g.phase };
+    const r = g.result || { timeout: true, phase: g.phase, notesLeft: g.notes.length, sample: g.notes.slice(0, 3).map((n) => ({ x: Math.round(n.x), hp: Math.round(n.hp), spd: n.spd, slowF: n.slowF, stunT: n.stunT, kx: n.kx, charm: n.charm, minion: !!n.minion })), bossX: Math.round(g.boss.x), bossHp: Math.round(g.boss.hp) };
     r.towersList = g.towers.map((t) => t.id + t.lv + (t.evo ? '*' : '')).join(',');
     r.bossHp = Math.round(g.boss.hp);
     r.inkLeft = Math.round(g.ink);
@@ -1800,6 +1818,263 @@
     c.restore();
   }
 
+  // 追加のボスの絵。描いたら true
+  function drawBossExtra(def, b, hurt, face) {
+    const R = b.r;
+    const col = hurt ? '#ffffff' : def.color || '#888';
+    const outline = () => {
+      ctx.strokeStyle = 'rgba(20,10,20,0.85)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    };
+    const T2 = G.t;
+    switch (def.id) {
+      case 'dancer': {
+        // 宮廷の踊り子: 回るスカートと扇
+        ctx.save();
+        ctx.rotate(Math.sin(T2 * 2) * 0.12);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(0, -12);
+        for (let i = 0; i <= 10; i++) {
+          const a = Math.PI * (0.15 + 0.7 * (i / 10));
+          ctx.lineTo(Math.cos(a) * R * 1.1, R * 0.9 + Math.sin(T2 * 6 + i) * 3);
+        }
+        ctx.closePath();
+        ctx.fill();
+        outline();
+        ctx.fillStyle = '#f3dccb';
+        ctx.beginPath();
+        ctx.arc(0, -24, 11, 0, Math.PI * 2);
+        ctx.fill();
+        outline();
+        ctx.fillStyle = '#fff6fb';
+        ctx.beginPath();
+        ctx.arc(0, -36, 9, Math.PI, 0);
+        ctx.fill();
+        ctx.restore();
+        face(0, -24, 10);
+        return true;
+      }
+      case 'carriage': {
+        // 嵐の馬車: 箱と回る車輪
+        ctx.fillStyle = col;
+        ctx.fillRect(-R, -R * 0.7, R * 2, R * 1.1);
+        ctx.beginPath();
+        ctx.rect(-R, -R * 0.7, R * 2, R * 1.1);
+        outline();
+        ctx.fillStyle = '#ffe9a0';
+        ctx.fillRect(-R * 0.6, -R * 0.5, R * 0.5, R * 0.4);
+        ctx.fillRect(R * 0.1, -R * 0.5, R * 0.5, R * 0.4);
+        for (const x of [-R * 0.6, R * 0.6]) {
+          ctx.save();
+          ctx.translate(x, R * 0.5);
+          ctx.rotate(-T2 * 6);
+          ctx.strokeStyle = '#3a2a1a';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(0, 0, R * 0.32, 0, Math.PI * 2);
+          ctx.stroke();
+          for (let k = 0; k < 4; k++) {
+            ctx.rotate(Math.PI / 4);
+            ctx.beginPath();
+            ctx.moveTo(-R * 0.3, 0);
+            ctx.lineTo(R * 0.3, 0);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+        face(0, -R * 0.05, 12);
+        return true;
+      }
+      case 'door': {
+        // 運命の扉: 叩くたびに揺れる扉
+        const knock = b.pulse;
+        ctx.save();
+        ctx.translate(knock * 4, 0);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(-R * 0.75, R);
+        ctx.lineTo(-R * 0.75, -R * 0.6);
+        ctx.arc(0, -R * 0.6, R * 0.75, Math.PI, 0);
+        ctx.lineTo(R * 0.75, R);
+        ctx.closePath();
+        ctx.fill();
+        outline();
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 2;
+        for (const x of [-R * 0.25, R * 0.25]) {
+          ctx.beginPath();
+          ctx.moveTo(x, -R * 0.9);
+          ctx.lineTo(x, R);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = '#e8c35a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(R * 0.4, 0, 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        face(0, -R * 0.35, 12);
+        return true;
+      }
+      case 'moon': {
+        // 嵐の満月: 月と流れる雲
+        ctx.fillStyle = hurt ? '#fff' : '#f7ecb5';
+        ctx.shadowColor = '#fff3b0';
+        ctx.shadowBlur = 20;
+        ctx.beginPath();
+        ctx.arc(0, 0, R, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        outline();
+        ctx.fillStyle = 'rgba(150,130,80,0.35)';
+        for (const [x, y, r] of [[-12, -10, 7], [10, 8, 9], [14, -14, 5]]) {
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(60,60,90,0.75)';
+        const cx = Math.sin(T2 * 0.8) * 20;
+        ctx.beginPath();
+        ctx.ellipse(cx, R * 0.55, R * 0.9, R * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        face(0, 0, 16);
+        return true;
+      }
+      case 'band': {
+        // 軍楽隊長: 太鼓と羽根つきの帽子
+        ctx.fillStyle = col;
+        ctx.fillRect(-R * 0.55, -R * 0.4, R * 1.1, R * 1.2);
+        ctx.beginPath();
+        ctx.rect(-R * 0.55, -R * 0.4, R * 1.1, R * 1.2);
+        outline();
+        ctx.fillStyle = '#f2c9a0';
+        ctx.beginPath();
+        ctx.arc(0, -R * 0.62, 12, 0, Math.PI * 2);
+        ctx.fill();
+        outline();
+        ctx.fillStyle = '#1d1d2a';
+        ctx.fillRect(-11, -R * 1.25, 22, 18);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(8, -R * 1.3, 4, 10, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e6c04a';
+        ctx.beginPath();
+        ctx.ellipse(0, R * 0.45, R * 0.5, R * 0.18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        outline();
+        face(0, -R * 0.62, 11);
+        return true;
+      }
+      case 'quartet': {
+        // 真夜中の弦楽四重奏: 4 つの弦楽器が並んで揺れる
+        const xs = [-R * 0.75, -R * 0.25, R * 0.25, R * 0.75];
+        xs.forEach((x, k) => {
+          ctx.save();
+          ctx.translate(x, Math.sin(T2 * 3 + k) * 3);
+          ctx.rotate(Math.sin(T2 * 2 + k) * 0.1);
+          const big = k === 3 ? 1.35 : k === 2 ? 1.1 : 1;
+          ctx.fillStyle = hurt ? '#fff' : ['#b5581f', '#a85020', '#8a4519', '#6e3714'][k];
+          ctx.beginPath();
+          ctx.ellipse(0, 6 * big, 9 * big, 10 * big, 0, 0, Math.PI * 2);
+          ctx.ellipse(0, -8 * big, 7 * big, 8 * big, 0, 0, Math.PI * 2);
+          ctx.fill();
+          outline();
+          ctx.fillStyle = '#1a1a1a';
+          ctx.fillRect(-1.5, -26 * big, 3, 22 * big);
+          ctx.restore();
+        });
+        face(0, R * 0.75, 10);
+        return true;
+      }
+      case 'phantom':
+      case 'grey': {
+        // 幻影・灰色の使者: ゆらめく幽霊の形
+        ctx.save();
+        ctx.globalAlpha = def.id === 'phantom' ? 0.75 + Math.sin(T2 * 4) * 0.15 : 1;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(-R * 0.8, R);
+        ctx.lineTo(-R * 0.8, -R * 0.2);
+        ctx.arc(0, -R * 0.2, R * 0.8, Math.PI, 0);
+        ctx.lineTo(R * 0.8, R);
+        for (let i = 0; i <= 6; i++) ctx.lineTo(R * 0.8 - (i / 6) * R * 1.6, R + (i % 2 ? -8 : 0) + Math.sin(T2 * 5 + i) * 3);
+        ctx.closePath();
+        ctx.fill();
+        outline();
+        if (def.id === 'grey') {
+          // フードの影
+          ctx.fillStyle = 'rgba(20,20,30,0.75)';
+          ctx.beginPath();
+          ctx.ellipse(0, -R * 0.25, R * 0.45, R * 0.35, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#ffdf6e';
+          ctx.beginPath();
+          ctx.arc(-7, -R * 0.25, 3, 0, Math.PI * 2);
+          ctx.arc(7, -R * 0.25, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        if (def.id !== 'grey') face(0, -R * 0.2, 14);
+        return true;
+      }
+      case 'puppy': {
+        // 子犬: 自分のしっぽを追ってくるくる回る
+        ctx.save();
+        ctx.rotate(T2 * 2.5);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, R * 0.8, R * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+        outline();
+        ctx.beginPath();
+        ctx.arc(R * 0.75, -R * 0.15, R * 0.42, 0, Math.PI * 2);
+        ctx.fill();
+        outline();
+        ctx.fillStyle = '#8a5a2b';
+        ctx.beginPath();
+        ctx.ellipse(R * 0.62, -R * 0.5, 7, 12, -0.5, 0, Math.PI * 2);
+        ctx.ellipse(R * 0.98, -R * 0.45, 7, 12, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(-R * 0.75, 0);
+        ctx.quadraticCurveTo(-R * 1.1, -R * 0.4, -R * 0.9, -R * 0.6);
+        ctx.stroke();
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.arc(R * 0.82, -R * 0.2, 3, 0, Math.PI * 2);
+        ctx.arc(R * 1.1, -R * 0.1, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        return true;
+      }
+      case 'flame': {
+        // 革命の炎: ゆらめく炎
+        for (let k = 0; k < 3; k++) {
+          const sc = 1 - k * 0.28;
+          ctx.fillStyle = hurt ? '#fff' : ['#c0392b', '#e8542f', '#ffd166'][k];
+          ctx.beginPath();
+          ctx.moveTo(0, R * sc);
+          for (let i = 0; i <= 12; i++) {
+            const a = Math.PI * 2 * (i / 12);
+            const rr = R * sc * (0.8 + 0.25 * Math.sin(T2 * 9 + i * 1.7 + k));
+            ctx.lineTo(Math.sin(a) * rr * 0.8, Math.cos(a) * rr * (a > Math.PI * 0.5 && a < Math.PI * 1.5 ? 1.5 : 1));
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+        face(0, R * 0.2, 13);
+        return true;
+      }
+      default:
+        return false;
+    }
+  }
+
   function drawBoss(b) {
     const def = b.def;
     ctx.save();
@@ -1820,6 +2095,8 @@
       drawStar(ctx, 0, 0, b.r, 5);
       ctx.restore();
       face(0, 2, b.r * 0.5);
+    } else if (drawBossExtra(def, b, hurt, face)) {
+      // 追加のボス (drawBossExtra で描いた)
     } else if (def.id === 'candle') {
       ctx.fillStyle = '#5a3a10';
       ctx.fillRect(-6, -10, 12, 40);

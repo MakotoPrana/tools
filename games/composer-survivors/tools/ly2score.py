@@ -17,7 +17,7 @@ import re
 import sys
 from fractions import Fraction as F
 
-NOTE = {'c': 0, 'd': 2, 'e': 4, 'f': 5, 'g': 7, 'a': 9, 'b': 11}
+NOTE = {'c': 0, 'd': 2, 'e': 4, 'f': 5, 'g': 7, 'a': 9, 'b': 11, 'h': 11}
 DYN = {'ppp': 0, 'pp': 0, 'p': 1, 'mp': 2, 'mf': 3, 'f': 4, 'ff': 5, 'fff': 5}
 
 
@@ -78,6 +78,8 @@ def tokenize(s):
 
 
 LANG = {'name': 'nederlands'}
+IFEMIDI = {'use': 'print'}  # \\ifemidi { 演奏用 } { 印刷用 } のどちらを読むか
+BARCHECK = {'on': False}  # 小節線 | の位置を記録する (調べるとき用)
 MARKERS = []  # (\\fin などの名前, 拍)
 
 
@@ -87,6 +89,12 @@ def pitch_of(name, octs):
     base = name[0]
     acc = 0
     rest = name[1:]
+    if LANG['name'] == 'deutsch':
+        # ドイツ式: h = B、b = B♭ (heses = B𝄫)。ほかはオランダ式と同じ (cis, es, as …)
+        if name == 'b':
+            return 48 + 10 + 12 * (octs.count("'") - octs.count(','))
+        if base == 'h':
+            base = 'b'
     if LANG['name'] == 'english':
         while rest:
             if rest.startswith('sharp'):
@@ -120,7 +128,7 @@ def pitch_of(name, octs):
     return 48 + NOTE[base] + acc + 12 * oct_shift
 
 
-NOTE_RE = re.compile(r"^([a-g](?:is|es|sharp|flat|s|f|x)*)([',]*)!?\??(\d+\.*)?(?:\*(\d+)(?:/(\d+))?)?$")
+NOTE_RE = re.compile(r"^([a-h](?:is|es|sharp|flat|s|f|x)*)([',]*)!?\??(\d+\.*)?(?:\*(\d+)(?:/(\d+))?)?$")
 REST_RE = re.compile(r"^([rRs])(\d+\.*)?(?:\*(\d+)(?:/(\d+))?)?$")
 
 
@@ -285,6 +293,10 @@ def parse_music(toks, variables, rel_start=None):
                     t += d * scale
                 last_note = None
                 continue
+            if tok == '|':
+                if BARCHECK['on']:
+                    MARKERS.append(('|', t))
+                continue
             if tok == '~':
                 if last_note:
                     for n in last_note:
@@ -305,6 +317,26 @@ def parse_music(toks, variables, rel_start=None):
     # 強弱・記号など、音符のあとにつく命令
     def handle_command(cmd, t, scale, grace):
         name = cmd[1:]
+        if name == 'ifemidi' and IFEMIDI['use'] == 'midi':
+            # \\ifemidi { 演奏用 } { 印刷用 }: 演奏用のほうだけ読む
+            r = t
+            if p.peek() == '{':
+                p.next()
+                r = seq(t, scale, grace)
+            if p.peek() == '{':
+                p.block_raw()
+            return r
+        if name == 'ifemidi':
+            # 印刷用のほうを読む
+            if p.peek() == '{':
+                p.block_raw()
+            if p.peek() == '{':
+                p.next()
+                return seq(t, scale, grace)
+            return t
+        if name == 'fermataMarkup' and BARCHECK['on']:
+            MARKERS.append(('gp', t))
+            return None
         if name in ('fin', 'dcf', 'fine'):
             MARKERS.append((name, t))
             return None
@@ -340,10 +372,62 @@ def parse_music(toks, variables, rel_start=None):
             if p.peek() == '{':
                 p.next()
                 body_start = p.i
-                # まず 1 回読んで長さを測る
-            else:
-                body_start = p.i
-            return do_repeat(kind, count, body_start, t, scale, grace)
+                return do_repeat(kind, count, body_start, t, scale, grace)
+            # { } のない形 (\\repeat tremolo 8 d16 / \\repeat unfold 4 <c e>8 など): 次の音符か和音 1 つをくり返す
+            body = []
+            if p.peek() == '<':
+                while p.peek() not in (None, '>'):
+                    body.append(p.next())
+                body.append(p.next())
+                if p.peek() and re.match(r'^\d+\.*$', p.peek()):
+                    body.append(p.next())
+            elif p.peek() is not None:
+                body.append(p.next())
+            # 1 回だけ読み、写して並べる
+            save_t, save_i = p.t, p.i
+            p.t, p.i = list(body), 0
+            before = len(notes)
+            te = seq(t, scale, grace, end=None)
+            p.t, p.i = save_t, save_i
+            seg = notes[before:]
+            del notes[before:]
+            step = te - t
+            for k in range(count):
+                for n in seg:
+                    notes.append(dict(n, t=n['t'] + step * k))
+            return t + step * count
+        if name == 'afterGrace':
+            # \\afterGrace 主音 { 装飾音 }: 装飾音は主音の終わりぎわに、時間をとらずに
+            before = len(notes)
+            tok = p.next()
+            r = t
+            m = NOTE_RE.match(tok or '')
+            if m:
+                q = resolve(m.group(1), m.group(2))
+                d = dur_of(m.group(3), st['dur'])
+                if m.group(3):
+                    st['dur'] = d
+                add_note(t, d * scale, q, grace, 1)
+                r = t + d * scale
+            if p.peek() == '{':
+                p.next()
+                gb = len(notes)
+                seq(r, F(1), True)
+                gs = notes[gb:]
+                for j, n in enumerate(gs):
+                    n['t'] = r - F(1, 8) + F(1, 8) * j / max(1, len(gs))
+                    n['d'] = F(1, 8) / max(1, len(gs))
+                    n['mk'] += 'g'
+            return r
+        if name == 'scaleDurations':
+            # \\scaleDurations #'(2 . 3) { … }
+            arg = p.next() or ''
+            m = re.search(r'(\d+)\s*\.\s*(\d+)', arg)
+            ratio = F(int(m.group(1)), int(m.group(2))) if m else F(1)
+            if p.peek() == '{':
+                p.next()
+                return seq(t, scale * ratio, grace)
+            return None
         if name in ('tuplet', 'times'):
             frac = p.next()
             a, b = (int(x) for x in frac.split('/'))
@@ -360,6 +444,18 @@ def parse_music(toks, variables, rel_start=None):
             if p.peek() == '{':
                 p.next()
                 seq(t, F(1), True)
+            elif p.peek() == '<':
+                # 和音の装飾音: < … >8
+                sub = []
+                while p.peek() not in (None, '>'):
+                    sub.append(p.next())
+                sub.append(p.next())
+                if p.peek() and re.match(r'^\d+\.*$', p.peek()):
+                    sub.append(p.next())
+                save_t, save_i = p.t, p.i
+                p.t, p.i = sub, 0
+                seq(t, F(1), True, end=None)
+                p.t, p.i = save_t, save_i
             else:
                 tok = p.next()
                 m = NOTE_RE.match(tok)
@@ -433,14 +529,17 @@ def parse_music(toks, variables, rel_start=None):
                 p.next()
                 p.next()
             elif name == 'tempo':
-                # \tempo "文字" 4 = 72 / \tempo 4 = 72
+                # \tempo "文字" 4 = 72 / \tempo 4 = 72。速さは 4 分音符の bpm に直して記録する
                 if p.peek() and p.peek().startswith('"'):
                     p.next()
                 if p.peek() and re.match(r'^\d+\.*$', p.peek()):
-                    p.next()
+                    unit = dur_of(p.next(), F(1))
                     if p.peek() == '=':
                         p.next()
-                        p.next()
+                        v = p.next()
+                        m = re.match(r'^(\d+)', v or '')
+                        if m:
+                            MARKERS.append(('tempo', t, float(unit * int(m.group(1)))))
             elif name == 'markup':
                 p.skip_arg()
             elif name == 'mark' and p.peek() == '\\markup':
@@ -480,41 +579,37 @@ def parse_music(toks, variables, rel_start=None):
         return variables
 
     def do_repeat(kind, count, body_start, t, scale, grace):
-        # 本体を何回か読む。volta なら \alternative も
-        start_i = p.i
-        body_end_i = None
-        ends = t
-        times = count
-        # 本体の範囲をつかむ
-        p.i = start_i
+        """くり返し。本体と \\alternative は書かれた順に 1 回だけ読み (相対音高と省いた長さは
+        LilyPond と同じく書かれた順で決まる)、できた音符を写して並べる"""
+        before = len(notes)
         t_after = seq(t, scale, grace)
-        body_end_i = p.i
+        body = notes[before:]
+        del notes[before:]
+        blen = t_after - t
         alts = []
         if p.peek() == '\\alternative':
             p.next()
             p.next()  # {
             while p.peek() == '{':
-                alts.append(p.i)
-                p.block_raw()
+                p.next()
+                b2 = len(notes)
+                te = seq(F(0), scale, grace)
+                alts.append((notes[b2:], te))
+                del notes[b2:]
             p.next()  # }
-        after_all = p.i
-        if kind == 'unfold' or kind == 'volta' or kind == 'percent' or kind == 'tremolo':
-            pass
-        # 1 回目の本体はもう読んだ (t_after)
-        cur = t_after
+        cur = t
         n_alt = len(alts)
-        for k in range(times):
-            if k > 0:
-                p.i = start_i
-                cur = seq(cur, scale, grace)
+        for k in range(count):
+            for n in body:
+                notes.append(dict(n, t=n['t'] - t + cur))
+            cur += blen
             if n_alt:
                 # 回数より選択肢が少ないときは、最初の選択肢を繰り返す
-                idx = max(0, min(n_alt - 1, k - (times - n_alt)))
-                p.i = alts[idx] + 1
-                cur = seq(cur, scale, grace)
-        p.i = after_all
-        if kind == 'volta' and not n_alt and times == 1:
-            pass
+                idx = max(0, min(n_alt - 1, k - (count - n_alt)))
+                an, al = alts[idx]
+                for n in an:
+                    notes.append(dict(n, t=n['t'] + cur))
+                cur += al
         return cur
 
     def resolve(name, octs):
@@ -526,7 +621,7 @@ def parse_music(toks, variables, rel_start=None):
         cand_pc = pitch_of(name, '') - 48  # 0〜11 (+ 変化記号)
         prev_step = step_of(prev)
         steps = [0, 1, 2, 3, 4, 5, 6]
-        letter = 'cdefgab'.index(name[0])
+        letter = 'cdefgab'.index('b' if name[0] == 'h' else name[0])
         # 前の音の音名の段 (オクターブ込み)
         diff = letter - prev_step % 7
         if diff > 3:
@@ -589,7 +684,9 @@ def extract_block(src, start_pat):
 def read_variables(src):
     """name = { ... } / name = \\relative c' { ... } の形の変数"""
     out = {}
-    for m in re.finditer(r'^[ \t]*([A-Za-z]+)\s*=\s*(\\relative\s+[a-g][\',]*\s*|\\new\s+\w+\s*|\\transpose\s+\S+\s+\S+\s*)?\{', src, re.M):
+    # name = { … } のほか、name = \\new Voice = "x" \\relative c' { … } のように命令が前につくもの
+    pre_re = r'(?:\\(?:relative(?:\s+[a-h](?:is|es|sharp|flat|s|f|x)*[\',]*)?|new\s+\w+(?:\s*=\s*"[^"]*")?|context\s+\w+(?:\s*=\s*"[^"]*")?|transpose\s+\S+\s+\S+|fixed\s+\S+)\s*)*'
+    for m in re.finditer(r'^[ \t]*([A-Za-z]+)\s*=\s*(' + pre_re + r')\{', src, re.M):
         i = src.index('{', m.end() - 1)
         depth = 0
         for j in range(i, len(src)):

@@ -813,7 +813,8 @@
     const up = {};
     for (const u of D.UPGRADES) up[u.id] = Math.round(u.max * upF);
     const out = [];
-    for (let i = 0; i < n; i++) out.push(Game.simulate({ song, composer: comp, mode: qs.get('mode') || 'normal', up }));
+    const maxSec = +(qs.get('max') || 1500);
+    for (let i = 0; i < n; i++) out.push(Game.simulate({ song, composer: comp, mode: qs.get('mode') || 'normal', up }, maxSec));
     window.SIM_RESULT = out;
     document.title = 'SIM DONE';
     return;

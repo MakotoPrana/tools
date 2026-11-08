@@ -796,6 +796,7 @@
     // pos までに鳴った音符 (まだ出していないもの) を返す
     due(pos) {
       const out = [];
+      if (!this.notes.length) return out;
       for (let guard = 0; guard < 500; guard++) {
         if (this.di >= this.notes.length) {
           if (!this.loopLen) break;
@@ -811,6 +812,7 @@
     // これから dt 秒の間に出る音符 (譜面プレビュー用)。[音符, 出る時刻]
     upcoming(pos, dt) {
       const out = [];
+      if (!this.notes.length) return out;
       let i = this.di;
       let c = this.dc;
       for (let guard = 0; guard < 300; guard++) {
