@@ -45,7 +45,14 @@
     return table[table.length - 1][1];
   };
   const regOf = (p) => (p < 55 ? 'lo' : p >= 72 ? 'hi' : 'mid');
-  const pitchColor = (p, l = 55) => `hsl(${((p % 12) * 30 + 350) % 360}, 75%, ${l}%)`;
+  // 音符の色は強さ (曲の強さをかける前の硬さ) で: 白 → 青 → 緑 → 赤 → 紫 → 黒 の順に強い
+  const RANK_COLORS = ['#f4f1ea', '#4a90e2', '#3cc46a', '#e5484d', '#a15be6', '#141414'];
+  const RANK_EDGES = [5, 8, 14, 25, 50];
+  const rankOf = (base) => {
+    let i = 0;
+    while (i < RANK_EDGES.length && base >= RANK_EDGES[i]) i++;
+    return i;
+  };
 
   // ---------- 画面 ----------
   const canvas = document.getElementById('board');
@@ -309,7 +316,7 @@
       d: src.d,
       v: src.v,
       reg: regOf(src.p),
-      col: pitchColor(src.p),
+      col: '#fff',
       x: minion ? clamp(G.boss.x + (pitchX(src.p) - FW / 2) * 0.5, 30, FW - 30) : pitchX(src.p) + rand(-4, 4),
       y: minion ? G.boss.y + 50 : -24,
       vy: 100 * clamp(Math.pow(1.3, o), 0.5, 2.4),
@@ -344,6 +351,8 @@
       r = 5;
     }
     n.hp = n.maxHp = hp;
+    n.rank = rankOf(hp / (G.power * G.densHp * (minion ? 0.6 : 1)));
+    n.col = RANK_COLORS[n.rank];
     if (!minion) G.hpSum += hp;
     n.r = r;
     n.shoot = n.elite || n.fermata ? rand(0.8, 1.6) : 0;
@@ -371,7 +380,7 @@
     for (const o of G.options) G.exp[o.id] = (G.exp[o.id] || 0) + e * EXP_SHARE;
     for (const s of G.slots) G.exp[s.id] = (G.exp[s.id] || 0) + e * EXP_SHARE;
     if (!G.sim) {
-      burst(n.x, n.y, n.col, n.elite ? 16 : 6, n.elite ? 240 : 140, 0.4, n.elite ? 5 : 3);
+      burst(n.x, n.y, n.rank >= 5 ? '#9a9a9a' : n.col, n.elite ? 16 : 6, n.elite ? 240 : 140, 0.4, n.elite ? 5 : 3);
       if (Math.random() < 0.18) Synth.sfx('pop', { p: n.p + 12 });
     }
   }
@@ -1230,7 +1239,7 @@
     c.save();
     c.translate(x, y);
     const hollow = n.d >= 2;
-    const col = n.flash > 0 ? '#fff' : n.stun > 0 ? '#bfe8ff' : n.col;
+    const col = n.flash > 0 ? (n.rank === 0 ? '#ffd84a' : '#fff') : n.stun > 0 ? '#bfe8ff' : n.col;
     if (n.elite) {
       c.strokeStyle = '#ffd84a';
       c.lineWidth = 3;
@@ -1242,6 +1251,15 @@
       const up = n.p < 71;
       const sxx = up ? r * 0.85 : -r * 0.85;
       const syy = up ? -r * 3.2 : r * 3.2;
+      if (n.rank >= 5) {
+        // 黒い音符は暗い背景で見えるように、棒と旗に白いふち
+        c.strokeStyle = 'rgba(255,255,255,0.75)';
+        c.lineWidth = Math.max(2, r * 0.18) + 3;
+        c.beginPath();
+        c.moveTo(sxx, 0);
+        c.lineTo(sxx, syy);
+        c.stroke();
+      }
       c.strokeStyle = col;
       c.lineWidth = Math.max(2, r * 0.18);
       c.beginPath();
@@ -1263,14 +1281,19 @@
     if (hollow) {
       c.fillStyle = 'rgba(255,255,255,0.15)';
       c.fill();
+      if (n.rank >= 5) {
+        c.strokeStyle = 'rgba(255,255,255,0.75)';
+        c.lineWidth = Math.max(2.5, r * 0.3) + 3;
+        c.stroke();
+      }
       c.strokeStyle = col;
       c.lineWidth = Math.max(2.5, r * 0.3);
       c.stroke();
     } else {
       c.fillStyle = col;
       c.fill();
-      c.strokeStyle = 'rgba(0,0,0,0.45)';
-      c.lineWidth = 1.5;
+      c.strokeStyle = n.rank >= 4 ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.5)';
+      c.lineWidth = n.rank >= 4 ? 2.5 : 1.5;
       c.stroke();
     }
     c.restore();
