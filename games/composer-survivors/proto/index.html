@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex" />
+  <title>作曲家サバイバー 試作</title>
+  <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="proto.css?v=1" />
+</head>
+<body>
+  <main id="menu" class="menu">
+    <header>
+      <a class="back" href="../">‹ 作曲家サバイバー</a>
+      <h1>作曲家サバイバー <small>遊び方の試作</small></h1>
+      <p class="lead">同じ曲・同じ音符で、3 つの遊び方を比べる。遊んだあとに ★ とメモを残すと、下の表で比べられる（この端末だけに保存）。</p>
+    </header>
+    <section>
+      <h2>1. 遊び方</h2>
+      <div id="modes" class="modes"></div>
+    </section>
+    <section>
+      <h2>2. 曲</h2>
+      <div id="songs" class="songs"></div>
+    </section>
+    <section class="row">
+      <div>
+        <h2>3. 指揮者</h2>
+        <div id="comps" class="chips"></div>
+      </div>
+      <div>
+        <h2>4. 難しさ</h2>
+        <div id="diffs" class="chips"></div>
+      </div>
+    </section>
+    <button id="start" class="start" type="button">開演</button>
+    <section>
+      <h2>比べる</h2>
+      <div class="table-wrap"><table id="compare"></table></div>
+      <button id="clear-ratings" class="link" type="button">評価のメモを消す</button>
+    </section>
+  </main>
+
+  <div id="game" class="game" hidden>
+    <div class="hud">
+      <div class="hud-prog"><i id="hud-prog"></i></div>
+      <span id="hud-time"></span>
+      <span id="hud-hp" class="hp"></span>
+      <span id="hud-ink" class="ink"></span>
+      <span id="hud-kill"></span>
+      <span id="hud-extra"></span>
+      <button id="pause-btn" type="button" class="icon" aria-label="一時停止">Ⅱ</button>
+    </div>
+    <div class="stage"><canvas id="board"></canvas>
+      <div id="banner" class="banner" hidden></div>
+      <div id="hint" class="hint"></div>
+    </div>
+    <div id="bar" class="bar"></div>
+  </div>
+
+  <div id="pause" class="overlay" hidden>
+    <div class="card">
+      <h2>一時停止</h2>
+      <button id="resume" type="button" class="start">続ける</button>
+      <button id="quit" type="button" class="link">やめてメニューへ</button>
+    </div>
+  </div>
+
+  <div id="result" class="overlay" hidden>
+    <div class="card">
+      <h2 id="res-title"></h2>
+      <div id="res-stats" class="stats"></div>
+      <h3>この遊び方は楽しかった？</h3>
+      <div id="res-rate" class="rate" data-v="0"><button type="button">★</button><button type="button">★</button><button type="button">★</button><button type="button">★</button><button type="button">★</button></div>
+      <textarea id="res-memo" rows="3" placeholder="メモ（楽しかったところ・つまらなかったところ）"></textarea>
+      <div class="res-btns">
+        <button id="res-retry" type="button" class="start">もう一度</button>
+        <button id="res-menu" type="button" class="secondary">メニューへ</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../audio.js?v=22"></script>
+  <script src="../scores/elise.js?v=20"></script>
+  <script src="../scores/minuet.js?v=20"></script>
+  <script src="../scores/pathetique3.js?v=20"></script>
+  <script src="../scores/fate.js?v=20"></script>
+  <script src="../scores/moonlight3.js?v=20"></script>
+  <script src="../scores/twinkle.js?v=20"></script>
+  <script src="../scores/turkish.js?v=20"></script>
+  <script src="../scores/nacht.js?v=20"></script>
+  <script src="../scores/fantasia.js?v=20"></script>
+  <script src="../scores/k457.js?v=20"></script>
+  <script src="../scores/nocturne.js?v=20"></script>
+  <script src="../scores/minute.js?v=20"></script>
+  <script src="../scores/fantaisie.js?v=20"></script>
+  <script src="../scores/revolution.js?v=20"></script>
+  <script src="../scores/winterwind.js?v=22"></script>
+  <script src="../data.js?v=22"></script>
+  <script src="common.js?v=1"></script>
+  <script src="lane.js?v=1"></script>
+  <script src="topdown.js?v=1"></script>
+  <script src="shooter.js?v=1"></script>
+  <script>if (!Proto.runSimFromUrl()) Proto.initUI();</script>
+</body>
+</html>
