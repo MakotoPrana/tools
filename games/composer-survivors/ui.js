@@ -224,38 +224,28 @@
 
   // ---------- タイトル ----------
   function titleScreen() {
-    const cps = D.COMPOSERS.map((c) => {
-      const open = compOpen(c);
-      return `<button type="button" class="comp-chip ${c.id === save.comp ? 'on' : ''}" data-comp="${c.id}" ${open ? '' : 'disabled'} title="${esc(open ? L(c.trait) : T('unlockComposer', { b: L(D.BOOKS.find((b) => b.id === c.unlock).name) }))}">
-        <span data-portrait="${c.id}" data-size="52" class="${open ? '' : 'dim'}"></span><span>${open ? esc(L(c.name)) : '？'}</span></button>`;
-    }).join('');
-    const cp = comp();
     show(`
       <div class="title-screen">
+        <p class="orn">❦</p>
         <h1 class="logo">${T('gameTitle')}</h1>
+        <p class="logo-en">Composer Survivors</p>
+        <p class="orn-line"><span></span>♪<span></span></p>
         <p class="sub">${T('subtitle')}</p>
         ${TEST_UNLOCK ? `<p class="test-badge">${T('testMode')}</p>` : ''}
         <div class="coins big">🪙 ${fmt(save.coins)}</div>
-        <div class="comp-row">${cps}</div>
-        <p class="trait"><b>${esc(L(cp.name))}</b> — ${esc(L(cp.trait))}</p>
         <div class="menu-btns">
-          <button type="button" class="primary" data-go="books">${T('play')}</button>
+          <button type="button" class="primary grand" data-go="start">${T('play')}</button>
           <button type="button" data-go="practice">${T('practice')}</button>
           <button type="button" data-go="shop">${T('shop')}</button>
           <button type="button" data-go="settings">${T('settings')}</button>
           ${TEST_UNLOCK ? `<button type="button" data-go="testcoins">${T('testCoins')}</button>` : ''}
         </div>
+        <p class="note bgm-note">${T('titleBgm')}</p>
       </div>`);
-    fillIcons();
-    on('[data-comp]', 'click', (el) => {
-      save.comp = el.dataset.comp;
-      persist();
-      titleScreen();
-    });
     on('[data-go]', 'click', (el) => {
       unlockAudio();
       const g = el.dataset.go;
-      if (g === 'books') booksScreen();
+      if (g === 'start') composerScreen();
       if (g === 'practice') practiceScreen(save.comp);
       if (g === 'shop') shopScreen();
       if (g === 'settings') settingsScreen();
@@ -265,6 +255,28 @@
         titleScreen();
       }
     });
+  }
+
+  // ---------- 作曲家 ----------
+  function composerScreen() {
+    const cards = D.COMPOSERS.map((c) => {
+      const open = compOpen(c);
+      return `<button type="button" class="comp-card ${c.id === save.comp ? 'on' : ''}" data-comp="${c.id}" ${open ? '' : 'disabled'}>
+        <span data-portrait="${c.id}" data-size="72" class="${open ? '' : 'dim'}"></span>
+        <b>${open ? esc(L(c.name)) : '？'}</b>
+        <small>${esc(open ? L(c.trait) : T('unlockComposer', { b: L(D.BOOKS.find((b) => b.id === c.unlock).name) }))}</small>
+      </button>`;
+    }).join('');
+    show(`${head(T('chooseComposer'))}<div class="comp-grid">${cards}</div>
+      <div class="next-row"><button type="button" class="primary grand" data-nextc>${T('next')}</button></div>`, titleScreen);
+    fillIcons();
+    on('[data-comp]', 'click', (el) => {
+      save.comp = el.dataset.comp;
+      persist();
+      overlay.querySelectorAll('[data-comp]').forEach((b) => b.classList.toggle('on', b.dataset.comp === save.comp));
+    });
+    on('[data-comp]', 'dblclick', () => booksScreen());
+    on('[data-nextc]', 'click', () => booksScreen());
   }
 
   // ---------- 曲集 ----------
@@ -278,12 +290,12 @@
         <span class="book-sub">${open ? `${T('cleared')} ${done}/${songs.length}` : '🔒 ' + esc(bookLockText(b))}</span>
       </button>`;
     }).join('');
-    show(`${head(T('play'))}<div class="books">${cards}</div>`, titleScreen);
+    show(`${head(T('chooseBook'))}<p class="note">${esc(L(comp().name))} — ${esc(L(comp().trait))}</p><div class="books">${cards}</div>`, composerScreen);
     on('[data-book]', 'click', (el) => songsScreen(el.dataset.book));
   }
 
   // ---------- 曲 ----------
-  function songsScreen(bookId, openSong) {
+  function songsScreen(bookId) {
     save.lastBook = bookId;
     persist();
     const book = D.BOOKS.find((b) => b.id === bookId);
@@ -291,25 +303,28 @@
     const items = songs.map((s) => {
       const open = songOpen(s) && window.CS_SCORES[s.score];
       const full = fullCleared(s);
-      return `<button type="button" class="song ${open ? '' : 'locked'} ${openSong === s.id ? 'on' : ''}" data-song="${s.id}" ${open ? '' : 'disabled'}>
+      let meta = '';
+      try {
+        const P = GM.parsedOf(s);
+        meta = `${mmss(P.lengthSec)} ・ ${T('notes')} ${P.notes.length}`;
+      } catch (e) {
+        meta = '';
+      }
+      return `<button type="button" class="song ${open ? '' : 'locked'}" data-song="${s.id}" ${open ? '' : 'disabled'}>
         <span class="song-no">${s.no}</span><span class="song-title">${esc(L(s.title))}</span>
-        <span class="song-meta">${'♪'.repeat(s.no)} ${full ? '✓' : ''} ${open ? '' : '🔒'}</span></button>`;
+        <span class="song-meta">${'♪'.repeat(s.no)} ・ ${meta} ${full ? ' ・ ✓' : ''} ${open ? '' : ' ・ 🔒 ' + esc(T('unlockSong'))}</span></button>`;
     }).join('');
-    show(`${head(L(book.name))}<div class="songs-wrap"><div class="songs">${items}</div><div class="song-detail" id="song-detail"></div></div>`, booksScreen);
-    on('[data-song]', 'click', (el) => songDetail(el.dataset.song));
-    const first = openSong || (songs.find((s) => songOpen(s) && !fullCleared(s)) || songs.filter(songOpen).pop() || songs[0]).id;
-    if (songOpen(D.SONGS.find((s) => s.id === first))) songDetail(first);
+    show(`${head(L(book.name))}<p class="note">${T('chooseSong')}</p><div class="songs">${items}</div>`, booksScreen);
+    on('[data-song]', 'click', (el) => partsScreen(el.dataset.song));
   }
-  function songDetail(songId) {
+  // ---------- パート ----------
+  function partsScreen(songId) {
     const s = D.SONGS.find((x) => x.id === songId);
-    overlay.querySelectorAll('[data-song]').forEach((el) => el.classList.toggle('on', el.dataset.song === songId));
-    const el = overlay.querySelector('#song-detail');
-    if (!el) return;
     let parsed;
     try {
       parsed = GM.parsedOf(s);
     } catch (e) {
-      el.innerHTML = `<p>${esc(String(e))}</p>`;
+      show(`${head(L(s.title))}<p>${esc(String(e))}</p>`, () => songsScreen(s.book));
       return;
     }
     const stages = [{ part: 0, label: T('full'), sub: mmss(parsed.lengthSec) + ' ・ ' + T('boss') + ': ' + esc(L(s.boss)) }].concat(
@@ -326,18 +341,18 @@
         return `<div class="stage-row ${st.part === 0 ? 'full' : ''}"><div class="stage-name"><b>${esc(st.label)}</b><small>${st.sub}</small></div><div class="tiers">${tiers}</div></div>`;
       })
       .join('');
-    el.innerHTML = `
-      <h3>${esc(L(s.title))}</h3>
-      <p class="meta">${T('notes')} ${parsed.notes.length} ・ ${T('length')} ${mmss(parsed.lengthSec)}</p>
-      <p class="trivia">${esc(L(s.trivia))}</p>
-      <div class="stages">${rows}</div>
-      <p class="note">${T('bossOnlyFull')}</p>`;
-    el.querySelectorAll('[data-play]').forEach((b) =>
-      b.addEventListener('click', () => {
-        const [part, tier] = b.dataset.play.split(':').map(Number);
-        startStage(s, part, tier);
-      }),
-    );
+    show(`${head(L(s.title))}
+      <div class="song-detail">
+        <p class="meta">${'♪'.repeat(s.no)} ・ ${T('notes')} ${parsed.notes.length} ・ ${T('length')} ${mmss(parsed.lengthSec)}</p>
+        <p class="trivia">${esc(L(s.trivia))}</p>
+        <p class="note">${T('choosePart')}</p>
+        <div class="stages">${rows}</div>
+        <p class="note">${T('bossOnlyFull')}</p>
+      </div>`, () => songsScreen(s.book));
+    on('[data-play]', 'click', (el) => {
+      const [part, tier] = el.dataset.play.split(':').map(Number);
+      startStage(s, part, tier);
+    });
   }
 
   // ---------- 練習室 ----------
@@ -529,8 +544,30 @@
     Synth.init();
     Synth.resume();
     Synth.setVolumes(save.settings.bgm, save.settings.se);
+    menuMusic(true);
   }
+  // タイトルとメニューの曲 (サティ「ジムノペディ第 1 番」を小さめに繰り返す)。遊んでいる間は止める
+  let menuTrack = null;
+  function menuMusic(on) {
+    if (on && playing) return;
+    if (!on) {
+      if (menuTrack) menuTrack.stop();
+      menuTrack = null;
+      return;
+    }
+    if (menuTrack || !Synth.ctx) return;
+    const song = D.SONGS.find((x) => x.id === 'gymnopedie');
+    if (!song || !window.CS_SCORES[song.score]) return;
+    const P = GM.parsedOf(song);
+    const notes = P.notes.map((n) => ({ ...n, velMul: 0.55 }));
+    menuTrack = new window.CSAudio.Track(notes, { loopLen: P.lengthSec + 3 });
+    menuTrack.start(0, 0.5);
+  }
+  document.addEventListener('pointerdown', () => {
+    if (!playing) unlockAudio();
+  });
   function startStage(song, part, tier) {
+    menuMusic(false);
     unlockAudio();
     hide();
     current = { song, part, tier };
@@ -625,7 +662,10 @@
     const newComps = D.COMPOSERS.filter((c) => compOpen(c) && !before.comps.includes(c.id));
     if (r.win) stageTrack.clear({ mode: D.TIERS[r.tier].id, character: r.comp });
     else stageTrack.fail({ mode: D.TIERS[r.tier].id, character: r.comp, progress_pct: Math.round(r.prog * 100) });
-    setTimeout(() => resultScreen(r, s, newBooks, newComps), 900);
+    setTimeout(() => {
+      resultScreen(r, s, newBooks, newComps);
+      setTimeout(() => menuMusic(true), 2500);
+    }, 900);
   }
   function resultScreen(r, s, newBooks, newComps) {
     document.body.classList.remove('playing');
@@ -658,7 +698,7 @@
     on('[data-r]', 'click', (el) => {
       const g = el.dataset.r;
       if (g === 'retry') startStage(s, r.part, r.tier);
-      if (g === 'songs') songsScreen(s.book, s.id);
+      if (g === 'songs') partsScreen(s.id);
       if (g === 'practice') practiceScreen(save.comp);
     });
   }
@@ -684,12 +724,13 @@
         GM.quit();
         playing = false;
         paused = false;
+        menuMusic(true);
         document.body.classList.remove('playing');
         pauseBtn.style.visibility = 'hidden';
         langSel.style.visibility = 'visible';
         bar.innerHTML = '';
         hud.innerHTML = '';
-        songsScreen(current.song.book, current.song.id);
+        partsScreen(current.song.id);
       }
     });
   }

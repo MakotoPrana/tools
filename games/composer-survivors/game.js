@@ -18,12 +18,14 @@
   const FH = 1280;
   const LINE_Y = 1200; // ここを越えた音符で体力が減る
   const PLAYER_Y0 = 420; // 自機が動ける範囲 (上の端)
+  const TOWER_Y1 = LINE_Y - 80; // 楽器が動ける下の端 (鍵盤や体力のバーにかからない)
   const STAR_STEP = 1.7; // 曲集の中で 1 曲進むごとの強さ
   const HP_TABLE = [[0.125, 3], [0.25, 6], [0.5, 10], [1, 18], [2, 32], [4, 55], [8, 80]];
   const R_TABLE = [[0.125, 7], [0.25, 8], [0.5, 9.5], [1, 11], [2, 13], [4, 16], [8, 18]];
   const DYN_LEAK = [3, 3, 4, 5, 6, 8];
   const BLACK_KEYS = [1, 3, 6, 8, 10];
   const COIN_K = 0.12; // 音符の硬さ → 金貨
+  const NOTE_SPEED = 105; // 音符の落ちる速さ (px/秒)。難しさの倍率をかける
   const EXP_K = 0.12; // 音符の硬さ → 楽器の経験値 (倒した楽器)
   const EXP_SHARE = 0.03; // ほかが倒したときに、呼び出した楽器みんなに入る分
   const REDEPLOY = 15; // 壊れた楽器を置き直せるまでの秒
@@ -247,7 +249,6 @@
       densHp: clamp(Math.pow(6.7 / dens, 0.9), 0.3, 1.2),
       densLeak: clamp(Math.pow(6.7 / dens, 0.6), 0.4, 1),
       // 短い曲ほど 1 つの音符の金貨を多く (曲の長さで金貨がかたよりすぎないように)
-      bookSpd: [0.9, 1, 1, 1, 1.08, 1.08, 1.15, 1.15][D.BOOKS.findIndex((b) => b.id === song.book)] || 1,
       coinLen: clamp(Math.pow(120 / Math.max(20, parsed.lengthSec), 0.6), 0.5, 2.5),
       phase: 'intro',
       t: 0,
@@ -318,7 +319,7 @@
       col: '#fff',
       x: minion ? clamp(G.boss.x + (pitchX(src.p) - FW / 2) * 0.5, 30, FW - 30) : pitchX(src.p) + rand(-4, 4),
       y: minion ? G.boss.y + 50 : -24,
-      vy: 100 * clamp(Math.pow(1.3, o), 0.5, 2.4) * G.T.spd * G.bookSpd,
+      vy: NOTE_SPEED * G.T.spd, // 音符はみんな同じ速さ (難しさでだけ変わる)
       slow: 1,
       push: 0,
       stun: 0,
@@ -343,7 +344,6 @@
     if (n.fermata) {
       hp *= 6;
       r *= 1.5;
-      n.vy *= 0.7;
     }
     if (n.grace) {
       hp = Math.min(hp, 1 * G.power);
@@ -550,7 +550,6 @@
         n.push -= k;
       }
       let vy = n.vy * n.slow * winter;
-      if (n.stacc) vy *= 0.55 + 0.9 * Math.max(0, Math.sin(n.t * 7 + n.phase)); // スタッカート: 止まっては進む
       n.y += vy * dt;
       if (n.trill) n.x += Math.sin(n.t * 18) * 30 * dt;
       n.slow = 1;
@@ -941,7 +940,7 @@
       }
     }
     t.tx = clamp(tx, 24, FW - 24);
-    t.ty = clamp(ty, PLAYER_Y0, LINE_Y - 30);
+    t.ty = clamp(ty, PLAYER_Y0, TOWER_Y1);
   }
   function moveTower(t, dt) {
     t.think -= dt;
@@ -977,7 +976,7 @@
     if (len > 1) {
       const k = Math.min(1, sp / len);
       t.x = clamp(t.x + vx * k, 24, FW - 24);
-      t.y = clamp(t.y + vy * k, PLAYER_Y0, LINE_Y - 30);
+      t.y = clamp(t.y + vy * k, PLAYER_Y0, TOWER_Y1);
     }
   }
 
@@ -1149,7 +1148,8 @@
       else G.coins += d.v;
     }
     G.drops = [];
-    const prog = G.phase === 'song' ? clamp(G.track.pos() / G.info.lengthSec, 0, 1) : 1;
+    // 弾けたところ = 倒した音符の割合
+    const prog = G.total ? clamp(G.killed / G.total, 0, 1) : 1;
     const bonus = win ? 0.5 : 0;
     const coins = Math.round(G.coins * (1 + bonus));
     const exp = {};

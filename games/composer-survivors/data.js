@@ -45,12 +45,13 @@
   // ---------- 曲集 ----------
   // need: 開く条件 [曲集, 何曲目] (その曲をどれかの難しさの通しでクリア)。power: 曲集の強さ (音符の硬さ・金貨の基準)
   const BOOKS = [
-    { id: 'beginner', name: { ja: 'はじめての曲集', en: 'First Pieces' }, need: null, power: 0.6, color: '#7fb77e' },
+    { id: 'beginner', name: { ja: 'はじめての曲集', en: 'First Pieces' }, need: null, power: 0.5, color: '#7fb77e' },
     { id: 'beethoven', name: { ja: 'ベートーヴェン代表曲集', en: 'Beethoven Favorites' }, need: [['beginner', 3]], power: 7, color: '#2d4a7a' },
     { id: 'mozart', name: { ja: 'モーツァルト代表曲集', en: 'Mozart Favorites' }, need: [['beginner', 3]], power: 7, color: '#b8323c' },
     { id: 'chopin', name: { ja: 'ショパン代表曲集', en: 'Chopin Favorites' }, need: [['beginner', 3]], power: 7, color: '#6c5b7b' },
     { id: 'bach', name: { ja: 'バッハ代表曲集', en: 'Bach Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, color: '#8b5a2b' },
     { id: 'vivaldi', name: { ja: 'ヴィヴァルディ代表曲集', en: 'Vivaldi Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, color: '#c0392b' },
+    { id: 'concerto', name: { ja: 'ピアノ協奏曲集', en: 'Piano Concertos' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, color: '#7a1f3d' },
     { id: 'tchaikovsky', name: { ja: 'チャイコフスキー代表曲集', en: 'Tchaikovsky Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 350, color: '#2e3b4e' },
     { id: 'debussy', name: { ja: 'ドビュッシー代表曲集', en: 'Debussy Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 350, color: '#58a55c' },
   ];
@@ -246,6 +247,25 @@
       trivia: {
         ja: '静かな 4 小節の序奏のあと、右手が吹きすさぶ風のように上下に駆けめぐり、左手が行進曲のような主題を力強く鳴らす。',
         en: 'After four quiet bars, the right hand whirls up and down like a gale while the left hand hammers out a march-like theme.',
+      },
+    },
+    // ---- ピアノ協奏曲集 (長い曲。パートごとにも遊べる) ----
+    {
+      id: 'beethoven_pc3', book: 'concerto', no: 1, score: 'beethoven_pc3',
+      title: { ja: 'ベートーヴェン ピアノ協奏曲第 3 番 第 1 楽章', en: 'Beethoven: Piano Concerto No. 3, I' },
+      boss: { id: 'storm_c', ja: 'ハ短調の嵐', en: 'The C-Minor Tempest', pattern: 'aimed', color: '#34495e', glyph: '🎼' },
+      trivia: {
+        ja: '1803 年に初演された、ベートーヴェン唯一の短調のピアノ協奏曲。オーケストラが力強いハ短調の主題を示し、独奏ピアノが受け継ぐ。オーケストラは合成の楽器の音で鳴らす。',
+        en: 'Premiered in 1803, Beethoven\'s only minor-key piano concerto. The orchestra states the stormy C-minor theme before the soloist takes it up. The orchestra is played with synthesized instruments.',
+      },
+    },
+    {
+      id: 'chopin_pc1', book: 'concerto', no: 2, score: 'chopin_pc1',
+      title: { ja: 'ショパン ピアノ協奏曲第 1 番 第 3 楽章 (独奏ピアノ編曲)', en: 'Chopin: Piano Concerto No. 1, III (solo piano arrangement)' },
+      boss: { id: 'krakowiak', ja: '舞踏会の薔薇', en: 'The Ballroom Rose', pattern: 'spread', color: '#c0392b', glyph: '🌹' },
+      trivia: {
+        ja: '1830 年、ワルシャワを離れる前にショパン自身の独奏で初演された協奏曲の終楽章。ポーランドの民俗舞曲クラコヴィアクのリズムによるロンド。ここではオーケストラの部分も入った独奏ピアノの編曲で遊ぶ。',
+        en: 'The finale of the concerto Chopin premiered himself in 1830 before leaving Warsaw: a rondo on the rhythm of the Polish krakowiak. Played here in a solo-piano arrangement that includes the orchestral passages.',
       },
     },
     // ---- バッハ ----
@@ -519,7 +539,13 @@
     gameTitle: { ja: '作曲家サバイバー', en: 'Composer Survivors' },
     subtitle: { ja: '降ってくる曲の音符を、作曲家と楽器で撃ち落とせ。', en: 'Shoot down the notes of the music as they rain down.' },
     backToGames: { ja: '‹ ゲーム一覧', en: '‹ Games' },
-    play: { ja: '▶ 曲集をえらぶ', en: '▶ Choose a Songbook' },
+    play: { ja: '開演', en: 'Begin' },
+    chooseComposer: { ja: '作曲家をえらぶ', en: 'Choose Your Composer' },
+    chooseBook: { ja: '曲集をえらぶ', en: 'Choose a Songbook' },
+    chooseSong: { ja: '曲をえらぶ', en: 'Choose a Piece' },
+    choosePart: { ja: 'パートと難しさをえらぶ', en: 'Choose a Part and Tier' },
+    next: { ja: 'この作曲家で ›', en: 'Continue ›' },
+    titleBgm: { ja: 'タイトルの曲: サティ「ジムノペディ第 1 番」', en: 'Title music: Satie, Gymnopédie No. 1' },
     practice: { ja: '🎹 練習室', en: '🎹 Practice Room' },
     shop: { ja: '🎻 楽器店', en: '🎻 Instrument Shop' },
     loadout: { ja: '🎼 編成', en: '🎼 Ensemble' },
@@ -583,7 +609,7 @@
     toPractice: { ja: '練習室へ', en: 'Practice Room' },
     bravo: { ja: 'ブラヴォー!', en: 'Bravo!' },
     failed: { ja: '演奏中断…', en: 'Performance Interrupted…' },
-    progress: { ja: '弾けたところ', en: 'Progress' },
+    progress: { ja: '弾けたところ (倒した音符)', en: 'Performed (notes defeated)' },
     defeated: { ja: '倒した音符', en: 'Notes defeated' },
     leaked: { ja: '通した音符', en: 'Notes let through' },
     earned: { ja: 'もらった金貨', en: 'Ducats earned' },

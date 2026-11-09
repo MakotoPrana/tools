@@ -276,6 +276,9 @@ def parse_music(toks, variables, rel_start=None):
                     elif x in ('-.', '^.', '_.'):
                         marks += "'"
                 p.next()
+                if not pitches and not (p.peek() and re.match(r'^\d+\.*$', p.peek())):
+                    # <> (空の和音): 記号をつけるためだけのもので、時間をとらない
+                    continue
                 d = st['dur']
                 after = p.peek()
                 if after and re.match(r'^\d+\.*$', after):
@@ -298,6 +301,7 @@ def parse_music(toks, variables, rel_start=None):
                         n['mk'] += marks
                         made.append(n)
                 last_note = made
+                tremolo(made, t, real)
                 if not grace:
                     t += real
                 continue
@@ -356,6 +360,8 @@ def parse_music(toks, variables, rel_start=None):
                     continue
                 n = add_note(t, real, q, grace, 1)
                 last_note = [n] if n else None
+                if n:
+                    tremolo([n], t, real)
                 if not grace:
                     t += real
                 continue
@@ -485,11 +491,34 @@ def parse_music(toks, variables, rel_start=None):
                 for n in seg:
                     notes.append(dict(n, t=n['t'] + step * k))
             return t + step * count
+        if name == 'transposition':
+            # \\transposition bes' : この楽器は書かれた c' が bes の高さで鳴る
+            arg = p.next() or ''
+            m = NOTE_RE.match(arg)
+            if m:
+                off = pitch_of(m.group(1), m.group(2)) - 60
+                # 管楽器の移調は下へ (0〜−12)。in B のクラリネットに bes' と書いた譜面 (本当は bes) も鳴る高さに直す
+                while off > 0:
+                    off -= 12
+                st['transp'] = off
+            return None
         if name == 'afterGrace':
             # \\afterGrace 主音 { 装飾音 }: 装飾音は主音の終わりぎわに、時間をとらずに
             before = len(notes)
-            tok = p.next()
+            # 新しい書き方 \afterGrace 3/4 主音 { … } の割合は読み飛ばす
+            if p.peek() and re.match(r'^#?\d+/\d+$', p.peek()):
+                p.next()
             r = t
+            if p.peek() == '{' or p.peek() == '<':
+                # 主音が { … } や和音のとき
+                if p.peek() == '{':
+                    p.next()
+                    r = seq(t, scale, grace)
+                else:
+                    r = seq(t, scale, grace, end=None, stop=('{',))
+                tok = None
+            else:
+                tok = p.next()
             m = NOTE_RE.match(tok or '')
             if m:
                 q = resolve(m.group(1), m.group(2))
@@ -498,6 +527,9 @@ def parse_music(toks, variables, rel_start=None):
                     st['dur'] = d
                 add_note(t, d * scale, q, grace, 1)
                 r = t + d * scale
+            # 主音につく記号 (^\\trill ^\\fermata など) を読み飛ばして、装飾音の { } へ
+            while p.peek() and p.peek() != '{' and (p.peek() in ('^', '_', '-', '(', ')', '~', '[', ']', '\\(', '\\)', '\\!', '\\<', '\\>') or re.match(r'^[-_^][.>!+^_-]$', p.peek()) or (p.peek().startswith('\\') and p.peek()[1:] in ('trill', 'fermata', 'staccato', 'accent', 'tenuto', 'marcato', 'startTrillSpan', 'stopTrillSpan', 'turn', 'mordent', 'prall', 'sf', 'sfz', 'p', 'pp', 'f', 'ff', 'mf', 'mp'))):
+                p.next()
             if p.peek() == '{':
                 p.next()
                 gb = len(notes)
@@ -734,9 +766,31 @@ def parse_music(toks, variables, rel_start=None):
         letter = {0: 0, 1: 0, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3, 7: 4, 8: 5, 9: 5, 10: 6, 11: 6}[pc]
         return (q // 12) * 7 + letter
 
+    def tremolo(made, t, real):
+        # c'4:16 (トレモロ): 書かれた長さを、:16 の長さの同じ音のくり返しに分ける (音符の数は楽譜どおり)
+        if p.peek() != ':':
+            return
+        p.next()
+        val = p.peek()
+        if not (val and re.match(r'^\d+$', val)):
+            return
+        p.next()
+        sub = F(4, int(val))
+        cnt = int(real / sub) if sub > 0 else 1
+        if cnt <= 1 or not made:
+            return
+        for n in list(made):
+            n['d'] = sub
+            for i in range(1, cnt):
+                m = dict(n)
+                m['t'] = t + sub * i
+                m['tie'] = False
+                notes.append(m)
+
     def add_note(t, d, q, grace, chord):
         if q is None:
             return None
+        q = q + st.get('transp', 0)  # 移調楽器 (\\transposition): 書かれた音 → 鳴る音
         n = {'t': t, 'd': d, 'p': q, 'v': st['dyn'], 'mk': '', 'chord': chord}
         # タイ: 前の同じ高さの音が tie で、ちょうど今で終わるなら延ばす
         for m in reversed(notes[-12:]):

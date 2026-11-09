@@ -463,6 +463,44 @@ def books(ftp):
          '前奏曲集 第 1 巻より「野を渡る風」(ドビュッシー)', 'Préludes I, No. 3', 'Glen Larsen', 'BY-SA 4.0', mnr(10), 126, P(0, 1))
 
 
+def concertos(ftp, conc_dir):
+    """ピアノ協奏曲集: ベートーヴェン第 3 番 第 1 楽章 (Mutopia の全楽譜)・ショパン第 1 番 第 3 楽章 (独奏ピアノへの編曲)"""
+    # ベートーヴェン: 独奏ピアノは録音のピアノ、オーケストラは合成の楽器の音で
+    base = os.path.join(ftp, 'BeethovenLv/O37/Concerto_No3/Concerto_No3-lys/Concerto_No3.ly')
+    orch = [('\\flauti', 'flute', 0.45), ('\\oboi', 'clarinet', 0.4), ('\\clarinetti', 'clarinet', 0.4), ('\\fagotti', 'cello', 0.45),
+            ('\\cornies', 'brass', 0.4), ('\\trombe', 'brass', 0.4), ('\\timpani', 'timpani', 0.6), ('\\violinoone', 'strings', 0.55),
+            ('\\violinotwo', 'strings', 0.45), ('\\viola', 'strings', 0.45), ('\\bassi', 'cello', 0.6)]
+    parts = [('\\pianoone', 'piano', 1, True), ('\\pianotwo', 'piano', 0.85, False)] + [(v, i, vol, False) for (v, i, vol) in orch]
+    song('beethoven_pc3', base, 'ピアノ協奏曲第 3 番 ハ短調 Op. 37 第 1 楽章 (ベートーヴェン)。独奏ピアノとオーケストラの全声部',
+         'Piano Concerto No. 3 in C Minor, Op. 37 (1st Movement)', 'Stelios Samelis', None, '{ tonic: 0, minor: true }', 132, parts,
+         theme={'part': 7, 'from': 0, 'len': 16})
+    # ショパン: 独奏ピアノへの編曲 (全 3 楽章) から第 3 楽章を切り出す。8 声部を右手 (1〜4)・左手 (5〜8) にまとめる
+    path = os.path.join(conc_dir, 'chopin-piano-concerto-no-1-in-e-minor-solo-arrangement.ly')
+    src, V = load(path)
+    names = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight']
+    body = V['PartPOneVoiceOne']
+    i = body.find('III - Vivace')
+    j = body.rfind('\\tempo', 0, i)
+    _, _, mk = parse(body[:j] + ' \\fine ' + body[j:], V)
+    t3 = [m[1] for m in mk if m[0] == 'fine'][0]
+    right, left, ends = [], [], []
+    for k, nm in enumerate(names):
+        notes, end, _ = parse('\\PartPOneVoice' + nm, V)
+        ends.append(float(end))
+        (right if k < 4 else left).extend(window(notes, t3, end + 1, 0))
+    if max(ends) - min(ends) > 0.01:
+        raise SystemExit(f'chopin_pc1: 声部の長さがそろわない {ends}')
+    write_js(
+        'chopin_pc1',
+        '// ピアノ協奏曲第 1 番 ホ短調 Op. 11 第 3 楽章「ロンド」(ショパン)。独奏ピアノへの編曲 (オーケストラの部分もピアノに入っている) の全曲\n'
+        '// 元の譜面: https://github.com/mocisly/chopin-piano-concerto-no-1-in-e-minor-solo-arrangement (MIT License, Copyright (c) 2026 mocisly)\n'
+        '//   ライセンス文は scores/LICENSE-chopin_pc1.txt\n'
+        '// tools/build_scores.py で作ったファイル。手で直さない',
+        {'id': "'chopin_pc1'", 'timeSig': '[2, 4]', 'key': '{ tonic: 4, minor: false }', 'theme': '{ part: 0, from: 0, len: 16, tempo: 104 }', 'tempo': '[[0, 104]]'},
+        [{'inst': 'piano', 'vol': 1, 'melody': True, 'notes': right}, {'inst': 'piano', 'vol': 0.8, 'melody': False, 'notes': left}],
+    )
+
+
 if __name__ == '__main__':
     ftp = sys.argv[1]
     if ftp != '-':
@@ -473,3 +511,5 @@ if __name__ == '__main__':
         books(ftp)
     if len(sys.argv) > 2:
         winterwind(sys.argv[2])
+    if len(sys.argv) > 3:
+        concertos(ftp, sys.argv[3])
