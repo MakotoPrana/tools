@@ -639,6 +639,27 @@
       };
       const p = opt.p ?? 72;
       switch (kind) {
+        case 'petit': {
+          // 音符を倒した: プチッとはじける音 (短い雑音のクリックと、高い音がすっと下がる)
+          const s = ctx.createBufferSource();
+          s.buffer = this.noise;
+          const f = ctx.createBiquadFilter();
+          f.type = 'bandpass';
+          f.frequency.value = 2200 + Math.random() * 2600;
+          f.Q.value = 4;
+          const gg = ctx.createGain();
+          gg.gain.setValueAtTime(0.0001, t);
+          gg.gain.exponentialRampToValueAtTime(0.22 * (opt.vol || 1), t + 0.002);
+          gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+          s.connect(f);
+          f.connect(gg);
+          gg.connect(g);
+          s.start(t, Math.random() * 0.8);
+          s.stop(t + 0.04);
+          const f0 = 1400 + Math.random() * 900;
+          tone('sine', f0, f0 * 0.45, 0.035, 0.05 * (opt.vol || 1));
+          break;
+        }
         case 'pop': // 音符を倒した (曲の調の音)
           tone('sine', mtof(p), 0, 0.09, 0.05);
           break;

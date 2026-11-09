@@ -225,3 +225,27 @@ canvas.dim { filter: brightness(0) opacity(0.6); }
   .top h1 { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   body.playing .top .back { display: none; }
 }
+
+/* ---------- 楽器 1 体ずつ・素材 ---------- */
+.party-bar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; max-width: 70%; }
+.pm { position: relative; width: 34px; height: 34px; border-radius: 8px; background: var(--panel-2); border: 1px solid #3a3346; display: grid; place-items: center; overflow: hidden; }
+.pm .pm-hp { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--mint); }
+.mats { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 4px 0 8px; }
+.mats.center { justify-content: center; }
+.mat { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; background: #221c2b; border-radius: 999px; padding: 1px 8px 1px 4px; }
+.mat i { width: 10px; height: 10px; transform: rotate(45deg); border: 1px solid rgba(255, 255, 255, 0.6); display: inline-block; }
+.mat.short { color: var(--rose); }
+.mat small { color: var(--panel-muted); }
+.owned-n { color: var(--mint); font-size: 0.85rem; }
+.units { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.unit { background: var(--panel-2); border-radius: 12px; padding: 8px 10px; border: 1px solid transparent; display: flex; flex-direction: column; gap: 4px; }
+.unit.in { border-color: var(--mint); }
+.grade { font-size: 0.75rem; border-radius: 999px; padding: 1px 8px; background: #221c2b; white-space: nowrap; }
+.grade.g2 { color: #9fd8ff; } .grade.g3 { color: #c0c8d8; } .grade.g4 { color: #ff9ad5; } .grade.g5 { color: var(--gold); }
+.expbar { display: inline-block; width: 60px; height: 5px; background: #1a1622; border-radius: 3px; vertical-align: middle; margin: 0 6px 0 2px; }
+.expbar i { display: block; height: 100%; background: var(--mint); border-radius: 3px; }
+.unit-btns { display: flex; gap: 6px; align-items: center; }
+.unit-btns .spacer { flex: 1; }
+.unit-btns button.on { border-color: var(--mint) !important; color: var(--mint); }
+.gcost { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 0.8rem; color: var(--gold); }
+.unit-btns button { white-space: nowrap; font-size: 0.85rem; padding: 6px 10px !important; }

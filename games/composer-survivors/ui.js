@@ -54,8 +54,10 @@
       coins: 0,
       comp: 'beethoven',
       stats: {},
-      towers: { piano: { lv: {}, star: 1, exp: 0 } },
-      loadout: { equip: ['piano', null], deploy: [null, null, null] },
+      units: [{ uid: 'u1', id: 'piano', grade: 1, lv: 0, exp: 0, paid: 0 }], // 持っている楽器 (同じ種類をいくつも持てる)
+      party: ['u1'], // 曲の中で呼び出す楽器 (最大 10)
+      mats: {}, // 素材
+      nextUid: 2,
       rec: {},
       settings: { bgm: 0.85, se: 0.7, shake: true },
       lastBook: 'beginner',
@@ -64,9 +66,33 @@
   let save = blankSave();
   try {
     const raw = localStorage.getItem(KEY + 'save');
-    if (raw) save = Object.assign(blankSave(), JSON.parse(raw));
+    if (raw) save = migrate(Object.assign(blankSave(), JSON.parse(raw)));
   } catch (e) {
     save = blankSave();
+  }
+  // 前の版 (楽器は種類ごとに 1 つ・装備と配置) のセーブを、楽器 1 体ずつの形に直す
+  function migrate(sv) {
+    if (sv.towers && !sv.unitsMigrated) {
+      const old = sv.towers;
+      const ids = Object.keys(old);
+      if (ids.length && (!sv.units || (sv.units.length === 1 && sv.units[0].id === 'piano' && sv.units[0].lv === 0))) {
+        sv.units = ids.map((id, i) => {
+          const t = old[id] || {};
+          const sum = Object.values(t.lv || {}).reduce((a, b) => a + b, 0);
+          const grade = Math.min(5, t.star || 1);
+          return { uid: 'u' + (i + 1), id, grade, lv: Math.min(D.GRADES[grade - 1].cap, Math.round(sum / 4)), exp: 0, paid: D.TOWERS[id].price };
+        });
+        sv.nextUid = ids.length + 1;
+        sv.party = sv.units.map((u) => u.uid).slice(0, D.MAX_PARTY);
+      }
+      delete sv.towers;
+      delete sv.loadout;
+      sv.unitsMigrated = true;
+    }
+    sv.mats = sv.mats || {};
+    sv.units = sv.units || [];
+    sv.party = (sv.party || []).filter((uid) => sv.units.some((u) => u.uid === uid));
+    return sv;
   }
   function persist() {
     try {
@@ -216,7 +242,6 @@
           <button type="button" class="primary" data-go="books">${T('play')}</button>
           <button type="button" data-go="practice">${T('practice')}</button>
           <button type="button" data-go="shop">${T('shop')}</button>
-          <button type="button" data-go="loadout">${T('loadout')}</button>
           <button type="button" data-go="settings">${T('settings')}</button>
           ${TEST_UNLOCK ? `<button type="button" data-go="testcoins">${T('testCoins')}</button>` : ''}
         </div>
@@ -233,7 +258,6 @@
       if (g === 'books') booksScreen();
       if (g === 'practice') practiceScreen(save.comp);
       if (g === 'shop') shopScreen();
-      if (g === 'loadout') loadoutScreen();
       if (g === 'settings') settingsScreen();
       if (g === 'testcoins') {
         save.coins += 1e6;
@@ -366,122 +390,101 @@
     });
   }
 
-  // ---------- 楽器店 ----------
-  function shopScreen() {
-    const cards = D.TOWER_IDS.map((id) => {
-      const T0 = D.TOWERS[id];
-      const own = save.towers[id];
-      if (!own) {
-        return `<div class="tower-card"><div class="tc-head"><span data-icon="${id}"></span><b>${esc(L(T0.name))}</b></div>
+  // ---------- 楽器店 (買う・持っている楽器: 呼び出す・格上げ・売る) ----------
+  const matChips = (mats, have) =>
+    Object.entries(mats || {})
+      .map(([k, n]) => {
+        const m = D.MATS.find((x) => x.id === k);
+        const ok = !have || (save.mats[k] || 0) >= n;
+        return `<span class="mat ${ok ? '' : 'short'}"><i style="background:${m.col}"></i>${esc(L(m.name))} ${fmt(n)}${have ? ` <small>(${fmt(save.mats[k] || 0)})</small>` : ''}</span>`;
+      })
+      .join('');
+  function shopScreen(tab = 'buy', sellArm) {
+    const owned = (id) => save.units.filter((u) => u.id === id).length;
+    const tabs = `<div class="tabs"><button type="button" class="tab ${tab === 'buy' ? 'on' : ''}" data-stab="buy">${T('buyTab')}</button><button type="button" class="tab ${tab === 'units' ? 'on' : ''}" data-stab="units">${T('unitsTab')} (${save.units.length})</button></div>`;
+    const matsLine = `<div class="mats">${D.MATS.map((m) => `<span class="mat"><i style="background:${m.col}"></i>${esc(L(m.name))} ${fmt(save.mats[m.id] || 0)}</span>`).join('')}</div>`;
+    let body = '';
+    if (tab === 'buy') {
+      body = `<div class="towers">${D.TOWER_IDS.map((id) => {
+        const T0 = D.TOWERS[id];
+        const price = D.unitPrice(id, owned(id));
+        return `<div class="tower-card"><div class="tc-head"><span data-icon="${id}"></span><b>${esc(L(T0.name))}</b><span class="owned-n">${owned(id) ? T('ownedN', { n: owned(id) }) : ''}</span></div>
           <p class="desc">${esc(L(T0.desc))}</p>
-          <button type="button" class="primary" data-buy="${id}" ${save.coins < T0.price ? 'disabled' : ''}>${T('buy')} 🪙${fmt(T0.price)}</button></div>`;
-      }
-      const ts = GM.towerStats(save, id);
-      const sum = D.TSTATS.reduce((a, s) => a + ((own.lv && own.lv[s.id]) || 0), 0);
-      const stRows = D.TSTATS.map((s) => {
-        const lv = (own.lv && own.lv[s.id]) || 0;
-        const cost = D.tstatCost(lv);
-        const maxed = lv >= s.max;
-        return `<div class="tstat"><span>${esc(L(s.name))} <b>${lv}</b><small>${esc(L(s.desc))}</small></span>
-          <button type="button" data-tup="${id}:${s.id}" ${maxed || (own.exp || 0) < cost ? 'disabled' : ''}>${maxed ? T('max') : '✦' + fmt(cost)}</button></div>`;
-      }).join('');
-      const star = own.star || 1;
-      const need = D.EVO_NEED[star] || 0;
-      const evo = star < 3
-        ? `<button type="button" class="evo" data-evo="${id}" ${sum < need || save.coins < D.evoCost(id, star) ? 'disabled' : ''}>${T('evolve')} ★${star + 1} 🪙${fmt(D.evoCost(id, star))}<small>${T('evoNeed', { n: need })}</small></button>`
-        : `<span class="evo done">★3</span>`;
-      return `<div class="tower-card owned"><div class="tc-head"><span data-icon="${id}"></span><b>${esc(L(T0.name))}</b><span class="stars">${'★'.repeat(star)}</span></div>
-        <p class="desc">${esc(L(T0.desc))}</p>
-        <p class="tnow">⚔${ts.dmg.toFixed(1)} ⏱${ts.cd ? ts.cd.toFixed(2) + 's' : '—'} ◎${Math.round(ts.range)} ♥${Math.round(ts.hp)}</p>
-        <p class="exp">${T('exp')} ✦${fmt(own.exp || 0)}</p>
-        <div class="tstats">${stRows}</div>${evo}</div>`;
-    }).join('');
-    show(`${head(T('shop'))}<p class="note">${T('shopNote')}</p><div class="towers">${cards}</div>`, titleScreen);
+          <p class="tnow">⚔${T0.dmg} ⏱${T0.cd ? T0.cd + 's' : '—'} ◎${T0.range} ♥${T0.hp}</p>
+          <button type="button" class="primary" data-buy="${id}" ${save.coins < price ? 'disabled' : ''}>${T('buy')} 🪙${fmt(price)}</button></div>`;
+      }).join('')}</div>`;
+    } else {
+      const inParty = (u) => save.party.includes(u.uid);
+      const list = [...save.units].sort((a, b) => inParty(b) - inParty(a) || b.grade - a.grade || b.lv - a.lv);
+      body = list.length
+        ? `<p class="note">${T('party', { n: save.party.length, m: D.MAX_PARTY })}</p><div class="units">${list
+            .map((u) => {
+              const T0 = D.TOWERS[u.id];
+              const st = GM.towerStats(u);
+              const cap = D.GRADES[u.grade - 1].cap;
+              const need = D.expNeed(u.lv);
+              const gc = u.grade < 5 ? D.gradeCost(u.id, u.grade) : null;
+              const canGrade = gc && save.coins >= gc.coins && Object.entries(gc.mats).every(([k, n]) => (save.mats[k] || 0) >= n);
+              return `<div class="unit ${inParty(u) ? 'in' : ''}">
+                <div class="tc-head"><span data-icon="${u.id}" data-size="36"></span><b>${esc(L(T0.name))}</b>
+                  <span class="grade g${u.grade}">${T('grade')} ${u.grade} ${esc(L(D.GRADES[u.grade - 1].name))}</span></div>
+                <p class="tnow">${T('lv')} ${u.lv}/${cap} <span class="expbar"><i style="width:${u.lv >= cap ? 100 : Math.min(100, ((u.exp || 0) / need) * 100)}%"></i></span> ⚔${st.dmg.toFixed(1)} ⏱${st.cd ? st.cd.toFixed(2) + 's' : '—'} ♥${Math.round(st.hp)}</p>
+                <div class="unit-btns">
+                  <button type="button" class="${inParty(u) ? 'on' : ''}" data-party="${u.uid}">${inParty(u) ? '✓ ' + T('inParty') : T('notInParty')}</button>
+                  ${gc ? `<button type="button" data-grade="${u.uid}" ${canGrade ? '' : 'disabled'}>${T('gradeUp')} → ${u.grade + 1}</button>` : `<span class="grade g5">MAX</span>`}
+                  <span class="spacer"></span>
+                  <button type="button" class="small ${sellArm === u.uid ? 'danger' : ''}" data-sell="${u.uid}">${sellArm === u.uid ? T('sellConfirm') : T('sell') + ' 🪙' + fmt(Math.round((u.paid || 0) * D.SELL_RATE))}</button>
+                </div>
+                ${gc ? `<div class="gcost">🪙${fmt(gc.coins)} ${matChips(gc.mats, true)}</div>` : ''}
+              </div>`;
+            })
+            .join('')}</div>`
+        : `<p>${T('noUnits')}</p>`;
+    }
+    show(`${head(T('shop'))}<p class="note">${T('shopNote')}</p>${matsLine}${tabs}${body}`, titleScreen);
     fillIcons();
+    on('[data-stab]', 'click', (el) => shopScreen(el.dataset.stab));
     on('[data-buy]', 'click', (el) => {
       const id = el.dataset.buy;
-      const p = D.TOWERS[id].price;
-      if (save.coins < p) return;
-      save.coins -= p;
-      save.towers[id] = { lv: {}, star: 1, exp: 0 };
-      // 空いている枠に入れる
-      const lo = save.loadout;
-      const ei = lo.equip.indexOf(null);
-      const di = lo.deploy.indexOf(null);
-      if (ei >= 0) lo.equip[ei] = id;
-      else if (di >= 0) lo.deploy[di] = id;
+      const price = D.unitPrice(id, owned(id));
+      if (save.coins < price) return;
+      save.coins -= price;
+      const u = { uid: 'u' + save.nextUid++, id, grade: 1, lv: 0, exp: 0, paid: price };
+      save.units.push(u);
+      if (save.party.length < D.MAX_PARTY) save.party.push(u.uid);
       persist();
       Synth.sfx('chest', { p: 72 });
-      shopScreen();
+      shopScreen('buy');
     });
-    on('[data-tup]', 'click', (el) => {
-      const [id, sid] = el.dataset.tup.split(':');
-      const own = save.towers[id];
-      own.lv = own.lv || {};
-      const lv = own.lv[sid] || 0;
-      const cost = D.tstatCost(lv);
-      if ((own.exp || 0) < cost || lv >= 50) return;
-      own.exp -= cost;
-      own.lv[sid] = lv + 1;
+    on('[data-party]', 'click', (el) => {
+      const uid = el.dataset.party;
+      if (save.party.includes(uid)) save.party = save.party.filter((x) => x !== uid);
+      else if (save.party.length < D.MAX_PARTY) save.party.push(uid);
+      else banner(T('partyFull', { m: D.MAX_PARTY }));
       persist();
-      Synth.sfx('pick', { p: 79 });
-      shopScreen();
+      shopScreen('units');
     });
-    on('[data-evo]', 'click', (el) => {
-      const id = el.dataset.evo;
-      const own = save.towers[id];
-      const star = own.star || 1;
-      const c = D.evoCost(id, star);
-      if (save.coins < c) return;
-      save.coins -= c;
-      own.star = star + 1;
+    on('[data-grade]', 'click', (el) => {
+      const u = save.units.find((x) => x.uid === el.dataset.grade);
+      const gc = D.gradeCost(u.id, u.grade);
+      if (save.coins < gc.coins || !Object.entries(gc.mats).every(([k, n]) => (save.mats[k] || 0) >= n)) return;
+      save.coins -= gc.coins;
+      for (const [k, n] of Object.entries(gc.mats)) save.mats[k] -= n;
+      u.grade++;
       persist();
       Synth.sfx('level', { p: 76 });
       Synth.sfx('cymbal');
-      shopScreen();
+      shopScreen('units');
     });
-  }
-
-  // ---------- 編成 ----------
-  function loadoutScreen(pick) {
-    const lo = save.loadout;
-    const slot = (kind, i) => {
-      const id = lo[kind][i];
-      return `<button type="button" class="slot ${pick && pick.kind === kind && pick.i === i ? 'on' : ''}" data-slot="${kind}:${i}">
-        ${id ? `<span data-icon="${id}" data-size="44"></span><span>${esc(L(D.TOWERS[id].name))} ${'★'.repeat(save.towers[id]?.star || 1)}</span>` : `<span class="empty">${T('empty')}</span>`}</button>`;
-    };
-    let chooser = '';
-    if (pick) {
-      const owned = D.TOWER_IDS.filter((id) => save.towers[id]);
-      chooser = `<div class="chooser"><p>${T('choose')}</p><div class="chooser-list">
-        ${owned
-          .map((id) => {
-            const used = [...lo.equip, ...lo.deploy].includes(id);
-            return `<button type="button" data-put="${id}" class="${used ? 'used' : ''}"><span data-icon="${id}" data-size="36"></span>${esc(L(D.TOWERS[id].name))}</button>`;
-          })
-          .join('')}
-        <button type="button" data-put="">${T('remove')}</button></div></div>`;
-    }
-    show(
-      `${head(T('loadout'))}<p class="note">${T('loadoutNote')}</p>
-      <h3>${T('equip')}</h3><div class="slots">${slot('equip', 0)}${slot('equip', 1)}</div>
-      <h3>${T('deploy')}</h3><div class="slots">${slot('deploy', 0)}${slot('deploy', 1)}${slot('deploy', 2)}</div>${chooser}`,
-      titleScreen,
-    );
-    fillIcons();
-    on('[data-slot]', 'click', (el) => {
-      const [kind, i] = el.dataset.slot.split(':');
-      loadoutScreen({ kind, i: +i });
-    });
-    on('[data-put]', 'click', (el) => {
-      const id = el.dataset.put || null;
-      // 同じ楽器はひとつの枠だけ (前の枠からは外す)
-      if (id) {
-        for (const k of ['equip', 'deploy']) lo[k] = lo[k].map((x) => (x === id ? null : x));
-      }
-      lo[pick.kind][pick.i] = id;
+    on('[data-sell]', 'click', (el) => {
+      const uid = el.dataset.sell;
+      if (sellArm !== uid) return shopScreen('units', uid);
+      const u = save.units.find((x) => x.uid === uid);
+      save.coins += Math.round((u.paid || 0) * D.SELL_RATE);
+      save.units = save.units.filter((x) => x.uid !== uid);
+      save.party = save.party.filter((x) => x !== uid);
       persist();
-      loadoutScreen();
+      shopScreen('units');
     });
   }
 
@@ -544,21 +547,22 @@
   function buildBar() {
     const G = GM.G;
     bar.innerHTML = '';
-    G.slots.forEach((s, i) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'slot-btn';
+    const wrap = document.createElement('div');
+    wrap.className = 'party-bar';
+    G.party.forEach((pm, i) => {
+      const b = document.createElement('span');
+      b.className = 'pm';
       b.dataset.i = i;
-      b.appendChild(iconCanvas(s.id, 34));
-      const lab = document.createElement('span');
-      lab.className = 'lab';
-      b.appendChild(lab);
+      b.appendChild(iconCanvas(pm.unit.id, 26));
+      const hp = document.createElement('i');
+      hp.className = 'pm-hp';
+      b.appendChild(hp);
       const cool = document.createElement('i');
       cool.className = 'cool';
       b.appendChild(cool);
-      b.addEventListener('click', () => GM.armSlot(i));
-      bar.appendChild(b);
+      wrap.appendChild(b);
     });
+    bar.appendChild(wrap);
     const sp = document.createElement('span');
     sp.className = 'spacer';
     bar.appendChild(sp);
@@ -578,12 +582,11 @@
       <span class="h-coin">🪙 ${fmt(G.coins)}</span>
       <span class="h-stage">${esc(L(G.song.title))} ・ ${stage} ・ ${esc(L(G.T.name))}</span>
       <span class="h-prog"><i style="width:${prog * 100}%"></i></span>`;
-    bar.querySelectorAll('.slot-btn').forEach((b) => {
-      const s = G.slots[+b.dataset.i];
-      b.classList.toggle('on', G.arm === +b.dataset.i);
-      b.disabled = s.state !== 'ready';
-      b.querySelector('.lab').textContent = s.state === 'placed' ? '✓' : s.state === 'cool' ? Math.ceil(s.cool) + 's' : String(+b.dataset.i + 1);
-      b.querySelector('.cool').style.height = s.state === 'cool' ? (s.cool / 15) * 100 + '%' : '0';
+    bar.querySelectorAll('.pm').forEach((b) => {
+      const pm = G.party[+b.dataset.i];
+      const t = G.towers.find((x) => x.pm === pm);
+      b.querySelector('.pm-hp').style.width = t ? Math.max(0, (t.hp / t.maxHp) * 100) + '%' : '0';
+      b.querySelector('.cool').style.height = pm.state === 'cool' ? Math.min(100, (pm.cool / 15) * 100) + '%' : pm.state === 'wait' ? '100%' : '0';
     });
     const sw = bar.querySelector('.sweep-btn');
     if (sw) {
@@ -601,7 +604,22 @@
     // 金貨と経験値
     const before = { books: D.BOOKS.filter(bookOpen).map((b) => b.id), comps: D.COMPOSERS.filter(compOpen).map((c) => c.id) };
     save.coins += r.coins;
-    for (const id in r.exp) if (save.towers[id]) save.towers[id].exp = (save.towers[id].exp || 0) + r.exp[id];
+    for (const [k, n] of Object.entries(r.mats || {})) save.mats[k] = (save.mats[k] || 0) + n;
+    // 楽器の経験値 → レベル (上限は格で決まる)
+    r.levelUps = [];
+    for (const u of save.units) {
+      const e = r.exp[u.uid];
+      if (!e) continue;
+      const cap = D.GRADES[u.grade - 1].cap;
+      const before = u.lv;
+      u.exp = (u.exp || 0) + e;
+      while (u.lv < cap && u.exp >= D.expNeed(u.lv)) {
+        u.exp -= D.expNeed(u.lv);
+        u.lv++;
+      }
+      if (u.lv >= cap) u.exp = Math.min(u.exp, D.expNeed(u.lv));
+      if (u.lv > before) r.levelUps.push({ id: u.id, from: before, to: u.lv });
+    }
     persist();
     const newBooks = D.BOOKS.filter((b) => bookOpen(b) && !before.books.includes(b.id));
     const newComps = D.COMPOSERS.filter((c) => compOpen(c) && !before.comps.includes(c.id));
@@ -615,10 +633,8 @@
     langSel.style.visibility = 'visible';
     bar.innerHTML = '';
     hud.innerHTML = '';
-    const exps = Object.entries(r.exp)
-      .filter(([id, v]) => save.towers[id] && v > 0)
-      .map(([id, v]) => `<span class="exp-chip"><span data-icon="${id}" data-size="24"></span>✦${fmt(v)}</span>`)
-      .join('');
+    const exps = (r.levelUps || []).map((x) => `<span class="exp-chip"><span data-icon="${x.id}" data-size="24"></span>Lv${x.from}→${x.to}</span>`).join('');
+    const mats = matChips(r.mats, false);
     const unlocks = [...newBooks.map((b) => L(b.name)), ...newComps.map((c) => L(c.name))];
     show(`<div class="result ${r.win ? 'win' : 'lose'}">
         <h2>${r.win ? T('bravo') : T('failed')}</h2>
@@ -629,7 +645,8 @@
           <span>${T('leaked')}</span><b>${r.leaked}</b>
           <span>${T('earned')}</span><b class="gold">🪙 ${fmt(r.coins)}</b>
         </div>
-        ${exps ? `<p>${T('expEarned')}</p><div class="exps">${exps}</div>` : ''}
+        ${mats ? `<p>${T('matsEarned')}</p><div class="mats center">${mats}</div>` : ''}
+        ${exps ? `<p>${T('levelUps')}</p><div class="exps">${exps}</div>` : ''}
         ${unlocks.length ? `<p class="unlock">🎉 ${T('newUnlock')} ${unlocks.map(esc).join('・')}</p>` : ''}
         ${!r.win ? `<p class="note">${T('hintStruggle')}</p>` : ''}
         <div class="r-btns">
@@ -766,8 +783,8 @@
     const owned = (q.get('towers') || 'piano').split(',');
     const fake = blankSave();
     fake.stats[cp.id] = Object.fromEntries(D.STATS.map((s) => [s.id, Math.min(s.max, lv)]));
-    fake.towers = Object.fromEntries(owned.map((id) => [id, { lv: { atk: tlv, spd: tlv, rng: tlv, hp: tlv }, star: +(q.get('star') || 1), exp: 0 }]));
-    fake.loadout = { equip: [owned[0] || null, owned[1] || null], deploy: [owned[2] || null, owned[3] || null, owned[4] || null] };
+    fake.units = owned.map((id, i) => ({ uid: 'u' + i, id, grade: +(q.get('grade') || 1), lv: tlv, exp: 0 }));
+    fake.party = fake.units.map((u) => u.uid).slice(0, D.MAX_PARTY);
     const out = [];
     for (let i = 0; i < +(q.get('n') || 1); i++) out.push(GM.simulate({ song, part: +(q.get('part') || 0), tier: +(q.get('tier') || 0), comp: cp, save: fake }, +(q.get('max') || 1200)));
     window.SIM_RESULT = out;

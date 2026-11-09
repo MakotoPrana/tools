@@ -56,10 +56,11 @@
   ];
 
   // ---------- 難しさ (1 つのステージに 3 段階) ----------
+  // 難しさは主に「速さ」で上げる (音符を硬くしすぎない)。spd: 落ちる速さ、hp: 音符の硬さ、dmg: 受けるダメージ、reward: 金貨・経験値・素材
   const TIERS = [
-    { id: 'normal', name: { ja: 'ノーマル', en: 'Normal' }, hp: 1, dmg: 1, reward: 1 },
-    { id: 'hard', name: { ja: 'ハード', en: 'Hard' }, hp: 3, dmg: 1.5, reward: 3 },
-    { id: 'virtuoso', name: { ja: 'ヴィルトゥオーソ', en: 'Virtuoso' }, hp: 6, dmg: 2, reward: 6 },
+    { id: 'normal', name: { ja: 'ノーマル', en: 'Normal' }, spd: 1, hp: 1, dmg: 1, reward: 1 },
+    { id: 'hard', name: { ja: 'ハード', en: 'Hard' }, spd: 1.35, hp: 1.6, dmg: 1.5, reward: 2.5 },
+    { id: 'virtuoso', name: { ja: 'ヴィルトゥオーソ', en: 'Virtuoso' }, spd: 1.75, hp: 2.5, dmg: 2, reward: 5 },
   ];
 
   // ---------- 曲 (ステージ) ----------
@@ -434,41 +435,68 @@
   ];
 
   // ---------- 楽器 (タワー) ----------
-  // 金貨で買う。買ったあとは、敵を倒すと経験値がたまり、経験値で能力を育てる。金貨で進化 (★2・★3)
-  // kind: 動き。dmg・cd (攻撃の間隔 秒)・range・hp (置いたときの耐久)
+  // 金貨で買う (同じ楽器をいくつも買える)。曲の中で最大 10 体を呼び出し、楽器は自分で動いて攻撃する
+  // kind: 攻撃のしかた。dmg・cd (攻撃の間隔 秒)・range・hp (耐久)。格 3 と格 5 で攻撃が強くなる (desc の ★2・★3)
   const TOWERS = {
-    piano: { name: { ja: 'ピアノ', en: 'Piano' }, kind: 'shot', price: 0, dmg: 6, cd: 0.5, range: 360, hp: 80,
-      desc: { ja: '近くの音符を狙って撃つ。★2 で 2 発、★3 で 3 発が貫く', en: 'Fires at the nearest note. ★2: 2 shots, ★3: 3 piercing shots' } },
+    piano: { name: { ja: 'ピアノ', en: 'Piano' }, kind: 'shot', price: 40, dmg: 6, cd: 0.5, range: 360, hp: 80,
+      desc: { ja: '近くの音符を狙って撃つ。格 3 で 2 発、格 5 で 3 発が貫く', en: 'Fires at the nearest note. Grade 3: 2 shots, Grade 5: 3 piercing shots' } },
     flute: { name: { ja: 'フルート', en: 'Flute' }, kind: 'homing', price: 80, dmg: 4, cd: 0.7, range: 520, hp: 50,
-      desc: { ja: '追いかける弾を 2 発。★2 で 3 発、★3 で 5 発', en: '2 homing shots. ★2: 3, ★3: 5' } },
+      desc: { ja: '追いかける弾を 2 発。格 3 で 3 発、格 5 で 5 発', en: '2 homing shots. Grade 3: 3, Grade 5: 5' } },
     violin: { name: { ja: 'ヴァイオリン', en: 'Violin' }, kind: 'beam', price: 250, dmg: 9, cd: 1.0, range: 1400, hp: 60,
-      desc: { ja: '真上へ光線。縦一列を貫く。★2 で太く、★3 で光線が残る', en: 'A beam straight up, piercing a whole column. ★2 wider, ★3 lingers' } },
+      desc: { ja: '真上へ光線。縦一列を貫く。格 3 で太く、格 5 で光線が残る', en: 'A beam straight up, piercing a whole column. Grade 3 wider, Grade 5 lingers' } },
     cello: { name: { ja: 'チェロ', en: 'Cello' }, kind: 'aura', price: 700, dmg: 4, cd: 0.5, range: 110, hp: 260,
-      desc: { ja: 'まわりの音符を遅くして削る。とても硬い。★2 で広く、★3 でときどき凍らせる', en: 'Slows and wears down nearby notes. Very sturdy. ★2 wider, ★3 sometimes freezes' } },
+      desc: { ja: 'まわりの音符を遅くして削る。とても硬い。格 3 で広く、格 5 でときどき凍らせる', en: 'Slows and wears down nearby notes. Very sturdy. Grade 3 wider, Grade 5 sometimes freezes' } },
     timpani: { name: { ja: 'ティンパニ', en: 'Timpani' }, kind: 'pulse', price: 2000, dmg: 14, cd: 1.8, range: 130, hp: 140,
-      desc: { ja: '衝撃波で押し上げる。★2 で 2 重、★3 でしびれさせる', en: 'A shockwave that pushes notes back up. ★2 double, ★3 stuns' } },
+      desc: { ja: '衝撃波で押し上げる。格 3 で 2 重、格 5 でしびれさせる', en: 'A shockwave that pushes notes back up. Grade 3 double, Grade 5 stuns' } },
     harp: { name: { ja: 'ハープ', en: 'Harp' }, kind: 'string', price: 6000, dmg: 10, cd: 0, range: 120, hp: 100,
-      desc: { ja: '横に弦を張る。弦を通りぬける音符を削る。★2 で 2 本、★3 で長く', en: 'Strings a horizontal line that cuts notes passing through. ★2 two strings, ★3 longer' } },
+      desc: { ja: '横に弦を張る。弦を通りぬける音符を削る。格 3 で 2 本、格 5 で長く', en: 'Strings a horizontal line that cuts notes passing through. Grade 3 two strings, Grade 5 longer' } },
     trumpet: { name: { ja: 'トランペット', en: 'Trumpet' }, kind: 'cone', price: 20000, dmg: 16, cd: 1.4, range: 240, hp: 90,
-      desc: { ja: '上へ扇形に吹き、まとめて押し戻す。★2 で 2 回、★3 で広く', en: 'Blasts an upward cone with knockback. ★2 twice, ★3 wider' } },
+      desc: { ja: '上へ扇形に吹き、まとめて押し戻す。格 3 で 2 回、格 5 で広く', en: 'Blasts an upward cone with knockback. Grade 3 twice, Grade 5 wider' } },
     cymbal: { name: { ja: 'シンバル', en: 'Cymbals' }, kind: 'boomerang', price: 60000, dmg: 12, cd: 1.6, range: 560, hp: 90,
-      desc: { ja: 'ブーメランのように飛んで戻る。行きも帰りも貫く。★2 で 2 枚、★3 で爆ぜる', en: 'Flies out and back like a boomerang, piercing both ways. ★2 two, ★3 bursts' } },
+      desc: { ja: 'ブーメランのように飛んで戻る。行きも帰りも貫く。格 3 で 2 枚、格 5 で爆ぜる', en: 'Flies out and back like a boomerang, piercing both ways. Grade 3 two, Grade 5 bursts' } },
     organ: { name: { ja: 'パイプオルガン', en: 'Pipe Organ' }, kind: 'pillar', price: 200000, dmg: 60, cd: 2.4, range: 1400, hp: 160,
-      desc: { ja: '画面で一番硬い音符に、パイプが突き上がる重い一撃。★2 で 2 か所、★3 で 3 か所', en: 'A pipe erupts under the toughest note on screen. ★2: 2 spots, ★3: 3' } },
+      desc: { ja: '画面で一番硬い音符に、パイプが突き上がる重い一撃。格 3 で 2 か所、格 5 で 3 か所', en: 'A pipe erupts under the toughest note on screen. Grade 3: 2 spots, Grade 5: 3' } },
     baton: { name: { ja: '指揮棒', en: 'Baton' }, kind: 'buff', price: 600000, dmg: 0, cd: 0, range: 220, hp: 120,
-      desc: { ja: '攻撃しない。自分とまわりの楽器の攻撃力と速さを上げる。★2・★3 で効果が大きく', en: 'No attack. Boosts the power and speed of you and nearby instruments. Stronger at ★2/★3' } },
+      desc: { ja: '攻撃しない。自分とまわりの楽器の攻撃力と速さを上げる。格 3・格 5 で効果が大きく', en: 'No attack. Boosts the power and speed of you and nearby instruments. Stronger at Grades 3 and 5' } },
   };
   const TOWER_IDS = Object.keys(TOWERS);
-  // 楽器の能力 (経験値で育てる)。最大 50
-  const TSTATS = [
-    { id: 'atk', name: { ja: '攻撃力', en: 'Power' }, max: 50, desc: { ja: '+12%', en: '+12%' } },
-    { id: 'spd', name: { ja: '速さ', en: 'Speed' }, max: 50, desc: { ja: '攻撃の間隔 −1.5%', en: '−1.5% interval' } },
-    { id: 'rng', name: { ja: '範囲', en: 'Reach' }, max: 50, desc: { ja: '+2%', en: '+2%' } },
-    { id: 'hp', name: { ja: '耐久', en: 'Durability' }, max: 50, desc: { ja: '置いたときの体力 +15%', en: '+15% HP when deployed' } },
+  // 同じ楽器をいくつも買える。2 つ目からは少しずつ高くなる
+  const unitPrice = (id, owned) => Math.round(TOWERS[id].price * (1 + 1.0 * owned));
+  const SELL_RATE = 0.4;
+
+  // 楽器の格 (5 段階)。金貨と素材で上げる。格が上がると強くなり、レベルの上限も上がる
+  const GRADES = [
+    { name: { ja: '見習い', en: 'Novice' }, mul: 1, cap: 10 },
+    { name: { ja: '団員', en: 'Member' }, mul: 1.5, cap: 20 },
+    { name: { ja: '首席', en: 'Principal' }, mul: 2.2, cap: 30 },
+    { name: { ja: '独奏者', en: 'Soloist' }, mul: 3.2, cap: 40 },
+    { name: { ja: '巨匠', en: 'Maestro' }, mul: 4.6, cap: 50 },
   ];
-  const tstatCost = (lv) => Math.round(30 * Math.pow(1.14, lv)); // 経験値
-  const evoCost = (id, star) => Math.max(500, TOWERS[id].price) * (star === 1 ? 5 : 30); // 金貨
-  const EVO_NEED = [0, 20, 60]; // 進化に必要な能力の合計 (★2・★3)
+  // 素材: 音符が落とす「音のかけら」6 色 (音符の色と同じ。強い音符ほど強い色) と、ボスが落とす「ボスの結晶」
+  const MATS = [
+    { id: 'w', name: { ja: '白のかけら', en: 'White Shard' }, col: '#f4f1ea' },
+    { id: 'b', name: { ja: '青のかけら', en: 'Blue Shard' }, col: '#4a90e2' },
+    { id: 'g', name: { ja: '緑のかけら', en: 'Green Shard' }, col: '#3cc46a' },
+    { id: 'r', name: { ja: '赤のかけら', en: 'Red Shard' }, col: '#e5484d' },
+    { id: 'p', name: { ja: '紫のかけら', en: 'Purple Shard' }, col: '#a15be6' },
+    { id: 'k', name: { ja: '黒のかけら', en: 'Black Shard' }, col: '#141414' },
+    { id: 'boss', name: { ja: 'ボスの結晶', en: 'Boss Crystal' }, col: '#ffd84a' },
+  ];
+  // 格を上げる値段 (いまの格 g = 1〜4 → g + 1)
+  function gradeCost(id, g) {
+    const base = Math.max(150, TOWERS[id].price);
+    const coins = Math.round(base * [0, 2, 6, 18, 50][g]);
+    const mats = [
+      null,
+      { w: 15, b: 6 },
+      { b: 25, g: 12, r: 3 },
+      { g: 40, r: 18, p: 5, boss: 1 },
+      { r: 45, p: 20, k: 5, boss: 3 },
+    ][g];
+    return { coins, mats };
+  }
+  // 楽器のレベル (倒した音符の経験値で自然に上がる。上限は格で決まる)
+  const expNeed = (lv) => Math.round(40 * Math.pow(1.25, lv));
 
   // ---------- 練習室 (自機の強化。作曲家ごと。金貨は共通) ----------
   // lv は 0〜max。値段は base × 1.16^lv
@@ -523,13 +551,29 @@
     upgrade: { ja: '強化', en: 'Upgrade' },
     evolve: { ja: '進化', en: 'Evolve' },
     evoNeed: { ja: '能力の合計 {n} で進化できる', en: 'Evolves at total level {n}' },
+    party: { ja: '呼び出す楽器 ({n}/{m})', en: 'Ensemble ({n}/{m})' },
+    inParty: { ja: '呼ぶ', en: 'In ensemble' },
+    notInParty: { ja: '呼ばない', en: 'Benched' },
+    partyFull: { ja: '呼び出せるのは {m} 体まで', en: 'Up to {m} instruments' },
+    grade: { ja: '格', en: 'Grade' },
+    gradeUp: { ja: '格を上げる', en: 'Raise grade' },
+    sell: { ja: '売る', en: 'Sell' },
+    sellConfirm: { ja: 'もう一度押すと売る', en: 'Tap again to sell' },
+    buyTab: { ja: '買う', en: 'Buy' },
+    unitsTab: { ja: '持っている楽器', en: 'Your instruments' },
+    materials: { ja: '素材', en: 'Materials' },
+    matsEarned: { ja: '拾った素材', en: 'Materials found' },
+    levelUps: { ja: 'レベルが上がった楽器', en: 'Instruments that leveled up' },
+    ownedN: { ja: '{n} 体', en: '×{n}' },
+    noUnits: { ja: '楽器を持っていない。「買う」から', en: 'No instruments yet. Buy some first.' },
+    summonHint: { ja: '楽器は自分で動いて攻撃する。壊れても 15 秒でまた呼び出される', en: 'Instruments move and attack on their own. Broken ones return after 15s.' },
     equip: { ja: '装備 (自機と一緒に撃つ)', en: 'Equipped (fly with you)' },
     deploy: { ja: '配置 (曲の中で置ける)', en: 'Deployable (place during play)' },
     empty: { ja: '空き', en: 'Empty' },
     choose: { ja: 'えらぶ', en: 'Choose' },
     remove: { ja: 'はずす', en: 'Remove' },
     practiceNote: { ja: '強化は作曲家ごと。金貨は全員共通', en: 'Upgrades are per composer. Ducats are shared.' },
-    shopNote: { ja: '楽器は買うと全員で使える。敵を倒すと経験値がたまり、能力を育てられる', en: 'Instruments are shared by everyone. Defeating notes earns EXP to train them.' },
+    shopNote: { ja: '同じ楽器をいくつも買える (全員で共通)。曲の中で最大 10 体を呼び出すと、自分で動いて攻撃する。敵を倒すとレベルが上がり、金貨と素材で格 (5 段階) を上げる', en: 'Buy as many as you like (shared by all composers). Up to 10 join each piece and fight on their own. They level up from defeated notes; raise their grade (5 steps) with ducats and materials.' },
     loadoutNote: { ja: '装備は 2 つ (自機の左右について撃つ)。配置は 3 つ (曲の中で好きな場所に置く。音符に当たると壊れ、少しすると置き直せる)', en: '2 equipped (fly beside you) and 3 deployable (place them during play; they break when hit and can be redeployed later).' },
     paused: { ja: '一時停止', en: 'Paused' },
     resume: { ja: '再開', en: 'Resume' },
@@ -569,5 +613,5 @@
     hintStruggle: { ja: '負けても金貨はもらえる。練習室で強くなってから、もう一度挑もう', en: 'You keep the ducats even when you fail. Train in the Practice Room and try again.' },
   };
 
-  window.CSData = { COMPOSERS, BOOKS, TIERS, SONGS, TOWERS, TOWER_IDS, TSTATS, tstatCost, evoCost, EVO_NEED, STATS, statCost, TEXT };
+  window.CSData = { COMPOSERS, BOOKS, TIERS, SONGS, TOWERS, TOWER_IDS, unitPrice, SELL_RATE, GRADES, MATS, gradeCost, expNeed, MAX_PARTY: 10, STATS, statCost, TEXT };
 })();
