@@ -28,7 +28,7 @@ CrazyGames 版・itch.io 版は Google タグを外すので、何も送らな�
 | `bowling` | `ワールド-ステージ` (`3-7` など) | ストライク・スペアでピンを全部倒した / 2投で残った | 始め: `world`。終わり: `clear_type` (strike / spare)、`treasure`、`pins_left` |
 | `breakout` | ステージ番号 (1〜) | ブロックを全部こわした / ライフがなくなった・リタイア | 始め: `difficulty`。終わり: `difficulty`、`clear_time`、`no_damage`、`time_attack`、`retired` |
 | `cleaning_survivors` | ステージ番号 (1〜)。チュートリアルは `tutorial` | 全部屋の清掃完了 / 力尽きた・時間切れ | 始め: `mode`、`character`。終わり: `mode`、`character`、`rooms_done`、`clean_pct`、`level`、`reason` (worn_out / time_up) |
-| `composer_survivors` | 曲の id (`elise`・`twinkle`・`nocturne` など) | ボスを倒した / 力尽きた | 始め: `mode`、`character` (作曲家の id)。終わり: `mode`、`character`、`level`。クリアは `rank`・`encore`、失敗は `progress_pct` (曲の何 % まで弾けたか) |
+| `composer_survivors` | 曲の id (`k2`・`elise`・`spring1` など)。パートは `_p` + 番号 (`elise_p2`) | 通しはボスを倒した・パートは音符をすべて倒すか通した / 力尽きた | 始め: `mode` (難しさ: `normal`・`hard`・`virtuoso`)、`character` (作曲家の id)。終わり: `mode`、`character`。失敗は `progress_pct` (曲の何 % まで弾けたか) |
 | `reclaim_gunners` | エリアの解放はエリアの id (`s1a3` など)、ボス戦は `boss_` + ボスの id (`boss_G1` など) | エリアを解放した・ボスを倒した / 力尽きた | 始め: `difficulty`、`hero`、`player_lv` (ボス戦は `boss_lv` も)。終わり: `reinvade` (エリア) |
 
 - reclaim-gunners はステージの区切りがないので、まだ解放していないエリアに入ったときをエリアの開始とする。エリアを出入りしても同じ挑戦のまま。別の未解放エリアに入る・全体図へ戻る・別のステージへ移ると、途中でやめたことになる。力尽きたあとにまたそのエリアに入ると失敗リトライ、解放したエリアを「再侵攻」すると成功リトライ
