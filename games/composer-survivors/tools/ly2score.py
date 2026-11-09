@@ -128,6 +128,7 @@ def pitch_of(name, octs):
     return 48 + NOTE[base] + acc + 12 * oct_shift
 
 
+SIMUL = {'restart': False, 'after': 'last'}  # << >> の相対音高の決め方
 NOTE_RE = re.compile(r"^([a-h](?:is|es|sharp|flat|s|f|x)*)([',]*)!?\??(\d+\.*)?(?:\*(\d+)(?:/(\d+))?)?$")
 REST_RE = re.compile(r"^([rRs])(\d+\.*)?(?:\*(\d+)(?:/(\d+))?)?$")
 
@@ -135,8 +136,8 @@ REST_RE = re.compile(r"^([rRs])(\d+\.*)?(?:\*(\d+)(?:/(\d+))?)?$")
 def dur_of(s, prev):
     if not s:
         return prev
-    m = re.match(r'(\d+)(\.*)', s)
-    base = F(4, int(m.group(1)))  # 4 分音符 = 1 拍
+    m = re.match(r'(\d+|\\breve|\\longa)(\.*)', s)
+    base = {'\\breve': F(8), '\\longa': F(16)}.get(m.group(1)) or F(4, int(m.group(1)))  # 4 分音符 = 1 拍
     d = base
     add = base
     for _ in m.group(2):
@@ -192,13 +193,18 @@ def parse_music(toks, variables, rel_start=None):
     p = Parser(toks, variables)
     notes = []
 
-    def seq(t0, scale=F(1), grace=False, end='}'):
-        """end が来るまで並べて読む。返り値は終わりの時刻"""
+    def seq(t0, scale=F(1), grace=False, end='}', stop=()):
+        """end が来るまで並べて読む。返り値は終わりの時刻。stop の字が来たら、読まずに戻る (<< a \\\\ b >> の括弧のない声部)"""
         t = t0
         last_note = None  # 記号をつける相手
         while True:
             tok = p.peek()
             if tok is None:
+                return t
+            if tok in stop:
+                return t
+            # 括弧のない声部は 1 つの音 (音・和音・休符) だけ (LilyPond の << >> の 1 要素)
+            if stop and t != t0 and (tok in ('{', '<', '<<') or NOTE_RE.match(tok) or REST_RE.match(tok)):
                 return t
             if tok == end:
                 p.next()
@@ -210,21 +216,45 @@ def parse_music(toks, variables, rel_start=None):
             if tok == '<<':
                 p.next()
                 # 同時に鳴る声部: { } のかたまりを同じ時刻から
+                # 相対音高は LilyPond と同じく、声部をつなげて決め (2 つめの声部は 1 つめの終わりの音から)、
+                # << >> のあとは 1 つめの声部の終わりの音から続ける
                 ends = [t]
+                first_rel = None
+                n_el = 0
+                start_rel = st['rel']
+
+                def mark_el():
+                    nonlocal first_rel, n_el
+                    n_el += 1
+                    if n_el == 1:
+                        first_rel = st['rel']
+                    if SIMUL['restart'] and st['rel'] is not None:
+                        st['rel'] = start_rel
+
                 while p.peek() not in (None, '>>'):
                     if p.peek() == '{':
                         p.next()
                         ends.append(seq(t, scale, grace))
+                        mark_el()
                     elif p.peek() == '\\\\':
                         p.next()
                     elif p.peek().startswith('\\') and p.peek() not in ('\\new', '\\context'):
                         r = handle_command(p.next(), t, scale, grace)
                         if r is not None:
                             ends.append(r)
+                            mark_el()
+                    elif p.peek() in ('\\new', '\\context'):
+                        p.next()
+                    elif NOTE_RE.match(p.peek()) or p.peek() in ('<', '<<') or re.match(r'^[rRs](\d|$)', p.peek()):
+                        # 括弧のない声部 (<< <a c f>4 \\\\ f4 >>): 次の \\\\ か >> まで
+                        ends.append(seq(t, scale, grace, end=None, stop=('\\\\', '>>')))
+                        mark_el()
                     else:
                         p.next()
                 p.next()
                 t = max(ends)
+                if SIMUL['after'] == 'first' and first_rel is not None and st['rel'] is not None:
+                    st['rel'] = first_rel
                 continue
             p.next()
             if tok.startswith('\\'):
@@ -251,11 +281,17 @@ def parse_music(toks, variables, rel_start=None):
                 if after and re.match(r'^\d+\.*$', after):
                     p.next()
                     d = dur_of(after, st['dur'])
+                    if p.peek() == '*':
+                        # <a c>4.*9/6: 長さに倍率 (省いた次の音にも続く)
+                        p.next()
+                        a_, _, b_ = (p.next() or '1').partition('/')
+                        d = d * int(a_) / int(b_ or 1)
                     st['dur'] = d
                 if pitches and st['rel'] is not None:
                     st['rel'] = pitches[0]
                 real = d * scale
                 made = []
+                st['chord'] = list(pitches)
                 for q in pitches:
                     n = add_note(t, real, q, grace, len(pitches))
                     if n:
@@ -265,18 +301,59 @@ def parse_music(toks, variables, rel_start=None):
                 if not grace:
                     t += real
                 continue
+            mq = re.match(r'^q(\d+\.*)?$', tok)
+            if mq and st.get('chord'):
+                # q: 前の和音をくり返す (高さは変えない。相対音高の基準も変えない)
+                dtok = mq.group(1)
+                if not dtok and p.peek() and re.match(r'^\d+\.*$', p.peek()):
+                    dtok = p.next()
+                d = dur_of(dtok, st['dur'])
+                if dtok:
+                    st['dur'] = d
+                real = d * scale
+                made = []
+                for q in st['chord']:
+                    n = add_note(t, real, q, grace, len(st['chord']))
+                    if n:
+                        made.append(n)
+                last_note = made
+                if not grace:
+                    t += real
+                continue
             m = NOTE_RE.match(tok)
             if m and tok not in ('s',) and not REST_RE.match(tok):
                 q = resolve(m.group(1), m.group(2))
                 dtok = m.group(3)
+                if not dtok and p.peek() in ('\\breve', '\\longa'):
+                    dtok = p.next()  # a\\breve (全音符 2 つ分)
+                    if p.peek() and re.match(r'^\.+$', p.peek()):
+                        dtok += p.next()
+                if not dtok and p.peek() == '=':
+                    # オクターブの確かめ (c,,,=,8): = のあとのオクターブに直す (LilyPond と同じ)
+                    p.next()
+                    octs = ''
+                    while p.peek() in ("'", ','):
+                        octs += p.next()
+                    q = pitch_of(m.group(1), octs)
+                    if st['rel'] is not None:
+                        st['rel'] = q
+                        letter = 'cdefgab'.index('b' if m.group(1)[0] == 'h' else m.group(1)[0])
+                        st['rel_step'][q] = 7 * (4 + octs.count("'") - octs.count(',')) + letter
                 if not dtok and p.peek() and re.match(r'^\d+\.*$', p.peek()):
                     dtok = p.next()  # 「ef 4.」のように、音名と長さの間に空白がある
                 d = dur_of(dtok, st['dur'])
-                if dtok:
-                    st['dur'] = d
                 if m.group(4):
                     d = d * int(m.group(4)) / int(m.group(5) or 1)
+                if dtok:
+                    st['dur'] = d  # 倍率も含めて、省いた次の音に続く (c8*2/3 d e)
                 real = d * scale
+                if p.peek() == '\\rest':
+                    # b'\\rest: 置く場所を決めた休符。音は出さない
+                    p.next()
+                    if not grace:
+                        t += real
+                    last_note = None
+                    continue
                 n = add_note(t, real, q, grace, 1)
                 last_note = [n] if n else None
                 if not grace:
@@ -285,10 +362,18 @@ def parse_music(toks, variables, rel_start=None):
             m = REST_RE.match(tok)
             if m:
                 d = dur_of(m.group(2), st['dur'])
-                if m.group(2):
-                    st['dur'] = d
                 if m.group(3):
                     d = d * int(m.group(3)) / int(m.group(4) or 1)
+                if m.group(2):
+                    st['dur'] = d  # 倍率も含めて続く (s8*2/3 s s)
+                if m.group(3):
+                    pass
+                elif p.peek() == '*':
+                    # 「s1 * 4」のように、* のまわりに空白がある
+                    p.next()
+                    mul = p.next() or '1'
+                    a_, _, b_ = mul.partition('/')
+                    d = d * int(a_) / int(b_ or 1)
                 if not grace:
                     t += d * scale
                 last_note = None
@@ -334,6 +419,10 @@ def parse_music(toks, variables, rel_start=None):
                 p.next()
                 return seq(t, scale, grace)
             return t
+        if name == 'barNumberCheck' and BARCHECK['on']:
+            MARKERS.append(('bnc', t, p.peek()))
+        if name == 'mark' and BARCHECK['on']:
+            MARKERS.append(('mark', t, p.peek()))
         if name == 'fermataMarkup' and BARCHECK['on']:
             MARKERS.append(('gp', t))
             return None
@@ -682,12 +771,33 @@ def extract_block(src, start_pat):
 
 
 def read_variables(src):
-    """name = { ... } / name = \\relative c' { ... } の形の変数"""
+    """name = { ... } / name = \\relative c' { ... } / name = \\relative c' \\other の形の変数。
+    LilyPond と同じく上から順に決める: 定義の中の \\other は、その時点での other の中身に置きかえる
+    (rhUp = {\\rhUp \\relative c'' \\rhUpRed} のように、同じ名前を少しずつ伸ばしていく書き方のため)"""
     out = {}
     # name = { … } のほか、name = \\new Voice = "x" \\relative c' { … } のように命令が前につくもの
     pre_re = r'(?:\\(?:relative(?:\s+[a-h](?:is|es|sharp|flat|s|f|x)*[\',]*)?|new\s+\w+(?:\s*=\s*"[^"]*")?|context\s+\w+(?:\s*=\s*"[^"]*")?|transpose\s+\S+\s+\S+|fixed\s+\S+)\s*)*'
-    for m in re.finditer(r'^[ \t]*([A-Za-z]+)\s*=\s*(' + pre_re + r')\{', src, re.M):
-        i = src.index('{', m.end() - 1)
+    ref_re = re.compile(r'\\([A-Za-z]+)(?![A-Za-z])')
+
+    assign_re = r'^[ \t]*([A-Za-z]+)\s*=\s*(' + pre_re + r')(\{|\\[A-Za-z]+(?![A-Za-z]))'
+    # 何度も定義される変数だけ、その時点の中身に置きかえる (1 度だけの変数は、読むときに名前で引く。\\fin などの印のため)
+    counts = {}
+    for m in re.finditer(assign_re, src, re.M):
+        counts[m.group(1)] = counts.get(m.group(1), 0) + 1
+
+    def expand(body):
+        return ref_re.sub(lambda m: ('{ ' + out[m.group(1)] + ' }') if m.group(1) in out and counts.get(m.group(1), 0) > 1 else m.group(0), body)
+
+    # \\parallelMusic #'(a b c) { 小節 a | 小節 b | 小節 c | … }: 小節線で切って、順に a・b・c へ配る
+    par_re = r"\\parallelMusic\s*#'\(([^)]*)\)\s*\{"
+    events = [(m.start(), 'def', m) for m in re.finditer(assign_re, src, re.M)]
+    events += [(m.start(), 'par', m) for m in re.finditer(par_re, src)]
+    for m in re.finditer(par_re, src):
+        for nm in m.group(1).split():
+            counts[nm] = counts.get(nm, 0) + 2
+    events.sort(key=lambda e: e[0])
+
+    def block_at(i):
         depth = 0
         for j in range(i, len(src)):
             if src[j] == '{':
@@ -695,9 +805,69 @@ def read_variables(src):
             elif src[j] == '}':
                 depth -= 1
                 if depth == 0:
-                    body = src[i:j + 1]
-                    out[m.group(1)] = (m.group(2) or '') + body
-                    break
+                    return src[i:j + 1]
+        return None
+
+    for _, kind, m in events:
+        if kind == 'par':
+            names = m.group(1).split()
+            body = block_at(m.end() - 1)
+            if body is None:
+                continue
+            inner = body[1:-1]
+            segs, depth, cur, k = [], 0, [], 0
+            while k < len(inner):
+                c = inner[k]
+                if c == '"':
+                    e_ = k + 1
+                    while e_ < len(inner) and inner[e_] != '"':
+                        e_ += 2 if inner[e_] == '\\' else 1
+                    cur.append(inner[k:e_ + 1])
+                    k = e_ + 1
+                    continue
+                if c == '%':
+                    e_ = inner.find('\n', k)
+                    e_ = len(inner) if e_ < 0 else e_
+                    k = e_
+                    continue
+                if inner.startswith('<<', k):
+                    depth += 1
+                    cur.append('<<')
+                    k += 2
+                    continue
+                if inner.startswith('>>', k):
+                    depth -= 1
+                    cur.append('>>')
+                    k += 2
+                    continue
+                if c == '{':
+                    depth += 1
+                elif c == '}':
+                    depth -= 1
+                if c == '|' and depth == 0:
+                    segs.append(''.join(cur))
+                    cur = []
+                else:
+                    cur.append(c)
+                k += 1
+            if ''.join(cur).strip():
+                segs.append(''.join(cur))
+            for vi, nm in enumerate(names):
+                out[nm] = '{ ' + ' | '.join(segs[vi::len(names)]) + ' | }'
+            continue
+        if m.group(3) == '{':
+            body = block_at(m.start(3))
+            if body is None:
+                continue
+        else:
+            # name = \\relative c' \\other (かっこなし): 変数だけを受けつける
+            if m.group(3)[1:] not in out:
+                continue
+            body = m.group(3)
+        # 自分自身を参照する定義 (rhUp = {\\rhUp …}) か、かっこのない定義のときは、その時点の中身に置きかえる
+        if body[0] != '{' or re.search(r'\\' + m.group(1) + r'(?![A-Za-z])', body):
+            body = expand(body)
+        out[m.group(1)] = (m.group(2) or '') + body
     return out
 
 

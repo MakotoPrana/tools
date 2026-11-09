@@ -1,421 +1,573 @@
-// 作曲家サバイバー: ゲームのデータ (作曲家・曲・楽器・パッシブ・練習室・画面の文言)
+// 作曲家サバイバー: ゲームのデータ (作曲家・曲集・曲・楽器・練習室・難しさ・画面の文言)
 (() => {
   'use strict';
 
-  // ---------- 作曲家 ----------
+  // ---------- 作曲家 (自機) ----------
+  // unlock: その曲集の 1 曲目を (どの作曲家でも) ノーマルの通しでクリアすると使える。null は最初から
   const COMPOSERS = [
     {
-      id: 'beethoven',
-      name: { ja: 'ベートーヴェン', en: 'Beethoven' },
-      weapon: 'timpani',
-      hp: 150,
-      speed: 0.95,
-      trait: { ja: '不屈: 指揮台の体力が半分を切ると、全タワーの攻撃力 +30%', en: 'Indomitable: all towers +30% power while the podium is below half HP' },
-      bio: {
-        ja: '耳が聞こえなくなっても作曲をやめなかった、ドイツの大作曲家。得意なタワーはティンパニ。',
-        en: 'The German master who kept composing even after losing his hearing. Favorite tower: Timpani.',
-      },
+      id: 'beethoven', name: { ja: 'ベートーヴェン', en: 'Beethoven' }, unlock: null,
+      trait: { ja: '不屈: 体力が半分を切ると、攻撃力 +30%', en: 'Indomitable: +30% power while below half HP' },
       colors: { coat: '#2d4a7a', hair: '#3b3330', scarf: '#c0392b', skin: '#f2c9a0' },
     },
     {
-      id: 'mozart',
-      name: { ja: 'モーツァルト', en: 'Mozart' },
-      weapon: 'violin',
-      hp: 120,
-      speed: 1.1,
-      trait: { ja: '神童: 倒した音符のインク +20%', en: 'Child Prodigy: +20% ink from notes' },
-      bio: {
-        ja: '5 歳で作曲を始めた天才。35 年の生涯で 600 を超える曲を残した。得意なタワーはヴァイオリン。',
-        en: 'A genius who began composing at five and wrote over 600 works in 35 years. Favorite tower: Violin.',
-      },
+      id: 'mozart', name: { ja: 'モーツァルト', en: 'Mozart' }, unlock: null,
+      trait: { ja: '神童: もらえる金貨 +20%', en: 'Child Prodigy: +20% ducats' },
       colors: { coat: '#b8323c', hair: '#f4f1ea', scarf: '#f5e6b8', skin: '#f6d2b0' },
     },
     {
-      id: 'chopin',
-      name: { ja: 'ショパン', en: 'Chopin' },
-      weapon: 'piano',
-      hp: 110,
-      speed: 1,
-      trait: { ja: 'ピアノの詩人: 全タワーの攻撃間隔 −10%、ピアノは弾が 1 つ多い', en: 'Poet of the Piano: all towers −10% cooldown, pianos fire +1 shot' },
-      bio: {
-        ja: 'ポーランド生まれ、パリで活躍した「ピアノの詩人」。作品のほとんどがピアノ曲。得意なタワーはピアノ。',
-        en: 'The Polish-born "Poet of the Piano" who shone in Paris. Favorite tower: Piano.',
-      },
+      id: 'chopin', name: { ja: 'ショパン', en: 'Chopin' }, unlock: null,
+      trait: { ja: 'ピアノの詩人: 弾を撃つ間隔 −10%', en: 'Poet of the Piano: −10% fire interval' },
       colors: { coat: '#20232b', hair: '#7a5236', scarf: '#ffffff', skin: '#f3d6bd' },
     },
+    {
+      id: 'bach', name: { ja: 'バッハ', en: 'Bach' }, unlock: 'bach',
+      trait: { ja: 'フーガ: 4 回に 1 回、同じ弾が少し遅れてもう一度出る', en: 'Fugue: every 4th volley echoes a moment later' },
+      colors: { coat: '#5b3a29', hair: '#eeeae0', scarf: '#f4efe4', skin: '#e9c3a0' },
+    },
+    {
+      id: 'vivaldi', name: { ja: 'ヴィヴァルディ', en: 'Vivaldi' }, unlock: 'vivaldi',
+      trait: { ja: '四季: 20 秒ごとに季節が変わる (春 攻撃 +25%・夏 連射 +25%・秋 金貨 +40%・冬 音符が遅い)', en: 'Four Seasons: every 20s the season changes (spring power, summer fire rate, autumn ducats, winter slows notes)' },
+      colors: { coat: '#7a1f2b', hair: '#c0392b', scarf: '#f4efe4', skin: '#f2cfae' },
+    },
+    {
+      id: 'tchaikovsky', name: { ja: 'チャイコフスキー', en: 'Tchaikovsky' }, unlock: 'tchaikovsky',
+      trait: { ja: '1812 年: 一振りが 30% 早くたまり、威力 +50% (大砲の音)', en: '1812: the baton sweep charges 30% faster and hits 50% harder' },
+      colors: { coat: '#2e3b4e', hair: '#d0d0d0', scarf: '#f4efe4', skin: '#f1cfb4' },
+    },
+    {
+      id: 'debussy', name: { ja: 'ドビュッシー', en: 'Debussy' }, unlock: 'debussy',
+      trait: { ja: '印象派: 弾が音符を 1 つ貫く。そのかわり攻撃力 −10%', en: 'Impressionist: shots pierce one note, −10% power' },
+      colors: { coat: '#3d4b3a', hair: '#2b2420', scarf: '#d8c8a8', skin: '#efcfb0' },
+    },
   ];
-  // あとの版で足す作曲家 (選択画面にシルエットで出す)
-  const FUTURE_COMPOSERS = [
-    { id: 'bach', name: { ja: 'バッハ', en: 'Bach' } },
-    { id: 'vivaldi', name: { ja: 'ヴィヴァルディ', en: 'Vivaldi' } },
-    { id: 'tchaikovsky', name: { ja: 'チャイコフスキー', en: 'Tchaikovsky' } },
-    { id: 'debussy', name: { ja: 'ドビュッシー', en: 'Debussy' } },
+
+  // ---------- 曲集 ----------
+  // need: 開く条件 [曲集, 何曲目] (その曲をどれかの難しさの通しでクリア)。power: 曲集の強さ (音符の硬さ・金貨の基準)
+  const BOOKS = [
+    { id: 'beginner', name: { ja: 'はじめての曲集', en: 'First Pieces' }, need: null, power: 0.6, color: '#7fb77e' },
+    { id: 'beethoven', name: { ja: 'ベートーヴェン代表曲集', en: 'Beethoven Favorites' }, need: [['beginner', 3]], power: 7, color: '#2d4a7a' },
+    { id: 'mozart', name: { ja: 'モーツァルト代表曲集', en: 'Mozart Favorites' }, need: [['beginner', 3]], power: 7, color: '#b8323c' },
+    { id: 'chopin', name: { ja: 'ショパン代表曲集', en: 'Chopin Favorites' }, need: [['beginner', 3]], power: 7, color: '#6c5b7b' },
+    { id: 'bach', name: { ja: 'バッハ代表曲集', en: 'Bach Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, color: '#8b5a2b' },
+    { id: 'vivaldi', name: { ja: 'ヴィヴァルディ代表曲集', en: 'Vivaldi Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, color: '#c0392b' },
+    { id: 'tchaikovsky', name: { ja: 'チャイコフスキー代表曲集', en: 'Tchaikovsky Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 350, color: '#2e3b4e' },
+    { id: 'debussy', name: { ja: 'ドビュッシー代表曲集', en: 'Debussy Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 350, color: '#58a55c' },
+  ];
+
+  // ---------- 難しさ (1 つのステージに 3 段階) ----------
+  const TIERS = [
+    { id: 'normal', name: { ja: 'ノーマル', en: 'Normal' }, hp: 1, dmg: 1, reward: 1 },
+    { id: 'hard', name: { ja: 'ハード', en: 'Hard' }, hp: 3, dmg: 1.5, reward: 3 },
+    { id: 'virtuoso', name: { ja: 'ヴィルトゥオーソ', en: 'Virtuoso' }, hp: 6, dmg: 2, reward: 6 },
   ];
 
   // ---------- 曲 (ステージ) ----------
-  // score: scores/*.js にある譜面の id (ないものは「準備中」)
-  // openToAll: 最初からどの作曲家でも遊べる (作曲家本人がクリアしなくても)
-  // hpMul: 曲ごとの音符の硬さの調整 (ふつうは 1)
+  // book: 曲集。no: 曲集の中の順番。score: scores/*.js の譜面
   const SONGS = [
-    // ベートーヴェン
+    // ---- はじめての曲集 ----
     {
-      id: 'elise', composer: 'beethoven', no: 1, stars: 1, score: 'elise',
+      id: 'k2', book: 'beginner', no: 1, score: 'k2',
+      title: { ja: 'メヌエット ヘ長調 K. 2 (モーツァルト)', en: 'Minuet in F, K. 2 (Mozart)' },
+      boss: { id: 'musicbox', ja: 'オルゴール', en: 'The Music Box', pattern: 'aimed', color: '#e8c070', glyph: '🎁' },
+      trivia: {
+        ja: 'モーツァルトが 6 歳 (1762 年) のころに作った小さなメヌエット。父レオポルトが楽譜に書きとめた。',
+        en: 'A little minuet Mozart made up at age six (1762); his father Leopold wrote it down.',
+      },
+    },
+    {
+      id: 'laboureur', book: 'beginner', no: 2, score: 'laboureur',
+      title: { ja: '楽しき農夫 (シューマン「子供のためのアルバム」)', en: 'The Happy Farmer (Schumann, Album for the Young)' },
+      boss: { id: 'scarecrow', ja: '陽気なかかし', en: 'The Jolly Scarecrow', pattern: 'spread', color: '#c9a227', glyph: '🌾' },
+      trivia: {
+        ja: '1848 年、シューマンが子どもたちのために書いた「子供のためのアルバム」の 1 曲。仕事帰りの農夫の歌を、左手が歌う。',
+        en: 'From the Album for the Young Schumann wrote for his children in 1848. The left hand sings the farmer\'s homeward song.',
+      },
+    },
+    {
+      id: 'petzold', book: 'beginner', no: 3, score: 'petzold',
+      title: { ja: 'メヌエット ト長調 (アンナ・マクダレーナ・バッハの音楽帳)', en: 'Minuet in G (Anna Magdalena Notebook)' },
+      boss: { id: 'metronome', ja: '銀のメトロノーム', en: 'The Silver Metronome', pattern: 'aimed', color: '#b8c4d6', glyph: '⏱' },
+      trivia: {
+        ja: '「アンナ・マクダレーナ・バッハのための音楽帳」(1725 年) にある有名なメヌエット。長くバッハの作と思われていたが、今はペツォールトの作とされる。',
+        en: 'The famous minuet from the 1725 notebook for Anna Magdalena Bach. Long credited to Bach, it is now attributed to Christian Petzold.',
+      },
+    },
+    {
+      id: 'gymnopedie', book: 'beginner', no: 4, score: 'gymnopedie',
+      title: { ja: 'ジムノペディ第 1 番 (サティ)', en: 'Gymnopédie No. 1 (Satie)' },
+      boss: { id: 'cat', ja: '月夜の黒猫', en: 'The Moonlit Black Cat', pattern: 'spread', color: '#4a3f6b', glyph: '🐈‍⬛' },
+      trivia: {
+        ja: '1888 年の作品。ゆっくりした 3 拍子の静かな和音の上に、旋律がぽつりぽつりと浮かぶ。',
+        en: 'From 1888: a slow, quiet waltz-time accompaniment with a melody that floats above it one note at a time.',
+      },
+    },
+    {
+      id: 'clementi', book: 'beginner', no: 5, score: 'clementi',
+      title: { ja: 'ソナチネ ハ長調 Op. 36-1 第 1 楽章 (クレメンティ)', en: 'Sonatina in C, Op. 36 No. 1, I (Clementi)' },
+      boss: { id: 'clocktower', ja: 'ソナチネの時計塔', en: 'The Sonatina Clock Tower', pattern: 'radial', color: '#8b6f47', glyph: '🕰' },
+      trivia: {
+        ja: 'クレメンティのソナチネ Op. 36 は、今もピアノを習う人がよく弾く 6 曲。その第 1 番の第 1 楽章。',
+        en: 'Clementi\'s six Op. 36 sonatinas are still staples for piano students; this is the first movement of No. 1.',
+      },
+    },
+    // ---- ベートーヴェン・モーツァルト・ショパン ----    // ベートーヴェン
+    {
+      id: 'elise', book: 'beethoven', no: 1, score: 'elise',
       title: { ja: 'エリーゼのために', en: 'Für Elise' },
       boss: { id: 'lady', ja: '謎の令嬢エリーゼ', en: 'The Mysterious Elise', pattern: 'aimed', color: '#9b59b6' },
-      room: { id: 'lodging', ja: 'ウィーンの下宿の一室', en: 'A Rented Room in Vienna', floor: 'wood' },
       trivia: {
         ja: '1810 年ごろの作曲。「エリーゼ」がだれなのかは今もわかっていない。楽譜は作曲者の死後 40 年たってから見つかった。',
         en: 'Composed around 1810. Nobody knows for sure who "Elise" was; the score was found 40 years after his death.',
       },
     },
     {
-      id: 'minuet', composer: 'beethoven', no: 2, stars: 2, score: 'minuet',
+      id: 'minuet', book: 'beethoven', no: 2, score: 'minuet',
       title: { ja: 'ピアノソナタ第20番 第2楽章「ト長調のメヌエット」', en: 'Piano Sonata No. 20, II. Tempo di Menuetto' },
       boss: { id: 'dancer', ja: '宮廷の踊り子', en: 'The Court Dancer', pattern: 'spread', color: '#e67fa8' },
-      room: { id: 'court', ja: '宮廷の舞踏室', en: 'A Court Ballroom', floor: 'marble' },
       trivia: {
         ja: 'ベートーヴェンが若いころに書いた、やさしいソナタ (Op. 49-2) の終楽章。このメヌエットの主題は、のちに七重奏曲でも使われた。',
         en: 'The finale of an easy early sonata (Op. 49 No. 2). Beethoven later reused this minuet theme in his Septet.',
       },
     },
     {
-      id: 'pathetique3', composer: 'beethoven', no: 3, stars: 3, score: 'pathetique3',
+      id: 'pathetique3', book: 'beethoven', no: 3, score: 'pathetique3',
       title: { ja: 'ピアノソナタ第8番「悲愴」第3楽章', en: 'Pathétique Sonata, III. Rondo' },
       boss: { id: 'carriage', ja: '嵐の馬車', en: 'The Storm Carriage', pattern: 'aimed', color: '#5b6e8c' },
-      room: { id: 'road', ja: '雨の街道の宿', en: 'An Inn on a Rainy Road', floor: 'wood' },
       trivia: {
         ja: '1798 年、27 歳ごろの作品。「悲愴」という題はベートーヴェン自身がつけた数少ない題のひとつ。ハ短調のロンドが何度も戻ってくる。',
         en: 'Written around 1798. "Pathétique" is one of the few titles Beethoven chose himself; a C-minor rondo theme keeps returning.',
       },
     },
     {
-      id: 'fate', composer: 'beethoven', no: 4, stars: 4, score: 'fate', hpMul: 0.85,
+      id: 'fate', book: 'beethoven', no: 4, score: 'fate',
       title: { ja: '交響曲第5番「運命」第1楽章 (ピアノ版)', en: 'Symphony No. 5, I. (piano reduction)' },
       boss: { id: 'door', ja: '運命の扉', en: 'The Door of Fate', pattern: 'radial', color: '#7a4a2a' },
-      room: { id: 'hall', ja: '嵐の夜の大広間', en: 'A Great Hall on a Stormy Night', floor: 'carpet' },
       trivia: {
         ja: '「ジャジャジャジャーン」の 4 つの音が、楽章じゅうに形を変えて現れる。「運命はこのように扉を叩く」と言ったという話が伝わる。',
         en: 'The famous four-note motif reappears in endless forms. Legend has it Beethoven said, "Thus Fate knocks at the door."',
       },
     },
     {
-      id: 'moonlight3', composer: 'beethoven', no: 5, stars: 5, score: 'moonlight3', hpMul: 0.65,
+      id: 'moonlight3', book: 'beethoven', no: 5, score: 'moonlight3',
       title: { ja: 'ピアノソナタ第14番「月光」第3楽章', en: 'Moonlight Sonata, III. Presto agitato' },
       boss: { id: 'moon', ja: '嵐の満月', en: 'The Stormy Full Moon', pattern: 'radial', color: '#f2e4a0' },
-      room: { id: 'study', ja: '月明かりの書斎', en: 'A Moonlit Study', floor: 'wood' },
       trivia: {
         ja: '静かな第 1 楽章とは正反対の、嵐のような終楽章。「月光」という名前は、作曲者の死後に詩人がつけたもの。',
         en: 'The stormy opposite of the calm first movement. The nickname "Moonlight" was given by a poet after Beethoven\'s death.',
       },
     },
-    // モーツァルト
     {
-      id: 'twinkle', composer: 'mozart', no: 1, stars: 1, score: 'twinkle', openToAll: true, hpMul: 1.05,
+      id: 'twinkle', book: 'mozart', no: 1, score: 'twinkle',
       title: { ja: 'きらきら星変奏曲', en: 'Twelve Variations on "Ah vous dirai-je, Maman"' },
       boss: { id: 'star', ja: 'きらきら星', en: 'The Twinkling Star', pattern: 'radial', color: '#f1c40f' },
-      room: { id: 'salon', ja: 'パリのサロン', en: 'A Paris Salon', floor: 'marble' },
       trivia: {
         ja: 'フランスの民謡「ああ、お母さん聞いて」をもとにした 12 の変奏曲 (1781〜82 年ごろ)。このゲームでは 6 分に収めるため、繰り返しを省いている。',
         en: 'Twelve variations (c. 1781–82) on a French song, the tune of "Twinkle, Twinkle". Repeats are omitted here to fit in six minutes.',
       },
     },
     {
-      id: 'turkish', composer: 'mozart', no: 2, stars: 2, score: 'turkish',
+      id: 'turkish', book: 'mozart', no: 2, score: 'turkish',
       title: { ja: 'ピアノソナタ第11番 第3楽章「トルコ行進曲」', en: 'Piano Sonata No. 11, III. Rondo alla Turca' },
       boss: { id: 'band', ja: '軍楽隊長', en: 'The Bandmaster', pattern: 'aimed', color: '#c0392b' },
-      room: { id: 'court2', ja: '宮廷の広間', en: 'A Court Hall', floor: 'marble' },
       trivia: {
         ja: '当時ウィーンで流行していた、トルコの軍楽隊 (メフテル) の響きをまねた楽章。左手の打楽器のような和音がその名残。',
         en: 'Imitates the Turkish janissary bands then fashionable in Vienna; the drum-like left-hand chords are a nod to them.',
       },
     },
     {
-      id: 'nacht', composer: 'mozart', no: 3, stars: 3, score: 'nacht',
+      id: 'nacht', book: 'mozart', no: 3, score: 'nacht',
       title: { ja: 'アイネ・クライネ・ナハトムジーク 第1楽章', en: 'Eine kleine Nachtmusik, I. Allegro' },
       boss: { id: 'quartet', ja: '真夜中の弦楽四重奏', en: 'The Midnight Quartet', pattern: 'spread', color: '#3b4a7a' },
-      room: { id: 'soiree', ja: '夜会のホール', en: 'A Soirée Hall', floor: 'carpet' },
       trivia: {
         ja: '「小さな夜の音楽」という意味。弦楽のための曲で、このゲームでは 4 つの声部をピアノの音で鳴らしている。',
         en: '"A little night music", written for strings; here its four parts are played on the piano.',
       },
     },
     {
-      id: 'fantasia', composer: 'mozart', no: 4, stars: 4, score: 'fantasia',
+      id: 'fantasia', book: 'mozart', no: 4, score: 'fantasia',
       title: { ja: '幻想曲 ニ短調 K. 397', en: 'Fantasia in D minor, K. 397' },
       boss: { id: 'phantom', ja: '霧の中の幻影', en: 'The Phantom in the Mist', pattern: 'spread', color: '#8fa3b8' },
-      room: { id: 'misty', ja: '霧の回廊', en: 'A Misty Gallery', floor: 'marble' },
       trivia: {
         ja: '暗く即興的な序奏と、突然の速いパッセージ。最後は明るいニ長調で終わる。終わりの数小節は、ほかの人が書き足したと言われる。',
         en: 'A dark, improvisatory piece with sudden rapid flourishes that ends in bright D major; the last bars are thought to be by another hand.',
       },
     },
     {
-      id: 'k457', composer: 'mozart', no: 5, stars: 5, score: 'k457', hpMul: 0.7,
+      id: 'k457', book: 'mozart', no: 5, score: 'k457',
       title: { ja: 'ピアノソナタ第14番 ハ短調 第3楽章', en: 'Piano Sonata No. 14 in C minor, III.' },
       boss: { id: 'grey', ja: '灰色の使者', en: 'The Grey Messenger', pattern: 'aimed', color: '#7d7d86' },
-      room: { id: 'cathedral', ja: '夜の大聖堂', en: 'A Cathedral at Night', floor: 'marble' },
       trivia: {
         ja: 'モーツァルトには珍しい、激しい短調のソナタ (1784 年)。何度も止まっては走り出す、緊張した終楽章。',
         en: 'One of Mozart\'s rare stormy minor-key sonatas (1784); a tense finale that keeps stopping and bursting forward.',
       },
     },
-    // ショパン
     {
-      id: 'nocturne', composer: 'chopin', no: 1, stars: 1, score: 'nocturne', openToAll: true, hpMul: 0.74,
+      id: 'nocturne', book: 'chopin', no: 1, score: 'nocturne',
       title: { ja: 'ノクターン第2番', en: 'Nocturne Op. 9 No. 2' },
       boss: { id: 'candle', ja: 'サロンの燭台', en: 'The Salon Candelabra', pattern: 'spread', color: '#e67e22' },
-      room: { id: 'salonP', ja: 'パリのサロン', en: 'A Paris Salon', floor: 'carpet' },
       trivia: {
         ja: '20 歳ごろ (1830〜31 年) に書かれた、ショパンのいちばん有名な夜想曲。ゆったりした 12/8 拍子の上で、歌うような旋律が飾られていく。',
         en: 'Written around age 20 (1830–31), it is Chopin\'s most famous nocturne: a singing, ornamented melody over a gentle 12/8 lilt.',
       },
     },
     {
-      id: 'minute', composer: 'chopin', no: 2, stars: 2, score: 'minute',
+      id: 'minute', book: 'chopin', no: 2, score: 'minute',
       title: { ja: '子犬のワルツ', en: 'Minute Waltz' },
       boss: { id: 'puppy', ja: '子犬', en: 'The Puppy', pattern: 'radial', color: '#d9a066' },
-      room: { id: 'parlor', ja: '屋敷の居間', en: 'A Parlor', floor: 'wood' },
       trivia: {
         ja: '自分のしっぽを追いかけてくるくる回る子犬を見て書いたと言われる。英語の「Minute」は「1 分」ではなく「小さな」という意味。',
         en: 'Said to depict a little dog chasing its tail. "Minute" means "small", not "sixty seconds".',
       },
     },
     {
-      id: 'fantaisie', composer: 'chopin', no: 3, stars: 3, score: 'fantaisie', hpMul: 0.6,
+      id: 'fantaisie', book: 'chopin', no: 3, score: 'fantaisie',
       title: { ja: '幻想即興曲', en: 'Fantaisie-Impromptu' },
       boss: { id: 'phantom', ja: '幻影', en: 'The Phantom', pattern: 'spread', color: '#b38fd9' },
-      room: { id: 'mirror', ja: '鏡の間', en: 'The Hall of Mirrors', floor: 'marble' },
       trivia: {
         ja: '右手の 16 分音符と左手の 3 連符がかみ合わない、独特のうねり。ショパンは生前この曲を出版せず、死後に世に出た。',
         en: 'Sixteenths against triplets give it its restless swirl. Chopin never published it; it appeared after his death.',
       },
     },
     {
-      id: 'revolution', composer: 'chopin', no: 4, stars: 4, score: 'revolution', hpMul: 0.7,
+      id: 'revolution', book: 'chopin', no: 4, score: 'revolution',
       title: { ja: '練習曲「革命」', en: 'Revolutionary Étude' },
       boss: { id: 'flame', ja: '革命の炎', en: 'The Flame of Revolution', pattern: 'radial', color: '#e8542f' },
-      room: { id: 'inn', ja: '旅の宿', en: 'A Traveler\'s Inn', floor: 'wood' },
       trivia: {
         ja: '左手が休みなく駆けめぐる練習曲。ワルシャワ蜂起が失敗したという知らせを聞いたころに書かれたと言われる。',
         en: 'A study for a relentless left hand, said to date from when Chopin heard of the failed Warsaw uprising.',
       },
     },
     {
-      id: 'winterwind', composer: 'chopin', no: 5, stars: 5, score: 'winterwind', hpMul: 1.5,
+      id: 'winterwind', book: 'chopin', no: 5, score: 'winterwind',
       title: { ja: '練習曲「木枯らし」', en: '"Winter Wind" Étude' },
       boss: { id: 'wind', ja: '木枯らし', en: 'The Winter Wind', pattern: 'spread', color: '#9cc9e8' },
-      room: { id: 'forest', ja: '冬の森の館', en: 'A Manor in the Winter Woods', floor: 'wood' },
       trivia: {
         ja: '静かな 4 小節の序奏のあと、右手が吹きすさぶ風のように上下に駆けめぐり、左手が行進曲のような主題を力強く鳴らす。',
         en: 'After four quiet bars, the right hand whirls up and down like a gale while the left hand hammers out a march-like theme.',
       },
     },
+    // ---- バッハ ----
+    {
+      id: 'bwv846', book: 'bach', no: 1, score: 'bwv846',
+      title: { ja: '平均律クラヴィーア曲集 第 1 巻 前奏曲第 1 番 ハ長調', en: 'Well-Tempered Clavier I, Prelude No. 1 in C' },
+      boss: { id: 'arpeggio', ja: '光のアルペジオ', en: 'The Shining Arpeggio', pattern: 'radial', color: '#f2d16b', glyph: '✨' },
+      trivia: {
+        ja: '「平均律クラヴィーア曲集」第 1 巻 (1722 年) の最初の曲。分散和音だけでできていて、のちにグノーがこの上に「アヴェ・マリア」の旋律をのせた。',
+        en: 'The opening piece of the Well-Tempered Clavier, Book I (1722), built entirely of broken chords; Gounod later laid his "Ave Maria" over it.',
+      },
+    },
+    {
+      id: 'invention1', book: 'bach', no: 2, score: 'invention1',
+      title: { ja: 'インヴェンション第 1 番 ハ長調', en: 'Invention No. 1 in C' },
+      boss: { id: 'twins', ja: '鏡の双子', en: 'The Mirror Twins', pattern: 'aimed', color: '#7fa6c9', glyph: '🪞' },
+      trivia: {
+        ja: 'バッハが息子のために書いた 2 声の練習曲集 (1723 年清書) の第 1 曲。右手の短い動機を、左手がまねして追いかける。',
+        en: 'The first of the two-part inventions Bach wrote for his son (fair copy 1723). The left hand imitates the right hand\'s short motif.',
+      },
+    },
+    {
+      id: 'invention8', book: 'bach', no: 3, score: 'invention8',
+      title: { ja: 'インヴェンション第 8 番 ヘ長調', en: 'Invention No. 8 in F' },
+      boss: { id: 'clockbird', ja: 'ぜんまい仕掛けの鳥', en: 'The Clockwork Bird', pattern: 'spread', color: '#d98c5f', glyph: '🐦' },
+      trivia: {
+        ja: '同じ曲集の第 8 番。右手が分散和音で駆け上がる動機を、左手が少し遅れて追いかける。',
+        en: 'No. 8 of the same set: the left hand chases the right hand\'s rising broken-chord figure a little behind.',
+      },
+    },
+    {
+      id: 'fugue2', book: 'bach', no: 4, score: 'fugue2',
+      title: { ja: '平均律クラヴィーア曲集 第 1 巻 フーガ第 2 番 ハ短調', en: 'Well-Tempered Clavier I, Fugue No. 2 in C minor' },
+      boss: { id: 'labyrinth', ja: '迷宮のフーガ', en: 'The Fugue Labyrinth', pattern: 'radial', color: '#6b5b95', glyph: '🌀' },
+      trivia: {
+        ja: '平均律第 1 巻の第 2 番のフーガ。3 つの声部が、同じ主題を順に歌いつないでいく。',
+        en: 'The C-minor fugue from Book I: three voices take up the same subject one after another.',
+      },
+    },
+    {
+      id: 'italian', book: 'bach', no: 5, score: 'italian',
+      title: { ja: 'イタリア協奏曲 第 1 楽章', en: 'Italian Concerto, I' },
+      boss: { id: 'sun', ja: 'イタリアの太陽', en: 'The Italian Sun', pattern: 'radial', color: '#f39c12', glyph: '☀' },
+      trivia: {
+        ja: '1735 年に出版された、チェンバロ 1 台で協奏曲の響きを表した曲。2 段鍵盤の強弱で、独奏と合奏を描き分ける。',
+        en: 'Published in 1735, it recreates a concerto on a single harpsichord, contrasting soloist and orchestra on its two keyboards.',
+      },
+    },
+    // ---- ヴィヴァルディ ----
+    {
+      id: 'winter2', book: 'vivaldi', no: 1, score: 'winter2',
+      title: { ja: '「四季」より 冬 第 2 楽章', en: 'The Four Seasons: Winter, II' },
+      boss: { id: 'hearth', ja: '暖炉の火', en: 'The Hearth Fire', pattern: 'spread', color: '#e67e22', glyph: '🔥' },
+      trivia: {
+        ja: '「四季」(1725 年出版) の「冬」第 2 楽章。添えられたソネットでは、外の雨をよそに暖炉のそばで静かに過ごす様子が描かれる。',
+        en: 'Winter\'s slow movement from The Four Seasons (1725). Its sonnet pictures quiet days by the fire while rain falls outside.',
+      },
+    },
+    {
+      id: 'spring1', book: 'vivaldi', no: 2, score: 'spring1',
+      title: { ja: '「四季」より 春 第 1 楽章', en: 'The Four Seasons: Spring, I' },
+      boss: { id: 'songbird', ja: '春の小鳥', en: 'The Spring Songbird', pattern: 'spread', color: '#7dcea0', glyph: '🐤' },
+      trivia: {
+        ja: '「春」第 1 楽章。春の訪れ、小鳥のさえずり、泉のせせらぎ、雷鳴が、ソネットのとおりに描かれる。',
+        en: 'Spring arrives with birdsong, murmuring streams and a thunderstorm, just as its sonnet describes.',
+      },
+    },
+    {
+      id: 'autumn3', book: 'vivaldi', no: 3, score: 'autumn3',
+      title: { ja: '「四季」より 秋 第 3 楽章「狩り」', en: 'The Four Seasons: Autumn, III "The Hunt"' },
+      boss: { id: 'horn', ja: '狩りの角笛', en: 'The Hunting Horn', pattern: 'aimed', color: '#b9770e', glyph: '📯' },
+      trivia: {
+        ja: '「秋」第 3 楽章。夜明けに角笛と猟犬で獲物を追う、狩りの様子を描く。',
+        en: 'Autumn\'s finale: hunters set out at dawn with horns and hounds in pursuit of their quarry.',
+      },
+    },
+    {
+      id: 'winter1', book: 'vivaldi', no: 4, score: 'winter1',
+      title: { ja: '「四季」より 冬 第 1 楽章', en: 'The Four Seasons: Winter, I' },
+      boss: { id: 'icestorm', ja: '氷の嵐', en: 'The Ice Storm', pattern: 'radial', color: '#aed6f1', glyph: '❄' },
+      trivia: {
+        ja: '「冬」第 1 楽章。凍える寒さ、足踏み、歯がガチガチ鳴る様子を、弦の刻みで描く。',
+        en: 'Winter\'s first movement: freezing cold, stamping feet and chattering teeth, all painted by the strings.',
+      },
+    },
+    {
+      id: 'summer3', book: 'vivaldi', no: 5, score: 'summer3',
+      title: { ja: '「四季」より 夏 第 3 楽章「嵐」', en: 'The Four Seasons: Summer, III "Storm"' },
+      boss: { id: 'thundercloud', ja: '夏の雷雲', en: 'The Summer Thundercloud', pattern: 'radial', color: '#5d6d7e', glyph: '⛈' },
+      trivia: {
+        ja: '「夏」第 3 楽章。激しい雷雨とひょうが畑を打ちすえる、嵐の楽章。',
+        en: 'Summer\'s finale: a violent thunderstorm and hail batter the fields.',
+      },
+    },
+    // ---- チャイコフスキー ----
+    {
+      id: 'oldfrench', book: 'tchaikovsky', no: 1, score: 'oldfrench',
+      title: { ja: '古いフランスの歌 (「子供のアルバム」)', en: 'Old French Song (Album for the Young)' },
+      boss: { id: 'doll', ja: 'オルゴールの人形', en: 'The Music-Box Doll', pattern: 'spread', color: '#e6a0b4', glyph: '🎎' },
+      trivia: {
+        ja: '1878 年の「子供のアルバム」Op. 39 の 1 曲。古いフランスの歌をもとにした、もの悲しい旋律。',
+        en: 'From the Album for the Young, Op. 39 (1878): a wistful melody based on an old French tune.',
+      },
+    },
+    {
+      id: 'woodensoldiers', book: 'tchaikovsky', no: 2, score: 'woodensoldiers',
+      title: { ja: '木の兵隊の行進 (「子供のアルバム」)', en: 'March of the Wooden Soldiers (Album for the Young)' },
+      boss: { id: 'toysoldier', ja: 'ブリキの隊長', en: 'The Toy Captain', pattern: 'aimed', color: '#c0392b', glyph: '🥁' },
+      trivia: {
+        ja: '同じ「子供のアルバム」から。おもちゃの兵隊が行進するような、軽い付点のリズム。',
+        en: 'Also from the Album for the Young: crisp dotted rhythms like toy soldiers on parade.',
+      },
+    },
+    {
+      id: 'january', book: 'tchaikovsky', no: 3, score: 'january',
+      title: { ja: '「四季」より 1 月「炉ばたにて」', en: 'The Seasons: January "At the Fireside"' },
+      boss: { id: 'armchair', ja: '炉ばたの安楽椅子', en: 'The Fireside Armchair', pattern: 'spread', color: '#a04000', glyph: '🪑' },
+      trivia: {
+        ja: 'ピアノ曲集「四季」(1876 年) の 1 月。月ごとに詩が添えられ、1 月は暖炉のそばのまどろみを描く。',
+        en: 'January from The Seasons (1876). Each month comes with a poem; January dozes by the fire.',
+      },
+    },
+    {
+      id: 'february', book: 'tchaikovsky', no: 4, score: 'february',
+      title: { ja: '「四季」より 2 月「謝肉祭」', en: 'The Seasons: February "Carnival"' },
+      boss: { id: 'mask', ja: '謝肉祭の仮面', en: 'The Carnival Mask', pattern: 'radial', color: '#8e44ad', glyph: '🎭' },
+      trivia: {
+        ja: '「四季」の 2 月「謝肉祭」。冬の終わりの、にぎやかなお祭り騒ぎ。',
+        en: 'February in The Seasons: the boisterous carnival at winter\'s end.',
+      },
+    },
+    {
+      id: 'august', book: 'tchaikovsky', no: 5, score: 'august',
+      title: { ja: '「四季」より 8 月「収穫の歌」', en: 'The Seasons: August "Harvest"' },
+      boss: { id: 'sheaf', ja: '黄金の麦束', en: 'The Golden Sheaf', pattern: 'radial', color: '#d4ac0d', glyph: '🌾' },
+      trivia: {
+        ja: '「四季」の 8 月「収穫の歌」。刈り入れの忙しさを、休みなく駆ける 6/8 拍子で描く。',
+        en: 'August in The Seasons: the bustle of the harvest in restless 6/8 time.',
+      },
+    },
+    // ---- ドビュッシー ----
+    {
+      id: 'arabesque1', book: 'debussy', no: 1, score: 'arabesque1',
+      title: { ja: 'アラベスク第 1 番', en: 'Arabesque No. 1' },
+      boss: { id: 'vine', ja: '唐草の蔓', en: 'The Arabesque Vine', pattern: 'spread', color: '#58a55c', glyph: '🌿' },
+      trivia: {
+        ja: '若いドビュッシーの作品 (1888〜91 年ごろ)。流れる 3 連符が、唐草模様 (アラベスク) のように曲線を描く。',
+        en: 'An early work (c. 1888–91): flowing triplets trace curves like an arabesque ornament.',
+      },
+    },
+    {
+      id: 'clairdelune', book: 'debussy', no: 2, score: 'clairdelune',
+      title: { ja: '月の光 (ベルガマスク組曲)', en: 'Clair de Lune (Suite bergamasque)' },
+      boss: { id: 'moon', ja: '月', en: 'The Moon', pattern: 'spread', color: '#dfe6f2' },
+      trivia: {
+        ja: '「ベルガマスク組曲」(1905 年出版) の第 3 曲。題はヴェルレーヌの詩「月の光」からとった。',
+        en: 'The third piece of the Suite bergamasque (published 1905), named after Verlaine\'s poem "Clair de lune".',
+      },
+    },
+    {
+      id: 'arabesque2', book: 'debussy', no: 3, score: 'arabesque2',
+      title: { ja: 'アラベスク第 2 番', en: 'Arabesque No. 2' },
+      boss: { id: 'butterfly', ja: '戯れる蝶', en: 'The Playful Butterfly', pattern: 'aimed', color: '#e59866', glyph: '🦋' },
+      trivia: {
+        ja: '2 つのアラベスクの 2 曲目。軽やかでいたずらっぽい、跳ねるリズムの曲。',
+        en: 'The second of the two Arabesques: light, playful and full of skipping rhythms.',
+      },
+    },
+    {
+      id: 'parfums', book: 'debussy', no: 4, score: 'parfums',
+      title: { ja: '音と香りは夕暮れの大気に漂う (前奏曲集 第 1 巻)', en: 'Les sons et les parfums tournent dans l\'air du soir (Préludes I)' },
+      boss: { id: 'dusk', ja: 'たそがれの花', en: 'The Twilight Flower', pattern: 'spread', color: '#c39bd3', glyph: '🌸' },
+      trivia: {
+        ja: '「前奏曲集」第 1 巻 (1910 年) の第 4 曲。題はボードレールの詩「夕べの諧調」の一節から。',
+        en: 'No. 4 of Préludes, Book I (1910); the title is a line from Baudelaire\'s "Harmonie du soir".',
+      },
+    },
+    {
+      id: 'ventplaine', book: 'debussy', no: 5, score: 'ventplaine',
+      title: { ja: '野を渡る風 (前奏曲集 第 1 巻)', en: 'Le vent dans la plaine (Préludes I)' },
+      boss: { id: 'wind', ja: '野の風', en: 'The Wind on the Plain', pattern: 'radial', color: '#a9cce3' },
+      trivia: {
+        ja: '前奏曲集第 1 巻の第 3 曲。ささやくような速い音型が、平原を渡る風を描く。',
+        en: 'No. 3 of Préludes, Book I: whispering rapid figures sketch the wind sweeping over the plain.',
+      },
+    },
   ];
 
-  // ---------- タワー (楽器) ----------
-  // 譜面の上に置く。reg: 得意な音域 (lo / mid / hi / all。得意な音域の音符には 1.5 倍)。
-  // cost: 建てる値段 (インク)。lv(L): レベル 1〜5 の値。evo: レベル 5 から進化 (値段は cost × 3)
-  // kind: 攻撃のしかた。shot (弾) / beam (右へ水平の光線) / aura (まわりを遅く) / pulse (衝撃波で右へ押し戻す) /
-  //       homing (追いかける弾) / string (縦の弦を通った音符に) / cone (右へ扇) / buff (まわりのタワーを強化) /
-  //       splash (投げて範囲) / pillar (遠くに重い一撃)
+  // ---------- 楽器 (タワー) ----------
+  // 金貨で買う。買ったあとは、敵を倒すと経験値がたまり、経験値で能力を育てる。金貨で進化 (★2・★3)
+  // kind: 動き。dmg・cd (攻撃の間隔 秒)・range・hp (置いたときの耐久)
   const TOWERS = {
-    piano: {
-      name: { ja: 'ピアノ', en: 'Piano' }, reg: 'all', kind: 'shot', cost: 60, evo: 'hammer',
-      desc: { ja: '一番先頭の音符を撃つ。どの音域にも効く基本のタワー', en: 'Shoots the leading note. A solid all-rounder' },
-      lv: (L) => ({ dmg: 9 + L * 4, cd: 0.9 - L * 0.06, range: 150 + L * 15 }),
-    },
-    violin: {
-      name: { ja: 'ヴァイオリン', en: 'Violin' }, reg: 'hi', kind: 'beam', cost: 80, evo: 'strad',
-      desc: { ja: '右へまっすぐ光線。同じ高さを流れる旋律をまとめて貫く', en: 'Fires a beam straight right, piercing a whole melodic line at its pitch' },
-      lv: (L) => ({ dmg: 10 + L * 5, cd: 1.5 - L * 0.1, len: 300 + L * 40, width: 26 + L * 3 }),
-    },
-    cello: {
-      name: { ja: 'チェロ', en: 'Cello' }, reg: 'lo', kind: 'aura', cost: 70, evo: 'contrabass',
-      desc: { ja: 'まわりの音符を遅くし、少しずつ削る', en: 'Slows and wears down notes around it' },
-      lv: (L) => ({ dmg: 3 + L * 2, cd: 0.5, range: 90 + L * 10, slow: 0.2 + L * 0.02 }),
-    },
-    timpani: {
-      name: { ja: 'ティンパニ', en: 'Timpani' }, reg: 'lo', kind: 'pulse', cost: 90, evo: 'thunder',
-      desc: { ja: '衝撃波で、まわりの音符を右へ押し戻す', en: 'A shockwave that knocks nearby notes back to the right' },
-      lv: (L) => ({ dmg: 9 + L * 5, cd: 2.0 - L * 0.12, range: 90 + L * 10, kb: 40 + L * 8 }),
-    },
-    flute: {
-      name: { ja: 'フルート', en: 'Flute' }, reg: 'hi', kind: 'homing', cost: 70, evo: 'magicflute',
-      desc: { ja: '射程が長く、追いかける弾を何発も撃つ。速い高音に強い', en: 'Long range, several homing shots. Great against fast high notes' },
-      lv: (L) => ({ dmg: 4 + L * 2.5, cd: 1.0 - L * 0.06, range: 230 + L * 15, count: 2 + (L >= 3) + (L >= 5) }),
-    },
-    harp: {
-      name: { ja: 'ハープ', en: 'Harp' }, reg: 'all', kind: 'string', cost: 100, evo: 'celestial',
-      desc: { ja: '縦に弦を張る。弦を通りぬける音符すべてにダメージ', en: 'Strings a vertical line; every note passing through takes damage' },
-      lv: (L) => ({ dmg: 10 + L * 5, range: 70 + L * 12 }),
-    },
-    baton: {
-      name: { ja: '指揮棒', en: 'Baton' }, reg: 'mid', kind: 'buff', cost: 120, evo: 'maestro',
-      desc: { ja: '攻撃しない。まわりのタワーの攻撃力と攻撃の速さを上げる', en: 'No attack. Boosts the power and speed of nearby towers' },
-      lv: (L) => ({ range: 110 + L * 10, might: 0.12 + L * 0.04, haste: 0.08 + L * 0.03 }),
-    },
-    trumpet: {
-      name: { ja: 'トランペット', en: 'Trumpet' }, reg: 'mid', kind: 'cone', cost: 110, evo: 'fanfare', locked: 'fate',
-      desc: { ja: '右へ扇形に吹き、音符を強く押し戻す', en: 'Blasts a cone to the right with strong knockback' },
-      lv: (L) => ({ dmg: 12 + L * 5, cd: 1.6 - L * 0.1, range: 160 + L * 15, kb: 70 + L * 10 }),
-    },
-    cymbal: {
-      name: { ja: 'シンバル', en: 'Cymbals' }, reg: 'mid', kind: 'splash', cost: 100, evo: 'janissary', locked: 'turkish',
-      desc: { ja: '先頭の音符へ投げ、まわりにも当たる', en: 'Thrown at the leading note, hitting those around it' },
-      lv: (L) => ({ dmg: 10 + L * 5, cd: 1.5 - L * 0.08, range: 180 + L * 12, splash: 50 + L * 5 }),
-    },
-    organ: {
-      name: { ja: 'パイプオルガン', en: 'Pipe Organ' }, reg: 'lo', kind: 'pillar', cost: 140, evo: 'cathedral', locked: 'k457',
-      desc: { ja: '遠くの硬い音符に、重い一撃', en: 'A heavy blow on tough notes far away' },
-      lv: (L) => ({ dmg: 30 + L * 14, cd: 2.4 - L * 0.12, range: 300 + L * 20, splash: 36 }),
-    },
+    piano: { name: { ja: 'ピアノ', en: 'Piano' }, kind: 'shot', price: 0, dmg: 6, cd: 0.5, range: 360, hp: 80,
+      desc: { ja: '近くの音符を狙って撃つ。★2 で 2 発、★3 で 3 発が貫く', en: 'Fires at the nearest note. ★2: 2 shots, ★3: 3 piercing shots' } },
+    flute: { name: { ja: 'フルート', en: 'Flute' }, kind: 'homing', price: 80, dmg: 4, cd: 0.7, range: 520, hp: 50,
+      desc: { ja: '追いかける弾を 2 発。★2 で 3 発、★3 で 5 発', en: '2 homing shots. ★2: 3, ★3: 5' } },
+    violin: { name: { ja: 'ヴァイオリン', en: 'Violin' }, kind: 'beam', price: 250, dmg: 9, cd: 1.0, range: 1400, hp: 60,
+      desc: { ja: '真上へ光線。縦一列を貫く。★2 で太く、★3 で光線が残る', en: 'A beam straight up, piercing a whole column. ★2 wider, ★3 lingers' } },
+    cello: { name: { ja: 'チェロ', en: 'Cello' }, kind: 'aura', price: 700, dmg: 4, cd: 0.5, range: 110, hp: 260,
+      desc: { ja: 'まわりの音符を遅くして削る。とても硬い。★2 で広く、★3 でときどき凍らせる', en: 'Slows and wears down nearby notes. Very sturdy. ★2 wider, ★3 sometimes freezes' } },
+    timpani: { name: { ja: 'ティンパニ', en: 'Timpani' }, kind: 'pulse', price: 2000, dmg: 14, cd: 1.8, range: 130, hp: 140,
+      desc: { ja: '衝撃波で押し上げる。★2 で 2 重、★3 でしびれさせる', en: 'A shockwave that pushes notes back up. ★2 double, ★3 stuns' } },
+    harp: { name: { ja: 'ハープ', en: 'Harp' }, kind: 'string', price: 6000, dmg: 10, cd: 0, range: 120, hp: 100,
+      desc: { ja: '横に弦を張る。弦を通りぬける音符を削る。★2 で 2 本、★3 で長く', en: 'Strings a horizontal line that cuts notes passing through. ★2 two strings, ★3 longer' } },
+    trumpet: { name: { ja: 'トランペット', en: 'Trumpet' }, kind: 'cone', price: 20000, dmg: 16, cd: 1.4, range: 240, hp: 90,
+      desc: { ja: '上へ扇形に吹き、まとめて押し戻す。★2 で 2 回、★3 で広く', en: 'Blasts an upward cone with knockback. ★2 twice, ★3 wider' } },
+    cymbal: { name: { ja: 'シンバル', en: 'Cymbals' }, kind: 'boomerang', price: 60000, dmg: 12, cd: 1.6, range: 560, hp: 90,
+      desc: { ja: 'ブーメランのように飛んで戻る。行きも帰りも貫く。★2 で 2 枚、★3 で爆ぜる', en: 'Flies out and back like a boomerang, piercing both ways. ★2 two, ★3 bursts' } },
+    organ: { name: { ja: 'パイプオルガン', en: 'Pipe Organ' }, kind: 'pillar', price: 200000, dmg: 60, cd: 2.4, range: 1400, hp: 160,
+      desc: { ja: '画面で一番硬い音符に、パイプが突き上がる重い一撃。★2 で 2 か所、★3 で 3 か所', en: 'A pipe erupts under the toughest note on screen. ★2: 2 spots, ★3: 3' } },
+    baton: { name: { ja: '指揮棒', en: 'Baton' }, kind: 'buff', price: 600000, dmg: 0, cd: 0, range: 220, hp: 120,
+      desc: { ja: '攻撃しない。自分とまわりの楽器の攻撃力と速さを上げる。★2・★3 で効果が大きく', en: 'No attack. Boosts the power and speed of you and nearby instruments. Stronger at ★2/★3' } },
   };
-  // 旧い名前で参照しているところのため
-  const WEAPONS = TOWERS;
-
-  const EVOS = {
-    hammer: { name: { ja: 'ハンマークラヴィーア', en: 'Hammerklavier' }, desc: { ja: '3 発の和音が貫通し、当たると爆ぜる', en: 'Triple chord shots that pierce and burst' } },
-    strad: { name: { ja: 'ストラディヴァリウス', en: 'Stradivarius' }, desc: { ja: '太い光線を出し続ける', en: 'A thick, lingering beam' } },
-    contrabass: { name: { ja: '大地のコントラバス', en: 'Earthshaking Contrabass' }, desc: { ja: '広い範囲を大きく遅くする', en: 'Greatly slows a wide area' } },
-    thunder: { name: { ja: '雷鳴のティンパニ', en: 'Thunder Timpani' }, desc: { ja: '2 重の衝撃波で、音符をしびれさせる', en: 'Double shockwaves that stun' } },
-    magicflute: { name: { ja: '魔笛', en: 'The Magic Flute' }, desc: { ja: '当てた音符をときどき魅了し、逆向きに流して仲間を攻撃させる', en: 'Sometimes charms notes to flow backward and strike their friends' } },
-    celestial: { name: { ja: '天上のハープ', en: 'Celestial Harp' }, desc: { ja: '弦が 2 本になり、高く張る', en: 'Two taller strings' } },
-    maestro: { name: { ja: 'マエストロのタクト', en: "Maestro's Baton" }, desc: { ja: '強化が大きくなり、まわりの音符も遅くする', en: 'Bigger boosts, and slows nearby notes' } },
-    fanfare: { name: { ja: '凱旋のファンファーレ', en: 'Triumphal Fanfare' }, desc: { ja: '2 回吹いて、大きく押し戻す', en: 'Blasts twice with huge knockback' } },
-    janissary: { name: { ja: '軍楽隊の大シンバル', en: 'Janissary Cymbals' }, desc: { ja: '2 枚を投げ、大きく爆ぜる', en: 'Throws two with a big crash' } },
-    cathedral: { name: { ja: '大聖堂のオルガン', en: 'Cathedral Organ' }, desc: { ja: '一度に 3 か所へ重い一撃', en: 'Three heavy blows at once' } },
-  };
-
-  // ---------- 練習室 (恒久アップグレード。作曲家ごと) ----------
-  const UPGRADES = [
-    { id: 'hp', name: { ja: '指揮台の体力', en: 'Podium HP' }, desc: { ja: '+10', en: '+10' }, max: 10, base: 40 },
-    { id: 'might', name: { ja: '攻撃力', en: 'Power' }, desc: { ja: 'タワーの攻撃力 +5%', en: 'Tower power +5%' }, max: 10, base: 60 },
-    { id: 'cd', name: { ja: '攻撃の速さ', en: 'Attack Speed' }, desc: { ja: '攻撃間隔 −3%', en: '−3% cooldown' }, max: 5, base: 100 },
-    { id: 'area', name: { ja: '射程', en: 'Range' }, desc: { ja: '+5%', en: '+5%' }, max: 5, base: 80 },
-    { id: 'ink', name: { ja: '最初のインク', en: 'Starting Ink' }, desc: { ja: '+25', en: '+25' }, max: 8, base: 50 },
-    { id: 'income', name: { ja: 'インクの量', en: 'Ink Income' }, desc: { ja: '倒した音符のインク +5%', en: '+5% ink from notes' }, max: 10, base: 80 },
-    { id: 'discount', name: { ja: '値引き', en: 'Discount' }, desc: { ja: '建てる・強化する値段 −3%', en: '−3% build and upgrade cost' }, max: 5, base: 120 },
-    { id: 'greed', name: { ja: '金貨', en: 'Ducats' }, desc: { ja: 'もらえる金貨 +10%', en: '+10% ducats' }, max: 5, base: 100 },
-    { id: 'revive', name: { ja: 'カーテンコール', en: 'Curtain Call' }, desc: { ja: '1 回だけ、体力が 0 になっても半分で立ち直る', en: 'Once, recover to half HP instead of falling' }, max: 1, base: 2000 },
+  const TOWER_IDS = Object.keys(TOWERS);
+  // 楽器の能力 (経験値で育てる)。最大 50
+  const TSTATS = [
+    { id: 'atk', name: { ja: '攻撃力', en: 'Power' }, max: 50, desc: { ja: '+12%', en: '+12%' } },
+    { id: 'spd', name: { ja: '速さ', en: 'Speed' }, max: 50, desc: { ja: '攻撃の間隔 −1.5%', en: '−1.5% interval' } },
+    { id: 'rng', name: { ja: '範囲', en: 'Reach' }, max: 50, desc: { ja: '+2%', en: '+2%' } },
+    { id: 'hp', name: { ja: '耐久', en: 'Durability' }, max: 50, desc: { ja: '置いたときの体力 +15%', en: '+15% HP when deployed' } },
   ];
+  const tstatCost = (lv) => Math.round(30 * Math.pow(1.14, lv)); // 経験値
+  const evoCost = (id, star) => Math.max(500, TOWERS[id].price) * (star === 1 ? 5 : 30); // 金貨
+  const EVO_NEED = [0, 20, 60]; // 進化に必要な能力の合計 (★2・★3)
+
+  // ---------- 練習室 (自機の強化。作曲家ごと。金貨は共通) ----------
+  // lv は 0〜max。値段は base × 1.16^lv
+  const STATS = [
+    { id: 'atk', name: { ja: '攻撃力', en: 'Power' }, max: 100, base: 12, desc: { ja: '弾の威力 ×1.065 (重なる)', en: 'Shot damage ×1.065 (compounding)' } },
+    { id: 'rate', name: { ja: '連射', en: 'Fire Rate' }, max: 100, base: 15, desc: { ja: '撃つ間隔 −1.5%', en: '−1.5% fire interval' } },
+    { id: 'ways', name: { ja: '弾の数', en: 'Spread' }, max: 96, base: 40, desc: { ja: '12 段ごとに弾が 1 本増える', en: '+1 shot every 12 levels' } },
+    { id: 'hp', name: { ja: '体力', en: 'Max HP' }, max: 100, base: 10, desc: { ja: '+5', en: '+5' } },
+    { id: 'def', name: { ja: '防御', en: 'Defense' }, max: 100, base: 18, desc: { ja: '受けるダメージ −0.7%', en: '−0.7% damage taken' } },
+    { id: 'speed', name: { ja: '移動の速さ', en: 'Move Speed' }, max: 100, base: 8, desc: { ja: '+1%', en: '+1%' } },
+    { id: 'crit', name: { ja: '会心', en: 'Critical' }, max: 100, base: 20, desc: { ja: '会心の出やすさ +0.5% (会心は 2.5 倍)', en: '+0.5% crit chance (crits deal 2.5×)' } },
+    { id: 'magnet', name: { ja: '回収', en: 'Magnet' }, max: 100, base: 6, desc: { ja: '金貨を引き寄せる範囲 +3%', en: '+3% pickup range' } },
+    { id: 'greed', name: { ja: '金運', en: 'Fortune' }, max: 100, base: 25, desc: { ja: 'もらえる金貨 +3%', en: '+3% ducats' } },
+    { id: 'bomb', name: { ja: '一振り', en: 'Baton Sweep' }, max: 100, base: 22, desc: { ja: 'たまる速さ +1%・威力 +5%', en: '+1% charge speed, +5% power' } },
+  ];
+  const statCost = (st, lv) => Math.round(st.base * Math.pow(1.16, lv));
 
   // ---------- 画面の文言 ----------
   const TEXT = {
     gameTitle: { ja: '作曲家サバイバー', en: 'Composer Survivors' },
-    ink: { ja: 'インク', en: 'Ink' },
-    testMode: { ja: 'テスト版: 全曲・ハード・全タワーを選べます', en: 'Test build: all pieces, Hard and all towers unlocked' },
-    evosFull: { ja: '進化できるのは {n} 基まで (ほかの進化したタワーを売ると空く)', en: 'Only {n} towers can evolve (sell an evolved one to free a slot)' },
-    towersFull: { ja: 'タワーは {n} 基まで。売るか、強化・進化で強くしよう', en: 'Up to {n} towers. Sell one, or upgrade and evolve instead' },
-    build: { ja: '建てる', en: 'Build' },
-    upgrade: { ja: '強化', en: 'Upgrade' },
-    evolve: { ja: '進化', en: 'Evolve' },
-    sell: { ja: '売る', en: 'Sell' },
-    sellConfirm: { ja: 'もう一度押すと売る', en: 'Tap again to sell' },
-    close: { ja: '閉じる', en: 'Close' },
-    maxLv: { ja: '最大', en: 'Max' },
-    prepHint: { ja: '譜面にタワーを置いてから「開演」。音符は右から左へ流れてくる', en: 'Place towers on the score, then start. Notes flow from right to left' },
-    startShow: { ja: '▶ 開演', en: '▶ Start' },
-    leaked: { ja: '通した音符', en: 'Notes let through' },
-    bossIncoming: { ja: 'ボスが流れてくる! 指揮台に届く前に倒せ', en: 'The boss is coming! Stop it before it reaches the podium' },
-    landscape: { ja: '横向きにすると遊びやすくなります', en: 'Turn your device sideways for a better view' },
-    lockedTower: { ja: '「{s}」をクリアすると使える', en: 'Clear "{s}" to unlock' },
-    favorite: { ja: '得意', en: 'Favorite' },
-    towerUnlocked: { ja: '新しいタワー「{w}」を使えるようになりました', en: 'New tower unlocked: {w}' },
+    subtitle: { ja: '降ってくる曲の音符を、作曲家と楽器で撃ち落とせ。', en: 'Shoot down the notes of the music as they rain down.' },
     backToGames: { ja: '‹ ゲーム一覧', en: '‹ Games' },
-    subtitle: { ja: '楽譜を流れてくる音符を、楽器のタワーで止めろ。', en: 'Stop the notes flowing across the score with instrument towers.' },
-    start: { ja: 'はじめる', en: 'Start' },
+    play: { ja: '▶ 曲集をえらぶ', en: '▶ Choose a Songbook' },
     practice: { ja: '🎹 練習室', en: '🎹 Practice Room' },
+    shop: { ja: '🎻 楽器店', en: '🎻 Instrument Shop' },
+    loadout: { ja: '🎼 編成', en: '🎼 Ensemble' },
     settings: { ja: '⚙ 設定', en: '⚙ Settings' },
     howto: { ja: '遊び方', en: 'How to Play' },
     back: { ja: '‹ 戻る', en: '‹ Back' },
-    completion: { ja: '達成率', en: 'Completion' },
-    chooseComposer: { ja: '作曲家をえらぶ', en: 'Choose a Composer' },
-    chooseSong: { ja: '曲をえらぶ', en: 'Choose a Piece' },
-    withThis: { ja: 'この作曲家で曲をえらぶ', en: 'Choose a piece with this composer' },
-    startWeapon: { ja: '得意なタワー (攻撃力 +25%・2 割引き)', en: 'Favorite tower (+25% power, 20% off)' },
-    trait: { ja: '個性', en: 'Trait' },
-    hp: { ja: '指揮台の体力', en: 'Podium HP' },
-    comingSoon: { ja: '準備中', en: 'Coming soon' },
-    futureComposer: { ja: 'あとの版で登場', en: 'Coming in a later update' },
-    cleared: { ja: 'クリアした曲', en: 'Pieces cleared' },
-    normal: { ja: 'ノーマル', en: 'Normal' },
-    hard: { ja: 'ハード「プレスト」', en: 'Hard "Presto"' },
-    hardShort: { ja: 'ハード', en: 'Hard' },
-    hardLocked: { ja: 'ハードはノーマルをクリアすると開く', en: 'Clear Normal to unlock Hard' },
-    lockedPrev: { ja: '前の曲をクリアすると開く', en: 'Clear the previous piece to unlock' },
-    lockedOwn: { ja: '{c} でクリアすると解禁', en: 'Clear it with {c} to unlock' },
-    ownPiece: { ja: '自作自演: 攻撃力 +10%', en: 'Own piece: +10% power' },
-    coStar: { ja: '共演: 金貨 ×1.2', en: 'Guest performance: ducats ×1.2' },
-    boss: { ja: 'ボス', en: 'Boss' },
-    room: { ja: '部屋', en: 'Room' },
+    composer: { ja: '作曲家', en: 'Composer' },
+    locked: { ja: '未解禁', en: 'Locked' },
+    unlockBook: { ja: '「{b}」の {n} 曲目をクリアすると開く', en: 'Clear piece {n} of "{b}" to unlock' },
+    unlockBookAny: { ja: '{b} のどれかで {n} 曲目をクリアすると開く', en: 'Clear piece {n} of any of: {b}' },
+    unlockComposer: { ja: '「{b}」の 1 曲目をクリアすると仲間になる', en: 'Joins when you clear piece 1 of "{b}"' },
+    unlockSong: { ja: '前の曲を通しでクリアすると開く', en: 'Clear the previous piece (full) to unlock' },
+    unlockTier: { ja: '1 つ下の難しさをクリアすると開く', en: 'Clear the tier below to unlock' },
+    full: { ja: '通し', en: 'Full' },
+    part: { ja: 'パート {n}', en: 'Part {n}' },
+    bars: { ja: '{a}〜{b} 小節', en: 'bars {a}–{b}' },
+    bossOnlyFull: { ja: 'ボスは通しでだけ出る', en: 'The boss appears only in full runs' },
     notes: { ja: '音符', en: 'Notes' },
     length: { ja: '長さ', en: 'Length' },
-    curtainUp: { ja: '開演', en: 'Curtain Up' },
-    range: { ja: '音域', en: 'Range' },
-    low: { ja: '低い音', en: 'Low' },
-    mid: { ja: '中くらい', en: 'Mid' },
-    high: { ja: '高い音', en: 'High' },
-    short: { ja: '短い音', en: 'Short' },
-    long: { ja: '長い音', en: 'Long' },
-    levelUp: { ja: 'LEVEL UP!', en: 'LEVEL UP!' },
-    reroll: { ja: '選び直す ({n})', en: 'Reroll ({n})' },
-    moreLevels: { ja: 'あと {n} 回', en: '+{n} more' },
-    weaponTag: { ja: '楽器', en: 'Instrument' },
-    passiveTag: { ja: 'パッシブ', en: 'Passive' },
-    newTag: { ja: 'NEW', en: 'NEW' },
-    healOpt: { ja: '体力を 30 回復', en: 'Recover 30 HP' },
-    goldOpt: { ja: '金貨 +10', en: '+10 ducats' },
+    boss: { ja: 'ボス', en: 'Boss' },
+    trivia: { ja: '曲のこと', en: 'About the piece' },
+    start: { ja: '▶ 開演', en: '▶ Start' },
+    ducats: { ja: '金貨', en: 'Ducats' },
+    exp: { ja: '経験値', en: 'EXP' },
+    lv: { ja: 'Lv', en: 'Lv' },
+    max: { ja: '最大', en: 'MAX' },
+    buy: { ja: '買う', en: 'Buy' },
+    owned: { ja: '持っている', en: 'Owned' },
+    upgrade: { ja: '強化', en: 'Upgrade' },
+    evolve: { ja: '進化', en: 'Evolve' },
+    evoNeed: { ja: '能力の合計 {n} で進化できる', en: 'Evolves at total level {n}' },
+    equip: { ja: '装備 (自機と一緒に撃つ)', en: 'Equipped (fly with you)' },
+    deploy: { ja: '配置 (曲の中で置ける)', en: 'Deployable (place during play)' },
+    empty: { ja: '空き', en: 'Empty' },
+    choose: { ja: 'えらぶ', en: 'Choose' },
+    remove: { ja: 'はずす', en: 'Remove' },
+    practiceNote: { ja: '強化は作曲家ごと。金貨は全員共通', en: 'Upgrades are per composer. Ducats are shared.' },
+    shopNote: { ja: '楽器は買うと全員で使える。敵を倒すと経験値がたまり、能力を育てられる', en: 'Instruments are shared by everyone. Defeating notes earns EXP to train them.' },
+    loadoutNote: { ja: '装備は 2 つ (自機の左右について撃つ)。配置は 3 つ (曲の中で好きな場所に置く。音符に当たると壊れ、少しすると置き直せる)', en: '2 equipped (fly beside you) and 3 deployable (place them during play; they break when hit and can be redeployed later).' },
     paused: { ja: '一時停止', en: 'Paused' },
     resume: { ja: '再開', en: 'Resume' },
-    retry: { ja: 'やり直す', en: 'Retry' },
-    toSongs: { ja: '曲選択へ', en: 'Piece Select' },
-    again: { ja: 'もう一度', en: 'Play Again' },
-    nextSong: { ja: '次の曲へ', en: 'Next Piece' },
+    quit: { ja: 'やめる', en: 'Quit' },
+    retry: { ja: 'もう一度', en: 'Retry' },
+    toSongs: { ja: '曲えらびへ', en: 'Piece Select' },
+    toPractice: { ja: '練習室へ', en: 'Practice Room' },
     bravo: { ja: 'ブラヴォー!', en: 'Bravo!' },
     failed: { ja: '演奏中断…', en: 'Performance Interrupted…' },
-    cleared2: { ja: 'スタンディングオベーション!', en: 'Standing Ovation!' },
     progress: { ja: '弾けたところ', en: 'Progress' },
     defeated: { ja: '倒した音符', en: 'Notes defeated' },
-    encores: { ja: 'アンコール', en: 'Encores' },
-    damage: { ja: '受けたダメージ', en: 'Damage taken' },
-    time: { ja: 'タイム', en: 'Time' },
-    rank: { ja: '評価', en: 'Rank' },
-    ducats: { ja: 'ダカット金貨', en: 'Ducats' },
-    unlockedFor: { ja: '解禁! 「{s}」をほかの作曲家でも遊べるようになりました', en: 'Unlocked! "{s}" can now be played by other composers' },
-    unlockedWeapon: { ja: '新しいタワー「{w}」を使えるようになりました', en: 'New tower unlocked: {w}' },
-    canBuy: { ja: '練習室で {n} 個強化できる', en: '{n} upgrades available in the Practice Room' },
-    practiceTitle: { ja: '練習室', en: 'Practice Room' },
-    practiceNote: { ja: '強化は作曲家ごと。金貨は全員共通', en: 'Upgrades are per composer. Ducats are shared.' },
-    buy: { ja: '強化', en: 'Upgrade' },
-    maxed: { ja: '最大', en: 'MAX' },
+    leaked: { ja: '通した音符', en: 'Notes let through' },
+    earned: { ja: 'もらった金貨', en: 'Ducats earned' },
+    expEarned: { ja: '楽器の経験値', en: 'Instrument EXP' },
+    newUnlock: { ja: '解禁!', en: 'Unlocked!' },
+    bossIncoming: { ja: 'ボス登場! 倒せばクリア', en: 'The boss appears! Defeat it to clear' },
+    sweep: { ja: '一振り', en: 'Sweep' },
+    sweepReady: { ja: '一振りの準備ができた (Space / ボタン)', en: 'Baton sweep ready (Space / button)' },
+    deployHint: { ja: '置く場所をタップ', en: 'Tap where to place it' },
+    deployArea: { ja: '画面の下半分に置ける', en: 'Place it in the lower half' },
+    broken: { ja: '壊れた', en: 'Broken' },
+    moveHint: { ja: 'ドラッグ (矢印キー / WASD) で動く。弾は自動', en: 'Drag (arrow keys / WASD) to move. You fire automatically' },
     bgmVol: { ja: '曲の音量', en: 'Music volume' },
     seVol: { ja: '効果音の音量', en: 'Sound effects' },
-    preview: { ja: '譜面プレビュー', en: 'Score preview' },
     shake: { ja: '画面の揺れ', en: 'Screen shake' },
     on: { ja: 'オン', en: 'On' },
     off: { ja: 'オフ', en: 'Off' },
     erase: { ja: 'セーブデータを消去', en: 'Erase save data' },
-    eraseConfirm: { ja: '本当に消去しますか? 金貨・強化・記録がすべて消えます。', en: 'Really erase? All ducats, upgrades and records will be lost.' },
-    eraseYes: { ja: '消去する', en: 'Erase' },
-    eraseNo: { ja: 'やめる', en: 'Cancel' },
-    remainNotes: { ja: '残りの音符をすべて倒せ!', en: 'Defeat all remaining notes!' },
-    encoreIn: { ja: 'アンコールまで {s} 秒', en: 'Encore in {s}s' },
-    encore: { ja: 'アンコール!', en: 'Encore!' },
-    shieldBreak: { ja: '結界が割れた! ボスを倒せ!', en: 'The barrier shatters! Defeat the boss!' },
-    resonance: { ja: '共鳴!', en: 'Resonance!' },
-    evolved: { ja: '進化! {w}', en: 'Evolved! {w}' },
-    chest: { ja: '楽譜ケース', en: 'Score Case' },
-    revived: { ja: 'カーテンコール! 復活', en: 'Curtain call! Revived' },
-    toPractice: { ja: '練習室へ', en: 'Practice Room' },
-    unseen: { ja: 'まだ出ていない', en: 'Unplayed' },
-    onField: { ja: '場にいる', en: 'On stage' },
-    bar: { ja: '小節', en: 'Bar' },
-    lv: { ja: 'Lv', en: 'Lv' },
-    owned: { ja: 'いまの持ち物', en: 'Your kit' },
-    empty: { ja: '空き', en: 'Empty' },
-    trivia: { ja: '曲のこと', en: 'About the piece' },
+    eraseConfirm: { ja: '本当に消去しますか? 金貨・強化・楽器・記録がすべて消えます。', en: 'Really erase? All ducats, upgrades, instruments and records will be lost.' },
+    testMode: { ja: 'テスト版: 全部の曲集・曲・難しさ・作曲家を選べます', en: 'Test build: all songbooks, pieces, tiers and composers unlocked' },
+    testCoins: { ja: '金貨 +100 万 (テスト)', en: '+1M ducats (test)' },
     tapToStart: { ja: 'タップ / クリックで音が鳴ります', en: 'Tap / click to enable sound' },
+    cleared: { ja: 'クリア', en: 'Cleared' },
+    best: { ja: '最高', en: 'Best' },
+    hp: { ja: '体力', en: 'HP' },
+    total: { ja: '合計', en: 'Total' },
+    hintStruggle: { ja: '負けても金貨はもらえる。練習室で強くなってから、もう一度挑もう', en: 'You keep the ducats even when you fail. Train in the Practice Room and try again.' },
   };
 
-  window.CSData = { COMPOSERS, FUTURE_COMPOSERS, SONGS, TOWERS, WEAPONS, EVOS, UPGRADES, TEXT };
+  window.CSData = { COMPOSERS, BOOKS, TIERS, SONGS, TOWERS, TOWER_IDS, TSTATS, tstatCost, evoCost, EVO_NEED, STATS, statCost, TEXT };
 })();

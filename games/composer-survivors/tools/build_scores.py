@@ -9,6 +9,8 @@ Mutopia Project の LilyPond の譜面から、ゲームの譜面 (scores/*.js) 
   - ノクターン Op.9-2: ftp/ChopinFF/O9/chopin_nocturne_op9_n2 (CC BY-SA 3.0, Renato Biolcati Rinaldi)
   - きらきら星変奏曲 K.265: ftp/MozartWA/KV265/guitar-duo-complete (Public Domain。ギター二重奏の版。
     音は Mozart の原曲どおり (原調) で、ギターで出ない低音だけが変えてある。繰り返しは省かれているので、ここで元の形に戻す)
+  - 曲集 (はじめての曲集・バッハ・ヴィヴァルディ・チャイコフスキー・ドビュッシー) の 25 曲は books() を参照
+    (曲ごとの ftp/ 以下のフォルダ・浄書者・ライセンスを書いてある。CC BY-SA のものは scores/*.js も同じライセンス)
 LilyPond は実行せず、ly2score.py で文字として読む。
 
   python3 -I build_scores.py <ftp フォルダ> <chopin_piano_score_dataset のフォルダ>
@@ -261,10 +263,14 @@ def generic(sid, path, header, meta, parts, tempo=None, use_marks=False, which=0
     src, V = load(path)
     stv = staves(src, which) if any(isinstance(x[0], int) for x in parts) else []
     out = []
+    ends = []
+    lasts = []
     marks = None
     for (sel, inst, vol, mel) in parts:
         text = stv[sel] if isinstance(sel, int) else sel
         notes, end, mk = parse(text, V)
+        ends.append(float(end))
+        lasts.append(max((float(n['t'] + n['d']) for n in notes), default=0))
         if marks is None:
             marks = [(float(m[1]), m[2]) for m in mk if m[0] == 'tempo']
         out.append({'inst': inst, 'vol': vol, 'melody': mel, 'notes': notes})
@@ -276,6 +282,9 @@ def generic(sid, path, header, meta, parts, tempo=None, use_marks=False, which=0
             else:
                 tm.append([b0, bpm])
         tempo = tm
+    # パートの長さがそろうこと (ちがうのは、最後の休符の分だけならよい)
+    if max(ends) - min(ends) > 0.01 and max(lasts) > min(ends) + 0.01:
+        raise SystemExit(f'{sid}: パートの長さがそろわない {ends}')
     meta = dict(meta)
     meta['tempo'] = '[' + ', '.join(f'[{b0:g}, {bpm:g}]' for b0, bpm in tempo) + ']'
     write_js(sid, header, {'id': repr(sid), **meta}, out)
@@ -356,6 +365,104 @@ def winterwind(dataset):
     )
 
 
+CC = {
+    'BY-SA 2.5': 'https://creativecommons.org/licenses/by-sa/2.5/',
+    'BY-SA 3.0': 'https://creativecommons.org/licenses/by-sa/3.0/',
+    'BY-SA 4.0': 'https://creativecommons.org/licenses/by-sa/4.0/',
+}
+
+
+def head(title, src_title, by=None, lic=None):
+    """scores/*.js の頭の説明。lic が CC のときは、同じライセンスで公開すると書く"""
+    lines = [f'// {title}。全曲', f'// 元の譜面: {MUT} "{src_title}"' + (f' typeset by {by}' if by else '')]
+    if lic:
+        lines.append(f'//   Licensed under Creative Commons Attribution-ShareAlike {lic.split()[1]} ({CC[lic]})')
+        lines.append(f'// このファイル (音符のデータ) も同じ CC {lic} で公開する。')
+    else:
+        lines.append('//   Public Domain')
+    lines.append('// tools/build_scores.py で作ったファイル。手で直さない')
+    return '\n'.join(lines)
+
+
+def song(sid, path, title, src_title, by, lic, key, tempo, parts, theme=None, use_marks=False, time='[4, 4]'):
+    th = theme or {'part': 0, 'from': 0, 'len': 16}
+    th = dict(th)
+    th.setdefault('tempo', tempo[0][1] if isinstance(tempo, list) else tempo)
+    meta = {'timeSig': time, 'key': key, 'theme': '{ ' + ', '.join(f'{k}: {v}' for k, v in th.items()) + ' }'}
+    generic(sid, path, head(title, src_title, by, lic), meta, parts, tempo if isinstance(tempo, list) else [[0, tempo]], use_marks=use_marks)
+
+
+def books(ftp):
+    """曲集: 初心者 (はじめての曲集)・バッハ・ヴィヴァルディ・チャイコフスキー・ドビュッシー"""
+    j = lambda *a: os.path.join(ftp, *a)
+    P = lambda a, b: [(a, 'piano', 1, True), (b, 'piano', 0.8, False)]
+    maj = lambda k: f'{{ tonic: {k}, minor: false }}'
+    mnr = lambda k: f'{{ tonic: {k}, minor: true }}'
+    # ---- はじめての曲集 ----
+    song('k2', j('MozartWA/KV2/menuet_k2/menuet_k2.ly'), 'メヌエット ヘ長調 K. 2 (モーツァルト、6 歳の作品)',
+         'Menuett K. 2', 'Nicolas Morant', None, maj(5), 120, P('\\AvoiceAA', '\\AvoiceBA'), time='[3, 4]')
+    song('laboureur', j('SchumannR/O68/schumann-op68-10-gai-laboureur/schumann-op68-10-gai-laboureur.ly'),
+         '「子供のためのアルバム」より 楽しき農夫 Op. 68-10 (シューマン)', 'Album pour la jeunesse Op. 68 No. 10', 'Philippe Hézaine', 'BY-SA 2.5',
+         maj(5), 120, P('\\upper', '\\lower'), theme={'part': 1, 'from': 0, 'len': 8})
+    song('petzold', j('BachJS/BWVAnh114/anna-magdalena-04/anna-magdalena-04.ly'),
+         'メヌエット ト長調 BWV Anh. 114 (アンナ・マクダレーナ・バッハの音楽帳より。ペツォールト作とされる)', 'Menuet in G', 'Allen Garvin', None,
+         maj(7), 140, P(0, 1), time='[3, 4]', theme={'part': 0, 'from': 0, 'len': 24})
+    song('gymnopedie', j('SatieE/gymnopedie_1/gymnopedie_1.ly'), 'ジムノペディ第 1 番 (サティ)', 'Gymnopédie No. 1', 'Evin Robertson', None,
+         maj(2), 72, P(0, 1), time='[3, 4]', theme={'part': 0, 'from': 12, 'len': 24})
+    song('clementi', j('ClementiM/O36/sonatina-1/sonatina-1.ly'), 'ソナチネ ハ長調 Op. 36-1 第 1 楽章 (クレメンティ)', 'Sonatina Op. 36 No. 1', 'Brian D. Rude', None,
+         maj(0), 156, P('\\upperfirst', '\\lowerfirst'), time='[2, 2]')
+    # ---- バッハ ----
+    song('bwv846', j('BachJS/BWV846/wtk1-prelude1/wtk1-prelude1.ly'), '平均律クラヴィーア曲集 第 1 巻 前奏曲第 1 番 ハ長調 BWV 846 (バッハ)',
+         'Das Wohltemperierte Clavier I, Prelude 1', 'Tobias Erbsland', None, maj(0), 66, P(0, 1))
+    song('invention1', j('BachJS/BWV772/bach-invention-01/bach-invention-01.ly'), 'インヴェンション第 1 番 ハ長調 BWV 772 (バッハ)',
+         'Invention 1', 'jeff covey', 'BY-SA 3.0', maj(0), 72, P(0, 1))
+    song('invention8', j('BachJS/BWV779/bach-invention-08/bach-invention-08.ly'), 'インヴェンション第 8 番 ヘ長調 BWV 779 (バッハ)',
+         'Invention 8', 'Allen Garvin', None, maj(5), 132, P(0, 1), time='[3, 4]', theme={'part': 0, 'from': 0, 'len': 12})
+    song('fugue2', j('BachJS/BWV847/fuga2/fuga2.ly'), '平均律クラヴィーア曲集 第 1 巻 フーガ第 2 番 ハ短調 BWV 847 (バッハ)',
+         'Fuga II', 'Urs Metzger', 'BY-SA 4.0', mnr(0), 72,
+         [('\\sopran', 'piano', 1, True), ('\\alt', 'piano', 0.85, False), ('\\bass', 'piano', 0.85, False)],
+         theme={'part': 1, 'from': 0, 'len': 8})
+    song('italian', j('BachJS/BWV971/piano/piano-lys/piano.ly'), 'イタリア協奏曲 第 1 楽章 BWV 971 (バッハ)', 'Italian Concerto',
+         'Glen Larsen', 'BY-SA 3.0', maj(5), 96, P('\\rightMvtI', '\\leftMvtI'), time='[2, 4]')
+    # ---- ヴィヴァルディ「四季」(独奏ヴァイオリンと弦楽合奏の 5 声部をピアノの音で) ----
+    def season(sid, sea, mv, title, key, tempo, time='[4, 4]', theme=None):
+        S_ = sea.capitalize()
+        names = [('ViolinoPrincipale', 1, True), ('ViolinoPrimo', 0.7, False), ('ViolinoSecondo', 0.65, False), ('AltoViola', 0.6, False), ('Violoncello', 0.8, False)]
+        parts = [('\\' + n + S_ + mv, 'piano', v, m) for (n, v, m) in names]
+        song(sid, j(f'VivaldiA/O8/{sea}/{sea}-lys/{sea}-score.ly'), title + ' (ヴィヴァルディ「四季」)。独奏と弦楽の 5 声部をピアノの音で',
+             f'The Four Seasons: {S_}', None, 'BY-SA 3.0', key, tempo, parts, time=time, theme=theme)
+    season('winter2', 'winter', 'Two', '冬 第 2 楽章 (ラルゴ)', maj(3), 50, theme={'part': 0, 'from': 0, 'len': 8})
+    season('spring1', 'spring', 'One', '春 第 1 楽章', maj(4), 100, theme={'part': 0, 'from': 0, 'len': 12})
+    season('autumn3', 'autumn', 'Three', '秋 第 3 楽章「狩り」', maj(5), 90, time='[3, 8]', theme={'part': 0, 'from': 0, 'len': 12})
+    season('winter1', 'winter', 'One', '冬 第 1 楽章', mnr(5), 108, theme={'part': 0, 'from': 44, 'len': 16})
+    season('summer3', 'summer', 'Three', '夏 第 3 楽章「嵐」', mnr(7), 200, time='[3, 4]', theme={'part': 0, 'from': 0, 'len': 24})
+    # ---- チャイコフスキー ----
+    song('oldfrench', j('TchaikovskyPI/O39/16OldFrenchSong/16OldFrenchSong.ly'), '「子供のアルバム」より 古いフランスの歌 Op. 39-16 (チャイコフスキー)',
+         'Old French Song', 'David McNamara', None, mnr(7), 70,
+         [('\\overallMelody', 'piano', 1, True), ('\\overallMiddle', 'piano', 0.75, False), ('\\overallBass', 'piano', 0.8, False)], time='[2, 4]')
+    song('woodensoldiers', j('TchaikovskyPI/O39/05MarchOfTheWoodenSoldiers/05MarchOfTheWoodenSoldiers.ly'),
+         '「子供のアルバム」より 木の兵隊の行進 Op. 39-5 (チャイコフスキー)', 'March of the Wooden Soldiers', None, None, maj(2), 120, P(0, 1), time='[2, 4]')
+    song('january', j('TchaikovskyPI/O37/Tschaikowsky-op37.1/Tschaikowsky-op37.1.ly'), '「四季」より 1 月「炉ばたにて」Op. 37-1 (チャイコフスキー)',
+         'The Seasons: January', 'Till Rettig', None, maj(9), 84, P(0, 1), time='[3, 4]', theme={'part': 0, 'from': 0, 'len': 12})
+    song('february', j('TchaikovskyPI/O37/Tschaikowsky-op37.2/Tschaikowsky-op37.2.ly'), '「四季」より 2 月「謝肉祭」Op. 37-2 (チャイコフスキー)',
+         'The Seasons: February', 'Till Rettig', None, maj(2), 132, P(0, 1), time='[2, 4]')
+    song('august', j('TchaikovskyPI/O37/Tschaikowsky-op37.8/Tschaikowsky-op37.8.ly'), '「四季」より 8 月「収穫の歌」Op. 37-8 (チャイコフスキー)',
+         'The Seasons: August', 'Till Rettig', None, mnr(11), 168, P(0, 1), time='[6, 8]', theme={'part': 0, 'from': 0, 'len': 12})
+    # ---- ドビュッシー ----
+    song('arabesque1', j('DebussyC/L66/debussy_Arabesque_1/debussy_Arabesque_1.ly'), 'アラベスク第 1 番 (ドビュッシー)', 'Première Arabesque',
+         'Keith OHara', None, maj(4), 100, P(0, 1), theme={'part': 0, 'from': 8, 'len': 16})
+    song('clairdelune', j('DebussyC/L75/debussy_Ste_Bergamesq_Clair/debussy_Ste_Bergamesq_Clair.ly'), 'ベルガマスク組曲より「月の光」(ドビュッシー)',
+         'Suite Bergamasque: Clair de Lune', 'Keith OHara', None, maj(1), 66,
+         [('\\rhUp', 'piano', 1, True), ('\\rhDown', 'piano', 0.8, False), ('\\lhUp', 'piano', 0.75, False), ('\\lhDown', 'piano', 0.8, False)],
+         time='[9, 8]', theme={'part': 0, 'from': 0, 'len': 18})
+    song('arabesque2', j('DebussyC/L66/debussy_Arabesque_2/debussy_Arabesque_2.ly'), 'アラベスク第 2 番 (ドビュッシー)', 'Deuxième Arabesque',
+         'Knute Snortum', 'BY-SA 4.0', maj(7), 160, P(0, 1))
+    song('parfums', j('DebussyC/L117/L117-prel-4/L117-prel-4-lys/debussy-L117-prel-4.ly'), '前奏曲集 第 1 巻より「音と香りは夕暮れの大気に漂う」(ドビュッシー)',
+         'Préludes I, No. 4', 'Knute Snortum', 'BY-SA 4.0', maj(9), 52, P(0, 1), time='[3, 4]')
+    song('ventplaine', j('DebussyC/L117/debussy-L117-prels/debussy-L117-prels-lys/L117-prel-3/L117-prel-3-lys/debussy-L117-prel-3.ly'),
+         '前奏曲集 第 1 巻より「野を渡る風」(ドビュッシー)', 'Préludes I, No. 3', 'Glen Larsen', 'BY-SA 4.0', mnr(10), 126, P(0, 1))
+
+
 if __name__ == '__main__':
     ftp = sys.argv[1]
     if ftp != '-':
@@ -363,5 +470,6 @@ if __name__ == '__main__':
         nocturne(ftp)
         twinkle(ftp)
         more(ftp)
+        books(ftp)
     if len(sys.argv) > 2:
         winterwind(sys.argv[2])
