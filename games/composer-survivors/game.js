@@ -190,11 +190,15 @@
     }
     return ps;
   }
-  // 楽器 1 体の能力 (種類・格・レベルから)。star: 攻撃の強化の段階 (格 3 で 2、格 5 で 3)
+  // 楽器 1 体の能力 (種類・格・経験値で上げた能力から)。star: 攻撃の強化の段階 (格 3 で 2、格 5 で 3)
   function towerStats(unit) {
     const T = D.TOWERS[unit.id];
     const g = clamp(unit.grade || 1, 1, 5);
-    const lv = unit.lv || 0;
+    const S = unit.st || {};
+    const a = S.atk || 0;
+    const sp = S.spd || 0;
+    const rg = S.rng || 0;
+    const hp = S.hp || 0;
     const star = g >= 5 ? 3 : g >= 3 ? 2 : 1;
     const gm = D.GRADES[g - 1].mul;
     return {
@@ -202,11 +206,11 @@
       kind: T.kind,
       star,
       grade: g,
-      dmg: T.dmg * 0.55 * gm * Math.pow(1.05, lv), // 10 体呼べるので 1 体ずつは控えめ
-      cd: T.cd * Math.pow(0.99, lv),
-      range: T.range * (1 + 0.006 * lv) * (star >= 3 && (T.kind === 'aura' || T.kind === 'cone' || T.kind === 'string') ? 1.35 : 1),
-      hp: T.hp * Math.sqrt(gm) * 1.5 * Math.pow(1.05, lv),
-      move: 150 * (1 + 0.01 * lv),
+      dmg: T.dmg * 0.55 * gm * Math.pow(1.06, a), // 10 体呼べるので 1 体ずつは控えめ
+      cd: T.cd * Math.pow(0.985, sp),
+      range: T.range * (1 + 0.02 * rg) * (star >= 3 && (T.kind === 'aura' || T.kind === 'cone' || T.kind === 'string') ? 1.35 : 1),
+      hp: T.hp * Math.sqrt(gm) * 1.5 * Math.pow(1.07, hp),
+      move: 150 * (1 + 0.01 * sp),
     };
   }
 

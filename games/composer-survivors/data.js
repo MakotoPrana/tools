@@ -47,14 +47,14 @@
   // income: もらえる金貨・経験値・素材の倍率 (育成のペース。木枯らしのクリアがおよそ 20 時間になるように)
   const BOOKS = [
     { id: 'beginner', name: { ja: 'はじめての曲集', en: 'First Pieces' }, need: null, power: 0.5, step: 1.7, income: 1, color: '#7fb77e' },
-    { id: 'beethoven', name: { ja: 'ベートーヴェン代表曲集', en: 'Beethoven Favorites' }, need: [['beginner', 3]], power: 3, step: 2.2, income: 0.11, color: '#2d4a7a' },
-    { id: 'mozart', name: { ja: 'モーツァルト代表曲集', en: 'Mozart Favorites' }, need: [['beginner', 3]], power: 3, step: 2.2, income: 0.11, color: '#b8323c' },
-    { id: 'chopin', name: { ja: 'ショパン代表曲集', en: 'Chopin Favorites' }, need: [['beginner', 3]], power: 3, step: 2.2, income: 0.11, color: '#6c5b7b' },
-    { id: 'bach', name: { ja: 'バッハ代表曲集', en: 'Bach Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, step: 2.2, income: 0.11, color: '#8b5a2b' },
-    { id: 'vivaldi', name: { ja: 'ヴィヴァルディ代表曲集', en: 'Vivaldi Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, step: 2.2, income: 0.11, color: '#c0392b' },
-    { id: 'concerto', name: { ja: 'ピアノ協奏曲集', en: 'Piano Concertos' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, step: 2.2, income: 0.11, color: '#7a1f3d' },
-    { id: 'tchaikovsky', name: { ja: 'チャイコフスキー代表曲集', en: 'Tchaikovsky Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 1500, step: 2.2, income: 0.11, color: '#2e3b4e' },
-    { id: 'debussy', name: { ja: 'ドビュッシー代表曲集', en: 'Debussy Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 1500, step: 2.2, income: 0.11, color: '#58a55c' },
+    { id: 'beethoven', name: { ja: 'ベートーヴェン代表曲集', en: 'Beethoven Favorites' }, need: [['beginner', 3]], power: 3, step: 2.2, income: 0.095, color: '#2d4a7a' },
+    { id: 'mozart', name: { ja: 'モーツァルト代表曲集', en: 'Mozart Favorites' }, need: [['beginner', 3]], power: 3, step: 2.2, income: 0.095, color: '#b8323c' },
+    { id: 'chopin', name: { ja: 'ショパン代表曲集', en: 'Chopin Favorites' }, need: [['beginner', 3]], power: 3, step: 2.2, income: 0.095, color: '#6c5b7b' },
+    { id: 'bach', name: { ja: 'バッハ代表曲集', en: 'Bach Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, step: 2.2, income: 0.095, color: '#8b5a2b' },
+    { id: 'vivaldi', name: { ja: 'ヴィヴァルディ代表曲集', en: 'Vivaldi Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, step: 2.2, income: 0.095, color: '#c0392b' },
+    { id: 'concerto', name: { ja: 'ピアノ協奏曲集', en: 'Piano Concertos' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, step: 2.2, income: 0.095, color: '#7a1f3d' },
+    { id: 'tchaikovsky', name: { ja: 'チャイコフスキー代表曲集', en: 'Tchaikovsky Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 1500, step: 2.2, income: 0.095, color: '#2e3b4e' },
+    { id: 'debussy', name: { ja: 'ドビュッシー代表曲集', en: 'Debussy Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 1500, step: 2.2, income: 0.095, color: '#58a55c' },
   ];
 
   // ---------- 難しさ (1 つのステージに 3 段階) ----------
@@ -516,8 +516,14 @@
     ][g];
     return { coins, mats };
   }
-  // 楽器のレベル (倒した音符の経験値で自然に上がる。上限は格で決まる)
-  const expNeed = (lv) => Math.round(40 * Math.pow(1.3, lv));
+  // 楽器の能力 (倒した音符の経験値をためて、楽器店で 1 つずつ上げる)。それぞれの上限は 10 × 格
+  const TSTATS = [
+    { id: 'atk', name: { ja: '攻撃力', en: 'Power' }, desc: { ja: '×1.06', en: '×1.06' } },
+    { id: 'spd', name: { ja: '速さ', en: 'Speed' }, desc: { ja: '攻撃の間隔 −1.5%・動く速さ +1%', en: '−1.5% interval, +1% move' } },
+    { id: 'rng', name: { ja: '範囲', en: 'Reach' }, desc: { ja: '+2%', en: '+2%' } },
+    { id: 'hp', name: { ja: '耐久', en: 'Durability' }, desc: { ja: '×1.07', en: '×1.07' } },
+  ];
+  const tstatCost = (lv) => Math.round(14 * Math.pow(1.34, lv)); // 経験値
 
   // ---------- 練習室 (自機の強化。作曲家ごと。金貨は共通) ----------
   // lv は 0〜max。値段は base × 1.16^lv
@@ -590,7 +596,8 @@
     unitsTab: { ja: '持っている楽器', en: 'Your instruments' },
     materials: { ja: '素材', en: 'Materials' },
     matsEarned: { ja: '拾った素材', en: 'Materials found' },
-    levelUps: { ja: 'レベルが上がった楽器', en: 'Instruments that leveled up' },
+    expEarnedUnits: { ja: '楽器がためた経験値 (楽器店で能力を上げられる)', en: 'EXP earned by instruments (spend it in the shop)' },
+    statCap: { ja: '上限 {n} (格で上がる)', en: 'Cap {n} (raised by grade)' },
     ownedN: { ja: '{n} 体', en: '×{n}' },
     noUnits: { ja: '楽器を持っていない。「買う」から', en: 'No instruments yet. Buy some first.' },
     summonHint: { ja: '楽器は自分で動いて攻撃する。壊れても 15 秒でまた呼び出される', en: 'Instruments move and attack on their own. Broken ones return after 15s.' },
@@ -600,7 +607,7 @@
     choose: { ja: 'えらぶ', en: 'Choose' },
     remove: { ja: 'はずす', en: 'Remove' },
     practiceNote: { ja: '強化は作曲家ごと。金貨は全員共通', en: 'Upgrades are per composer. Ducats are shared.' },
-    shopNote: { ja: '同じ楽器をいくつも買える (全員で共通)。曲の中で最大 10 体を呼び出すと、自分で動いて攻撃する。敵を倒すとレベルが上がり、金貨と素材で格 (5 段階) を上げる', en: 'Buy as many as you like (shared by all composers). Up to 10 join each piece and fight on their own. They level up from defeated notes; raise their grade (5 steps) with ducats and materials.' },
+    shopNote: { ja: '同じ楽器をいくつも買える (全員で共通)。曲の中で最大 10 体を呼び出すと、自分で動いて攻撃する。敵を倒すと楽器ごとに経験値がたまり、経験値で能力 (攻撃力・速さ・範囲・耐久) を上げる。金貨と素材で格 (5 段階) を上げると、能力の上限も上がる', en: 'Buy as many as you like (shared by all composers). Up to 10 join each piece and fight on their own. Each earns EXP from defeated notes to spend on Power, Speed, Reach and Durability; raise their grade (5 steps) with ducats and materials to lift the caps.' },
     loadoutNote: { ja: '装備は 2 つ (自機の左右について撃つ)。配置は 3 つ (曲の中で好きな場所に置く。音符に当たると壊れ、少しすると置き直せる)', en: '2 equipped (fly beside you) and 3 deployable (place them during play; they break when hit and can be redeployed later).' },
     paused: { ja: '一時停止', en: 'Paused' },
     resume: { ja: '再開', en: 'Resume' },
@@ -640,5 +647,5 @@
     hintStruggle: { ja: '負けても金貨はもらえる。練習室で強くなってから、もう一度挑もう', en: 'You keep the ducats even when you fail. Train in the Practice Room and try again.' },
   };
 
-  window.CSData = { COMPOSERS, BOOKS, TIERS, SONGS, TOWERS, TOWER_IDS, unitPrice, SELL_RATE, GRADES, MATS, gradeCost, expNeed, MAX_PARTY: 10, STATS, statCost, TEXT };
+  window.CSData = { COMPOSERS, BOOKS, TIERS, SONGS, TOWERS, TOWER_IDS, unitPrice, SELL_RATE, GRADES, MATS, gradeCost, TSTATS, tstatCost, MAX_PARTY: 10, STATS, statCost, TEXT };
 })();

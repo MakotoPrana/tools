@@ -54,7 +54,7 @@
       coins: 0,
       comp: 'beethoven',
       stats: {},
-      units: [{ uid: 'u1', id: 'piano', grade: 1, lv: 0, exp: 0, paid: 0 }], // 持っている楽器 (同じ種類をいくつも持てる)
+      units: [{ uid: 'u1', id: 'piano', grade: 1, st: { atk: 0, spd: 0, rng: 0, hp: 0 }, exp: 0, paid: 0 }], // 持っている楽器 (同じ種類をいくつも持てる)
       party: ['u1'], // 曲の中で呼び出す楽器 (最大 10)
       mats: {}, // 素材
       nextUid: 2,
@@ -75,12 +75,13 @@
     if (sv.towers && !sv.unitsMigrated) {
       const old = sv.towers;
       const ids = Object.keys(old);
-      if (ids.length && (!sv.units || (sv.units.length === 1 && sv.units[0].id === 'piano' && sv.units[0].lv === 0))) {
+      if (ids.length && (!sv.units || (sv.units.length === 1 && sv.units[0].id === 'piano' && !(sv.units[0].exp > 0)))) {
         sv.units = ids.map((id, i) => {
           const t = old[id] || {};
           const sum = Object.values(t.lv || {}).reduce((a, b) => a + b, 0);
           const grade = Math.min(5, t.star || 1);
-          return { uid: 'u' + (i + 1), id, grade, lv: Math.min(D.GRADES[grade - 1].cap, Math.round(sum / 4)), exp: 0, paid: D.TOWERS[id].price };
+          const l = Math.min(D.GRADES[grade - 1].cap, Math.round(sum / 4));
+          return { uid: 'u' + (i + 1), id, grade, st: { atk: l, spd: l, rng: l, hp: l }, exp: 0, paid: D.TOWERS[id].price };
         });
         sv.nextUid = ids.length + 1;
         sv.party = sv.units.map((u) => u.uid).slice(0, D.MAX_PARTY);
@@ -91,6 +92,14 @@
     }
     sv.mats = sv.mats || {};
     sv.units = sv.units || [];
+    // 自動でレベルが上がっていた版の楽器: レベルを 4 つの能力に移す
+    for (const u of sv.units) {
+      if (!u.st) {
+        const l = u.lv || 0;
+        u.st = { atk: l, spd: l, rng: l, hp: l };
+        delete u.lv;
+      }
+    }
     sv.party = (sv.party || []).filter((uid) => sv.units.some((u) => u.uid === uid));
     return sv;
   }
@@ -430,20 +439,25 @@
       }).join('')}</div>`;
     } else {
       const inParty = (u) => save.party.includes(u.uid);
-      const list = [...save.units].sort((a, b) => inParty(b) - inParty(a) || b.grade - a.grade || b.lv - a.lv);
+      const list = [...save.units].sort((a, b) => inParty(b) - inParty(a) || b.grade - a.grade || (b.exp || 0) - (a.exp || 0));
       body = list.length
         ? `<p class="note">${T('party', { n: save.party.length, m: D.MAX_PARTY })}</p><div class="units">${list
             .map((u) => {
               const T0 = D.TOWERS[u.id];
               const st = GM.towerStats(u);
               const cap = D.GRADES[u.grade - 1].cap;
-              const need = D.expNeed(u.lv);
               const gc = u.grade < 5 ? D.gradeCost(u.id, u.grade) : null;
               const canGrade = gc && save.coins >= gc.coins && Object.entries(gc.mats).every(([k, n]) => (save.mats[k] || 0) >= n);
               return `<div class="unit ${inParty(u) ? 'in' : ''}">
                 <div class="tc-head"><span data-icon="${u.id}" data-size="36"></span><b>${esc(L(T0.name))}</b>
                   <span class="grade g${u.grade}">${T('grade')} ${u.grade} ${esc(L(D.GRADES[u.grade - 1].name))}</span></div>
-                <p class="tnow">${T('lv')} ${u.lv}/${cap} <span class="expbar"><i style="width:${u.lv >= cap ? 100 : Math.min(100, ((u.exp || 0) / need) * 100)}%"></i></span> ⚔${st.dmg.toFixed(1)} ⏱${st.cd ? st.cd.toFixed(2) + 's' : '—'} ♥${Math.round(st.hp)}</p>
+                <p class="tnow">⚔${st.dmg.toFixed(1)} ⏱${st.cd ? st.cd.toFixed(2) + 's' : '—'} ◎${Math.round(st.range)} ♥${Math.round(st.hp)} <span class="exp">${T('exp')} ✦${fmt(u.exp || 0)}</span></p>
+                <div class="tstats">${D.TSTATS.map((ts) => {
+                  const lv = (u.st && u.st[ts.id]) || 0;
+                  const cost = D.tstatCost(lv);
+                  const full = lv >= cap;
+                  return `<div class="tstat"><span>${esc(L(ts.name))} <b>${lv}</b>/${cap}<small>${esc(L(ts.desc))}</small></span><button type="button" data-tup="${u.uid}:${ts.id}" ${full || (u.exp || 0) < cost ? 'disabled' : ''}>${full ? T('max') : '✦' + fmt(cost)}</button></div>`;
+                }).join('')}</div>
                 <div class="unit-btns">
                   <button type="button" class="${inParty(u) ? 'on' : ''}" data-party="${u.uid}">${inParty(u) ? '✓ ' + T('inParty') : T('notInParty')}</button>
                   ${gc ? `<button type="button" data-grade="${u.uid}" ${canGrade ? '' : 'disabled'}>${T('gradeUp')} → ${u.grade + 1}</button>` : `<span class="grade g5">MAX</span>`}
@@ -464,7 +478,7 @@
       const price = D.unitPrice(id, owned(id));
       if (save.coins < price) return;
       save.coins -= price;
-      const u = { uid: 'u' + save.nextUid++, id, grade: 1, lv: 0, exp: 0, paid: price };
+      const u = { uid: 'u' + save.nextUid++, id, grade: 1, st: { atk: 0, spd: 0, rng: 0, hp: 0 }, exp: 0, paid: price };
       save.units.push(u);
       if (save.party.length < D.MAX_PARTY) save.party.push(u.uid);
       persist();
@@ -477,6 +491,19 @@
       else if (save.party.length < D.MAX_PARTY) save.party.push(uid);
       else banner(T('partyFull', { m: D.MAX_PARTY }));
       persist();
+      shopScreen('units');
+    });
+    on('[data-tup]', 'click', (el) => {
+      const [uid, sid] = el.dataset.tup.split(':');
+      const u = save.units.find((x) => x.uid === uid);
+      u.st = u.st || {};
+      const lv = u.st[sid] || 0;
+      const cost = D.tstatCost(lv);
+      if (lv >= D.GRADES[u.grade - 1].cap || (u.exp || 0) < cost) return;
+      u.exp -= cost;
+      u.st[sid] = lv + 1;
+      persist();
+      Synth.sfx('pick', { p: 79 });
       shopScreen('units');
     });
     on('[data-grade]', 'click', (el) => {
@@ -642,20 +669,13 @@
     const before = { books: D.BOOKS.filter(bookOpen).map((b) => b.id), comps: D.COMPOSERS.filter(compOpen).map((c) => c.id) };
     save.coins += r.coins;
     for (const [k, n] of Object.entries(r.mats || {})) save.mats[k] = (save.mats[k] || 0) + n;
-    // 楽器の経験値 → レベル (上限は格で決まる)
-    r.levelUps = [];
+    // 楽器の経験値: 楽器ごとにためる (楽器店で能力に使う)
+    r.unitExp = [];
     for (const u of save.units) {
       const e = r.exp[u.uid];
       if (!e) continue;
-      const cap = D.GRADES[u.grade - 1].cap;
-      const before = u.lv;
       u.exp = (u.exp || 0) + e;
-      while (u.lv < cap && u.exp >= D.expNeed(u.lv)) {
-        u.exp -= D.expNeed(u.lv);
-        u.lv++;
-      }
-      if (u.lv >= cap) u.exp = Math.min(u.exp, D.expNeed(u.lv));
-      if (u.lv > before) r.levelUps.push({ id: u.id, from: before, to: u.lv });
+      r.unitExp.push({ id: u.id, e });
     }
     persist();
     const newBooks = D.BOOKS.filter((b) => bookOpen(b) && !before.books.includes(b.id));
@@ -673,7 +693,7 @@
     langSel.style.visibility = 'visible';
     bar.innerHTML = '';
     hud.innerHTML = '';
-    const exps = (r.levelUps || []).map((x) => `<span class="exp-chip"><span data-icon="${x.id}" data-size="24"></span>Lv${x.from}→${x.to}</span>`).join('');
+    const exps = (r.unitExp || []).filter((x) => x.e >= 1).map((x) => `<span class="exp-chip"><span data-icon="${x.id}" data-size="24"></span>✦${fmt(x.e)}</span>`).join('');
     const mats = matChips(r.mats, false);
     const unlocks = [...newBooks.map((b) => L(b.name)), ...newComps.map((c) => L(c.name))];
     show(`<div class="result ${r.win ? 'win' : 'lose'}">
@@ -686,7 +706,7 @@
           <span>${T('earned')}</span><b class="gold">🪙 ${fmt(r.coins)}</b>
         </div>
         ${mats ? `<p>${T('matsEarned')}</p><div class="mats center">${mats}</div>` : ''}
-        ${exps ? `<p>${T('levelUps')}</p><div class="exps">${exps}</div>` : ''}
+        ${exps ? `<p>${T('expEarnedUnits')}</p><div class="exps">${exps}</div>` : ''}
         ${unlocks.length ? `<p class="unlock">🎉 ${T('newUnlock')} ${unlocks.map(esc).join('・')}</p>` : ''}
         ${!r.win ? `<p class="note">${T('hintStruggle')}</p>` : ''}
         <div class="r-btns">
@@ -824,7 +844,7 @@
     const owned = (q.get('towers') || 'piano').split(',');
     const fake = blankSave();
     fake.stats[cp.id] = Object.fromEntries(D.STATS.map((s) => [s.id, Math.min(s.max, lv)]));
-    fake.units = owned.map((id, i) => ({ uid: 'u' + i, id, grade: +(q.get('grade') || 1), lv: tlv, exp: 0 }));
+    fake.units = owned.map((id, i) => ({ uid: 'u' + i, id, grade: +(q.get('grade') || 1), st: { atk: tlv, spd: tlv, rng: tlv, hp: tlv }, exp: 0 }));
     fake.party = fake.units.map((u) => u.uid).slice(0, D.MAX_PARTY);
     const out = [];
     for (let i = 0; i < +(q.get('n') || 1); i++) out.push(GM.simulate({ song, part: +(q.get('part') || 0), tier: +(q.get('tier') || 0), comp: cp, save: fake }, +(q.get('max') || 1200)));
