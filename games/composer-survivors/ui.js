@@ -567,11 +567,11 @@
     if (!playing) unlockAudio();
   });
   function startStage(song, part, tier) {
-    menuMusic(false);
+    playing = true; // 先に「遊んでいる」にして、タイトルの曲がまた鳴りださないように
     unlockAudio();
+    menuMusic(false);
     hide();
     current = { song, part, tier };
-    playing = true;
     paused = false;
     document.body.classList.add('playing');
     pauseBtn.style.visibility = 'visible';
