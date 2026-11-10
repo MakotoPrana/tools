@@ -44,16 +44,17 @@
 
   // ---------- 曲集 ----------
   // need: 開く条件 [曲集, 何曲目] (その曲をどれかの難しさの通しでクリア)。power: 曲集の強さ (音符の硬さ・金貨の基準)
+  // income: もらえる金貨・経験値・素材の倍率 (育成のペース。木枯らしのクリアがおよそ 20 時間になるように)
   const BOOKS = [
-    { id: 'beginner', name: { ja: 'はじめての曲集', en: 'First Pieces' }, need: null, power: 0.5, color: '#7fb77e' },
-    { id: 'beethoven', name: { ja: 'ベートーヴェン代表曲集', en: 'Beethoven Favorites' }, need: [['beginner', 3]], power: 7, color: '#2d4a7a' },
-    { id: 'mozart', name: { ja: 'モーツァルト代表曲集', en: 'Mozart Favorites' }, need: [['beginner', 3]], power: 7, color: '#b8323c' },
-    { id: 'chopin', name: { ja: 'ショパン代表曲集', en: 'Chopin Favorites' }, need: [['beginner', 3]], power: 7, color: '#6c5b7b' },
-    { id: 'bach', name: { ja: 'バッハ代表曲集', en: 'Bach Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, color: '#8b5a2b' },
-    { id: 'vivaldi', name: { ja: 'ヴィヴァルディ代表曲集', en: 'Vivaldi Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, color: '#c0392b' },
-    { id: 'concerto', name: { ja: 'ピアノ協奏曲集', en: 'Piano Concertos' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, color: '#7a1f3d' },
-    { id: 'tchaikovsky', name: { ja: 'チャイコフスキー代表曲集', en: 'Tchaikovsky Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 350, color: '#2e3b4e' },
-    { id: 'debussy', name: { ja: 'ドビュッシー代表曲集', en: 'Debussy Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 350, color: '#58a55c' },
+    { id: 'beginner', name: { ja: 'はじめての曲集', en: 'First Pieces' }, need: null, power: 0.5, step: 1.7, income: 1, color: '#7fb77e' },
+    { id: 'beethoven', name: { ja: 'ベートーヴェン代表曲集', en: 'Beethoven Favorites' }, need: [['beginner', 3]], power: 3, step: 2.2, income: 0.11, color: '#2d4a7a' },
+    { id: 'mozart', name: { ja: 'モーツァルト代表曲集', en: 'Mozart Favorites' }, need: [['beginner', 3]], power: 3, step: 2.2, income: 0.11, color: '#b8323c' },
+    { id: 'chopin', name: { ja: 'ショパン代表曲集', en: 'Chopin Favorites' }, need: [['beginner', 3]], power: 3, step: 2.2, income: 0.11, color: '#6c5b7b' },
+    { id: 'bach', name: { ja: 'バッハ代表曲集', en: 'Bach Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, step: 2.2, income: 0.11, color: '#8b5a2b' },
+    { id: 'vivaldi', name: { ja: 'ヴィヴァルディ代表曲集', en: 'Vivaldi Favorites' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, step: 2.2, income: 0.11, color: '#c0392b' },
+    { id: 'concerto', name: { ja: 'ピアノ協奏曲集', en: 'Piano Concertos' }, need: [['beethoven', 3], ['mozart', 3], ['chopin', 3]], needAny: true, power: 60, step: 2.2, income: 0.11, color: '#7a1f3d' },
+    { id: 'tchaikovsky', name: { ja: 'チャイコフスキー代表曲集', en: 'Tchaikovsky Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 1500, step: 2.2, income: 0.11, color: '#2e3b4e' },
+    { id: 'debussy', name: { ja: 'ドビュッシー代表曲集', en: 'Debussy Favorites' }, need: [['bach', 3], ['vivaldi', 3]], needAny: true, power: 1500, step: 2.2, income: 0.11, color: '#58a55c' },
   ];
 
   // ---------- 難しさ (1 つのステージに 3 段階) ----------
@@ -481,7 +482,7 @@
   };
   const TOWER_IDS = Object.keys(TOWERS);
   // 同じ楽器をいくつも買える。2 つ目からは少しずつ高くなる
-  const unitPrice = (id, owned) => Math.round(TOWERS[id].price * (1 + 1.0 * owned));
+  const unitPrice = (id, owned) => Math.round(TOWERS[id].price * (1 + 1.5 * owned));
   const SELL_RATE = 0.4;
 
   // 楽器の格 (5 段階)。金貨と素材で上げる。格が上がると強くなり、レベルの上限も上がる
@@ -505,7 +506,7 @@
   // 格を上げる値段 (いまの格 g = 1〜4 → g + 1)
   function gradeCost(id, g) {
     const base = Math.max(150, TOWERS[id].price);
-    const coins = Math.round(base * [0, 2, 6, 18, 50][g]);
+    const coins = Math.round(base * [0, 4, 12, 36, 100][g]);
     const mats = [
       null,
       { w: 15, b: 6 },
@@ -516,13 +517,13 @@
     return { coins, mats };
   }
   // 楽器のレベル (倒した音符の経験値で自然に上がる。上限は格で決まる)
-  const expNeed = (lv) => Math.round(40 * Math.pow(1.25, lv));
+  const expNeed = (lv) => Math.round(40 * Math.pow(1.3, lv));
 
   // ---------- 練習室 (自機の強化。作曲家ごと。金貨は共通) ----------
   // lv は 0〜max。値段は base × 1.16^lv
   const STATS = [
-    { id: 'atk', name: { ja: '攻撃力', en: 'Power' }, max: 100, base: 12, desc: { ja: '弾の威力 ×1.065 (重なる)', en: 'Shot damage ×1.065 (compounding)' } },
-    { id: 'rate', name: { ja: '連射', en: 'Fire Rate' }, max: 100, base: 15, desc: { ja: '撃つ間隔 −1.5%', en: '−1.5% fire interval' } },
+    { id: 'atk', name: { ja: '攻撃力', en: 'Power' }, max: 100, base: 12, desc: { ja: '弾の威力 ×1.04 (重なる)', en: 'Shot damage ×1.04 (compounding)' } },
+    { id: 'rate', name: { ja: '連射', en: 'Fire Rate' }, max: 100, base: 15, desc: { ja: '撃つ間隔 −1%', en: '−1% fire interval' } },
     { id: 'ways', name: { ja: '弾の数', en: 'Spread' }, max: 96, base: 40, desc: { ja: '12 段ごとに弾が 1 本増える', en: '+1 shot every 12 levels' } },
     { id: 'hp', name: { ja: '体力', en: 'Max HP' }, max: 100, base: 10, desc: { ja: '+5', en: '+5' } },
     { id: 'def', name: { ja: '防御', en: 'Defense' }, max: 100, base: 18, desc: { ja: '受けるダメージ −0.7%', en: '−0.7% damage taken' } },
@@ -532,7 +533,7 @@
     { id: 'greed', name: { ja: '金運', en: 'Fortune' }, max: 100, base: 25, desc: { ja: 'もらえる金貨 +3%', en: '+3% ducats' } },
     { id: 'bomb', name: { ja: '一振り', en: 'Baton Sweep' }, max: 100, base: 22, desc: { ja: 'たまる速さ +1%・威力 +5%', en: '+1% charge speed, +5% power' } },
   ];
-  const statCost = (st, lv) => Math.round(st.base * Math.pow(1.16, lv));
+  const statCost = (st, lv) => Math.round(st.base * Math.pow(1.18, lv));
 
   // ---------- 画面の文言 ----------
   const TEXT = {

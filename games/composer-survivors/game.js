@@ -157,7 +157,7 @@
     const P = parsedOf(song);
     // 長い曲 (3 分より長い) は少しやさしく
     const norm = clamp(HP_RATE_REF / P.hpRate, 0.5, 2) * clamp(Math.pow(180 / P.lengthSec, 0.3), 0.75, 1);
-    return book.power * Math.pow(STAR_STEP, song.no - 1) * D.TIERS[tier].hp * norm;
+    return book.power * Math.pow(book.step || STAR_STEP, song.no - 1) * D.TIERS[tier].hp * norm;
   }
 
   // ---------- 能力 ----------
@@ -165,8 +165,8 @@
     const lv = (save.stats[compId] || {});
     const L = (id) => lv[id] || 0;
     const ps = {
-      dmg: 4 * Math.pow(1.065, L('atk')),
-      interval: 0.16 * Math.pow(0.985, L('rate')),
+      dmg: 4 * Math.pow(1.04, L('atk')),
+      interval: 0.16 * Math.pow(0.99, L('rate')),
       ways: 1 + Math.floor(L('ways') / 12),
       maxHp: 100 + 5 * L('hp'),
       def: Math.pow(0.993, L('def')),
@@ -202,7 +202,7 @@
       kind: T.kind,
       star,
       grade: g,
-      dmg: T.dmg * 0.55 * gm * Math.pow(1.07, lv), // 10 体呼べるので 1 体ずつは控えめ
+      dmg: T.dmg * 0.55 * gm * Math.pow(1.05, lv), // 10 体呼べるので 1 体ずつは控えめ
       cd: T.cd * Math.pow(0.99, lv),
       range: T.range * (1 + 0.006 * lv) * (star >= 3 && (T.kind === 'aura' || T.kind === 'cone' || T.kind === 'string') ? 1.35 : 1),
       hp: T.hp * Math.sqrt(gm) * 1.5 * Math.pow(1.05, lv),
@@ -249,6 +249,7 @@
       densHp: clamp(Math.pow(6.7 / dens, 0.9), 0.3, 1.2),
       densLeak: clamp(Math.pow(6.7 / dens, 0.6), 0.4, 1),
       // 短い曲ほど 1 つの音符の金貨を多く (曲の長さで金貨がかたよりすぎないように)
+      income: D.BOOKS.find((b) => b.id === song.book).income || 1, // 曲集ごとの金貨・経験値・素材の倍率
       coinLen: clamp(Math.pow(120 / Math.max(20, parsed.lengthSec), 0.6), 0.5, 2.5),
       phase: 'intro',
       t: 0,
@@ -371,14 +372,14 @@
     n.dead = true;
     G.killed += n.minion ? 0 : 1;
     // 金貨を落とす
-    const coin = n.maxHp * COIN_K * G.coinLen * G.ps.greed * (G.comp.id === 'vivaldi' && G.season === 2 ? 1.4 : 1) * (G.T.reward / G.T.hp);
+    const coin = n.maxHp * COIN_K * G.income * G.coinLen * G.ps.greed * (G.comp.id === 'vivaldi' && G.season === 2 ? 1.4 : 1) * (G.T.reward / G.T.hp);
     G.drops.push({ x: n.x, y: n.y, v: coin, t: 0, vy: -70 });
     // 経験値 (倒した楽器に。呼び出した楽器みんなにも少し)
-    const e = n.maxHp * EXP_K * (G.T.reward / G.T.hp);
+    const e = n.maxHp * EXP_K * G.income * (G.T.reward / G.T.hp);
     if (src) G.exp[src] = (G.exp[src] || 0) + e;
     for (const pm of G.party) G.exp[pm.unit.uid] = (G.exp[pm.unit.uid] || 0) + e * EXP_SHARE;
     // 素材: 音符の色のかけら (強い音符ほどよく落とす)
-    if (!n.minion && Math.random() < [0.05, 0.05, 0.05, 0.06, 0.08, 0.2][n.rank]) {
+    if (!n.minion && Math.random() < [0.05, 0.05, 0.05, 0.06, 0.08, 0.2][n.rank] * Math.sqrt(G.income)) {
       const k = D.MATS[n.rank].id;
       const cnt = Math.max(1, Math.round(G.T.reward * (0.6 + Math.random() * 0.8)));
       G.drops.push({ x: n.x, y: n.y, mat: k, v: cnt, t: 0, vy: -90 });
