@@ -54,12 +54,14 @@ $('tabGoal').onclick=()=>setView('goal');
 $('goalBar').onclick=()=>setView('goal');
 
 // ---- 描画 ----
-let lastSig='',refocus=null,openItemForm=new Set();
+let lastSig='',refocus=null,openItemForm=new Set(),projOpen=null,showDone=true;
 function renderGoals(){
   const goal=window.ttView==='goal',k=keyOf(cur),tk=todayKey();
   $('tabTime').setAttribute('aria-selected',String(!goal));$('tabGoal').setAttribute('aria-selected',String(goal));
   $('grid').hidden=goal;$('goalView').hidden=!goal;$('inbox').hidden=goal;
   if(goal){$('sampleBar').hidden=true;document.body.classList.remove('assigning')}
+  const ps=projOpen&&proj(projOpen);if(!ps)projOpen=null;
+  document.querySelector('.datebar').hidden=goal&&!!ps;
   syncPanel();
 
   const pend=pendingItems(),urgent=pend.filter(x=>diffDays(x.it.due,tk)<=0).length;
@@ -75,6 +77,7 @@ function renderGoals(){
     $('goalBar').innerHTML=parts.join('・')+'<span class="go">目標を見る ›</span>';$('goalBar').hidden=false;
   }else $('goalBar').hidden=true;
   if(!goal)return;
+  $('prepBox').hidden=$('projBar').hidden=$('projList').hidden=!!ps;$('projScreen').hidden=!ps;
 
   const gt=gs.flatMap(g=>g.tasks),tdone=gt.filter(t=>t.done).length;
   $('summary').innerHTML=gs.length
@@ -82,9 +85,10 @@ function renderGoals(){
     :`<span>この日の目標はまだありません</span><span>要準備 <b>${pend.length}</b></span>`;
 
   // 入力中に30秒ごとの再描画で消えないよう、内容が変わったときだけ作り直す
-  const sig=JSON.stringify([k,tk,store.projects,store.goals,store.projFilter,[...openItemForm]]);
+  const sig=JSON.stringify([k,tk,store.projects,store.goals,store.projFilter,[...openItemForm],projOpen,showDone]);
+  if(ps)$('summary').innerHTML=projSummary(ps);
   if(sig===lastSig)return;lastSig=sig;
-  renderPrep(pend,tk);renderProjects(k);
+  if(ps){renderProjectScreen(ps,tk);$('projList').innerHTML=$('prepList').innerHTML=''}else{renderPrep(pend,tk);renderProjects(k);$('projScreen').innerHTML=''}
   if(refocus){const el=$('goalView').querySelector(refocus);refocus=null;if(el){el.focus({preventScroll:false})}}
 }
 
@@ -118,28 +122,32 @@ function renderProjects(k){
     const gs=store.goals.filter(g=>g.pid===p.id&&g.date===k);
     const next=store.goals.filter(g=>g.pid===p.id&&g.date>k).sort((a,b)=>a.date.localeCompare(b.date))[0];
     return `<section class="proj" style="--pc:${p.color}">
-      <header class="phead"><span class="dot"></span><button class="ptitle" data-act="editproj" data-pid="${p.id}" title="プロジェクトを編集">${esc(p.name)}</button>
+      <header class="phead"><span class="dot"></span><button class="ptitle" data-act="openproj" data-pid="${p.id}" title="プロジェクトの進捗と整理">${esc(p.name)}<span class="more">進捗・整理 ›</span></button>
         <span class="pmeta">${gs.length?`達成 ${gs.filter(g=>g.done).length}/${gs.length}`:''}</span></header>
       ${gs.map(goalHTML).join('')||`<p class="none">この日の目標はまだありません${next?`。次の目標は <button class="link" data-act="goto" data-date="${next.date}">${dlabel(next.date)}「${esc(next.title)}」</button>`:''}</p>`}
       <form class="addrow" data-add="goal" data-pid="${p.id}"><input type="text" placeholder="${dlabel(k)}の目標を追加" autocomplete="off" aria-label="${esc(p.name)}の目標"><button class="btn">追加</button></form>
     </section>`}).join('');
 }
 
-function goalHTML(g){
-  const td=g.tasks.filter(t=>t.done).length;
+function goalHTML(g,o={}){
+  const td=g.tasks.filter(t=>t.done).length,tasks=o.hideDone?g.tasks.filter(t=>!t.done):g.tasks;
+  const rest=g.tasks.filter(t=>!t.done),tgt=o.org&&rest.length&&!g.done?carryTarget(g):null;
   return `<article class="goal${g.done?' done':''}" data-gid="${g.id}">
     <div class="ghead"><input type="checkbox" class="chk" data-act="goaldone" data-gid="${g.id}"${g.done?' checked':''} aria-label="目標を達成">
       <button class="gtitle" data-act="editgoal" data-gid="${g.id}">${esc(g.title)}</button>
       ${g.tasks.length?`<span class="gprog">${td}/${g.tasks.length}</span>`:''}</div>
-    <ul class="gtasks">${g.tasks.map(t=>taskHTML(g,t)).join('')}</ul>
+    ${o.org&&g.tasks.length?`<div class="mbar sm"><i style="width:${td/g.tasks.length*100}%"></i></div>`:''}
+    <ul class="gtasks">${tasks.map((t,i)=>taskHTML(g,t,o.org?{first:i===0,last:i===tasks.length-1}:null)).join('')}</ul>
+    ${o.hideDone&&td?`<p class="hid">完了したタスク ${td}件を非表示</p>`:''}
+    ${tgt?`<button class="carry" data-act="carry" data-gid="${g.id}" data-to="${tgt.id}">未完了の${rest.length}件を ${dlabel(tgt.date)}「${esc(tgt.title)}」へ移す</button>`:''}
     <form class="addrow sub" data-add="task" data-gid="${g.id}"><input type="text" placeholder="達成に必要なタスクを追加" autocomplete="off" aria-label="タスク"><button class="btn">追加</button></form>
   </article>`;
 }
 
-function taskHTML(g,t){
+function taskHTML(g,t,org){
   const open=openItemForm.has(t.id);
   return `<li class="gtask${t.done?' done':''}">
-    <div class="trow"><input type="checkbox" class="chk" data-act="taskdone" data-gid="${g.id}" data-tid="${t.id}"${t.done?' checked':''} aria-label="タスクを完了">
+    <div class="trow">${org?`<span class="ord"><button class="mini" data-act="up" data-gid="${g.id}" data-tid="${t.id}" aria-label="「${esc(t.title)}」を上へ"${org.first?' disabled':''}>▲</button><button class="mini" data-act="down" data-gid="${g.id}" data-tid="${t.id}" aria-label="「${esc(t.title)}」を下へ"${org.last?' disabled':''}>▼</button></span>`:''}<input type="checkbox" class="chk" data-act="taskdone" data-gid="${g.id}" data-tid="${t.id}"${t.done?' checked':''} aria-label="タスクを完了">
       <button class="ttl" data-act="edittask" data-gid="${g.id}" data-tid="${t.id}">${esc(t.title)}</button>
       <button class="mini" data-act="toinbox" data-gid="${g.id}" data-tid="${t.id}" title="タイムテーブルの「時間未定」に追加">未定へ</button>
       <button class="mini" data-act="toggleitem" data-tid="${t.id}" aria-expanded="${open}">＋ 必要なもの</button></div>
@@ -152,6 +160,49 @@ function taskHTML(g,t){
       <label class="dl">いつまでに<input type="date" value="${g.date}" aria-label="いつまでに用意するか"></label>
       <button class="btn primary">登録</button></form>`:''}
   </li>`;
+}
+
+// ---- プロジェクト画面（進捗と整理） ----
+const projGoals=pid=>store.goals.filter(g=>g.pid===pid).sort((a,b)=>a.date.localeCompare(b.date));
+// 未完了タスクの移し先：今日以降でまだ達成していない、いちばん近い目標
+function carryTarget(g){const tk=todayKey(),from=g.date>tk?g.date:tk;
+  return projGoals(g.pid).find(x=>x!==g&&!x.done&&(x.date>from||(x.date===from&&x.date!==g.date)))||null}
+function projSummary(p){
+  const gs=projGoals(p.id),ts=gs.flatMap(g=>g.tasks);
+  return `<span>目標 <b>${gs.filter(g=>g.done).length}/${gs.length}</b></span><span>タスク <b>${ts.filter(t=>t.done).length}/${ts.length}</b></span>`;
+}
+const meter=(lab,a,b,warn)=>`<div class="meter"><div class="mlab"><span>${lab}</span><b>${a}<small>/${b}</small></b><em>${b?Math.round(a/b*100):0}%</em></div><div class="mbar${warn?' warn':''}"><i style="width:${b?a/b*100:0}%"></i></div></div>`;
+function relDay(k,tk){const d=diffDays(k,tk);return d===0?'今日':d===1?'明日':d===-1?'昨日':d>0?`あと${d}日`:`${-d}日前`}
+function renderProjectScreen(p,tk){
+  const gs=projGoals(p.id),ts=gs.flatMap(g=>g.tasks),its=ts.flatMap(t=>t.items);
+  const over=its.filter(i=>!i.ready&&dueState(i).cls==='over').length;
+  const late=gs.filter(g=>!g.done&&g.date<tk).length,next=gs.find(g=>!g.done&&g.date>=tk);
+  const notes=[];
+  if(gs.length)notes.push(`期間 <b>${dlabel(gs[0].date)}〜${dlabel(gs[gs.length-1].date)}</b>`);
+  if(next)notes.push(`次の目標 <button class="link" data-act="gotodate" data-date="${next.date}">${dlabel(next.date)}「${esc(next.title)}」</button>`);
+  if(late)notes.push(`<span class="warn">達成していない過去の目標 ${late}件</span>`);
+  if(over)notes.push(`<span class="warn">期限切れの準備 ${over}件</span>`);
+  const shown=showDone?gs:gs.filter(g=>!(g.done&&g.tasks.every(t=>t.done)));
+  let lastPast=false;
+  $('projScreen').innerHTML=`<div class="pstop" style="--pc:${p.color}">
+      <button class="btn" data-act="closeproj">‹ 一覧</button>
+      <h2><span class="dot"></span>${esc(p.name)}</h2>
+      <button class="btn" data-act="editproj" data-pid="${p.id}">編集</button></div>
+    <section class="pstats" style="--pc:${p.color}" aria-label="進捗">
+      ${meter('目標の達成',gs.filter(g=>g.done).length,gs.length)}
+      ${meter('タスクの完了',ts.filter(t=>t.done).length,ts.length)}
+      ${meter('必要なものの用意',its.filter(i=>i.ready).length,its.length,over)}
+      ${notes.length?`<p class="pnotes">${notes.join('<span class="sep">・</span>')}</p>`:''}
+    </section>
+    <div class="ptools">
+      <div class="seg" role="group" aria-label="表示"><button data-act="showdone" data-v="1" aria-pressed="${showDone}">すべて</button><button data-act="showdone" data-v="0" aria-pressed="${!showDone}">未完了のみ</button></div>
+    </div>
+    <form class="addrow pgoal" data-add="goal" data-pid="${p.id}"><input type="text" placeholder="目標を追加" autocomplete="off" aria-label="目標"><input type="date" value="${tk}" aria-label="目標の日付"><button class="btn primary">追加</button></form>
+    <ol class="tline" style="--pc:${p.color}">${shown.map(g=>{
+      const d=diffDays(g.date,tk),cls=d<0?'past':d===0?'today':'future';
+      const mark=!lastPast&&d>=0&&gs.some(x=>x.date<tk)?' first-now':'';if(d>=0)lastPast=true;
+      return `<li class="tl ${cls}${mark}"><button class="tldate" data-act="gotodate" data-date="${g.date}">${dlabel(g.date)}<small>${relDay(g.date,tk)}</small></button>${goalHTML(g,{org:true,hideDone:!showDone})}</li>`}).join('')
+      ||`<li class="none">${gs.length?'未完了の目標はありません。':'まだ目標がありません。上のフォームで日付を決めて追加します。'}</li>`}</ol>`;
 }
 
 // ---- 操作 ----
@@ -172,6 +223,16 @@ $('goalView').addEventListener('click',e=>{
   if(a==='filter'){store.projFilter=d.pid;commit()}
   else if(a==='newproj')openG({kind:'project'});
   else if(a==='editproj')openG({kind:'project',pid:d.pid});
+  else if(a==='openproj'){projOpen=d.pid;render();window.scrollTo({top:0})}
+  else if(a==='closeproj'){projOpen=null;render();window.scrollTo({top:0})}
+  else if(a==='showdone'){showDone=d.v==='1';render()}
+  else if(a==='gotodate'){projOpen=null;cur=parseKey(d.date);render();window.scrollTo({top:0})}
+  else if(a==='up'||a==='down'){const g=findGoal(d.gid),i=g.tasks.findIndex(x=>x.id===d.tid),j=a==='up'?i-1:i+1;
+    if(j<0||j>=g.tasks.length)return;[g.tasks[i],g.tasks[j]]=[g.tasks[j],g.tasks[i]];commit();
+    const b=$('goalView').querySelector(`[data-act="${a}"][data-tid="${d.tid}"]`);b&&!b.disabled&&b.focus()}
+  else if(a==='carry'){const g=findGoal(d.gid),to=findGoal(d.to),before=gsnap(),mv=g.tasks.filter(t=>!t.done);
+    g.tasks=g.tasks.filter(t=>t.done);to.tasks.push(...mv);commit();
+    gtoast(`${mv.length}件を${dlabel(to.date)}「${to.title}」へ移しました`,before)}
   else if(a==='editgoal')openG({kind:'goal',gid:d.gid});
   else if(a==='edittask')openG({kind:'task',gid:d.gid,tid:d.tid});
   else if(a==='edititem')openG({kind:'item',iid:d.iid});
@@ -192,7 +253,8 @@ $('goalView').addEventListener('submit',e=>{
     const p={id:uid(),name:v,color:PCOLORS[store.projects.length%PCOLORS.length]};store.projects.push(p);
     refocus=`[data-add="goal"][data-pid="${p.id}"] input`;
   }else if(d.add==='goal'){
-    const g={id:uid(),pid:d.pid,date:keyOf(cur),title:v,done:false,tasks:[]};store.goals.push(g);
+    const dt=f.querySelector('input[type=date]'),date=(dt&&dt.value)||keyOf(cur);
+    const g={id:uid(),pid:d.pid,date,title:v,done:false,tasks:[]};store.goals.push(g);
     refocus=`[data-add="task"][data-gid="${g.id}"] input`;
   }else if(d.add==='task'){
     findGoal(d.gid).tasks.push({id:uid(),title:v,done:false,items:[]});
@@ -216,12 +278,13 @@ const syncDueChips=()=>[...$('gDueChips').children].forEach(b=>b.setAttribute('a
 
 function openG(o){
   gEdit=o;const show=(id,on)=>$(id).hidden=!on;
-  show('gDueField',o.kind==='item');show('gDateField',o.kind==='goal');show('gColorField',o.kind==='project');
+  show('gDueField',o.kind==='item');show('gDateField',o.kind==='goal');show('gColorField',o.kind==='project');show('gMoveField',o.kind==='task');
   let name='',title='';$('gDel').hidden=false;
   if(o.kind==='project'){const p=o.pid&&proj(o.pid);title=p?'プロジェクトを編集':'プロジェクトを作成';name=p?p.name:'';
     gColor=p?p.color:PCOLORS[store.projects.length%PCOLORS.length];syncSw();$('gDel').hidden=!p;$('gNameLab').textContent='プロジェクト名'}
   else if(o.kind==='goal'){const g=findGoal(o.gid);title='目標を編集';name=g.title;$('gDate').value=g.date;$('gNameLab').textContent='目標'}
-  else if(o.kind==='task'){const t=findGoal(o.gid).tasks.find(x=>x.id===o.tid);title='タスクを編集';name=t.title;$('gNameLab').textContent='タスク'}
+  else if(o.kind==='task'){const t=findGoal(o.gid).tasks.find(x=>x.id===o.tid);title='タスクを編集';name=t.title;$('gNameLab').textContent='タスク';
+    const g0=findGoal(o.gid);$('gMove').innerHTML=projGoals(g0.pid).map(g=>`<option value="${g.id}"${g===g0?' selected':''}>${dlabel(g.date)} ${esc(g.title)}${g.done?'（達成）':''}</option>`).join('')}
   else{const f=findItem(o.iid);title='必要なものを編集';name=f.it.name;$('gNameLab').textContent='必要なもの';
     $('gDue').value=f.it.due;$('gDueTime').value=f.it.dueTime||'';
     const gd=f.g.date,tk=todayKey();
@@ -238,14 +301,15 @@ $('gform').addEventListener('submit',e=>{
     if(p){p.name=v;p.color=gColor}else{const np={id:uid(),name:v,color:gColor};store.projects.push(np);store.projFilter='all';msg='プロジェクトを作成しました'}}
   else if(o.kind==='goal'){const g=findGoal(o.gid);g.title=v;const nd=$('gDate').value;
     if(nd&&nd!==g.date){g.date=nd;msg=`${dlabel(nd)}に移動しました`}}
-  else if(o.kind==='task'){findGoal(o.gid).tasks.find(x=>x.id===o.tid).title=v}
+  else if(o.kind==='task'){const g=findGoal(o.gid),t=g.tasks.find(x=>x.id===o.tid);t.title=v;
+    const to=findGoal($('gMove').value);if(to&&to!==g){g.tasks=g.tasks.filter(x=>x!==t);to.tasks.push(t);msg=`${dlabel(to.date)}「${to.title}」へ移しました`}}
   else{const f=findItem(o.iid);f.it.name=v;f.it.due=$('gDue').value||f.it.due;f.it.dueTime=$('gDueTime').value}
   $('gdlg').close();commit();toast(msg);
 });
 $('gDel').onclick=()=>{
   const o=gEdit,before=gsnap();let msg;
   if(o.kind==='project'){const p=proj(o.pid);const n=store.goals.filter(g=>g.pid===p.id).length;
-    store.projects=store.projects.filter(x=>x!==p);store.goals=store.goals.filter(g=>g.pid!==p.id);
+    store.projects=store.projects.filter(x=>x!==p);if(projOpen===p.id)projOpen=null;store.goals=store.goals.filter(g=>g.pid!==p.id);
     msg=`プロジェクト「${p.name}」を削除しました${n?`（目標${n}件も削除）`:''}`}
   else if(o.kind==='goal'){const g=findGoal(o.gid);store.goals=store.goals.filter(x=>x!==g);msg=`目標「${g.title}」を削除しました`}
   else if(o.kind==='task'){const g=findGoal(o.gid),t=g.tasks.find(x=>x.id===o.tid);g.tasks=g.tasks.filter(x=>x!==t);msg=`タスク「${t.title}」を削除しました`}
