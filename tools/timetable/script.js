@@ -54,7 +54,7 @@ function toast(msg,snapshot){
   $('toastMsg').textContent=msg;$('undoBtn').hidden=!snapshot;$('toast').hidden=false;
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000);
 }
-$('undoBtn').onclick=()=>{if(!undoSnap)return;{const d=JSON.parse(undoSnap.data);store.days[undoSnap.key]=d.t;store.inbox[undoSnap.key]=d.i;}save();render();$('toast').hidden=true};
+$('undoBtn').onclick=()=>{if(!undoSnap)return;if(undoSnap.restore){undoSnap.restore();$('toast').hidden=true;return}{const d=JSON.parse(undoSnap.data);store.days[undoSnap.key]=d.t;store.inbox[undoSnap.key]=d.i;}save();render();$('toast').hidden=true};
 
 // ---- 描画 ----
 const ROW=()=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row'));
@@ -101,6 +101,7 @@ function render(){
   const lastEnd=list.length?Math.max(...list.map(t=>t.start+t.dur)):null;
   $('summary').innerHTML=list.length?`<span>完了 <b>${done}/${list.length}</b></span><span>残り <b>${Math.floor(rest/60)}h${pad(rest%60)}m</b></span><span>終了予定 <b>${fmt(lastEnd%DAY)}${lastEnd>DAY?'(翌)':''}</b></span>`:'<span>空いている枠をタップしてタスクを追加</span>';
   renderInbox();
+  if(window.renderGoals)renderGoals();
 }
 
 // ---- 完了 ----
@@ -301,7 +302,7 @@ function renderInbox(){
   syncPanel();
 }
 function syncPanel(){
-  const h=$('inbox').offsetHeight;
+  const h=$('inbox').hidden?0:$('inbox').offsetHeight;
   document.documentElement.style.setProperty('--panelH',h+'px');
   document.querySelector('.wrap').style.paddingBottom=(h+40)+'px';
 }
@@ -369,6 +370,7 @@ const go=d=>{assignId=null;cur.setDate(cur.getDate()+d);render();scrollToFocus()
 $('prevDay').onclick=()=>go(-1);$('nextDay').onclick=()=>go(1);
 $('todayBtn').onclick=()=>{cur=new Date();cur.setHours(0,0,0,0);render();scrollToFocus()};
 function scrollToFocus(){
+  if(window.ttView==='goal'){window.scrollTo({top:0});return}
   const list=tasks();let m=isToday()?nowMin():(list.length?Math.min(...list.map(t=>t.start)):480);
   const y=$('grid').getBoundingClientRect().top+window.scrollY+(m/STEP)*ROW()-160;
   window.scrollTo({top:Math.max(0,y)});
