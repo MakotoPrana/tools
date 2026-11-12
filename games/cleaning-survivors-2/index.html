@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>おそうじサバイバー2</title>
+  <meta name="description" content="家の中から町の外まで、押し寄せるゴミを自動で動く清掃ギアで一掃するヴァンサバ風アクションの第2弾。16種類のギアを工房で恒久強化し、必殺技を装備して、全10ステージ・3段階の難易度に挑もう。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../">‹ ゲーム一覧</a>
+      <h1>おそうじサバイバー2</h1>
+    </header>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="ゲーム画面"></canvas>
+
+      <div class="hud" id="hud" hidden>
+        <div class="xp"><i id="xp-fill"></i></div>
+        <div class="hud-top">
+          <span class="chip lv" id="hud-lv">Lv 1</span>
+          <span class="chip" id="hud-kill">🧹 0</span>
+          <span class="chip time" id="hud-time">4:00</span>
+          <span class="chip" id="hud-coin">🪙 0</span>
+          <button type="button" class="pause-btn" id="pause-btn" aria-label="一時停止">Ⅱ</button>
+        </div>
+        <div class="boss-bar" id="boss-bar" hidden><span id="boss-name"></span><div><i id="boss-fill"></i></div></div>
+        <div class="banner" id="banner" hidden></div>
+        <div class="slots" id="slots"></div>
+        <button type="button" class="ult-btn" id="ult-btn" aria-label="必殺技"><span id="ult-ic">💥</span></button>
+      </div>
+
+      <div class="overlay" id="overlay"><div class="screen" id="screen"></div></div>
+    </div>
+
+    <section class="help">
+      <h2>遊び方</h2>
+      <p>清掃員を動かして、押し寄せるゴミから逃げながら片付けるヴァンサバ風アクションです。清掃ギアはすべて自動で動きます。ゴミを片付けると落ちる「ダスト」を拾うと経験値になり、レベルアップのたびにギアかパッシブを 1 つ選んで強くなります。4:00 に現れるボスを倒すとクリアです。</p>
+
+      <h3>操作</h3>
+      <table>
+        <tbody>
+          <tr><th>スマホ</th><td>画面のどこでも、指を置いた位置が中心のスティックで移動。右下のボタンで必殺技、右上の Ⅱ で一時停止</td></tr>
+          <tr><th>パソコン</th><td>WASD / 矢印キーで移動、Space で必殺技、Esc / P で一時停止、レベルアップは 1〜3 キーでも選べる</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ステージと難易度</h3>
+      <p>ステージは 10 個。1〜5 は家の中 (玄関とろうか・リビング・キッチン・おふろ・屋根裏)、6〜10 は外 (庭・公園・商店街・河川敷・ゴミ処理場) です。すべる床、まっ暗、突風、水たまり、走りぬける乗り物、雨など、ステージごとにしかけがあります。前のステージをクリアすると次が開きます。</p>
+      <table>
+        <tbody>
+          <tr><th>ノーマル</th><td>ゴミの体力 ×1、ダメージ ×1、量 ×1、コイン ×1</td></tr>
+          <tr><th>ハード</th><td>体力 ×1.7、ダメージ ×1.5、量 ×1.25、コイン ×2 (そのステージのノーマルをクリアで開く)</td></tr>
+          <tr><th>ゴミ屋敷級</th><td>体力 ×2.6、ダメージ ×1.8、量 ×1.4、コイン ×3.5 (ハードをクリアで開く)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>清掃ギアと工房</h3>
+      <p>ギアは 16 種類。最初は 6 種類が使え、ステージを初めてクリアするたびに 1 つずつ増えます。1 回のプレイで持てるのはギア 5 つ・パッシブ 5 つまでです。出撃前に「最初のギア」を選べます。</p>
+      <p>集めたコインは「工房」でギアの恒久強化に使えます。強化はずっと残り、Lv ごとにダメージ +7%、Lv3 で範囲 +10%、Lv6 で間隔 −10%、Lv10 でプレイ中の最大レベルが 6 から 7 になります。</p>
+
+      <h3>必殺技</h3>
+      <p>必殺技は出撃前に 1 つ装備します。ゴミを片付けるとゲージがたまり、満タンになると使えます。コインで新しい必殺技を買ったり、威力を強化したりできます (大掃除フラッシュ・メガロボ出動・放水タイフーン・除菌ドーム・ブラックホール吸引・ピカピカタイム)。</p>
+
+      <h3>落とし物</h3>
+      <table>
+        <tbody>
+          <tr><th>🪙 コイン</th><td>工房・必殺技・トレーニングに使う。力尽きても、拾ったぶんはもらえる</td></tr>
+          <tr><th>🍙 おにぎり</th><td>体力を 30 回復</td></tr>
+          <tr><th>🧲 磁石</th><td>落ちているダストとコインを全部引き寄せる</td></tr>
+          <tr><th>🎁 宝箱</th><td>金色の輪のエリートが落とす。コインと、レベルアップ 1 回ぶん</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>&copy; tools.e-seventh.com</footer>
+
+  <!-- 最初に Origami Works のロゴアニメーションを流す (games/ の共通部品) -->
+  <script src="../origami-intro.js"></script>
+  <script>if (!/[?&]bot=1/.test(location.search)) OrigamiIntro.play();</script>
+  <script src="data.js?v=1"></script>
+  <script src="game.js?v=1"></script>
+  <script src="ui.js?v=1"></script>
+</body>
+</html>
