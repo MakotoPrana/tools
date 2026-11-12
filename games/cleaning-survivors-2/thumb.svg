@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <!-- ゲーム一覧 (games/index.html) のタイル画像。左が家の中、右が外 -->
+  <defs>
+    <clipPath id="in"><polygon points="0,0 190,0 130,200 0,200"/></clipPath>
+    <clipPath id="out"><polygon points="190,0 320,0 320,200 130,200"/></clipPath>
+    <symbol id="eyes" viewBox="-10 -5 20 10"><circle cx="-4" r="3" fill="#fff"/><circle cx="4" r="3" fill="#fff"/><circle cx="-3.6" cy=".4" r="1.5" fill="#1a1a22"/><circle cx="4.4" cy=".4" r="1.5" fill="#1a1a22"/></symbol>
+  </defs>
+  <g clip-path="url(#in)">
+    <rect width="320" height="200" fill="#c79a63"/>
+    <g stroke="#a87a48" stroke-width="2"><path d="M0 40H320M0 80H320M0 120H320M0 160H320M60 0V40M150 40V80M30 80V120M110 120V160M70 160V200"/></g>
+  </g>
+  <g clip-path="url(#out)">
+    <rect width="320" height="200" fill="#6fae54"/>
+    <g fill="#5f9a48"><circle cx="210" cy="30" r="3"/><circle cx="262" cy="64" r="4"/><circle cx="300" cy="24" r="3"/><circle cx="238" cy="118" r="4"/><circle cx="292" cy="150" r="3"/><circle cx="200" cy="172" r="4"/><circle cx="170" cy="150" r="3"/></g>
+    <g fill="#f2d24a"><circle cx="284" cy="96" r="4"/><circle cx="292" cy="102" r="4"/><circle cx="280" cy="104" r="4"/></g>
+  </g>
+  <polygon points="188,0 192,0 132,200 128,200" fill="#fff" opacity=".8"/>
+  <!-- 掃除機の扇 -->
+  <path d="M160 108 L78 52 A100 100 0 0 0 62 128 Z" fill="#bfeaff" opacity=".55"/>
+  <!-- 回る水の筋 -->
+  <g stroke="#96dcff" stroke-width="7" stroke-linecap="round" opacity=".85"><path d="M172 100 L236 58M170 118 L214 172"/></g>
+  <g stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M172 100 L236 58M170 118 L214 172"/></g>
+  <!-- ゴミ: ホコリ・空き缶・落ち葉・泥 -->
+  <g stroke="#1a1a22" stroke-opacity=".6" stroke-width="2">
+    <circle cx="52" cy="76" r="13" fill="#b9b4ab"/><circle cx="84" cy="110" r="11" fill="#b9b4ab"/><circle cx="40" cy="126" r="12" fill="#b9b4ab"/>
+    <rect x="92" y="52" width="18" height="26" rx="4" fill="#d9483b" transform="rotate(-18 101 65)"/>
+    <path d="M250 28 Q270 44 250 62 Q230 44 250 28Z" fill="#d98a2b"/><path d="M284 52 Q300 64 284 80 Q268 64 284 52Z" fill="#d98a2b"/>
+    <path d="M232 150 a20 18 0 0 1 40 0 q-5 12 -10 2 q-5 12 -10 2 q-5 12 -10 2 q-5 10 -10 -6Z" fill="#7a5a3a"/>
+  </g>
+  <use href="#eyes" x="42" y="71" width="20" height="10"/><use href="#eyes" x="75" y="106" width="18" height="9"/><use href="#eyes" x="31" y="121" width="18" height="9"/>
+  <use href="#eyes" x="92" y="58" width="18" height="9"/><use href="#eyes" x="241" y="38" width="18" height="9"/><use href="#eyes" x="275" y="60" width="18" height="9"/><use href="#eyes" x="242" y="140" width="20" height="10"/>
+  <!-- ダスト -->
+  <g fill="#6ad0ff" stroke="#fff" stroke-width="1"><path d="M120 150l4 5-4 5-4-5z"/><path d="M196 36l4 5-4 5-4-5z"/><path d="M146 60l4 5-4 5-4-5z"/></g>
+  <!-- 清掃員 -->
+  <ellipse cx="160" cy="132" rx="16" ry="5" fill="#000" opacity=".25"/>
+  <g stroke="#1a2a30" stroke-width="2.5">
+    <rect x="147" y="104" width="26" height="22" rx="8" fill="#3fc8b0"/>
+    <rect x="153" y="111" width="14" height="10" fill="#fff" stroke="none"/>
+    <circle cx="160" cy="94" r="12.5" fill="#ffd9b0"/>
+    <path d="M148 92 A12.5 12.5 0 0 1 172 92Z" fill="#f2f6f8"/>
+  </g>
+  <circle cx="156" cy="97" r="2" fill="#1a1a22"/><circle cx="165" cy="97" r="2" fill="#1a1a22"/>
+  <!-- 2 -->
+  <text x="296" y="190" text-anchor="end" font-family="system-ui,sans-serif" font-weight="900" font-size="64" fill="#ffd23a" stroke="#3a2a08" stroke-width="5" paint-order="stroke" transform="rotate(6 280 170)">2</text>
+</svg>

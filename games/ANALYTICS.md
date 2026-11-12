@@ -28,6 +28,7 @@ CrazyGames 版・itch.io 版は Google タグを外すので、何も送らな�
 | `bowling` | `ワールド-ステージ` (`3-7` など) | ストライク・スペアでピンを全部倒した / 2投で残った | 始め: `world`。終わり: `clear_type` (strike / spare)、`treasure`、`pins_left` |
 | `breakout` | ステージ番号 (1〜) | ブロックを全部こわした / ライフがなくなった・リタイア | 始め: `difficulty`。終わり: `difficulty`、`clear_time`、`no_damage`、`time_attack`、`retired` |
 | `cleaning_survivors` | ステージ番号 (1〜)。チュートリアルは `tutorial` | 全部屋の清掃完了 / 力尽きた・時間切れ | 始め: `mode`、`character`。終わり: `mode`、`character`、`rooms_done`、`clean_pct`、`level`、`reason` (worn_out / time_up) |
+| `cleaning_survivors_2` | ステージ番号 (1〜) | ボスを倒した / 力尽きた | 始め: `difficulty` (`normal`・`hard`・`hell`)、`gear` (最初のギアの id)、`ult` (必殺技の id)。終わり: `difficulty`、`level`、`kills`。失敗は `time_sec` |
 | `composer_survivors` | 曲の id (`k2`・`elise`・`spring1` など)。パートは `_p` + 番号 (`elise_p2`) | 通しはボスを倒した・パートは音符をすべて倒すか通した / 力尽きた | 始め: `mode` (難しさ: `normal`・`hard`・`virtuoso`)、`character` (作曲家の id)。終わり: `mode`、`character`。失敗は `progress_pct` (曲の何 % まで弾けたか) |
 | `reclaim_gunners` | エリアの解放はエリアの id (`s1a3` など)、ボス戦は `boss_` + ボスの id (`boss_G1` など) | エリアを解放した・ボスを倒した / 力尽きた | 始め: `difficulty`、`hero`、`player_lv` (ボス戦は `boss_lv` も)。終わり: `reinvade` (エリア) |
 
@@ -35,6 +36,7 @@ CrazyGames 版・itch.io 版は Google タグを外すので、何も送らな�
 - mole の `stage_start` / `stage_end` は以前から `stage_no` で送っていたので、続けて見られるように `stage_no` も残す
 - voxel-grenade・paper-plane のゲーム専用のイベント (`voxel_grenade_start` など) もそのまま送る
 - cleaning-survivors は、共通のイベントに加えて、同じ中身で頭に `cs_` をつけたイベント (`cs_stage_start`・`cs_stage_end`・`cs_stage_retry_fail`・`cs_stage_retry_clear`・`cs_stage_retry_quit`) も送る。`game` で絞りこまなくても、このゲームのイベントだけを見られる
+- cleaning-survivors-2 も、共通のイベントに加えて、頭に `cs2_` をつけたイベント (`cs2_stage_start` など) を同じ中身で送る
 - composer-survivors も、共通のイベントに加えて、頭に `cps_` をつけたイベント (`cps_stage_start` など) を同じ中身で送る
 - cleaning-survivors は、力尽きるたびに `cs_death` も送る (宝物や広告で復活したぶんも数える。時間切れは数えない)。パラメータは `game`、`stage`、`mode`、`character`、`level`、`death_no` (このプレイで何回目か)、`time_sec` (プレイ開始からの秒数)、`rooms_done`、`clean_pct`
 
