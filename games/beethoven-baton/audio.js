@@ -58,6 +58,27 @@
     return { notes: out, length: t };
   }
 
+  // 作曲家サバイバー (../composer-survivors/scores/) の譜面を、この形に直す。
+  // あちらは「前の音からのずれ,長さ,高さ,強さ(0〜5)」をティックで並べている
+  function fromCS(cs, title) {
+    const bpb = (cs.timeSig[0] * 4) / cs.timeSig[1];
+    const ppq = cs.ppq || 96;
+    let end = 0;
+    const parts = cs.parts.map((part) => {
+      let t = 0;
+      const out = [];
+      for (const tok of part.data.split(';')) {
+        const f = tok.split(',');
+        t += +f[0];
+        out.push([t, +f[1], +f[2], +f[3]]);
+        end = Math.max(end, t + +f[1]);
+      }
+      return { inst: 'piano', vol: (part.vol ?? 1) * (part.melody ? 1 : 0.85), melody: !!part.melody, abs: out };
+    });
+    const bars = Math.ceil(end / ppq / bpb - 0.01);
+    return { title, bpm: (cs.tempo || [[0, 120]])[0][1], beatsPerBar: bpb, lengthBeats: bars * bpb, ppq, parts, cs: true };
+  }
+
   // 曲 → { bpm, beatsPerBar, length, notes: [{t,d,p,v,inst,mel}], cues: [拍] }
   function loadSong(raw) {
     const notes = [];
@@ -65,7 +86,9 @@
     raw.parts.forEach((part, i) => {
       const inst = part.inst || 'piano';
       const vol = part.vol || 1;
-      if (raw.text) {
+      if (raw.cs) {
+        for (const [a, b, c, d] of part.abs) notes.push({ t: a / raw.ppq, d: b / raw.ppq, p: c, v: (0.3 + d * 0.11) * vol, inst, mel: !!part.melody });
+      } else if (raw.text) {
         let t0 = 0;
         for (const sec of part.data) {
           const r = parseText(sec, raw.beatsPerBar, `${raw.title} part ${i}`);
@@ -103,14 +126,16 @@
     // 強拍 (小節の頭) かどうか
     const cueInfo = cues.map((c) => ({ t: c, down: Math.abs(c % raw.beatsPerBar) < 1e-6, mel: melOn.has(Math.round(c * 48)) }));
     // メロディの音の頭 (16 分音符の格子の上のものだけ。トリルや装飾音のような細かい音は除く)。攻撃はこれに合わせる
+    // 速い曲 (1 拍 0.36 秒未満) は 8 分音符の格子にする (16 分音符の連打は速すぎるので)
+    const grid = raw.bpm > 166 ? 2 : 4;
     const melMap = new Map();
     for (const n of notes) {
       if (!n.mel) continue;
-      const q = n.t * 4;
+      const q = n.t * grid;
       if (Math.abs(q - Math.round(q)) > 0.03) continue;
       const k = Math.round(q);
       const prev = melMap.get(k);
-      if (!prev || n.d > prev.d) melMap.set(k, { t: k / 4, d: n.d, p: n.p });
+      if (!prev || n.d > prev.d) melMap.set(k, { t: k / grid, d: n.d, p: n.p });
       else if (n.p > prev.p) prev.p = n.p;
     }
     const mel = [...melMap.values()].sort((a, b) => a.t - b.t);
@@ -120,7 +145,9 @@
       const pv = i > 0 ? mel[i - 1].t : mel[mel.length - 1].t - length;
       m.gap = Math.min(nx - m.t, m.t - pv);
     });
-    return { title: raw.title, bpm: raw.bpm, beatsPerBar: raw.beatsPerBar, length, notes, cues: cueInfo, mel };
+    // 敵が考える間隔 (拍)。速い曲では 2 拍ごと
+    const pulse = raw.bpm > 166 ? 2 : 1;
+    return { title: raw.title, composer: raw.composer, bpm: raw.bpm, beatsPerBar: raw.beatsPerBar, length, notes, cues: cueInfo, mel, pulse };
   }
 
   // ---------- 鳴らす部品 ----------
@@ -599,5 +626,5 @@
     }
   }
 
-  window.BB_AUDIO = { Audio, Player, loadSong };
+  window.BB_AUDIO = { Audio, Player, loadSong, fromCS };
 })();
