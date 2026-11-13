@@ -176,6 +176,16 @@
   const PERFECT_WIN = 0.07;
   const GREAT_WIN = 0.135;
   const JUST_WIN = 0.2; // ジャストガード: 当たる時刻の何秒前までに構えればよいか
+  const JUST_LV2 = 0.1;
+  const JUST_LV3 = 0.045; // これより近ければ「完璧」→ カデンツァ
+  const JUST_LEVELS = {
+    1: { label: 'JUST GUARD', short: 'JUST', color: '#8ff0ff', size: 28, score: 500 },
+    2: { label: 'GREAT JUST!', short: 'GREAT JUST', color: '#7fd8ff', size: 32, score: 900 },
+    3: { label: 'PERFECT JUST!!', short: 'PERFECT JUST', color: '#ffd84a', size: 38, score: 1500 },
+  };
+  // カデンツァ: 完璧なジャストガードのあと、敵がスローになり、画面の中央にメロディのガイドが出る。
+  // ガイドどおりに打てたかで 100 点満点。80 点以上で相手に大ダメージ
+  const CADENZA_PASS = 80;
 
   // ---------- 入力 ----------
   const keys = {};
@@ -343,8 +353,8 @@
 
   // 道中の敵の波 (x に来たら、画面を止めて戦う)
   const WAVES = [
-    { x: 760, list: ['gent'], hint: '拍に合わせて J (Z) で攻撃！ 光る音符に合わせるほど派手になる' },
-    { x: 1500, list: ['gent', 'gent'], hint: '敵の「!」は拍の上で来る。拍に合わせて K (X) で構えるとジャストガード！' },
+    { x: 760, list: ['gent'], hint: 'メロディに合わせて J (Z) で攻撃！ 16 分音符は連打で。合うほど派手になる' },
+    { x: 1500, list: ['gent', 'gent'], hint: '敵の「!」は拍の上で来る。ぴったり K (X) で構えると PERFECT JUST → カデンツァ！' },
     { x: 2250, list: ['heavy', 'butler'], hint: '傘で防ぐ敵には、J 長押しの「ため攻撃」で防御くずし！ 離した瞬間を拍に' },
     { x: 3000, list: ['gent', 'butler', 'heavy'], hint: '赤く光る「!!」はため攻撃。出かかりを通常攻撃でつぶせ！' },
     { x: 3750, list: ['heavy', 'gent', 'butler', 'gent', 'butler'], hint: null },
@@ -566,6 +576,11 @@
     while (pressQ.length) {
       const ev = pressQ.shift();
       if (p.state === 'dead') continue;
+      if (g.cadenza) {
+        // カデンツァ中は、攻撃ボタン (押した瞬間) でメロディをなぞる。ほかの操作は効かない
+        if (ev.kind === 'attack' && ev.down && g.cadenza.phase === 'play') cadenzaPress(g, ev.beat);
+        continue;
+      }
       if (ev.kind === 'jump' && ev.down) {
         if (p.onGround && (p.state === 'free' || p.state === 'charging')) {
           p.vy = -P.jumpV;
@@ -948,6 +963,282 @@
     }
   }
 
+  // ---------- カデンツァ ----------
+  function startCadenza(g, target, nowBeat) {
+    const m = g.music;
+    // 次の拍の次から 1 小節。メロディの音が少なければ 2 小節
+    const start = Math.ceil(nowBeat) + 1;
+    let end = start + 4;
+    let notes = m.melBetween(start, end);
+    if (notes.length < 5) {
+      end = start + 8;
+      notes = m.melBetween(start, end);
+    }
+    if (notes.length === 0) return;
+    const cz = {
+      phase: 'play', start, end, from: nowBeat, target, t: 0,
+      notes: notes.map((n) => ({ t: n.t, d: n.d, p: n.p, res: null })),
+      extra: 0, score: 0, shown: 0,
+    };
+    g.cadenza = cz;
+    // 敵の行動と飛んでいるケーキを、カデンツァが終わるまで後ろへずらす
+    const shift = end - nowBeat + 1;
+    for (const e of g.enemies) {
+      if (!e.act) continue;
+      e.act.start += shift;
+      e.act.hits = e.act.hits.map((b) => b + shift);
+      if (e.act.lastHit) e.act.lastHit += shift;
+    }
+    for (const s of g.shots) {
+      if (s.kind === 'cake' && !s.done) {
+        s.start += shift;
+        s.end += shift;
+      }
+    }
+    for (const e of g.enemies) if (e.guardUntil > nowBeat) e.guardUntil += shift;
+    const p = g.player;
+    p.state = 'free';
+    p.atk = null;
+    p.hold = null;
+    p.buffered = null;
+    p.chargeLv = 0;
+    p.vx = 0;
+    g.score += 500;
+    popText(p.x, p.y - 200, 'CADENZA!', '#ffd84a', 42, 1.4, -30);
+    flash(0.3, '#fff6cc');
+  }
+
+  function cadenzaPress(g, beat) {
+    const cz = g.cadenza;
+    const spb = g.music.spb;
+    g.player.conduct = 0.16;
+    // 一番近い、まだ打っていない音
+    let best = null;
+    let bd = 1e9;
+    for (const n of cz.notes) {
+      if (n.res) continue;
+      const d = Math.abs(n.t - beat) * spb;
+      if (d < bd) {
+        bd = d;
+        best = n;
+      }
+    }
+    const gap = best ? Math.max(0.06, Math.min(0.12, guideGap(cz, best) * spb * 0.5)) : 0;
+    if (best && bd <= gap) {
+      best.res = bd <= Math.min(0.06, gap * 0.85) ? 'perfect' : 'great';
+      let mp = best.p;
+      while (mp < 76) mp += 12;
+      Audio.sfxChord([mp], best.res === 'perfect' ? 2 : 1);
+      cz.hitFx = { t: 0.3, col: best.res === 'perfect' ? '#ffd84a' : '#7fd8ff' };
+    } else {
+      // ガイドに無い所で打った
+      cz.extra++;
+      cz.hitFx = { t: 0.3, col: '#ff6a6a' };
+      Audio.sfxBlock();
+    }
+  }
+  function guideGap(cz, n) {
+    const i = cz.notes.indexOf(n);
+    const a = i > 0 ? n.t - cz.notes[i - 1].t : 1;
+    const b = i + 1 < cz.notes.length ? cz.notes[i + 1].t - n.t : 1;
+    return Math.min(a, b, 1);
+  }
+  function cadenzaScore(cz) {
+    let pts = 0;
+    for (const n of cz.notes) pts += n.res === 'perfect' ? 1 : n.res === 'great' ? 0.7 : 0;
+    pts -= cz.extra * 0.5;
+    return clamp(Math.round((100 * pts) / cz.notes.length), 0, 100);
+  }
+
+  function updateCadenza(g, beat, dt) {
+    const cz = g.cadenza;
+    cz.t += dt;
+    if (cz.hitFx) cz.hitFx.t -= dt;
+    const spb = g.music.spb;
+    if (cz.phase === 'play') {
+      // 打たずに過ぎた音はミス
+      for (const n of cz.notes) if (!n.res && (beat - n.t) * spb > 0.14) n.res = 'miss';
+      if (beat > cz.end + 0.25 || g.music.beat(0) < 0) {
+        for (const n of cz.notes) if (!n.res) n.res = 'miss';
+        cz.score = cadenzaScore(cz);
+        cz.phase = 'result';
+        cz.rt = 0;
+        finishCadenza(g, cz);
+      }
+    } else {
+      cz.rt += dt;
+      if (cz.rt > 1.6) g.cadenza = null;
+    }
+  }
+
+  function finishCadenza(g, cz) {
+    const e = cz.target;
+    g.stats.cadenza = (g.stats.cadenza || 0) + 1;
+    g.score += cz.score * 60;
+    if (cz.score >= CADENZA_PASS && e && !e.dead) {
+      // 大ダメージ: 紳士たちは一撃、ボスは 160〜320
+      const dmg = e.T.boss ? Math.round(160 + (cz.score - CADENZA_PASS) * 8) : e.hp + 50;
+      g.stats.cadenzaPass = (g.stats.cadenzaPass || 0) + 1;
+      g.score += 3000;
+      damageEnemy(g, e, dmg, 500, e.x > g.player.x ? 1 : -1);
+      if (!e.dead) {
+        e.state = 'stun';
+        e.stun = 1.5;
+        e.act = null;
+      }
+      const hx = e.x;
+      const hy = e.y - (e.T.boss ? 130 : 80);
+      popText(hx, hy - 40, String(dmg), '#ffd84a', 48, 1.4);
+      popText(hx, hy - 100, 'FINALE!!', '#ffd84a', 46, 1.6, -30);
+      for (let i = 0; i < 6; i++) ring(hx, hy, 10 + i * 18, 400 + i * 160, i % 2 ? '#ffd84a' : '#ffffff', 6, 0.9);
+      burst(hx, hy, 50, { colors: ['#ffd84a', '#fff7d0', '#ff9ad5', '#9fe6ff'], kind: 'note', min: 160, max: 700, smin: 20, smax: 34, life: 1.4, grav: 150 });
+      g.staffFx.push({ t: 0, max: 1.2, y: hy, dir: 1 });
+      g.staffFx.push({ t: 0, max: 1.2, y: hy + 70, dir: -1 });
+      flash(0.6, '#fff6cc');
+      shake(22);
+      g.gold = 1;
+      g.hitstop = 0.15;
+      Audio.sfxHit(1);
+      musicChord(g.music.beat(offsetMs / 1000), 2, true);
+    } else if (e && !e.dead) {
+      // 届かなかったら、点数に応じた小さなダメージ
+      const dmg = Math.round(cz.score * 0.3);
+      if (dmg > 0) {
+        damageEnemy(g, e, dmg, 120, e.x > g.player.x ? 1 : -1);
+        popText(e.x, e.y - 140, String(dmg), '#ffffff', 26);
+      }
+    }
+  }
+
+  // カデンツァのガイド (画面の中央)
+  const CZ_Y = 230;
+  const CZ_PX = 150; // 1 拍あたりの幅
+  function drawCadenza(g, beat) {
+    const cz = g.cadenza;
+    const cx = W / 2;
+    const fadeIn = clamp(cz.t * 4, 0, 1);
+    const fadeOut = cz.phase === 'result' ? clamp((1.6 - cz.rt) * 3, 0, 1) : 1;
+    ctx.save();
+    // 世界を暗く、時が止まったように
+    ctx.globalAlpha = 0.45 * fadeIn * fadeOut;
+    ctx.fillStyle = '#0b0820';
+    ctx.fillRect(0, -OY, W, H + OY);
+    ctx.globalAlpha = fadeIn * fadeOut;
+    // 帯
+    const bandH = 120;
+    const grd = ctx.createLinearGradient(0, CZ_Y - bandH / 2, 0, CZ_Y + bandH / 2);
+    grd.addColorStop(0, 'rgba(20,12,40,0)');
+    grd.addColorStop(0.2, 'rgba(20,12,40,0.85)');
+    grd.addColorStop(0.8, 'rgba(20,12,40,0.85)');
+    grd.addColorStop(1, 'rgba(20,12,40,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, CZ_Y - bandH / 2, W, bandH);
+    ctx.fillStyle = '#ffd84a';
+    ctx.textAlign = 'center';
+    ctx.font = `bold italic 22px ${FONT}`;
+    ctx.fillText('— Cadenza —', cx, CZ_Y - 66);
+    ctx.font = `13px ${SANS}`;
+    ctx.fillStyle = '#fff6d8';
+    ctx.fillText('メロディをなぞれ！ 音符が線に重なる瞬間に攻撃ボタン', cx, CZ_Y - 46);
+    // 五線
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, CZ_Y + i * 8);
+      ctx.lineTo(W, CZ_Y + i * 8);
+      ctx.stroke();
+    }
+    // 判定の線 (真ん中より少し左)
+    const jx = cx - 160;
+    const pulse = g.beatPulse;
+    ctx.strokeStyle = `rgba(255,216,74,${0.7 + pulse * 0.3})`;
+    ctx.lineWidth = 3 + pulse * 2;
+    ctx.beginPath();
+    ctx.moveTo(jx, CZ_Y - 30);
+    ctx.lineTo(jx, CZ_Y + 30);
+    ctx.stroke();
+    if (cz.hitFx && cz.hitFx.t > 0) {
+      const k = cz.hitFx.t / 0.3;
+      ctx.strokeStyle = cz.hitFx.col;
+      ctx.globalAlpha = fadeIn * fadeOut * k;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(jx, CZ_Y, 14 + (1 - k) * 30, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = fadeIn * fadeOut;
+    }
+    // 拍の線
+    for (let bt = Math.ceil(beat - 2); bt <= cz.end + 1; bt++) {
+      const x = jx + (bt - beat) * CZ_PX;
+      if (x < -20 || x > W + 20) continue;
+      ctx.strokeStyle = bt === cz.start || bt === cz.end ? 'rgba(255,216,74,0.6)' : 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, CZ_Y - 22);
+      ctx.lineTo(x, CZ_Y + 22);
+      ctx.stroke();
+    }
+    // 音符
+    for (const n of cz.notes) {
+      const x = jx + (n.t - beat) * CZ_PX;
+      if (x < -30 || x > W + 30) continue;
+      const dy = clamp((n.p - 74) * -1.6, -22, 22);
+      const r = n.d >= 1 ? 9 : n.d >= 0.5 ? 7.5 : 6;
+      const col = n.res === 'perfect' ? '#ffd84a' : n.res === 'great' ? '#7fd8ff' : n.res === 'miss' ? 'rgba(160,160,180,0.45)' : '#ffffff';
+      ctx.fillStyle = col;
+      ctx.strokeStyle = col;
+      ctx.beginPath();
+      ctx.ellipse(x, CZ_Y + dy, r * 1.25, r * 0.9, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + r * 1.15, CZ_Y + dy);
+      ctx.lineTo(x + r * 1.15, CZ_Y + dy - 24);
+      ctx.stroke();
+      if (n.d < 0.5) {
+        ctx.beginPath();
+        ctx.moveTo(x + r * 1.15, CZ_Y + dy - 24);
+        ctx.quadraticCurveTo(x + r * 1.15 + 10, CZ_Y + dy - 16, x + r * 1.15 + 6, CZ_Y + dy - 8);
+        ctx.stroke();
+      }
+      if (n.res === 'perfect' || n.res === 'great') {
+        ctx.globalAlpha = fadeIn * fadeOut * clamp(1 - (beat - n.t) * 2, 0, 1);
+        ctx.font = `bold 11px ${SANS}`;
+        ctx.fillText(n.res === 'perfect' ? 'PERFECT' : 'GREAT', x, CZ_Y + dy + 26);
+        ctx.globalAlpha = fadeIn * fadeOut;
+      }
+    }
+    // 進み具合と、今の点数
+    const live = cadenzaScore({ notes: cz.notes.map((n) => (n.res ? n : { res: 'perfect' })), extra: cz.extra });
+    ctx.font = `bold 14px ${SANS}`;
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${cz.notes.filter((n) => n.res).length} / ${cz.notes.length} 音`, W - 30, CZ_Y + 50);
+    ctx.textAlign = 'left';
+    ctx.fillText(cz.phase === 'play' ? `見込み ${live} 点` : '', 30, CZ_Y + 50);
+    // 結果
+    if (cz.phase === 'result') {
+      const k = clamp(cz.rt * 4, 0, 1);
+      const pass = cz.score >= CADENZA_PASS;
+      ctx.textAlign = 'center';
+      ctx.save();
+      ctx.translate(cx, CZ_Y + 6);
+      ctx.scale(0.6 + k * 0.4, 0.6 + k * 0.4);
+      ctx.font = `bold 64px ${FONT}`;
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgba(30,10,20,0.9)';
+      ctx.fillStyle = pass ? '#ffd84a' : '#d8d2e8';
+      ctx.strokeText(`${cz.score} 点`, 0, 0);
+      ctx.fillText(`${cz.score} 点`, 0, 0);
+      ctx.font = `bold 22px ${SANS}`;
+      ctx.fillStyle = pass ? '#fff6cc' : '#c9c3d8';
+      ctx.fillText(pass ? 'BRAVISSIMO! 大ダメージ！' : `あと ${CADENZA_PASS - cz.score} 点… (${CADENZA_PASS} 点で大ダメージ)`, 0, 34);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   // ---------- 敵 ----------
   function startAct(g, e, kind, hits, extra = {}) {
     const now = g.music.beat(offsetMs / 1000);
@@ -1074,7 +1365,7 @@
         }
       }
       // 行動の進み: 拍の上で当たる
-      if (e.act) {
+      if (e.act && !g.cadenza) {
         const a = e.act;
         const hb = a.hits[a.i];
         if (a.kind === 'charge' && a.anim === 'spin') e.spinA += dt * (4 + 20 * clamp((beat - a.start) / (hb - a.start), 0, 1));
@@ -1171,21 +1462,29 @@
       const early = (h.beat - p.guardBeat) * spb; // 何秒前に構えたか
       const just = early <= JUST_WIN && early >= -0.08;
       if (just) {
-        // ジャストガード: ダメージなし。通常攻撃なら相手は大きくひるむ
+        // ジャストガード: ダメージなし。通常攻撃なら相手は大きくひるむ。
+        // レベルは当たる瞬間とのずれで決まる: Lv3 (完璧) 0.045 秒以内 / Lv2 0.1 秒以内 / Lv1 それより外
+        const off = Math.abs(early);
+        const lv = off <= JUST_LV3 ? 3 : off <= JUST_LV2 ? 2 : 1;
+        const LV = JUST_LEVELS[lv];
         g.stats.just++;
+        g.stats['just' + lv] = (g.stats['just' + lv] || 0) + 1;
         g.combo++;
         g.maxCombo = Math.max(g.maxCombo, g.combo);
-        g.score += 800;
+        g.score += LV.score;
         Audio.sfxJust();
-        musicChord(nowBeat, 2, h.kind === 'charge');
-        popText(hx, hy - 60, 'JUST GUARD!', '#8ff0ff', 34, 1.1, -40);
-        showLaneJudge(2, 'JUST');
-        ring(hx, hy, 10, 600, '#8ff0ff', 6, 0.5);
+        musicChord(nowBeat, 2, lv >= 2 || h.kind === 'charge');
+        popText(hx, hy - 60, LV.label, LV.color, LV.size, 1.1, -40);
+        showLaneJudge(2, LV.short);
+        ring(hx, hy, 10, 600, LV.color, 4 + lv * 2, 0.5);
         ring(hx, hy, 30, 300, '#ffffff', 3, 0.6);
-        burst(hx, hy, 22, { colors: ['#8ff0ff', '#ffffff', '#ffd84a'], kind: 'note', min: 120, max: 460, smin: 16, smax: 26, grav: 150 });
-        flash(0.25, '#d8fbff');
-        shake(8);
-        g.hitstop = Math.max(g.hitstop, 0.1);
+        if (lv >= 2) ring(hx, hy, 50, 800, '#ffd84a', 3, 0.7);
+        burst(hx, hy, 12 + lv * 8, { colors: [LV.color, '#ffffff', '#ffd84a'], kind: 'note', min: 120, max: 360 + lv * 80, smin: 16, smax: 26, grav: 150 });
+        flash(0.15 + lv * 0.08, '#d8fbff');
+        shake(4 + lv * 3);
+        g.hitstop = Math.max(g.hitstop, 0.06 + lv * 0.03);
+        const target = e || h.owner;
+        if (lv === 3 && target && !target.dead && !g.cadenza && !g.over) startCadenza(g, target, nowBeat);
         p.glow = 0.5;
         p.guardBeat = -99; // 同じ構えで何度もジャストにならないように (続けて来たら構え直す)
         if (e && h.kind !== 'cake') {
@@ -1297,7 +1596,7 @@
             s.done = true;
             const near = Math.abs(p.x - s.x) < 60 && Math.abs(p.z - s.tz) < DZ_HIT && p.z - p.y < 60;
             if (near) {
-              const r = hitPlayer(g, { kind: 'cake', dmg: s.dmg, from: null, beat: s.end });
+              const r = hitPlayer(g, { kind: 'cake', dmg: s.dmg, from: null, owner: s.owner, beat: s.end });
               if (r === 'just' && s.owner && !s.owner.dead) {
                 // ジャストガードでケーキを打ち返す
                 s.reflected = true;
@@ -1425,7 +1724,7 @@
       g.lastBeatInt = bi;
       g.beatPulse = 1;
       if (g.music && Math.abs(bi % g.music.song.beatsPerBar) < 1e-6) g.downPulse = 1;
-      if (!g.trans && !g.over) {
+      if (!g.trans && !g.over && !g.cadenza) {
         for (const e of g.enemies) think(g, e, bi);
       }
     }
@@ -1437,7 +1736,7 @@
     if (g.stage === 'boss' && g.bossIntro && beat >= 8) {
       g.bossIntro = 0;
       g.boss.state = 'idle';
-      g.hint = 'マリー・アントワネット: 投げてくるケーキも拍の上で落ちる。ジャストガードで打ち返せ！';
+      g.hint = 'マリー・アントワネット: ケーキも拍の上で落ちる。ジャストガードで打ち返せ！';
       g.hintT = 6;
     }
 
@@ -1452,9 +1751,20 @@
     }
     if (!g.trans) {
       handleInputs(g);
-      updatePlayer(g, edt);
-      updateEnemies(g, edt, beat);
-      updateShots(g, edt, beat);
+      if (g.cadenza) {
+        // カデンツァ: 敵と飛ぶものはスロー (行動はずらしてあるので当たらない)。ベートーヴェンは指揮だけ
+        updateCadenza(g, beat, dt);
+        const pl = g.player;
+        pl.st += dt;
+        if (pl.conduct > 0) pl.conduct -= dt;
+        pl.vx = 0;
+        updateEnemies(g, edt * 0.12, beat);
+        updateShots(g, edt * 0.12, beat);
+      } else {
+        updatePlayer(g, edt);
+        updateEnemies(g, edt, beat);
+        updateShots(g, edt, beat);
+      }
       updateWaves(g, dt);
     } else pressQ.length = 0;
 
@@ -1548,7 +1858,7 @@
       startBoss(game);
     } else {
       startStreet(game);
-      game.hint = touchMode ? '左側をなぞってスティックで移動（奥・手前にも動ける）。帯の線に音符が重なる瞬間が「拍」' : '矢印キーで上下左右に移動、Space でジャンプ。下の線に音符が重なる瞬間が「拍」';
+      game.hint = touchMode ? '左側をなぞってスティックで移動（奥・手前にも動ける）。曲をよく聴いて戦おう' : '矢印キーで上下左右に移動、Space でジャンプ。曲をよく聴いて戦おう';
       game.hintT = 6;
     }
   }
@@ -2078,6 +2388,7 @@
     }
     if (p.state === 'guard') a = -0.9;
     if (p.state === 'hurt' || p.state === 'broken') a = -2.6;
+    if (g && g.cadenza) a = p.conduct > 0 ? lerp(0.5, -1.7, p.conduct / 0.16) : -1.7 + Math.sin(t * 4) * 0.05; // 指揮する
     // うしろの腕
     arm(-8, -92 + bounce, Math.PI * 0.55 + leg * 0.4, 30, '#1f4033', 8);
     const [hx2, hy2] = arm(sx, sy, a, 30, '#2b5444', 9);
@@ -2635,7 +2946,26 @@
     ctx.fillRect(x - 24, y, 48 * clamp(e.hp / e.maxHp, 0, 1), 5);
   }
 
-  // ---------- 下の拍の帯 ----------
+  function drawJudgeLabel(g) {
+    if (!g.laneJudge || g.cadenza) return;
+    const lj = g.laneJudge;
+    if (lj.label === 'MISS') return;
+    const p = g.player;
+    const J = JUDGE[lj.j];
+    ctx.save();
+    ctx.globalAlpha = clamp(lj.t * 3, 0, 1);
+    ctx.fillStyle = lj.label.includes('JUST') ? '#8ff0ff' : J.color;
+    ctx.font = `bold italic 16px ${SANS}`;
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(20,10,30,0.8)';
+    const y = p.y - 150 - (0.6 - lj.t) * 20;
+    ctx.strokeText(lj.label, p.x - g.camX, y);
+    ctx.fillText(lj.label, p.x - g.camX, y);
+    ctx.restore();
+  }
+
+  // ---------- 下の拍の帯 (今は使っていない。カデンツァのガイドに置きかえた) ----------
   let LANE_Y = 506;
   const JUDGE_X = 300;
   const PX_PER_BEAT = 120;
@@ -3042,7 +3372,9 @@
     drawShots(g, beat);
     drawFx(g);
     ctx.restore();
-    drawLane(g, beat);
+    // 普段は音符のガイドを出さない (曲を聴いて合わせる)。判定の文字だけ頭の上に
+    drawJudgeLabel(g);
+    if (g.cadenza) drawCadenza(g, beat);
     drawHud(g, beat);
     drawTouchButtons();
     if (g.flash > 0) {
@@ -3171,8 +3503,8 @@
       '移動 矢印キー / WASD（奥と手前にも動ける）　ジャンプ Space',
       '攻撃 J / Z（短く押す）　ため攻撃 J / Z 長押し → 離す',
       '防御 K / X（押している間）',
-      '下の帯の音符が線に重なる瞬間 = 拍。拍に合わせると威力と演出が倍増',
-      '敵の攻撃も拍の上で来る。その拍に防御を合わせると「ジャストガード」',
+      'メロディの音に合わせて攻撃すると威力と演出が倍増（16 分音符は連打で）',
+      '敵の攻撃は拍の上。ぴったり防ぐと「ジャストガード」→ 完璧ならカデンツァ',
       'スマホ: 画面の左側がスティック、右下が 防 / 攻 / 跳',
     ];
     lines.forEach((l, i) => ctx.fillText(l, 352, 200 + i * 21));
@@ -3293,7 +3625,8 @@
       ['スコア', String(result.score)],
       ['最大コンボ', String(result.maxCombo)],
       ['PERFECT / GREAT', `${s.perfect} / ${s.great}`],
-      ['ジャストガード', String(s.just)],
+      ['ジャストガード（うち完璧）', `${s.just}（${s.just3 || 0}）`],
+      ['カデンツァ 成功 / 回数', `${s.cadenzaPass || 0} / ${s.cadenza || 0}`],
       ['拍に合った割合', `${Math.round(result.rate * 100)}%`],
       ['受けたダメージ', String(s.dmgTaken)],
     ];
@@ -3369,5 +3702,6 @@
     },
     startGame,
     SONGS,
+    cadenza: () => startCadenza(game, game.boss || game.enemies.find((e) => !e.dead), game.music.beat(offsetMs / 1000)),
   };
 })();
