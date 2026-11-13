@@ -338,7 +338,7 @@
     gent: { name: '紳士', hp: 55, speed: 115, reach: 105, dmgN: 9, dmgC: 20, w: { normal: 4, charge: 2.5, guard: 3, wait: 2 }, lines: ['Jolly good!', 'Tally-ho!', '失敬!', 'お茶の時間だ'] },
     butler: { name: '執事', hp: 42, speed: 165, reach: 100, dmgN: 8, dmgC: 17, w: { normal: 6, charge: 1.5, guard: 2, wait: 1.5 }, lines: ['お引き取りを', 'Indeed.', '銀のお盆を!'] },
     heavy: { name: '伯爵', hp: 120, speed: 75, reach: 115, dmgN: 12, dmgC: 26, w: { normal: 2, charge: 4, guard: 4, wait: 2 }, lines: ['By Jove!', 'けしからん!', 'ふん!'] },
-    marie: { name: 'マリー・アントワネット', hp: 900, speed: 110, reach: 135, dmgN: 11, dmgC: 24, boss: true },
+    marie: { name: 'マリー・アントワネット', hp: 1200, speed: 110, reach: 135, dmgN: 11, dmgC: 24, boss: true },
   };
 
   // 道中の敵の波 (x に来たら、画面を止めて戦う)
@@ -390,6 +390,9 @@
       time: 0,
       fromBoss: !!fromBoss,
       goSign: 0,
+      usedMel: new Set(),
+      offStreak: 0, // メロディに関係ない攻撃が続いた回数
+      lastAtkTime: -9,
     };
     return g;
   }
@@ -517,13 +520,31 @@
   }
 
   // ---------- 拍の判定 ----------
-  function judgeAt(beat) {
+  // 攻撃の判定: 一番近い、まだ使っていないメロディの音とのずれ。
+  // 16 分音符の連打にも合わせられるように、判定の幅は音と音の間に合わせて狭める。
+  // 同じ音で二度は合わない (連打のしすぎは「メロディに関係ない」扱い)
+  function judgeAt(beat, press) {
     const m = game.music;
-    if (!m) return 0;
-    const c = m.nearestCue(beat);
-    if (!c) return 0;
-    const dt = Math.abs(beat - c.t) * m.spb;
-    return dt <= PERFECT_WIN ? 2 : dt <= GREAT_WIN ? 1 : 0;
+    if (!m) return { j: 0 };
+    if (press) {
+      // でたらめな連打を見分ける: 直前 1 拍で押した数が、その間のメロディの音の数より 2 つ以上多ければノイズ
+      game.pressBeats = (game.pressBeats || []).filter((b) => b > beat - 1);
+      game.pressBeats.push(beat);
+      const notes = m.melBetween(beat - 1, beat + 0.15).length;
+      if (game.pressBeats.length > notes + 1) return { j: 0, noise: true };
+    }
+    const n = m.nearestMel(beat, game.usedMel);
+    if (!n) return { j: 0 };
+    const dt = Math.abs(beat - n.t) * m.spb;
+    const gapSec = n.gap * m.spb;
+    const perf = Math.min(PERFECT_WIN, gapSec * 0.42);
+    const great = Math.min(GREAT_WIN, gapSec * 0.5);
+    const j = dt <= perf ? 2 : dt <= great ? 1 : 0;
+    if (j > 0) {
+      game.usedMel.add(Math.round(n.t * 4));
+      if (game.usedMel.size > 400) game.usedMel = new Set([...game.usedMel].slice(-200));
+    }
+    return { j, note: n };
   }
   function showLaneJudge(j, label) {
     game.laneJudge = { j, label: label || JUDGE[j].name, t: 0.6 };
@@ -553,15 +574,16 @@
         }
       } else if (ev.kind === 'attack') {
         if (ev.down) {
-          if (canAct(p)) {
-            p.hold = { time: ev.time, beat: ev.beat, judge: judgeAt(ev.beat) };
+          if (canPress(p)) {
+            p.hold = { time: ev.time, beat: ev.beat, jr: judgeAt(ev.beat, true) };
           }
         } else if (p.hold) {
           const held = ev.time - p.hold.time;
           if (p.state === 'charging') {
             releaseCharge(g, p, ev);
-          } else if (held < P.tapMax + 0.05 && canAct(p)) {
-            normalAttack(g, p, p.hold.judge, p.hold.beat);
+          } else if (held < P.tapMax + 0.05) {
+            if (canAct(p)) normalAttack(g, p, p.hold.jr, p.hold.beat, ev.time);
+            else p.buffered = { jr: p.hold.jr, beat: p.hold.beat, time: ev.time };
           }
           p.hold = null;
         }
@@ -585,17 +607,36 @@
       }
     }
   }
+  // 通常攻撃は振り終わる前に次を出せる (16 分音符の連打)
   function canAct(p) {
-    return p.state === 'free' || (p.state === 'attack' && p.st > p.atk.dur * 0.7) || p.state === 'guard';
+    return p.state === 'free' || (p.state === 'attack' && p.st >= p.atk.act1 - 0.01) || p.state === 'guard';
+  }
+  function canPress(p) {
+    return canAct(p) || p.state === 'attack';
   }
   function canGuard(p) {
     return p.state === 'free' || p.state === 'charging' || (p.state === 'attack' && p.st > 0.12);
   }
 
-  function normalAttack(g, p, judge, beat) {
+  function normalAttack(g, p, jr, beat, time) {
+    const judge = jr.j;
+    // 連打: 前の攻撃から 0.3 秒以内
+    const rapid = time - g.lastAtkTime < 0.3;
+    g.lastAtkTime = time;
+    // メロディに関係ない攻撃が続くと、威力が落ちていく
+    let mult = 1;
+    if (judge === 0) {
+      g.offStreak = rapid ? g.offStreak + 1 : 1;
+      mult = Math.max(0.15, 0.55 * Math.pow(0.7, g.offStreak - 1));
+      if (g.offStreak >= 2) popText(p.x, p.y - 150, `ノイズ ×${mult.toFixed(1)}`, '#9aa4b0', 16, 0.5, -40);
+    } else {
+      g.offStreak = 0;
+    }
+    // 短い音に合わせた一撃は軽い (16 分音符 ≒ 0.45 倍)。連打の総量で長い音とつり合う
+    const noteK = jr.note && judge > 0 ? clamp(0.25 + jr.note.d * 0.8, 0.45, 1) : 1;
     p.state = 'attack';
     p.st = 0;
-    p.atk = { kind: 'normal', judge, level: 0, hit: new Set(), dur: 0.3, act0: 0.05, act1: 0.15, reach: 118, beat };
+    p.atk = { kind: 'normal', judge, level: 0, hit: new Set(), dur: 0.24, act0: 0.02, act1: 0.1, reach: 118, beat, mult: mult * noteK, rapid, note: jr.note };
     p.recent.push('normal');
     g.stats.attacks++;
     Audio.sfxSwing(false);
@@ -608,12 +649,13 @@
 
   function releaseCharge(g, p, ev) {
     const lv = p.chargeLv;
-    const judge = judgeAt(ev.beat);
+    const jr = judgeAt(ev.beat);
+    const judge = jr.j;
     p.chargeT = 0;
     p.chargeLv = 0;
     if (lv === 0) {
       // ためが足りなかったら、ふつうの攻撃
-      normalAttack(g, p, judge, ev.beat);
+      normalAttack(g, p, jr, ev.beat, ev.time);
       return;
     }
     p.state = 'cattack';
@@ -639,6 +681,14 @@
     p.st += dt;
     if (p.inv > 0) p.inv -= dt;
     if (p.glow > 0) p.glow -= dt;
+    // ためておいた連打の一撃を、振れるようになったら出す
+    if (p.buffered) {
+      if (canAct(p) && p.state !== 'guard') {
+        const b = p.buffered;
+        p.buffered = null;
+        normalAttack(g, p, b.jr, b.beat, Audio.now());
+      } else if (Audio.now() - p.buffered.time > 0.25 || (p.state !== 'attack' && p.state !== 'free')) p.buffered = null;
+    }
     // ため: 押しっぱなしで tapMax を越えたら、ための構えへ
     if (p.hold && p.state !== 'charging' && Audio.now() - p.hold.time >= P.tapMax && canAct(p) && input.attack) {
       p.state = 'charging';
@@ -809,8 +859,10 @@
     } else if (e.stun > 0) {
       mult *= 1.2;
     }
-    dmg = Math.round(dmg * mult * (1 + Math.min(g.combo, 50) * 0.01));
-    damageEnemy(g, e, dmg, a.kind === 'charge' ? 380 : 160, p.face);
+    if (a.mult) mult *= a.mult;
+    dmg = Math.max(1, Math.round(dmg * mult * (1 + Math.min(g.combo, 50) * 0.01)));
+    // 連打中は押し返しを小さく (間合いの外へ飛ばさない)
+    damageEnemy(g, e, dmg, a.kind === 'charge' ? 380 : a.rapid ? 30 : 160, p.face);
     if (e.dead) {
       /* 倒れた */
     } else if (stun) {
@@ -827,28 +879,34 @@
         if (e.state !== 'stun') {
           e.state = 'hurt';
           e.st = 0;
-          e.hurtT = a.kind === 'charge' ? 0.5 : 0.28;
+          e.hurtT = a.kind === 'charge' ? 0.5 : a.rapid ? 0.2 : 0.28;
         }
       }
     }
     // 判定ごとの演出
-    g.hitstop = Math.max(g.hitstop, J.stop + (a.kind === 'charge' ? 0.04 : 0));
-    Audio.sfxHit(a.kind === 'charge' ? 1 : 0.4);
-    popText(hx + rand(-10, 10), hy, String(dmg), a.judge >= 2 ? '#ffd84a' : a.judge === 1 ? '#bfeaff' : '#ffffff', a.judge >= 2 ? 34 : 26);
+    // 連打中のヒットストップは短く (次の 16 分音符に間に合うように)
+    g.hitstop = Math.max(g.hitstop, a.rapid ? 0.015 : J.stop + (a.kind === 'charge' ? 0.04 : 0));
+    Audio.sfxHit(a.kind === 'charge' ? 1 : a.rapid ? 0.2 : 0.4);
+    popText(hx + rand(-14, 14), hy + rand(-8, 8), String(dmg), a.judge >= 2 ? '#ffd84a' : a.judge === 1 ? '#bfeaff' : '#ffffff', a.rapid ? 22 : a.judge >= 2 ? 34 : 26, a.rapid ? 0.5 : 0.9);
     if (a.judge >= 1) {
       g.combo++;
       g.maxCombo = Math.max(g.maxCombo, g.combo);
       g.stats[a.judge >= 2 ? 'perfect' : 'great']++;
-      musicChord(a.beat, a.judge, a.kind === 'charge' && a.judge >= 2);
+      if (a.rapid && a.note) {
+        // 連打は、合わせたメロディの音を 1 オクターブ上で重ねる (指揮棒でメロディを弾く)
+        let mp = a.note.p;
+        while (mp < 76) mp += 12;
+        Audio.sfxChord([mp], a.judge);
+      } else musicChord(a.beat, a.judge, a.kind === 'charge' && a.judge >= 2);
     }
     g.score += dmg * 10 * (1 + a.judge);
     if (a.judge >= 2) {
-      popText(hx, hy - 70, a.kind === 'charge' ? (a.level >= 2 ? 'FORTISSIMO!!' : 'SFORZANDO!') : pick(['BRAVO!', 'BRAVISSIMO!', 'MAESTRO!']), '#ffd84a', a.kind === 'charge' ? 40 : 32, 1.1, -40);
-      burst(hx, hy, a.kind === 'charge' ? 28 : 16, { colors: ['#ffd84a', '#fff7d0', '#ff9ad5', '#9fe6ff'], kind: 'note', min: 120, max: 520, smin: 18, smax: 30, life: 1.1, grav: 200 });
+      if (!a.rapid) popText(hx, hy - 70, a.kind === 'charge' ? (a.level >= 2 ? 'FORTISSIMO!!' : 'SFORZANDO!') : pick(['BRAVO!', 'BRAVISSIMO!', 'MAESTRO!']), '#ffd84a', a.kind === 'charge' ? 40 : 32, 1.1, -40);
+      burst(hx, hy, a.kind === 'charge' ? 28 : a.rapid ? 7 : 16, { colors: ['#ffd84a', '#fff7d0', '#ff9ad5', '#9fe6ff'], kind: 'note', min: 120, max: 520, smin: 18, smax: 30, life: 1.1, grav: 200 });
       burst(hx, hy, 24, { colors: ['#fff', '#ffd84a'], min: 200, max: 700, life: 0.5 });
       ring(hx, hy, 10, 700, '#ffd84a', 7, 0.5);
       ring(hx, hy, 10, 420, '#fff', 3, 0.6);
-      shake(a.kind === 'charge' ? 16 : 9);
+      shake(a.kind === 'charge' ? 16 : a.rapid ? 4 : 9);
       flash(a.kind === 'charge' ? 0.35 : 0.18, '#fff6cc');
       g.gold = Math.max(g.gold, a.kind === 'charge' ? 1 : 0.5);
     } else if (a.judge === 1) {
@@ -2114,6 +2172,8 @@
     if (x < -150 || x > W + 150) return;
     shadow(x, e.z, T === 'heavy' ? 40 : 30, e.z - e.y);
     ctx.save();
+    // 攻撃を受けた瞬間は白く光る
+    if (e.flash > 0) ctx.filter = `brightness(${1 + e.flash * 8})`;
     ctx.translate(x, y);
     ctx.scale(e.face, 1);
     if (e.dead) {
@@ -2308,12 +2368,6 @@
       }
     }
     // 被弾の白い光
-    if (e.flash > 0) {
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = `rgba(255,255,255,${e.flash * 6})`;
-      ctx.fillRect(-60, -170, 120, 175);
-      ctx.globalCompositeOperation = 'source-over';
-    }
     ctx.restore();
     drawTelegraph(e, beat, g, x, y - 150 - (T === 'heavy' ? 4 : 0));
     drawSpeech(e, x, y - 175);
@@ -2326,6 +2380,7 @@
     const y = e.y;
     shadow(x, e.z, 80);
     ctx.save();
+    if (e.flash > 0) ctx.filter = `brightness(${1 + e.flash * 8})`;
     ctx.translate(x, y);
     if (e.dead) {
       ctx.globalAlpha = clamp(3.5 - e.deadT, 0.3, 1);
@@ -2476,12 +2531,6 @@
         ctx.stroke();
       }
     }
-    if (e.flash > 0) {
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = `rgba(255,255,255,${e.flash * 6})`;
-      ctx.fillRect(-100, -320, 200, 330);
-      ctx.globalCompositeOperation = 'source-over';
-    }
     ctx.restore();
     drawTelegraph(e, beat, g, x + e.face * 70, y - 250);
     drawSpeech(e, x, y - 290);
@@ -2624,24 +2673,40 @@
     ctx.beginPath();
     ctx.arc(JUDGE_X, LANE_Y, 14 + jp * 6, 0, Math.PI * 2);
     ctx.fill();
-    // 合図 (拍・メロディ)
-    const cues = m.cuesBetween(beat - 1.5, beat + 5.5);
-    for (const c of cues) {
+    // 拍の線 (敵の攻撃とジャストガードはこの上に来る)
+    for (let bt = Math.ceil(beat - 1.5); bt < beat + 5.5; bt++) {
+      const x = JUDGE_X + (bt - beat) * PX_PER_BEAT;
+      const down = ((bt % m.song.beatsPerBar) + m.song.beatsPerBar) % m.song.beatsPerBar === 0;
+      ctx.globalAlpha = bt < beat ? clamp(1 - (beat - bt) * 2, 0, 1) * 0.6 : clamp(1 - (bt - beat - 4) / 1.5, 0, 1) * 0.6;
+      ctx.strokeStyle = down ? '#ffe7a0' : 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = down ? 2.5 : 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x, LANE_Y - (down ? 18 : 13));
+      ctx.lineTo(x, LANE_Y + (down ? 18 : 13));
+      ctx.stroke();
+    }
+    // メロディの音 (攻撃はこれに合わせる。長い音ほど大きく、使った音は暗く)
+    const mels = m.melBetween(beat - 1.5, beat + 5.5);
+    for (const c of mels) {
       const x = JUDGE_X + (c.t - beat) * PX_PER_BEAT;
       const past = c.t < beat;
+      const used = g.usedMel.has(Math.round(c.t * 4));
       const al = past ? clamp(1 - (beat - c.t) * 2, 0, 1) : clamp(1 - (c.t - beat - 4) / 1.5, 0, 1);
-      ctx.globalAlpha = al;
-      const r = c.down ? 8 : Number.isInteger(c.t) ? 6 : 4;
-      ctx.fillStyle = c.down ? '#ffe7a0' : c.mel ? '#ffffff' : '#c9c3d8';
+      ctx.globalAlpha = al * (used ? 0.35 : 1);
+      const r = c.d >= 1 ? 7.5 : c.d >= 0.5 ? 6 : 4.2;
+      // 音の高さで少し上下させる (五線の上の音符のように)
+      const dy = clamp((c.p - 72) * -0.9, -12, 12);
+      ctx.fillStyle = used ? '#ffd84a' : Number.isInteger(c.t) ? '#ffffff' : '#e6e0f2';
       ctx.beginPath();
-      ctx.ellipse(x, LANE_Y, r * 1.2, r * 0.9, -0.35, 0, Math.PI * 2);
+      ctx.ellipse(x, LANE_Y + dy, r * 1.2, r * 0.9, -0.35, 0, Math.PI * 2);
       ctx.fill();
-      if (c.down) {
-        ctx.strokeStyle = '#ffe7a0';
-        ctx.lineWidth = 2;
+      if (c.d < 0.5) {
+        // 8 分・16 分音符の旗
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(x + r * 1.1, LANE_Y);
-        ctx.lineTo(x + r * 1.1, LANE_Y - 20);
+        ctx.moveTo(x + r * 1.1, LANE_Y + dy);
+        ctx.lineTo(x + r * 1.1, LANE_Y + dy - 14);
         ctx.stroke();
       }
     }

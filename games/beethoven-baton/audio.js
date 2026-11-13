@@ -102,7 +102,25 @@
     });
     // 強拍 (小節の頭) かどうか
     const cueInfo = cues.map((c) => ({ t: c, down: Math.abs(c % raw.beatsPerBar) < 1e-6, mel: melOn.has(Math.round(c * 48)) }));
-    return { title: raw.title, bpm: raw.bpm, beatsPerBar: raw.beatsPerBar, length, notes, cues: cueInfo };
+    // メロディの音の頭 (16 分音符の格子の上のものだけ。トリルや装飾音のような細かい音は除く)。攻撃はこれに合わせる
+    const melMap = new Map();
+    for (const n of notes) {
+      if (!n.mel) continue;
+      const q = n.t * 4;
+      if (Math.abs(q - Math.round(q)) > 0.03) continue;
+      const k = Math.round(q);
+      const prev = melMap.get(k);
+      if (!prev || n.d > prev.d) melMap.set(k, { t: k / 4, d: n.d, p: n.p });
+      else if (n.p > prev.p) prev.p = n.p;
+    }
+    const mel = [...melMap.values()].sort((a, b) => a.t - b.t);
+    // 次の音までの間 (判定の幅を決めるのに使う)
+    mel.forEach((m, i) => {
+      const nx = i + 1 < mel.length ? mel[i + 1].t : length + mel[0].t;
+      const pv = i > 0 ? mel[i - 1].t : mel[mel.length - 1].t - length;
+      m.gap = Math.min(nx - m.t, m.t - pv);
+    });
+    return { title: raw.title, bpm: raw.bpm, beatsPerBar: raw.beatsPerBar, length, notes, cues: cueInfo, mel };
   }
 
   // ---------- 鳴らす部品 ----------
@@ -522,6 +540,37 @@
       }
       // ループの継ぎ目
       if (local > L - 1 && Math.abs(L - local) < bd) best = { t: (loop + 1) * L, down: true };
+      return best;
+    }
+    // [from, to) のメロディの音の頭 (通しの拍)
+    melBetween(from, to) {
+      const L = this.song.length;
+      const out = [];
+      for (let loop = Math.floor(from / L); loop * L < to; loop++) {
+        for (const m of this.song.mel) {
+          const t = m.t + loop * L;
+          if (t >= from && t < to) out.push({ t, d: m.d, p: m.p });
+        }
+      }
+      return out;
+    }
+    // 拍 b のまわりで、まだ使っていない一番近いメロディの音 (used: 使った音の通しの拍 × 4 の集合)
+    nearestMel(b, used) {
+      const cand = this.melBetween(b - 1, b + 1);
+      let best = null;
+      let bd = 1e9;
+      for (const m of cand) {
+        if (used && used.has(Math.round(m.t * 4))) continue;
+        const d = Math.abs(m.t - b);
+        if (d < bd) {
+          bd = d;
+          best = m;
+        }
+      }
+      if (best) {
+        const i = this.song.mel.findIndex((x) => Math.abs(x.t - (((best.t % this.song.length) + this.song.length) % this.song.length)) < 1e-6);
+        best.gap = i >= 0 ? this.song.mel[i].gap : 1;
+      }
       return best;
     }
     // [from, to) の合図 (通しの拍)
