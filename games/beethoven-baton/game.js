@@ -13,18 +13,31 @@
   // ---------- 画面 ----------
   const W = 960;
   const H = 540;
-  const GROUND = 440;
+  const GROUND = 440; // タイトルなどで使う、ふつうの足もとの高さ
+  // ベルトスクロール: 地面は奥行きのある帯。z = 足もとの画面の y (奥 Z_TOP 〜 手前 Z_BOT)
+  const HORIZON = 330;
+  const Z_TOP = 362;
+  const Z_BOT = 470;
+  const DZ_HIT = 30; // これより奥行きがずれていたら当たらない
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   let scale = 1;
   let dpr = 1;
+  let rotated = false;
   function resize() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    let vw = window.innerWidth;
+    let vh = window.innerHeight;
+    // 縦長の画面では、キャンバスを 90 度回して横向きに出す (端末を横にして遊ぶ)
+    rotated = vh > vw * 1.1;
+    if (rotated) [vw, vh] = [vh, vw];
     scale = Math.min(vw / W, vh / H);
     canvas.style.width = `${Math.floor(W * scale)}px`;
     canvas.style.height = `${Math.floor(H * scale)}px`;
+    canvas.style.position = 'absolute';
+    canvas.style.left = '50%';
+    canvas.style.top = '50%';
+    canvas.style.transform = `translate(-50%, -50%)${rotated ? ' rotate(90deg)' : ''}`;
     canvas.width = Math.floor(W * scale * dpr);
     canvas.height = Math.floor(H * scale * dpr);
   }
@@ -135,12 +148,16 @@
 
   // ---------- 入力 ----------
   const keys = {};
-  const input = { left: false, right: false, jump: false, attack: false, guard: false };
+  const input = { left: false, right: false, up: false, down: false, jump: false, attack: false, guard: false };
+  // スマホのスティック (傾きの向きと強さ。-1〜1)
+  const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0, ax: 0, ay: 0 };
   const pressQ = []; // { kind: 'attack' | 'guard' | 'jump', down: bool, beat, time }
   const KEYMAP = {
     ArrowLeft: 'left', KeyA: 'left',
     ArrowRight: 'right', KeyD: 'right',
-    ArrowUp: 'jump', KeyW: 'jump', Space: 'jump',
+    ArrowUp: 'up', KeyW: 'up',
+    ArrowDown: 'down', KeyS: 'down',
+    Space: 'jump', KeyL: 'jump', KeyC: 'jump',
     KeyJ: 'attack', KeyZ: 'attack',
     KeyK: 'guard', KeyX: 'guard',
   };
@@ -182,9 +199,9 @@
 
   // タッチ: 画面のボタン
   let touchMode = false;
+  const STICK_R = 60;
+  const STICK_HOME = { x: 130, y: 430 };
   const TBTN = [
-    { id: 'left', x: 70, y: 470, r: 46, label: '◀' },
-    { id: 'right', x: 180, y: 470, r: 46, label: '▶' },
     { id: 'guard', x: 650, y: 474, r: 44, label: '防' },
     { id: 'attack', x: 770, y: 448, r: 54, label: '攻' },
     { id: 'jump', x: 885, y: 474, r: 44, label: '跳' },
@@ -192,7 +209,32 @@
   const pointers = new Map();
   function toLogical(e) {
     const r = canvas.getBoundingClientRect();
+    if (rotated) {
+      // 縦持ちのときはキャンバスを 90 度回して横向きに見せている
+      return { x: ((e.clientY - r.top) / r.height) * W, y: ((r.right - e.clientX) / r.width) * H };
+    }
     return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
+  }
+  function moveStick(p) {
+    let dx = p.x - stick.ox;
+    let dy = p.y - stick.oy;
+    const d = Math.hypot(dx, dy);
+    if (d > STICK_R) {
+      // 指が遠くへ行ったら、スティックの台もついてくる
+      stick.ox += (dx / d) * (d - STICK_R);
+      stick.oy += (dy / d) * (d - STICK_R);
+      dx = p.x - stick.ox;
+      dy = p.y - stick.oy;
+    }
+    stick.x = dx;
+    stick.y = dy;
+    const k = Math.hypot(dx, dy) < 10 ? 0 : 1;
+    stick.ax = k * clamp(dx / STICK_R, -1, 1);
+    stick.ay = k * clamp(dy / STICK_R, -1, 1);
+  }
+  function releaseStick() {
+    stick.id = null;
+    stick.x = stick.y = stick.ax = stick.ay = 0;
   }
   function btnAt(p) {
     let bestB = null;
@@ -216,6 +258,16 @@
         pauseGame();
         return;
       }
+      // 画面の左側はどこを押してもスティック (押した所が中心)
+      if (p.x < W * 0.45 && stick.id === null) {
+        stick.id = e.pointerId;
+        stick.ox = p.x;
+        stick.oy = p.y;
+        moveStick(p);
+        canvas.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
       const b = btnAt(p);
       if (b) {
         pointers.set(e.pointerId, b.id);
@@ -228,6 +280,7 @@
     onTap(p);
   });
   const releasePointer = (e) => {
+    if (e.pointerId === stick.id) releaseStick();
     const id = pointers.get(e.pointerId);
     if (id) {
       pointers.delete(e.pointerId);
@@ -237,15 +290,7 @@
   canvas.addEventListener('pointerup', releasePointer);
   canvas.addEventListener('pointercancel', releasePointer);
   canvas.addEventListener('pointermove', (e) => {
-    const id = pointers.get(e.pointerId);
-    if (!id || (id !== 'left' && id !== 'right')) return;
-    // 左右のボタンは指をすべらせて切りかえられる
-    const b = btnAt(toLogical(e));
-    if (b && (b.id === 'left' || b.id === 'right') && b.id !== id) {
-      pointers.set(e.pointerId, b.id);
-      if (![...pointers.values()].includes(id)) setInput(id, false);
-      setInput(b.id, true);
-    }
+    if (e.pointerId === stick.id) moveStick(toLogical(e));
   });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -318,7 +363,7 @@
 
   function makePlayer(x) {
     return {
-      x, y: GROUND, vx: 0, vy: 0, face: 1, hp: 100, maxHp: 100, onGround: true,
+      x, y: 420, z: 420, vx: 0, vy: 0, face: 1, hp: 100, maxHp: 100, onGround: true,
       state: 'free', st: 0, // 状態と、その状態になってからの秒
       atk: null, // 振っている攻撃 { kind, judge, level, hit:Set, dur, a0, a1 }
       hold: null, // 攻撃ボタンを押している { time, beat, judge }
@@ -343,7 +388,8 @@
     g.camX = 0;
     g.lock = null;
     g.player.x = 200;
-    g.player.y = GROUND;
+    g.player.z = 420;
+    g.player.y = 420;
     g.player.vx = 0;
     g.player.state = 'free';
     g.player.atk = null;
@@ -362,10 +408,17 @@
     stageTrack.start('boss');
   }
 
-  function makeEnemy(type, x, face) {
+  function makeEnemy(type, x, face, z) {
     const T = ETYPES[type];
+    if (z === undefined) z = T.boss ? 415 : rand(Z_TOP + 8, Z_BOT - 8);
+    const e = mkEnemy(type, T, x, face);
+    e.z = z;
+    e.y = z;
+    return e;
+  }
+  function mkEnemy(type, T, x, face) {
     return {
-      type, T, x, y: GROUND, vx: 0, vy: 0, face, hp: T.hp, maxHp: T.hp,
+      type, T, x, y: 0, z: 0, vx: 0, vy: 0, face, hp: T.hp, maxHp: T.hp,
       state: 'walk', st: 0, act: null, guardUntil: -1, stun: 0, hurtT: 0,
       hitBy: null, bob: Math.random() * 6, speech: null, speechT: 0, dead: false, deadT: 0,
       flash: 0, nextThink: 0, walkT: Math.random() * 10, spinA: 0, phase: 1, lunge: 0,
@@ -539,7 +592,7 @@
     showLaneJudge(judge);
     // 最大までためて拍に合わせたら、音の波を飛ばす
     if (lv >= 2 && judge >= 1) {
-      g.shots.push({ kind: 'wave', x: p.x + p.face * 70, y: p.y - 70, vx: p.face * 720, life: 0.7, judge, hit: new Set(), friendly: true });
+      g.shots.push({ kind: 'wave', x: p.x + p.face * 70, y: p.y - 70, z: p.z, vx: p.face * 720, life: 0.7, judge, hit: new Set(), friendly: true });
     }
     if (judge >= 2 && lv >= 2) {
       g.staffFx.push({ t: 0, max: 1.1, y: p.y - 90, dir: p.face });
@@ -587,14 +640,22 @@
       p.guardTime = s.time;
       p.atk = null;
     }
-    // 移動
-    const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    // 移動: キーは 8 方向、スティックは傾きの強さで速さが変わる
+    let ax = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    let az = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+    if (stick.id !== null) {
+      ax = stick.ax;
+      az = stick.ay;
+    }
+    const dir = Math.abs(ax) < 0.2 ? 0 : Math.sign(ax);
     let sp = 0;
     if (p.state === 'free') sp = P.speed;
     else if (p.state === 'charging') sp = P.chargeSpeed;
     else if ((p.state === 'attack' || p.state === 'cattack') && !p.onGround) sp = P.speed * 0.6;
+    p.vz = 0;
     if (sp > 0) {
-      p.vx = dir * sp;
+      p.vx = clamp(ax, -1, 1) * sp;
+      p.vz = clamp(az, -1, 1) * sp * 0.62;
       if (dir !== 0 && p.state === 'free') p.face = dir;
     } else if (p.state === 'hurt' || p.state === 'stagger' || p.state === 'broken') {
       p.vx *= Math.pow(0.02, dt);
@@ -609,11 +670,15 @@
     if (p.state === 'charging' && dir !== 0) p.face = dir;
 
     p.x += p.vx * dt;
+    // 奥行き。空中では変えない (ジャンプの弧が崩れないように)
+    const oldZ = p.z;
+    if (p.onGround) p.z = clamp(p.z + p.vz * dt, Z_TOP, Z_BOT);
+    p.y += p.z - oldZ;
     p.vy += P.grav * dt;
     p.y += p.vy * dt;
-    if (p.y >= GROUND) {
-      if (!p.onGround && p.vy > 300) burst(p.x, GROUND, 5, { color: '#c9b79a', up: 20, min: 20, max: 100, life: 0.35, grav: 300 });
-      p.y = GROUND;
+    if (p.y >= p.z) {
+      if (!p.onGround && p.vy > 300) burst(p.x, p.z, 5, { color: '#c9b79a', up: 20, min: 20, max: 100, life: 0.35, grav: 300 });
+      p.y = p.z;
       p.vy = 0;
       p.onGround = true;
     }
@@ -621,7 +686,8 @@
     const minX = g.lock ? g.lock.min + 30 : 30;
     const maxX = g.lock ? g.lock.max - 30 : g.stage === 'street' ? STREET_LEN - 30 : W - 30;
     p.x = clamp(p.x, minX, maxX);
-    if (Math.abs(p.vx) > 10 && p.onGround) p.walkT += dt * Math.abs(p.vx) / 40;
+    const mv = Math.hypot(p.vx, p.vz || 0);
+    if (mv > 10 && p.onGround) p.walkT += (dt * mv) / 40;
 
     // 攻撃の当たり
     if (p.atk && (p.state === 'attack' || p.state === 'cattack')) {
@@ -631,7 +697,8 @@
           if (e.dead || a.hit.has(e) || e.state === 'intro') continue;
           const dx = (e.x - p.x) * p.face;
           const big = e.T.boss ? 40 : 0;
-          if (dx > -25 - big && dx < a.reach + big && Math.abs(e.y - p.y) < 80) {
+          const dzOk = Math.abs(e.z - p.z) < (a.kind === 'charge' ? DZ_HIT + 12 : DZ_HIT) + (e.T.boss ? 14 : 0);
+          if (dx > -25 - big && dx < a.reach + big && dzOk && Math.abs(e.y - p.y) < 90) {
             a.hit.add(e);
             playerHits(g, p, e, a);
           }
@@ -783,7 +850,7 @@
       if (!e.T.boss) {
         popText(e.x, e.y - 150, pick(['Oh dear!', 'ぎゃふん', 'Good heavens!', '無念…', 'Blimey!']), '#ffffff', 20, 1.2, -30);
         // 体力の回復 (楽譜が落ちる)
-        if (Math.random() < 0.35 || g.player.hp < 40) g.shots.push({ kind: 'heal', x: e.x, y: e.y - 60, vy: -300, vx: rand(-60, 60), life: 12 });
+        if (Math.random() < 0.35 || g.player.hp < 40) g.shots.push({ kind: 'heal', x: e.x, y: e.z - 60, z: e.z, vy: -300, vx: rand(-60, 60), life: 12 });
       } else {
         bossDefeated(g, e);
       }
@@ -811,7 +878,7 @@
     if (e.T.boss) return bossThink(g, e, beatInt);
     const dist = Math.abs(p.x - e.x);
     e.face = p.x > e.x ? 1 : -1;
-    if (dist > e.T.reach + 10) {
+    if (dist > e.T.reach + 10 || Math.abs(p.z - e.z) > DZ_HIT - 8) {
       e.state = 'walk';
       return;
     }
@@ -849,7 +916,7 @@
       flash(0.4, '#ffc8e8');
       if (!g.summoned) {
         g.summoned = true;
-        g.enemies.push(makeEnemy('gent', -40, 1), makeEnemy('butler', W + 40, -1));
+        g.enemies.push(makeEnemy('gent', -40, 1, Z_TOP + 20), makeEnemy('butler', W + 40, -1, Z_BOT - 20));
       }
       e.state = 'guard';
       e.guardUntil = beatInt + 4;
@@ -893,8 +960,8 @@
         e.x += e.vx * dt;
         e.vy += 1500 * dt;
         e.y += e.vy * dt;
-        if (e.y > GROUND) {
-          e.y = GROUND;
+        if (e.y > e.z) {
+          e.y = e.z;
           e.vy = -e.vy * 0.3;
           e.vx *= 0.6;
         }
@@ -939,13 +1006,18 @@
       }
       // 歩く
       let mv = 0;
+      let mz = 0;
       if (e.state === 'walk') {
         const dist = Math.abs(p.x - e.x);
         const want = e.T.reach - 15;
         if (dist > want) mv = (p.x > e.x ? 1 : -1) * e.T.speed;
+        const dz = p.z - e.z;
+        if (Math.abs(dz) > 6) mz = Math.sign(dz) * Math.min(Math.abs(dz) * 4, e.T.speed * 0.7);
         e.face = p.x > e.x ? 1 : -1;
         e.walkT += dt * 6;
       }
+      e.z = clamp(e.z + mz * dt, Z_TOP, Z_BOT);
+      e.y = e.z;
       e.vx = lerp(e.vx, mv, Math.min(1, dt * (e.state === 'walk' ? 8 : 4)));
       if (e.lunge > 0) {
         e.lunge -= dt;
@@ -956,7 +1028,10 @@
       for (const o of g.enemies) {
         if (o === e || o.dead) continue;
         const d = e.x - o.x;
-        if (Math.abs(d) < 46) e.x += Math.sign(d || 1) * (46 - Math.abs(d)) * dt * 6;
+        if (Math.abs(d) < 46 && Math.abs(e.z - o.z) < 24) {
+          e.x += Math.sign(d || 1) * (46 - Math.abs(d)) * dt * 6;
+          e.z = clamp(e.z + Math.sign(e.z - o.z || 1) * 20 * dt, Z_TOP, Z_BOT);
+        }
       }
       if (g.lock) e.x = clamp(e.x, g.lock.min - 60, g.lock.max + 60);
       if (g.stage === 'boss') e.x = clamp(e.x, 60, W - 60);
@@ -970,7 +1045,7 @@
       // ケーキは投げてから 1 拍で落ちる (一投ずつ)
       const flyB = 1;
       const hb = a.hits[a.i];
-      g.shots.push({ kind: 'cake', x: e.x + e.face * 40, y: e.y - 150, sx: e.x + e.face * 40, sy: e.y - 150, tx: p.x, start: hb, end: hb + flyB, owner: e, dmg: e.T.dmgN, reflected: false });
+      g.shots.push({ kind: 'cake', x: e.x + e.face * 40, y: e.y - 150, sx: e.x + e.face * 40, sy: e.y - 150, tx: p.x, tz: p.z, start: hb, end: hb + flyB, owner: e, dmg: e.T.dmgN, reflected: false });
       e.state = 'throw';
       e.st = 0;
       return;
@@ -982,7 +1057,8 @@
     e.state = 'strike';
     e.st = 0;
     const dx = (p.x - e.x) * e.face;
-    const inRange = dx > -30 && dx < a.reach + (a.kind === 'charge' ? 70 : 10) && Math.abs(p.y - e.y) < 70;
+    const dzMax = DZ_HIT + (a.anim === 'spin' ? 26 : a.kind === 'charge' ? 8 : 0);
+    const inRange = dx > -30 && dx < a.reach + (a.kind === 'charge' ? 70 : 10) && Math.abs(p.z - e.z) < dzMax && p.z - p.y < 70;
     if (a.kind === 'charge') shake(5);
     if (!inRange || p.state === 'dead') {
       Audio.sfxSwing(a.kind === 'charge');
@@ -1103,7 +1179,7 @@
         s.life -= dt;
         for (const e of g.enemies) {
           if (e.dead || s.hit.has(e) || e.state === 'intro') continue;
-          if (Math.abs(e.x - s.x) < (e.T.boss ? 70 : 40) && Math.abs(e.y - 70 - s.y) < 90) {
+          if (Math.abs(e.x - s.x) < (e.T.boss ? 70 : 40) && Math.abs(e.z - s.z) < DZ_HIT + 20) {
             s.hit.add(e);
             const guarding = e.state === 'guard';
             const dmg = Math.round((guarding ? 26 : 20) * JUDGE[s.judge].mult);
@@ -1124,11 +1200,11 @@
         const t = clamp((beat - s.start) / (s.end - s.start), 0, 1);
         if (!s.reflected) {
           s.x = lerp(s.sx, s.tx, t);
-          s.y = lerp(s.sy, GROUND - 60, t) - Math.sin(t * Math.PI) * 140;
+          s.y = lerp(s.sy, s.tz - 60, t) - Math.sin(t * Math.PI) * 140;
           s.rot = (s.rot || 0) + dt * 8;
           if (beat >= s.end && !s.done) {
             s.done = true;
-            const near = Math.abs(p.x - s.x) < 60 && p.y > GROUND - 110;
+            const near = Math.abs(p.x - s.x) < 60 && Math.abs(p.z - s.tz) < DZ_HIT && p.z - p.y < 60;
             if (near) {
               const r = hitPlayer(g, { kind: 'cake', dmg: s.dmg, from: null, beat: s.end });
               if (r === 'just' && s.owner && !s.owner.dead) {
@@ -1142,7 +1218,7 @@
               }
               if (r === 'hit') burst(p.x, p.y - 60, 16, { colors: ['#ffc3dc', '#fff', '#ff6f91'], min: 80, max: 300 });
             } else {
-              burst(s.x, GROUND - 10, 14, { colors: ['#ffc3dc', '#fff', '#ff6f91'], min: 60, max: 260, up: 160 });
+              burst(s.x, s.tz - 10, 14, { colors: ['#ffc3dc', '#fff', '#ff6f91'], min: 60, max: 260, up: 160 });
             }
             s.dead = true;
           }
@@ -1170,13 +1246,13 @@
         s.vy += 1200 * dt;
         s.x += s.vx * dt;
         s.y += s.vy * dt;
-        if (s.y > GROUND - 14) {
-          s.y = GROUND - 14;
+        if (s.y > s.z - 14) {
+          s.y = s.z - 14;
           s.vy = 0;
           s.vx = 0;
         }
         s.life -= dt;
-        if (Math.abs(p.x - s.x) < 40 && Math.abs(p.y - 30 - s.y) < 60) {
+        if (Math.abs(p.x - s.x) < 40 && Math.abs(p.z - s.z) < 30 && p.z - p.y < 60) {
           s.dead = true;
           p.hp = Math.min(p.maxHp, p.hp + 18);
           popText(p.x, p.y - 150, '+18', '#7dffa0', 24);
@@ -1381,7 +1457,7 @@
       startBoss(game);
     } else {
       startStreet(game);
-      game.hint = touchMode ? '◀ ▶ で移動、「跳」でジャンプ。帯の線に音符が重なる瞬間が「拍」' : '← → で移動、↑ / Space でジャンプ。下の線に音符が重なる瞬間が「拍」';
+      game.hint = touchMode ? '左側をなぞってスティックで移動（奥・手前にも動ける）。帯の線に音符が重なる瞬間が「拍」' : '矢印キーで上下左右に移動、Space でジャンプ。下の線に音符が重なる瞬間が「拍」';
       game.hintT = 6;
     }
   }
@@ -1478,13 +1554,13 @@
   function drawStreetBg(g, beatPulse, downPulse) {
     const cam = g ? g.camX : (titleT * 40) % 2000;
     // 空
-    const sky = ctx.createLinearGradient(0, 0, 0, GROUND);
+    const sky = ctx.createLinearGradient(0, 0, 0, HORIZON);
     sky.addColorStop(0, '#1d1b3d');
     sky.addColorStop(0.55, '#5b3b6b');
     sky.addColorStop(0.85, '#e0866a');
     sky.addColorStop(1, '#f4c27a');
     ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, GROUND);
+    ctx.fillRect(0, 0, W, HORIZON);
     // 月と星
     ctx.fillStyle = 'rgba(255,250,230,0.9)';
     ctx.beginPath();
@@ -1509,7 +1585,7 @@
     for (const b of town.far) {
       const x = b.x - fo;
       if (x > W + 100 || x + b.w < -100) continue;
-      const top = GROUND - 120 - b.h;
+      const top = HORIZON - 120 - b.h;
       ctx.fillRect(x, top, b.w, b.h + 130);
       if (b.dome) {
         ctx.beginPath();
@@ -1530,7 +1606,7 @@
     for (const b of town.mid) {
       const x = b.x - mo;
       if (x > W + 20 || x + b.w < -20) continue;
-      const top = GROUND - 40 - b.h;
+      const top = HORIZON - 40 - b.h;
       ctx.fillStyle = b.col;
       ctx.fillRect(x, top, b.w, b.h + 40);
       // 夕日の当たり
@@ -1570,24 +1646,24 @@
       }
     }
     // 道
-    const road = ctx.createLinearGradient(0, GROUND - 40, 0, H);
+    const road = ctx.createLinearGradient(0, HORIZON - 40, 0, H);
     road.addColorStop(0, '#6b5a66');
     road.addColorStop(1, '#3a2f3c');
     ctx.fillStyle = road;
-    ctx.fillRect(0, GROUND - 6, W, H - GROUND + 6);
+    ctx.fillRect(0, HORIZON - 6, W, H - HORIZON + 6);
     // 石畳
     ctx.strokeStyle = 'rgba(30,20,30,0.35)';
     ctx.lineWidth = 2;
-    for (let row = 0; row < 5; row++) {
-      const y = GROUND + row * 22;
-      const s = 50 + row * 8;
+    for (let row = 0; row < 9; row++) {
+      const y = HORIZON + row * (14 + row * 1.6);
+      const s = 40 + row * 9;
       const off = -((cam * (1 + row * 0.05)) % s) + (row % 2) * s * 0.5;
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(W, y);
       for (let x = off; x < W; x += s) {
         ctx.moveTo(x, y);
-        ctx.lineTo(x - row * 3, y + 22);
+        ctx.lineTo(x - row * 3, y + 14 + row * 1.6);
       }
       ctx.stroke();
     }
@@ -1595,38 +1671,38 @@
     for (let lx = Math.floor(cam / 420) * 420 - 420; lx < cam + W + 420; lx += 420) {
       const x = lx + 200 - cam;
       ctx.fillStyle = '#20181f';
-      ctx.fillRect(x - 3, GROUND - 190, 6, 190);
-      ctx.fillRect(x - 10, GROUND - 8, 20, 8);
+      ctx.fillRect(x - 3, HORIZON + 14 - 190, 6, 190);
+      ctx.fillRect(x - 10, HORIZON + 6, 20, 8);
       ctx.beginPath();
-      ctx.moveTo(x - 14, GROUND - 190);
-      ctx.lineTo(x + 14, GROUND - 190);
-      ctx.lineTo(x + 9, GROUND - 222);
-      ctx.lineTo(x - 9, GROUND - 222);
+      ctx.moveTo(x - 14, HORIZON + 14 - 190);
+      ctx.lineTo(x + 14, HORIZON + 14 - 190);
+      ctx.lineTo(x + 9, HORIZON + 14 - 222);
+      ctx.lineTo(x - 9, HORIZON + 14 - 222);
       ctx.fill();
       const glow = 0.5 + beatPulse * 0.5 + downPulse * 0.3;
-      const rg = ctx.createRadialGradient(x, GROUND - 205, 2, x, GROUND - 205, 60 + beatPulse * 30);
+      const rg = ctx.createRadialGradient(x, HORIZON + 14 - 205, 2, x, HORIZON + 14 - 205, 60 + beatPulse * 30);
       rg.addColorStop(0, `rgba(255,230,150,${0.9 * glow})`);
       rg.addColorStop(1, 'rgba(255,200,120,0)');
       ctx.fillStyle = rg;
-      ctx.fillRect(x - 100, GROUND - 300, 200, 200);
+      ctx.fillRect(x - 100, HORIZON + 14 - 300, 200, 200);
       ctx.fillStyle = `rgba(255,236,170,${0.7 + beatPulse * 0.3})`;
-      ctx.fillRect(x - 8, GROUND - 218, 16, 24);
+      ctx.fillRect(x - 8, HORIZON + 14 - 218, 16, 24);
       // 地面の光
       ctx.fillStyle = `rgba(255,220,140,${0.06 + beatPulse * 0.08})`;
       ctx.beginPath();
-      ctx.ellipse(x, GROUND + 10, 90, 16, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, HORIZON + 40, 110, 26, 0, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
   // ---------- 背景: ヴェルサイユ宮殿 鏡の間 ----------
   function drawPalaceBg(g, beatPulse, downPulse) {
-    const wall = ctx.createLinearGradient(0, 0, 0, GROUND);
+    const wall = ctx.createLinearGradient(0, 0, 0, HORIZON);
     wall.addColorStop(0, '#5a3f2a');
     wall.addColorStop(0.3, '#c9a865');
     wall.addColorStop(1, '#f0dfb0');
     ctx.fillStyle = wall;
-    ctx.fillRect(0, 0, W, GROUND);
+    ctx.fillRect(0, 0, W, HORIZON);
     // 天井画の帯
     ctx.fillStyle = '#7a5530';
     ctx.fillRect(0, 0, W, 60);
@@ -1642,44 +1718,44 @@
     for (let i = 0; i < 6; i++) {
       const x = 40 + i * 160;
       ctx.fillStyle = '#e8c35a';
-      rr(x - 8, 92, 116, 300, 50);
+      rr(x - 8, 74, 116, 244, 50);
       ctx.fill();
-      const mg = ctx.createLinearGradient(x, 100, x + 100, 380);
+      const mg = ctx.createLinearGradient(x, 82, x + 100, 310);
       mg.addColorStop(0, '#d6e4ef');
       mg.addColorStop(0.5, `rgba(${170 + beatPulse * 60},${190 + beatPulse * 40},210,1)`);
       mg.addColorStop(1, '#9fb3c4');
       ctx.fillStyle = mg;
-      rr(x, 100, 100, 284, 46);
+      rr(x, 82, 100, 228, 46);
       ctx.fill();
       // 鏡の格子
       ctx.strokeStyle = 'rgba(200,160,70,0.8)';
       ctx.lineWidth = 2;
       for (let k = 1; k < 4; k++) {
         ctx.beginPath();
-        ctx.moveTo(x, 100 + k * 71);
-        ctx.lineTo(x + 100, 100 + k * 71);
+        ctx.moveTo(x, 82 + k * 57);
+        ctx.lineTo(x + 100, 82 + k * 57);
         ctx.stroke();
       }
       ctx.beginPath();
-      ctx.moveTo(x + 50, 100);
-      ctx.lineTo(x + 50, 384);
+      ctx.moveTo(x + 50, 82);
+      ctx.lineTo(x + 50, 310);
       ctx.stroke();
       // 映りこみの光
       ctx.fillStyle = `rgba(255,255,255,${0.15 + beatPulse * 0.25})`;
       ctx.beginPath();
-      ctx.moveTo(x + 15 + ((g ? g.time : titleT) * 30) % 80, 110);
-      ctx.lineTo(x + 30 + ((g ? g.time : titleT) * 30) % 80, 110);
-      ctx.lineTo(x + 5 + ((g ? g.time : titleT) * 30) % 80, 370);
-      ctx.lineTo(x - 10 + ((g ? g.time : titleT) * 30) % 80, 370);
+      ctx.moveTo(x + 15 + ((g ? g.time : titleT) * 30) % 80, 92);
+      ctx.lineTo(x + 30 + ((g ? g.time : titleT) * 30) % 80, 92);
+      ctx.lineTo(x + 5 + ((g ? g.time : titleT) * 30) % 80, 300);
+      ctx.lineTo(x - 10 + ((g ? g.time : titleT) * 30) % 80, 300);
       ctx.closePath();
       ctx.save();
-      rr(x, 100, 100, 284, 46);
+      rr(x, 82, 100, 228, 46);
       ctx.clip();
       ctx.fill();
       ctx.restore();
       // 柱
       ctx.fillStyle = '#b98a4a';
-      ctx.fillRect(x + 118, 80, 26, GROUND - 80);
+      ctx.fillRect(x + 118, 80, 26, HORIZON - 80);
       ctx.fillStyle = '#e8c35a';
       ctx.fillRect(x + 114, 80, 34, 14);
     }
@@ -1724,37 +1800,40 @@
       ctx.restore();
     }
     // 床 (寄木)
-    const fl = ctx.createLinearGradient(0, GROUND, 0, H);
+    const fl = ctx.createLinearGradient(0, HORIZON, 0, H);
     fl.addColorStop(0, '#8a5a30');
     fl.addColorStop(1, '#4a2c16');
     ctx.fillStyle = fl;
-    ctx.fillRect(0, GROUND - 6, W, H - GROUND + 6);
+    ctx.fillRect(0, HORIZON - 6, W, H - HORIZON + 6);
     ctx.strokeStyle = 'rgba(255,220,160,0.18)';
     ctx.lineWidth = 2;
-    for (let row = 0; row < 5; row++) {
-      const y = GROUND + row * 22;
+    for (let row = 0; row < 9; row++) {
+      const y = HORIZON + row * (14 + row * 1.6);
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(W, y);
       for (let x = (row % 2) * 40; x < W; x += 80) {
         ctx.moveTo(x, y);
-        ctx.lineTo(x + 10, y + 22);
+        ctx.lineTo(x + 10, y + 14 + row * 1.6);
       }
       ctx.stroke();
     }
     // 赤じゅうたん
     ctx.fillStyle = 'rgba(150,20,40,0.55)';
-    ctx.fillRect(0, GROUND + 18, W, 30);
+    ctx.fillRect(0, HORIZON + 62, W, 64);
     ctx.fillStyle = 'rgba(230,190,80,0.6)';
-    ctx.fillRect(0, GROUND + 18, W, 3);
-    ctx.fillRect(0, GROUND + 45, W, 3);
+    ctx.fillRect(0, HORIZON + 62, W, 3);
+    ctx.fillRect(0, HORIZON + 123, W, 3);
   }
 
   // ---------- 人物 ----------
-  function shadow(x, y, w) {
+  function depthScale(z) {
+    return 0.86 + 0.18 * clamp((z - Z_TOP) / (Z_BOT - Z_TOP), 0, 1);
+  }
+  function shadow(x, z, w, h = 0) {
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath();
-    ctx.ellipse(x, GROUND + 4, w * clamp(1 - (GROUND - y) / 300, 0.4, 1), 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, z + 4, w * clamp(1 - h / 300, 0.4, 1), 8, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -1776,7 +1855,7 @@
     const t = g ? g.time : titleT;
     const x = p.x - (g ? g.camX : 0);
     const y = p.y;
-    shadow(x, y, 34);
+    shadow(x, p.z === undefined ? y : p.z, 34, p.z === undefined ? 0 : p.z - p.y);
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(p.face, 1);
@@ -1998,7 +2077,7 @@
     let y = e.y;
     const T = e.type;
     if (x < -150 || x > W + 150) return;
-    shadow(x, y, T === 'heavy' ? 40 : 30);
+    shadow(x, e.z, T === 'heavy' ? 40 : 30, e.z - e.y);
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(e.face, 1);
@@ -2210,7 +2289,7 @@
   function drawMarie(e, beat, g) {
     const x = e.x;
     const y = e.y;
-    shadow(x, y, 80);
+    shadow(x, e.z, 80);
     ctx.save();
     ctx.translate(x, y);
     if (e.dead) {
@@ -2679,6 +2758,23 @@
   function drawTouchButtons() {
     if (!touchMode) return;
     ctx.save();
+    // スティック: 押していないときは定位置に薄く出す
+    const on = stick.id !== null;
+    const bx = on ? stick.ox : STICK_HOME.x;
+    const by = on ? stick.oy : STICK_HOME.y;
+    ctx.globalAlpha = on ? 0.45 : 0.25;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(bx, by, STICK_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = on ? 0.9 : 0.5;
+    ctx.strokeStyle = '#ffe7a0';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#ffe7a0';
+    ctx.beginPath();
+    ctx.arc(bx + stick.x, by + stick.y, 28, 0, Math.PI * 2);
+    ctx.fill();
     for (const b of TBTN) {
       const on = input[b.id];
       ctx.globalAlpha = on ? 0.7 : 0.35;
@@ -2782,7 +2878,7 @@
           ctx.strokeStyle = `rgba(255,143,192,${0.3 + k * 0.6})`;
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.ellipse(s.tx - cx, GROUND + 2, 40 - k * 16, 8, 0, 0, Math.PI * 2);
+          ctx.ellipse(s.tx - cx, s.tz + 2, 40 - k * 16, 8, 0, 0, Math.PI * 2);
           ctx.stroke();
         }
       } else if (s.kind === 'heal') {
@@ -2819,12 +2915,19 @@
       ctx.fillRect(0, 0, W, H);
     }
     // 人物 (奥から)
-    const list = [...g.enemies].sort((a, b) => (a.dead ? -1 : 0) - (b.dead ? -1 : 0));
+    const list = [...g.enemies, g.player].sort((a, b) => a.z - b.z);
     for (const e of list) {
-      if (e.type === 'marie') drawMarie(e, beat, g);
+      const sx = e.x - (e.type === 'marie' ? 0 : g.camX);
+      const k = depthScale(e.z);
+      ctx.save();
+      ctx.translate(sx, e.z);
+      ctx.scale(k, k);
+      ctx.translate(-sx, -e.z);
+      if (e === g.player) drawBeethoven(e, beat, g);
+      else if (e.type === 'marie') drawMarie(e, beat, g);
       else drawGentleman(e, beat, g);
+      ctx.restore();
     }
-    drawBeethoven(g.player, beat, g);
     drawShots(g, beat);
     drawFx(g);
     ctx.restore();
@@ -2918,6 +3021,7 @@
     // 主人公
     titleBeethoven.x = 170;
     titleBeethoven.y = 330;
+    titleBeethoven.z = 330;
     titleBeethoven.face = 1;
     titleBeethoven.state = 'free';
     ctx.save();
@@ -2928,7 +3032,7 @@
     // 遊び方
     ctx.save();
     ctx.fillStyle = 'rgba(20,14,30,0.78)';
-    rr(330, 150, 600, 250, 14);
+    rr(330, 150, 600, 262, 14);
     ctx.fill();
     ctx.strokeStyle = 'rgba(255,231,160,0.5)';
     ctx.lineWidth = 1.5;
@@ -2939,16 +3043,17 @@
     ctx.fillStyle = '#fff';
     ctx.font = `14px ${SANS}`;
     const lines = [
-      '移動 ← →（A D）　ジャンプ ↑ / Space',
+      '移動 矢印キー / WASD（奥と手前にも動ける）　ジャンプ Space',
       '攻撃 J / Z（短く押す）　ため攻撃 J / Z 長押し → 離す',
       '防御 K / X（押している間）',
       '下の帯の音符が線に重なる瞬間 = 拍。拍に合わせると威力と演出が倍増',
       '敵の攻撃も拍の上で来る。その拍に防御を合わせると「ジャストガード」',
+      'スマホ: 画面の左側がスティック、右下が 防 / 攻 / 跳',
     ];
-    lines.forEach((l, i) => ctx.fillText(l, 352, 204 + i * 22));
+    lines.forEach((l, i) => ctx.fillText(l, 352, 200 + i * 21));
     // 三すくみ
     const cx = 520;
-    const cy = 340;
+    const cy = 360;
     const nodes = [
       { label: '通常攻撃', x: cx, y: cy - 34, col: '#ffd84a' },
       { label: 'ため攻撃', x: cx + 120, y: cy + 26, col: '#ff6a7a' },
@@ -2992,7 +3097,7 @@
     ctx.textAlign = 'left';
     ctx.fillStyle = '#c9c3d8';
     ctx.font = `12px ${SANS}`;
-    ctx.fillText('強い ← 矢印の向きに勝つ', 730, 392);
+    ctx.fillText('強い ← 矢印の向きに勝つ', 730, 404);
     ctx.restore();
 
     hotspots = [];
