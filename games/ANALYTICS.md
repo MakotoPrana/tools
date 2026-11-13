@@ -29,6 +29,7 @@ CrazyGames 版・itch.io 版は Google タグを外すので、何も送らな�
 | `breakout` | ステージ番号 (1〜) | ブロックを全部こわした / ライフがなくなった・リタイア | 始め: `difficulty`。終わり: `difficulty`、`clear_time`、`no_damage`、`time_attack`、`retired` |
 | `cleaning_survivors` | ステージ番号 (1〜)。チュートリアルは `tutorial` | 全部屋の清掃完了 / 力尽きた・時間切れ | 始め: `mode`、`character`。終わり: `mode`、`character`、`rooms_done`、`clean_pct`、`level`、`reason` (worn_out / time_up) |
 | `cleaning_survivors_2` | ステージ番号 (1〜) | ボスを倒した / 力尽きた | 始め: `difficulty` (`normal`・`hard`・`hell`)、`gear` (最初のギアの id)、`ult` (必殺技の id)。終わり: `difficulty`、`level`、`kills`。失敗は `time_sec` |
+| `beethoven_baton` | `street` (道中) / `boss` (ボス戦) | 道の終わりに着いた・ボスを倒した / 体力が尽きた。道中をクリアするとそのままボス戦を始める。結果画面の「ボスから」はボス戦だけを始める | 終わり: `score`。ボスのクリアは `rank`、失敗は `at` (`street`・`boss`) |
 | `composer_survivors` | 曲の id (`k2`・`elise`・`spring1` など)。パートは `_p` + 番号 (`elise_p2`) | 通しはボスを倒した・パートは音符をすべて倒すか通した / 力尽きた | 始め: `mode` (難しさ: `normal`・`hard`・`virtuoso`)、`character` (作曲家の id)。終わり: `mode`、`character`。失敗は `progress_pct` (曲の何 % まで弾けたか) |
 | `reclaim_gunners` | エリアの解放はエリアの id (`s1a3` など)、ボス戦は `boss_` + ボスの id (`boss_G1` など) | エリアを解放した・ボスを倒した / 力尽きた | 始め: `difficulty`、`hero`、`player_lv` (ボス戦は `boss_lv` も)。終わり: `reinvade` (エリア) |
 
