@@ -11,8 +11,11 @@
   const { Audio, Player, loadSong } = window.BB_AUDIO;
 
   // ---------- 画面 ----------
-  const W = 960;
+  // 画面の論理サイズ。高さは 540 で決め、横幅は画面の比率に合わせて広げる (画面いっぱいに出す)。
+  // 16:9 より縦長の画面では横幅 960 のまま、上に空 (OY) を足す
+  let W = 960;
   const H = 540;
+  let OY = 0;
   const GROUND = 440; // タイトルなどで使う、ふつうの足もとの高さ
   // ベルトスクロール: 地面は奥行きのある帯。z = 足もとの画面の y (奥 Z_TOP 〜 手前 Z_BOT)
   const HORIZON = 330;
@@ -31,18 +34,28 @@
     // 縦長の画面では、キャンバスを 90 度回して横向きに出す (端末を横にして遊ぶ)
     rotated = vh > vw * 1.1;
     if (rotated) [vw, vh] = [vh, vw];
-    scale = Math.min(vw / W, vh / H);
-    canvas.style.width = `${Math.floor(W * scale)}px`;
-    canvas.style.height = `${Math.floor(H * scale)}px`;
+    const aspect = vw / vh;
+    if (aspect >= 960 / 540) {
+      W = Math.round(Math.min(2200, 540 * aspect));
+      scale = vh / H;
+      OY = 0;
+    } else {
+      W = 960;
+      scale = vw / W;
+      OY = vh / scale - H;
+    }
+    // 右下のボタンは右端からの位置で置く
+    for (const b of TBTN) b.x = W - b.fromRight;
+    canvas.style.width = `${Math.round(vw)}px`;
+    canvas.style.height = `${Math.round(vh)}px`;
     canvas.style.position = 'absolute';
     canvas.style.left = '50%';
     canvas.style.top = '50%';
     canvas.style.transform = `translate(-50%, -50%)${rotated ? ' rotate(90deg)' : ''}`;
-    canvas.width = Math.floor(W * scale * dpr);
-    canvas.height = Math.floor(H * scale * dpr);
+    canvas.width = Math.round(vw * dpr);
+    canvas.height = Math.round(vh * dpr);
   }
-  window.addEventListener('resize', resize);
-  resize();
+  window.addEventListener('resize', () => resize());
 
   // ---------- 保存 ----------
   const store = {
@@ -202,18 +215,20 @@
   const STICK_R = 60;
   const STICK_HOME = { x: 130, y: 430 };
   const TBTN = [
-    { id: 'guard', x: 650, y: 474, r: 44, label: '防' },
-    { id: 'attack', x: 770, y: 448, r: 54, label: '攻' },
-    { id: 'jump', x: 885, y: 474, r: 44, label: '跳' },
+    { id: 'guard', fromRight: 310, y: 474, r: 44, label: '防' },
+    { id: 'attack', fromRight: 190, y: 448, r: 54, label: '攻' },
+    { id: 'jump', fromRight: 75, y: 474, r: 44, label: '跳' },
   ];
+  resize();
   const pointers = new Map();
   function toLogical(e) {
     const r = canvas.getBoundingClientRect();
+    const VH = H + OY;
     if (rotated) {
       // 縦持ちのときはキャンバスを 90 度回して横向きに見せている
-      return { x: ((e.clientY - r.top) / r.height) * W, y: ((r.right - e.clientX) / r.width) * H };
+      return { x: ((e.clientY - r.top) / r.height) * W, y: ((r.right - e.clientX) / r.width) * VH - OY };
     }
-    return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
+    return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * VH - OY };
   }
   function moveStick(p) {
     let dx = p.x - stick.ox;
@@ -254,7 +269,7 @@
     const p = toLogical(e);
     if (e.pointerType === 'touch') touchMode = true;
     if (scene === 'play' && touchMode) {
-      if (p.x > W - 70 && p.y < 60) {
+      if (p.x > W - 70 && p.y < 60 - OY) {
         pauseGame();
         return;
       }
@@ -1513,8 +1528,9 @@
       }
     }
   }
+  let hotDX = 0; // タイトルを真ん中に寄せて描くときのずれ
   function button(x, y, w, h, label, fn, opts = {}) {
-    hotspots.push({ x, y, w, h, fn });
+    hotspots.push({ x: x + hotDX, y, w, h, fn });
     ctx.save();
     rr(x, y, w, h, 10);
     ctx.fillStyle = opts.fill || 'rgba(255,248,230,0.92)';
@@ -1554,13 +1570,13 @@
   function drawStreetBg(g, beatPulse, downPulse) {
     const cam = g ? g.camX : (titleT * 40) % 2000;
     // 空
-    const sky = ctx.createLinearGradient(0, 0, 0, HORIZON);
+    const sky = ctx.createLinearGradient(0, -OY, 0, HORIZON);
     sky.addColorStop(0, '#1d1b3d');
     sky.addColorStop(0.55, '#5b3b6b');
     sky.addColorStop(0.85, '#e0866a');
     sky.addColorStop(1, '#f4c27a');
     ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, HORIZON);
+    ctx.fillRect(0, -OY, W, HORIZON + OY);
     // 月と星
     ctx.fillStyle = 'rgba(255,250,230,0.9)';
     ctx.beginPath();
@@ -1702,11 +1718,12 @@
     wall.addColorStop(0.3, '#c9a865');
     wall.addColorStop(1, '#f0dfb0');
     ctx.fillStyle = wall;
-    ctx.fillRect(0, 0, W, HORIZON);
+    ctx.fillRect(0, -OY, W, HORIZON + OY);
     // 天井画の帯
     ctx.fillStyle = '#7a5530';
-    ctx.fillRect(0, 0, W, 60);
-    for (let i = 0; i < 6; i++) {
+    ctx.fillRect(0, -OY, W, 60 + OY);
+    const nArch = Math.ceil(W / 160) + 1;
+    for (let i = 0; i < nArch; i++) {
       ctx.fillStyle = i % 2 ? '#8fa3c8' : '#d9b4a0';
       rr(20 + i * 160, 8, 140, 44, 20);
       ctx.fill();
@@ -1715,7 +1732,7 @@
       ctx.stroke();
     }
     // 鏡のアーチ
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < nArch; i++) {
       const x = 40 + i * 160;
       ctx.fillStyle = '#e8c35a';
       rr(x - 8, 74, 116, 244, 50);
@@ -1761,7 +1778,7 @@
     }
     // シャンデリア (拍でゆれて輝く)
     const t = g ? g.time : titleT;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < Math.ceil((W - 20) / 310); i++) {
       const cx = 170 + i * 310;
       const sw = Math.sin(t * 2 + i) * 4;
       ctx.strokeStyle = '#d9b54a';
@@ -2662,6 +2679,8 @@
   function drawHud(g, beat) {
     const p = g.player;
     ctx.save();
+    // 縦長の画面では、上に足した空 (OY) のぶん HUD を画面の上端へ寄せる
+    ctx.translate(0, -OY);
     // 体力
     ctx.fillStyle = 'rgba(10,8,20,0.6)';
     rr(14, 12, 270, 46, 10);
@@ -2705,7 +2724,7 @@
     ctx.fillStyle = '#fff';
     ctx.fillRect(W - 46, 22, 5, 20);
     ctx.fillRect(W - 35, 22, 5, 20);
-    hotspots.push({ x: W - 62, y: 12, w: 48, h: 40, fn: pauseGame });
+    hotspots.push({ x: W - 62, y: 12 - OY, w: 48, h: 40, fn: pauseGame });
     // ボスの体力
     if (g.boss && g.stage === 'boss' && !g.bossIntro) {
       const b = g.boss;
@@ -2912,7 +2931,7 @@
     // 金色の光 (ばっちり合ったとき)
     if (g.gold > 0) {
       ctx.fillStyle = `rgba(255,200,80,${g.gold * 0.18})`;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0, -OY, W, H + OY);
     }
     // 人物 (奥から)
     const list = [...g.enemies, g.player].sort((a, b) => a.z - b.z);
@@ -2937,7 +2956,7 @@
     if (g.flash > 0) {
       ctx.globalAlpha = clamp(g.flash, 0, 1);
       ctx.fillStyle = g.flashColor;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0, -OY, W, H + OY);
       ctx.globalAlpha = 1;
     }
     // 場面の切りかえ
@@ -2945,7 +2964,7 @@
       const t = g.trans.t;
       const a = t < 1.4 ? t / 1.2 : t < 2.6 ? 1 : 1 - (t - 2.6);
       ctx.fillStyle = `rgba(8,4,14,${clamp(a, 0, 1)})`;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0, -OY, W, H + OY);
       if (t > 1.0 && t < 3.4) {
         ctx.globalAlpha = clamp(Math.min(t - 1.0, 3.4 - t) * 2, 0, 1);
         ctx.fillStyle = '#ffe7a0';
@@ -2988,7 +3007,7 @@
         ctx.fillText('Bravo, Maestro!', W / 2, H / 2 - 40);
       } else {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(0, 0, W, H);
+        ctx.fillRect(0, -OY, W, H + OY);
         ctx.fillStyle = '#fff';
         ctx.font = `bold 48px ${FONT}`;
         ctx.fillText('演奏中断…', W / 2, H / 2 - 20);
@@ -3004,7 +3023,21 @@
     const pulse = Math.pow(Math.max(0, Math.cos(titleT * Math.PI * 2 * (132 / 60) / 2)), 8);
     drawStreetBg(null, pulse, 0);
     ctx.fillStyle = 'rgba(10,6,20,0.45)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OY, W, H + OY);
+    const realW = W;
+    hotDX = Math.round((W - 960) / 2);
+    ctx.save();
+    ctx.translate(hotDX, 0);
+    W = 960;
+    try {
+      drawTitleBody();
+    } finally {
+      W = realW;
+      ctx.restore();
+      hotDX = 0;
+    }
+  }
+  function drawTitleBody() {
     // 題
     ctx.save();
     ctx.textAlign = 'center';
@@ -3138,7 +3171,7 @@
     drawGame(game);
     hotspots = [];
     ctx.fillStyle = 'rgba(8,4,14,0.7)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OY, W, H + OY);
     ctx.fillStyle = '#ffe7a0';
     ctx.textAlign = 'center';
     ctx.font = `bold 44px ${FONT}`;
@@ -3154,7 +3187,7 @@
     else drawStreetBg(null, 0, 0);
     hotspots = [];
     ctx.fillStyle = 'rgba(8,4,14,0.72)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OY, W, H + OY);
     ctx.save();
     ctx.textAlign = 'center';
     ctx.fillStyle = result.kind === 'clear' ? '#ffe7a0' : '#ffb0b0';
@@ -3216,7 +3249,7 @@
   function frame(now) {
     const dt = Math.min(1 / 30, (now - last) / 1000);
     last = now;
-    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, OY * scale * dpr);
     ctx.textBaseline = 'alphabetic';
     if (scene === 'title') {
       drawTitle(dt);
