@@ -182,6 +182,10 @@
   }
   // 進み具合 (どのステージまで開いたか・ステージごとの一番よい結果)
   let progress = store.get('bb-progress', { open: 1, best: {} });
+  // テスト版: 全ステージを開き、どのステージもボスから始められる (window.BB_TEST か、URL に ?test)
+  const TEST_MODE = !!window.BB_TEST || /[?&]test\b/.test(location.search);
+  const openCount = () => (TEST_MODE ? STAGES.length : progress.open);
+  const bossOpen = (no) => TEST_MODE || !!progress.best[no] || no < progress.open;
   {
     // 前の版 (1 ステージだけのころ) のハイスコアを引きつぐ
     const old = store.get('bb-best', null);
@@ -1920,7 +1924,7 @@
     if (game && game.music) game.music.stop(0.4);
     if (scene === 'pause' || scene === 'play') stageTrack.quit();
     game = null;
-    selNo = Math.min(selNo, progress.open);
+    selNo = Math.min(selNo, openCount());
     scene = 'select';
   }
 
@@ -1933,9 +1937,9 @@
       if (code === 'Escape' || code === 'KeyP') pauseGame();
     } else if (scene === 'select') {
       if (code === 'ArrowUp' || code === 'KeyW' || code === 'ArrowLeft' || code === 'KeyA') selNo = Math.max(1, selNo - 1);
-      else if (code === 'ArrowDown' || code === 'KeyS' || code === 'ArrowRight' || code === 'KeyD') selNo = Math.min(progress.open, selNo + 1);
+      else if (code === 'ArrowDown' || code === 'KeyS' || code === 'ArrowRight' || code === 'KeyD') selNo = Math.min(openCount(), selNo + 1);
       else if (code === 'Enter' || code === 'KeyJ' || code === 'KeyZ' || code === 'Space') startGame(selNo, false);
-      else if (code === 'KeyB' && (progress.best[selNo] || selNo < progress.open)) startGame(selNo, true);
+      else if (code === 'KeyB' && bossOpen(selNo)) startGame(selNo, true);
       else if (code === 'Escape') toTitle();
     } else if (scene === 'pause') {
       if (code === 'Escape' || code === 'KeyP' || code === 'Enter') resumeGame();
@@ -4878,6 +4882,11 @@
     ctx.fillStyle = '#ffe7a0';
     ctx.font = `bold 34px ${FONT}`;
     ctx.fillText('演目を選ぶ', W / 2, 62);
+    if (TEST_MODE) {
+      ctx.font = `bold 13px ${SANS}`;
+      ctx.fillStyle = '#8ff0ff';
+      ctx.fillText('テスト版: 全ステージ開放・どのステージもボスから遊べます', W / 2, 82);
+    }
     ctx.restore();
     // カード
     const n = STAGES.length;
@@ -4886,7 +4895,7 @@
     STAGES.forEach((st, i) => {
       const x = x0 + i * (cw + 12);
       const y = 92;
-      const open = st.no <= progress.open;
+      const open = st.no <= openCount();
       const sel = st.no === selNo;
       ctx.save();
       rr(x, y, cw, 214, 12);
@@ -4944,7 +4953,7 @@
     ctx.fillText(`ボス ♪ ${bs.composer}：${bs.title}`, W / 2, 356);
     ctx.restore();
     button(W / 2 - 230, 380, 220, 52, '▶ 開演 (Enter)', () => startGame(selNo, false), { size: 20 });
-    const bossOk = progress.best[selNo] || selNo < progress.open;
+    const bossOk = bossOpen(selNo);
     if (bossOk) button(W / 2 + 10, 380, 220, 52, 'ボスから (B)', () => startGame(selNo, true), { size: 18 });
     else {
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
