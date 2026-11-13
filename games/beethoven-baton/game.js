@@ -27,6 +27,18 @@
   let scale = 1;
   let dpr = 1;
   let rotated = false;
+  // ノッチやホームバーの幅 (論理の単位)。絵は端まで描き、ボタンと HUD だけこの内側に置く
+  let SAFE_L = 0;
+  let SAFE_R = 0;
+  const safeProbe = document.createElement('div');
+  safeProbe.style.cssText =
+    'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+    'padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
+  document.body.appendChild(safeProbe);
+  function readInsets() {
+    const cs = getComputedStyle(safeProbe);
+    return { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
+  }
   function resize() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     let vw = window.innerWidth;
@@ -44,8 +56,13 @@
       scale = vw / W;
       OY = vh / scale - H;
     }
+    // 回して出しているときは、画面の上下がゲームの左右になる
+    const ins = readInsets();
+    SAFE_L = (rotated ? ins.t : ins.l) / scale;
+    SAFE_R = (rotated ? ins.b : ins.r) / scale;
     // 右下のボタンは右端からの位置で置く
-    for (const b of TBTN) b.x = W - b.fromRight;
+    for (const b of TBTN) b.x = W - b.fromRight - SAFE_R;
+    STICK_HOME.x = 130 + SAFE_L;
     canvas.style.width = `${Math.round(vw)}px`;
     canvas.style.height = `${Math.round(vh)}px`;
     canvas.style.position = 'absolute';
@@ -56,6 +73,7 @@
     canvas.height = Math.round(vh * dpr);
   }
   window.addEventListener('resize', () => resize());
+  window.addEventListener('orientationchange', () => setTimeout(resize, 300));
 
   // ---------- 保存 ----------
   const store = {
@@ -269,7 +287,7 @@
     const p = toLogical(e);
     if (e.pointerType === 'touch') touchMode = true;
     if (scene === 'play' && touchMode) {
-      if (p.x > W - 70 && p.y < 60 - OY) {
+      if (p.x > W - 70 - SAFE_R && p.y < 60 - OY) {
         pauseGame();
         return;
       }
@@ -2679,8 +2697,18 @@
   function drawHud(g, beat) {
     const p = g.player;
     ctx.save();
-    // 縦長の画面では、上に足した空 (OY) のぶん HUD を画面の上端へ寄せる
-    ctx.translate(0, -OY);
+    // 縦長の画面では、上に足した空 (OY) のぶん HUD を画面の上端へ寄せる。左右はノッチを避ける
+    ctx.translate(SAFE_L, -OY);
+    const fullW = W;
+    W = fullW - SAFE_L - SAFE_R;
+    try {
+      drawHudBody(g, beat, p);
+    } finally {
+      W = fullW;
+      ctx.restore();
+    }
+  }
+  function drawHudBody(g, beat, p) {
     // 体力
     ctx.fillStyle = 'rgba(10,8,20,0.6)';
     rr(14, 12, 270, 46, 10);
@@ -2724,7 +2752,7 @@
     ctx.fillStyle = '#fff';
     ctx.fillRect(W - 46, 22, 5, 20);
     ctx.fillRect(W - 35, 22, 5, 20);
-    hotspots.push({ x: W - 62, y: 12 - OY, w: 48, h: 40, fn: pauseGame });
+    hotspots.push({ x: W - 62 + SAFE_L, y: 12 - OY, w: 48, h: 40, fn: pauseGame });
     // ボスの体力
     if (g.boss && g.stage === 'boss' && !g.bossIntro) {
       const b = g.boss;
@@ -2771,7 +2799,6 @@
       ctx.fillText(g.hint, W / 2, 131);
       ctx.globalAlpha = 1;
     }
-    ctx.restore();
   }
 
   function drawTouchButtons() {
