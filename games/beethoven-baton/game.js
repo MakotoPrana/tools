@@ -669,7 +669,7 @@
     g.combo = 0;
   }
 
-  // 連続攻撃の型 (0.45 秒以内に続けて振ると、次の型に移る)
+  // 連続攻撃の型。前の攻撃が音楽に合って当たり、そこから 1 秒以内に音楽に合わせて振ると、次の型に移る
   //   0 振り下ろし / 1 切り上げ / 2 突き (遠くまで) / 3 回転 (うしろにも当たる)
   const MOTIONS = [
     { name: 'down', reach: 118, back: 25 },
@@ -677,7 +677,7 @@
     { name: 'thrust', reach: 150, back: 10, dz: -6 },
     { name: 'spin', reach: 120, back: 95, dz: 6 },
   ];
-  const CHAIN_GAP = 0.45;
+  const CHAIN_GAP = 1.0;
 
   function normalAttack(g, p, jr, beat, time) {
     const judge = jr.j;
@@ -699,10 +699,11 @@
     const noteK = jr.note && judge > 0 ? clamp(0.25 + jr.note.d * 0.8, 0.45, 1) : 1;
     p.state = 'attack';
     p.st = 0;
-    // 続けて振ると型が変わる
-    const chain = time - (p.lastSwing || -9) < CHAIN_GAP;
+    // 連撃: 前の攻撃が音楽に合って当たっていて、1 秒以内に、今の攻撃も音楽に合っていれば型が変わる
+    const chain = judge >= 1 && p.prevHitOnBeat && time - (p.lastSwing || -9) < CHAIN_GAP;
     p.motion = chain ? ((p.motion || 0) + 1) % MOTIONS.length : 0;
     p.lastSwing = time;
+    p.prevHitOnBeat = false; // この攻撃が音楽に合って当たったら true にする (playerHits)
     const M = MOTIONS[p.motion];
     p.atk = { kind: 'normal', judge, level: 0, hit: new Set(), dur: 0.24, act0: 0.02, act1: 0.1, reach: M.reach, back: M.back, dzx: M.dz || 0, motion: p.motion, beat, mult: mult * noteK, rapid, note: jr.note };
     if (M.name === 'thrust') p.x += p.face * 14; // 突きは半歩ふみこむ
@@ -730,6 +731,7 @@
     if (judge === 0) comboBreak(g);
     else comboKeep(g, ev.beat);
     p.motion = 0;
+    p.prevHitOnBeat = false;
     p.state = 'cattack';
     p.st = 0;
     p.atk = { kind: 'charge', judge, level: lv, hit: new Set(), dur: 0.55, act0: 0.07, act1: 0.24, reach: lv >= 2 ? 175 : 150, beat: ev.beat };
@@ -960,6 +962,7 @@
     Audio.sfxHit(a.kind === 'charge' ? 1 : a.rapid ? 0.2 : 0.4);
     popText(hx + rand(-14, 14), hy + rand(-8, 8), String(dmg), a.judge >= 2 ? '#ffd84a' : a.judge === 1 ? '#bfeaff' : '#ffffff', a.rapid ? 22 : a.judge >= 2 ? 34 : 26, a.rapid ? 0.5 : 0.9);
     if (a.judge >= 1) {
+      if (a.kind === 'normal') p.prevHitOnBeat = true;
       comboAdd(g, a.beat);
       g.stats[a.judge >= 2 ? 'perfect' : 'great']++;
       if (a.rapid && a.note) {
