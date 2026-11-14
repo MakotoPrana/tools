@@ -650,6 +650,35 @@
     return p.state === 'free' || p.state === 'charging' || (p.state === 'attack' && p.st > 0.12);
   }
 
+  // コンボ: 一度当てたら、曲に合わせている間は続く。
+  // 拍に合った攻撃・ジャストガード・カデンツァの音で時計を巻き直し、合わない攻撃か被弾で切れる。
+  // 何もしないまま 2 小節たっても切れる
+  function comboLimit(g) {
+    return g.music ? g.music.song.beatsPerBar * 2 : 8;
+  }
+  function comboKeep(g, beat) {
+    if (g.combo > 0) g.comboBeat = Math.max(g.comboBeat || -1e9, beat);
+  }
+  function comboAdd(g, beat) {
+    g.combo++;
+    g.maxCombo = Math.max(g.maxCombo, g.combo);
+    g.comboBeat = Math.max(g.comboBeat || -1e9, beat);
+  }
+  function comboBreak(g, why) {
+    if (g.combo >= 2) popText(g.player.x, g.player.y - 175, why || 'COMBO BREAK', '#9aa4b0', 18, 0.8, -30);
+    g.combo = 0;
+  }
+
+  // 連続攻撃の型 (0.45 秒以内に続けて振ると、次の型に移る)
+  //   0 振り下ろし / 1 切り上げ / 2 突き (遠くまで) / 3 回転 (うしろにも当たる)
+  const MOTIONS = [
+    { name: 'down', reach: 118, back: 25 },
+    { name: 'up', reach: 118, back: 25 },
+    { name: 'thrust', reach: 150, back: 10, dz: -6 },
+    { name: 'spin', reach: 120, back: 95, dz: 6 },
+  ];
+  const CHAIN_GAP = 0.45;
+
   function normalAttack(g, p, jr, beat, time) {
     const judge = jr.j;
     // 連打: 前の攻撃から 0.3 秒以内
@@ -658,17 +687,25 @@
     // メロディに関係ない攻撃が続くと、威力が落ちていく
     let mult = 1;
     if (judge === 0) {
+      comboBreak(g);
       g.offStreak = rapid ? g.offStreak + 1 : 1;
       mult = Math.max(0.15, 0.55 * Math.pow(0.7, g.offStreak - 1));
       if (g.offStreak >= 2) popText(p.x, p.y - 150, `ノイズ ×${mult.toFixed(1)}`, '#9aa4b0', 16, 0.5, -40);
     } else {
       g.offStreak = 0;
+      comboKeep(g, beat);
     }
     // 短い音に合わせた一撃は軽い (16 分音符 ≒ 0.45 倍)。連打の総量で長い音とつり合う
     const noteK = jr.note && judge > 0 ? clamp(0.25 + jr.note.d * 0.8, 0.45, 1) : 1;
     p.state = 'attack';
     p.st = 0;
-    p.atk = { kind: 'normal', judge, level: 0, hit: new Set(), dur: 0.24, act0: 0.02, act1: 0.1, reach: 118, beat, mult: mult * noteK, rapid, note: jr.note };
+    // 続けて振ると型が変わる
+    const chain = time - (p.lastSwing || -9) < CHAIN_GAP;
+    p.motion = chain ? ((p.motion || 0) + 1) % MOTIONS.length : 0;
+    p.lastSwing = time;
+    const M = MOTIONS[p.motion];
+    p.atk = { kind: 'normal', judge, level: 0, hit: new Set(), dur: 0.24, act0: 0.02, act1: 0.1, reach: M.reach, back: M.back, dzx: M.dz || 0, motion: p.motion, beat, mult: mult * noteK, rapid, note: jr.note };
+    if (M.name === 'thrust') p.x += p.face * 14; // 突きは半歩ふみこむ
     p.recent.push('normal');
     g.stats.attacks++;
     Audio.sfxSwing(false);
@@ -690,6 +727,9 @@
       normalAttack(g, p, jr, ev.beat, ev.time);
       return;
     }
+    if (judge === 0) comboBreak(g);
+    else comboKeep(g, ev.beat);
+    p.motion = 0;
     p.state = 'cattack';
     p.st = 0;
     p.atk = { kind: 'charge', judge, level: lv, hit: new Set(), dur: 0.55, act0: 0.07, act1: 0.24, reach: lv >= 2 ? 175 : 150, beat: ev.beat };
@@ -812,8 +852,8 @@
           if (e.dead || a.hit.has(e) || e.state === 'intro') continue;
           const dx = (e.x - p.x) * p.face;
           const big = e.T.boss ? 40 : 0;
-          const dzOk = Math.abs(e.z - p.z) < (a.kind === 'charge' ? DZ_HIT + 12 : DZ_HIT) + (e.T.boss ? 14 : 0);
-          if (dx > -25 - big && dx < a.reach + big && dzOk && Math.abs(e.y - p.y) < 90) {
+          const dzOk = Math.abs(e.z - p.z) < (a.kind === 'charge' ? DZ_HIT + 12 : DZ_HIT + (a.dzx || 0)) + (e.T.boss ? 14 : 0);
+          if (dx > -(a.back || 25) - big && dx < a.reach + big && dzOk && Math.abs(e.y - p.y) < 90) {
             a.hit.add(e);
             playerHits(g, p, e, a);
           }
@@ -862,7 +902,6 @@
       p.st = 0;
       p.vx = -p.face * 260;
       p.atk = null;
-      g.combo = 0;
       // 紳士はすかさず反撃
       if (!e.act && Math.random() < (e.T.boss ? 0.8 : 0.55)) {
         const b = Math.ceil(g.music.beat(offsetMs / 1000) + 0.35);
@@ -921,8 +960,7 @@
     Audio.sfxHit(a.kind === 'charge' ? 1 : a.rapid ? 0.2 : 0.4);
     popText(hx + rand(-14, 14), hy + rand(-8, 8), String(dmg), a.judge >= 2 ? '#ffd84a' : a.judge === 1 ? '#bfeaff' : '#ffffff', a.rapid ? 22 : a.judge >= 2 ? 34 : 26, a.rapid ? 0.5 : 0.9);
     if (a.judge >= 1) {
-      g.combo++;
-      g.maxCombo = Math.max(g.maxCombo, g.combo);
+      comboAdd(g, a.beat);
       g.stats[a.judge >= 2 ? 'perfect' : 'great']++;
       if (a.rapid && a.note) {
         // 連打は、合わせたメロディの音を 1 オクターブ上で重ねる (指揮棒でメロディを弾く)
@@ -1043,6 +1081,7 @@
     const gap = best ? Math.max(0.06, Math.min(0.12, guideGap(cz, best) * spb * 0.5)) : 0;
     if (best && bd <= gap) {
       best.res = bd <= Math.min(0.06, gap * 0.85) ? 'perfect' : 'great';
+      comboKeep(g, beat);
       let mp = best.p;
       while (mp < 76) mp += 12;
       Audio.sfxChord([mp], best.res === 'perfect' ? 2 : 1);
@@ -1495,8 +1534,7 @@
         const LV = JUST_LEVELS[lv];
         g.stats.just++;
         g.stats['just' + lv] = (g.stats['just' + lv] || 0) + 1;
-        g.combo++;
-        g.maxCombo = Math.max(g.maxCombo, g.combo);
+        comboAdd(g, h.beat);
         g.score += LV.score;
         Audio.sfxJust();
         musicChord(nowBeat, 2, lv >= 2 || h.kind === 'charge');
@@ -1531,7 +1569,7 @@
         p.state = 'broken';
         p.st = 0;
         p.vx = -p.face * 380;
-        g.combo = 0;
+        comboBreak(g);
         Audio.sfxHurt();
         popText(hx, hy - 40, 'GUARD BREAK', '#ff7a5a', 28, 1.0);
         popText(hx, hy, String(dmg), '#ff6060', 24);
@@ -1564,7 +1602,7 @@
       p.vy = -360;
       p.onGround = false;
     }
-    g.combo = 0;
+    comboBreak(g);
     Audio.sfxHurt();
     popText(p.x, p.y - 140, String(dmg), '#ff6060', 28);
     burst(p.x, p.y - 70, 12, { color: '#ff8a8a', min: 80, max: 300, life: 0.4 });
@@ -1755,6 +1793,11 @@
       if (!g.trans && !g.over && !g.cadenza && bi % (g.pulse || 1) === 0) {
         for (const e of g.enemies) think(g, e, bi);
       }
+    }
+    // 曲に合わせた動きが 2 小節ないとコンボが切れる (カデンツァ中は止める)
+    if (g.combo > 0 && !g.over) {
+      if (g.cadenza || g.trans) g.comboBeat = beat;
+      else if (beat - g.comboBeat > comboLimit(g)) comboBreak(g, 'COMBO END');
     }
     g.beatPulse = Math.max(0, g.beatPulse - dt * 3.5);
     g.downPulse = Math.max(0, g.downPulse - dt * 2);
@@ -2927,6 +2970,20 @@
     if (p.state === 'dead') {
       ctx.rotate(-Math.min(1.4, p.st * 3));
     }
+    // 連続攻撃の型ごとの体の動き
+    const mo = p.state === 'attack' && p.atk ? p.atk.motion || 0 : -1;
+    const mk = mo >= 0 ? clamp(p.st / p.atk.dur, 0, 1) : 0;
+    if (mo === 3) {
+      // 回転: その場で一回転 (横に縮めて裏返す)
+      const c = Math.cos(mk * Math.PI * 2);
+      ctx.scale(Math.sign(c || 1) * Math.max(0.12, Math.abs(c)), 1);
+    } else if (mo === 2) {
+      // 突き: 前に踏みこんで前傾
+      ctx.translate(Math.sin(mk * Math.PI) * 10, 0);
+      ctx.rotate(Math.sin(mk * Math.PI) * 0.12);
+    } else if (mo === 1) {
+      ctx.translate(0, -Math.sin(mk * Math.PI) * 6); // 切り上げで少し伸び上がる
+    }
     if (p.inv > 0 && Math.floor(p.inv * 20) % 2 === 0) ctx.globalAlpha = 0.5;
     const bounce = g ? Math.pow(g.beatPulse, 2) * 3 : 0;
     const walking = Math.abs(p.vx) > 10 && p.onGround;
@@ -3038,9 +3095,17 @@
     let a = -0.3 + Math.sin(t * 3) * 0.05;
     let batonLen = 52;
     if (g && p.state === 'free') a = -0.5 + (g.beatPulse) * 0.5; // 拍を振る
+    let armLen = 30;
     if (p.state === 'attack' && p.atk) {
       const k = clamp(p.st / p.atk.act1, 0, 1);
-      a = lerp(-2.0, 0.9, Math.pow(k, 0.6));
+      const m = p.atk.motion || 0;
+      if (m === 0) a = lerp(-2.0, 0.9, Math.pow(k, 0.6));
+      else if (m === 1) a = lerp(1.1, -2.3, Math.pow(k, 0.6));
+      else if (m === 2) {
+        // 突き: 腕を引いてから真っすぐ伸ばす
+        a = lerp(-0.5, -0.12, Math.pow(k, 0.5));
+        armLen = lerp(20, 44, Math.pow(k, 0.5));
+      } else a = -2.0 + Math.pow(clamp(p.st / p.atk.dur, 0, 1), 0.7) * Math.PI * 2;
     }
     if (p.state === 'charging') a = -2.3 + Math.sin(t * 20) * 0.04;
     if (p.state === 'cattack' && p.atk) {
@@ -3053,7 +3118,7 @@
     if (g && g.cadenza) a = p.conduct > 0 ? lerp(0.5, -1.7, p.conduct / 0.16) : -1.7 + Math.sin(t * 4) * 0.05; // 指揮する
     // うしろの腕
     arm(-8, -92 + bounce, Math.PI * 0.55 + leg * 0.4, 30, '#1f4033', 8);
-    const [hx2, hy2] = arm(sx, sy, a, 30, '#2b5444', 9);
+    const [hx2, hy2] = arm(sx, sy, a, armLen, '#2b5444', 9);
     ctx.fillStyle = '#e9b98f';
     ctx.beginPath();
     ctx.arc(hx2, hy2, 5, 0, Math.PI * 2);
@@ -3081,23 +3146,59 @@
     ctx.restore();
 
     // 振りの軌跡
-    if ((p.state === 'attack' || p.state === 'cattack') && p.atk && p.st < p.atk.act1 + 0.12) {
+    const A0 = p.atk;
+    const mo2 = A0 && A0.kind === 'normal' ? A0.motion || 0 : 0;
+    if (p.state === 'attack' && A0 && (mo2 === 2 || mo2 === 3) && p.st < A0.dur + 0.06) {
+      const col = A0.judge >= 2 ? '255,216,74' : A0.judge === 1 ? '127,216,255' : '255,255,255';
+      const fade = 1 - clamp((p.st - A0.act1) / 0.16, 0, 1);
+      if (mo2 === 2) {
+        // 突きの残像: 前へ走る光の筋
+        const k = clamp(p.st / A0.act1, 0, 1);
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 3; i++) {
+          ctx.strokeStyle = `rgba(${col},${(0.8 - i * 0.22) * fade})`;
+          ctx.lineWidth = (8 + A0.judge * 4) - i * 3;
+          ctx.beginPath();
+          ctx.moveTo(30, -96 + (i - 1) * 10);
+          ctx.lineTo(30 + 120 * k, -96 + (i - 1) * 4);
+          ctx.stroke();
+        }
+        ctx.fillStyle = `rgba(255,255,255,${0.9 * fade})`;
+        ctx.beginPath();
+        ctx.arc(30 + 120 * k, -96, 6 + A0.judge * 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // 回転の残像: ぐるりと一周の輪
+        const k = clamp(p.st / A0.dur, 0, 1);
+        ctx.strokeStyle = `rgba(${col},${0.7 * fade})`;
+        ctx.lineWidth = 10 + A0.judge * 5;
+        ctx.beginPath();
+        ctx.ellipse(0, -80, 92, 40, 0, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(255,255,255,${0.85 * fade})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+    } else if ((p.state === 'attack' || p.state === 'cattack') && p.atk && p.st < p.atk.act1 + 0.12) {
       const A = p.atk;
       const col = A.judge >= 2 ? '255,216,74' : A.judge === 1 ? '127,216,255' : '255,255,255';
       const k = clamp(p.st / A.act1, 0, 1);
       const r0 = A.kind === 'charge' ? 100 : 80;
-      const a0 = A.kind === 'charge' ? -2.6 : -2.0;
-      const a1 = lerp(a0, A.kind === 'charge' ? 1.2 : 0.9, k);
+      const up = A.kind === 'normal' && A.motion === 1;
+      const a0 = A.kind === 'charge' ? -2.6 : up ? 1.1 : -2.0;
+      const a1 = lerp(a0, A.kind === 'charge' ? 1.2 : up ? -2.3 : 0.9, k);
       const fade = 1 - clamp((p.st - A.act1) / 0.12, 0, 1);
       ctx.strokeStyle = `rgba(${col},${0.75 * fade})`;
       ctx.lineWidth = A.kind === 'charge' ? 18 + A.judge * 8 : 10 + A.judge * 6;
+      // 切り上げは逆回り
+      const dir = up ? -1 : 1;
       ctx.beginPath();
-      ctx.arc(6, -92, r0, a0 + 0.2, a1 - 0.25);
+      ctx.arc(6, -92, r0, a0 + 0.2 * dir, a1 - 0.25 * dir, up);
       ctx.stroke();
       ctx.strokeStyle = `rgba(255,255,255,${0.9 * fade})`;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(6, -92, r0, a0 + 0.3, a1 - 0.25);
+      ctx.arc(6, -92, r0, a0 + 0.3 * dir, a1 - 0.25 * dir, up);
       ctx.stroke();
     }
     // ガード: 光る五線の盾
@@ -3145,6 +3246,21 @@
   }
 
   const SKIN = '#f2cfae';
+  // 攻撃を受けた瞬間に白く光る (ctx.filter は重いので、白い光を足し算で重ねる)
+  function hitFlash(e, x, cy, rx, ry) {
+    if (!(e.flash > 0)) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = Math.min(1, e.flash * 7) * 0.7;
+    const rg = ctx.createRadialGradient(x, cy, 0, x, cy, Math.max(rx, ry));
+    rg.addColorStop(0, 'rgba(255,255,255,0.9)');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   // アルレッキーノの菱形模様で塗る
   function harlequinFill(x, y, w, h) {
     const cols = ['#c8202a', '#2c7a3a', '#e6c35a', '#203a8a'];
@@ -3190,8 +3306,6 @@
     const fat = L.fat || 1;
     if (!portrait) shadow(x, e.z, 30 * S * fat, e.z - e.y);
     ctx.save();
-    if (e.flash > 0) ctx.filter = `brightness(${1 + e.flash * 8})`;
-    else if (L.statue) ctx.filter = 'grayscale(0.6)';
     ctx.translate(x, y);
     ctx.scale(e.face * S, S);
     if (e.dead) {
@@ -3461,6 +3575,7 @@
       }
     }
     ctx.restore();
+    hitFlash(e, x, y + floatY * S - 70 * S, 42 * S * fat, 80 * S);
     if (!portrait) {
       drawTelegraph(e, beat, g, x, y + floatY * S - 150 * S);
       drawSpeech(e, x, y - 175 * S);
@@ -3880,10 +3995,9 @@
   function drawMarie(e, beat, g, portrait) {
     const x = e.x - (g ? g.camX : 0);
     const y = e.y;
-    const time = g ? time : titleT;
+    const time = g ? g.time : titleT;
     if (!portrait) shadow(x, e.z, 80);
     ctx.save();
-    if (e.flash > 0) ctx.filter = `brightness(${1 + e.flash * 8})`;
     ctx.translate(x, y);
     if (e.dead) {
       ctx.globalAlpha = clamp(3.5 - e.deadT, 0.3, 1);
@@ -4035,6 +4149,7 @@
       }
     }
     ctx.restore();
+    hitFlash(e, x, y - 130, 90, 150);
     if (!portrait) {
       drawTelegraph(e, beat, g, x + e.face * 70, y - 250);
       drawSpeech(e, x, y - 290);
@@ -4392,6 +4507,13 @@
       ctx.font = `bold italic 20px ${SANS}`;
       ctx.fillText(`${g.combo} COMBO`, 0, 0);
       ctx.restore();
+    }
+    if (g.combo >= 1 && g.music) {
+      const left = clamp(1 - (beat - g.comboBeat) / comboLimit(g), 0, 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.fillRect(W - 200, 74, 120, 4);
+      ctx.fillStyle = left < 0.3 ? '#ff8a6a' : g.combo >= 20 ? '#ffd84a' : '#bfeaff';
+      ctx.fillRect(W - 200 + 120 * (1 - left), 74, 120 * left, 4);
     }
     // 曲名
     ctx.textAlign = 'left';
