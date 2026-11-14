@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>指揮棒ベートーヴェン</title>
+  <meta name="description" content="クラシック音楽に合わせて戦うベルトスクロールアクション。指揮棒を手にしたベートーヴェンが、マリー・アントワネット、ナポレオン、カサノヴァ、パガニーニ、そしてモーツァルトの幻影に挑む全 5 ステージ。拍に合わせた一撃とジャストガードで演出が派手に。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #08040e;
+      overflow: hidden;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    canvas {
+      display: block;
+      background: #1d1b3d;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .back {
+      position: fixed;
+      left: 8px;
+      bottom: 6px;
+      color: rgba(255, 255, 255, 0.45);
+      font: 12px system-ui, -apple-system, "Hiragino Sans", sans-serif;
+      text-decoration: none;
+    }
+    .back:hover { color: #ffe7a0; }
+    body[data-scene="play"] .back, body[data-scene="pause"] .back { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="指揮棒ベートーヴェン"></canvas>
+  <a class="back" href="../">‹ ゲーム一覧</a>
+  <script src="scores/k545.js"></script>
+  <script src="scores/k467.js"></script>
+  <!-- ステージ 2〜5 の曲は、作曲家サバイバーの譜面をそのまま使う (出典とライセンスは各ファイルの先頭) -->
+  <script>window.CS_SCORES = window.CS_SCORES || {};</script>
+  <script src="../composer-survivors/scores/turkish.js"></script>
+  <script src="../composer-survivors/scores/fate.js"></script>
+  <script src="../composer-survivors/scores/spring1.js"></script>
+  <script src="../composer-survivors/scores/summer3.js"></script>
+  <script src="../composer-survivors/scores/italian.js"></script>
+  <script src="../composer-survivors/scores/winter1.js"></script>
+  <script src="../composer-survivors/scores/k457.js"></script>
+  <script src="../composer-survivors/scores/moonlight3.js"></script>
+  <script src="stages.js"></script>
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
