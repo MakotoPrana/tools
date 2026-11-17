@@ -55,7 +55,7 @@ function openStageMap(mode, def) {
     return `
     <div class="overlay"><div class="panel full">
       ${head(`${def.id}. ${def.name}`, mode === 'travel' ? tr('転移先を選ぶ') : mode === 'view' ? tr('マップ') : tr('エリアを選ぶ'))}
-      <div class="stage-map"><canvas id="stage-canvas" width="${map.w * 8}" height="${map.h * 8}"></canvas></div>
+      <div class="stage-map"><canvas id="stage-canvas" width="${Math.round(map.w * Q)}" height="${Math.round(map.h * Q)}"></canvas></div>
       <div class="region-info">${info}</div>
       ${gateBtns ? `<div class="btn-row">${gateBtns}</div>` : ''}
       ${mode === 'travel' ? `<div class="btn-row"><button class="btn" data-act="toWorld">${tr('全体図へ戻る')}</button></div>` : ''}
@@ -65,11 +65,14 @@ function openStageMap(mode, def) {
   uiShow(fn);
 }
 
+// ステージ図の 1 タイルの大きさ (px)。ステージを引きのばした分だけ小さくして、絵と文字の大きさは元のまま
+const Q = 8 / RG.STAGE_SCALE;
+
 export function drawStageCanvas(def, map, mode) {
   const c = document.getElementById('stage-canvas');
   if (!c) return;
   const g = c.getContext('2d');
-  const k = 8 / TILE;
+  const k = Q / TILE;
   g.imageSmoothingEnabled = true;
   g.drawImage(map.bg, 0, 0, c.width, c.height);
   const free = (a) => (G && G.def === def ? G.areas.find((x) => x.def === a).free : prog.areas.includes(a.id));
@@ -84,8 +87,8 @@ export function drawStageCanvas(def, map, mode) {
   });
   def.areas.forEach((a, ai) => {
     const ctr = map.centers[ai];
-    const x = ctr.x * 8 + 4;
-    const y = ctr.y * 8 + 4;
+    const x = ctr.x * Q + Q / 2;
+    const y = ctr.y * Q + Q / 2;
     g.font = `400 24px ${RG.FONTS.display}`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
@@ -101,8 +104,8 @@ export function drawStageCanvas(def, map, mode) {
     g.strokeText(sub, x, y + 12);
     g.fillText(sub, x, y + 12);
     // 転移碑
-    const sx = a.stone[0] * 8 + 4;
-    const sy = a.stone[1] * 8 + 4;
+    const sx = a.stone[0] * Q + Q / 2;
+    const sy = a.stone[1] * Q + Q / 2;
     g.fillStyle = prog.travel.includes(a.id) ? '#6ad0ff' : '#444';
     g.beginPath();
     g.arc(sx, sy, 6, 0, TAU);
@@ -114,7 +117,7 @@ export function drawStageCanvas(def, map, mode) {
       for (const n of a.nests) {
         g.fillStyle = '#ff3a5a';
         g.beginPath();
-        g.arc(n.x * 8 + 4, n.y * 8 + 4, 4, 0, TAU);
+        g.arc(n.x * Q + Q / 2, n.y * Q + Q / 2, 4, 0, TAU);
         g.fill();
       }
     }
@@ -125,7 +128,7 @@ export function drawStageCanvas(def, map, mode) {
     g.lineWidth = 2;
     g.setLineDash([5, 4]);
     g.beginPath();
-    g.arc(l.x * 8 + 4, l.y * 8 + 4, l.r * 8, 0, TAU);
+    g.arc(l.x * Q + Q / 2, l.y * Q + Q / 2, l.r * Q, 0, TAU);
     g.stroke();
     g.setLineDash([]);
   }
@@ -135,7 +138,7 @@ export function drawStageCanvas(def, map, mode) {
     if (!prog.travel.includes(st.id)) continue;
     g.fillStyle = '#6ad0ff';
     g.beginPath();
-    g.arc(st.x * 8 + 4, st.y * 8 + 4, 6, 0, TAU);
+    g.arc(st.x * Q + Q / 2, st.y * Q + Q / 2, 6, 0, TAU);
     g.fill();
     g.strokeStyle = '#000';
     g.lineWidth = 2;
@@ -147,8 +150,8 @@ export function drawStageCanvas(def, map, mode) {
     g.font = `800 14px ${RG.FONTS.ui}`;
     g.strokeStyle = '#000';
     g.lineWidth = 4;
-    g.strokeText(tr('武器屋'), f.door[0] * 8 + 4, f.door[1] * 8 + 14);
-    g.fillText(tr('武器屋'), f.door[0] * 8 + 4, f.door[1] * 8 + 14);
+    g.strokeText(tr('武器屋'), f.door[0] * Q + Q / 2, f.door[1] * Q + 14);
+    g.fillText(tr('武器屋'), f.door[0] * Q + Q / 2, f.door[1] * Q + 14);
   }
   if (G && G.def === def) {
     g.fillStyle = '#fff';
