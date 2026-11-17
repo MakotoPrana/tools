@@ -288,6 +288,35 @@ export function drawStone(s) {
   ctx.fillRect(s.x - 1.5, s.y - 9, 3, 12);
 }
 
+// ダンジョンの入口 (ステージ側) と出口 (ダンジョン側): 黒い洞窟の口と、むらさきの光
+export function drawDungeonMarks(inView) {
+  const marks = (G.def.dungeons || []).map((d) => ({ x: tc(d.x), y: tc(d.y), name: d.name, open: (G.areas.find((a) => a.def.id === d.area) || {}).free }));
+  if (G.def.exit) marks.push({ x: tc(G.def.exit[0]), y: tc(G.def.exit[1]), name: tr('出口'), open: true });
+  for (const m of marks) {
+    if (!inView(m.x, m.y, 40)) continue;
+    const pulse = 0.5 + Math.sin(G.t * 3 + m.x) * 0.15;
+    const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, 34);
+    g.addColorStop(0, `rgba(190,100,255,${m.open ? pulse : 0.2})`);
+    g.addColorStop(1, 'rgba(190,100,255,0)');
+    ctx.fillStyle = g;
+    circle(ctx, m.x, m.y, 34);
+    ctx.fillStyle = '#5a4e48';
+    ctx.beginPath();
+    ctx.ellipse(m.x, m.y + 2, 17, 13, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#0c0812';
+    ctx.beginPath();
+    ctx.ellipse(m.x, m.y + 3, 12, 9, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = m.open ? '#d9a8ff' : '#6a5a78';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(m.x, m.y + 2, 15, 11, 0, 0, TAU);
+    ctx.stroke();
+    txt(m.name, m.x, m.y - 20, 7, m.open ? '#e8c8ff' : '#9a8aa8', 'center');
+  }
+}
+
 export function drawPickup(p) {
   if (p.type === 'mat') {
     const b = Math.sin(G.t * 5 + p.x) * 1.5;

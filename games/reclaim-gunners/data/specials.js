@@ -126,12 +126,50 @@ window.RG = window.RG || {};
     ],
   };
 
+  // 超必殺技 (武器ごとに 4 つ目): 特別な素材 (ダンジョンのボスが落とす) で解放する。いくつかの技を時間をずらして重ねる
+  //   parts: 重ねる技 [{ kind: 上の kind, ...値, at: 出すまでの秒, rot: 向きのずれ (lance) }]
+  const U = (name, parts) => ({ name, kind: 'multi', ultra: true, parts });
+  const ULT = {
+    A1: U('百発百中・終幕', [{ kind: 'fan', n: 24, arc: 1.6, mul: 1 }, { kind: 'volley', n: 10, mul: 6, at: 0.3 }]),
+    A2: U('女王蜂の巣襲来', [{ kind: 'nova', n: 40, mul: 0.9 }, { kind: 'rapid', t: 6, k: 3, at: 0.2 }]),
+    A3: U('双牙・千刃乱舞', [{ kind: 'nova', n: 36, mul: 0.8 }, { kind: 'fan', n: 30, arc: 2, mul: 0.7, at: 0.25 }, { kind: 'volley', n: 8, mul: 5, at: 0.5 }]),
+    A4: U('神聖十字・浄化', [{ kind: 'lance', len: 600, w: 40, mul: 14 }, { kind: 'lance', len: 500, w: 40, mul: 12, rot: Math.PI / 2, at: 0.1 }, { kind: 'blast', n: 1, r: 150, mul: 10, at: 0.3 }]),
+    B1: U('零距離・破城', [{ kind: 'quake', r: 130, mul: 8 }, { kind: 'fan', n: 40, arc: 1.6, mul: 0.6, at: 0.15 }]),
+    B2: U('番犬の咆哮', [{ kind: 'quake', r: 170, mul: 12 }, { kind: 'quake', r: 100, mul: 8, at: 0.25 }]),
+    B3: U('針千本・針地獄', [{ kind: 'nova', n: 48, mul: 0.8, pierce: 4 }, { kind: 'fan', n: 40, arc: 2.4, mul: 0.6, pierce: 4, at: 0.2 }, { kind: 'lance', len: 500, w: 30, mul: 9, at: 0.4 }]),
+    B4: U('竜王の業火', [{ kind: 'lance', len: 420, w: 90, mul: 14 }, { kind: 'fan', n: 30, arc: 1.4, mul: 0.8, at: 0.2 }, { kind: 'quake', r: 150, mul: 7, at: 0.4 }]),
+    C1: U('弾幕の終焉', [{ kind: 'rapid', t: 6, k: 3 }, { kind: 'nova', n: 60, mul: 0.6, at: 0.3 }, { kind: 'fan', n: 60, arc: 1.5, mul: 0.5, at: 0.6 }]),
+    C2: U('終末の絨毯', [{ kind: 'blast', n: 12, r: 80, mul: 4, spread: 160 }, { kind: 'blast', n: 1, r: 200, mul: 14, at: 0.5 }]),
+    C3: U('煉獄大火炎', [{ kind: 'lance', len: 260, w: 110, mul: 8 }, { kind: 'quake', r: 140, mul: 6, at: 0.2 }, { kind: 'blast', n: 8, r: 70, mul: 4, spread: 120, at: 0.4 }]),
+    C4: U('流星群・天落', [{ kind: 'blast', n: 16, r: 80, mul: 4.5, spread: 220 }, { kind: 'blast', n: 1, r: 220, mul: 16, at: 0.8 }]),
+    D1: U('千本矢', [{ kind: 'fan', n: 9, arc: 0.5, mul: 4, pierce: 99 }, { kind: 'blast', n: 10, r: 45, mul: 3, spread: 140, at: 0.3 }]),
+    D2: U('必中・乱れ撃ち', [{ kind: 'volley', n: 16, mul: 7 }, { kind: 'volley', n: 16, mul: 7, at: 0.4 }]),
+    D3: U('血の宴・終曲', [{ kind: 'volley', n: 12, mul: 5 }, { kind: 'lance', len: 500, w: 30, mul: 12, at: 0.3 }, { kind: 'fan', n: 20, arc: 1, mul: 2.5, pierce: 5, at: 0.5 }]),
+    D4: U('神槍・天罰', [{ kind: 'lance', len: 700, w: 90, mul: 22 }, { kind: 'volley', n: 12, mul: 8, at: 0.3 }]),
+    E1: U('紅蓮・大噴火', [{ kind: 'blast', n: 8, r: 70, mul: 4, spread: 140 }, { kind: 'nova', n: 20, mul: 0.8, at: 0.2 }, { kind: 'blast', n: 1, r: 180, mul: 12, at: 0.5 }]),
+    E2: U('絶対零度・氷結世界', [{ kind: 'quake', r: 220, mul: 12 }, { kind: 'nova', n: 30, mul: 1, at: 0.2 }, { kind: 'blast', n: 10, r: 55, mul: 3, spread: 180, at: 0.4 }]),
+    E3: U('雷神の怒り', [{ kind: 'volley', n: 16, mul: 6 }, { kind: 'blast', n: 8, r: 70, mul: 5, spread: 160, at: 0.3 }, { kind: 'lance', len: 500, w: 60, mul: 12, at: 0.6 }]),
+    E4: U('天の裁き・聖域', [{ kind: 'lance', len: 600, w: 100, mul: 18 }, { kind: 'quake', r: 200, mul: 8, at: 0.3 }, { kind: 'volley', n: 10, mul: 8, at: 0.5 }]),
+    S1: U('暴食の宴', [{ kind: 'quake', r: 200, mul: 14 }, { kind: 'volley', n: 14, mul: 6, at: 0.2 }, { kind: 'nova', n: 40, mul: 0.8, at: 0.4 }]),
+    S2: U('星喰い・終焉', [{ kind: 'blast', n: 1, r: 240, mul: 20 }, { kind: 'nova', n: 40, mul: 1, at: 0.2 }, { kind: 'volley', n: 14, mul: 8, at: 0.6 }]),
+  };
+  for (const id of Object.keys(ULT)) RG.SPECIALS[id].push(ULT[id]);
+
+  // 超必殺技の解放に使う特別な素材 (ダンジョンのボスの素材)。武器の格が上がるほど、あとのステージのダンジョンの素材
+  //   持っていれば解放できる (使ってなくならない)
+  const ORDER = ['A1', 'B1', 'C1', 'D1', 'E1', 'A2', 'B2', 'C2', 'D2', 'E2', 'A3', 'B3', 'C3', 'D3', 'E3', 'A4', 'B4', 'C4', 'D4', 'E4', 'S1', 'S2'];
+  RG.ULTRA_MAT = {};
+  ORDER.forEach((id, i) => {
+    RG.ULTRA_MAT[id] = RG.DUNGEON_MATS[Math.floor((i * RG.DUNGEON_MATS.length) / ORDER.length)];
+  });
+
   RG.SP_MAX = 10; // 必殺技の Lv の上限
   // 習得の条件と値段: 前の必殺技の Lv・お金 (武器の値段 × mul。下限 min)・悪魔の心臓 (中級悪魔が必ず落とす)
   RG.SP_UNLOCK = [
     null,
     { req: 3, mul: 0.6, min: 800, hearts: 1 },
     { req: 5, mul: 2, min: 3000, hearts: 3 },
+    { req: 3, mul: 3, min: 20000, hearts: 0, mat: true }, // 超必殺技: 3 つ目が Lv3 以上・特別な素材を持っている
   ];
   // ゲージ (最大 100) のたまる量
   RG.SP_GAIN = { kill: 2, elite: 6, mid: 15, nest: 8 };

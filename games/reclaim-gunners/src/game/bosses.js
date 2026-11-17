@@ -17,7 +17,7 @@ import { G, P, stageDef } from './stage.js';
 import { toast } from '../ui/toast.js';
 
 export function makeBoss(id, l) {
-  const def = BOSSES[id];
+  const def = l.def || BOSSES[id];
   const lv = Math.min(99, def.lv + D.lv);
   const total = def.hp * lvMul.hp(lv);
   const b = { id, def, lair: l, lv, total, state: 'sleep', t: 0, parts: [], atk: def.atk * lvMul.atk(lv), cx: tc(l.x), cy: tc(l.y), R: l.r * TILE, act: 0, step: 0 };
@@ -96,7 +96,7 @@ export function updateBosses(dt) {
       if (!G.dead && !G.lock && dp < b.R - 4) {
         b.state = 'fight';
         G.lock = b;
-        if (!G.room) bossTrack.start(`boss_${b.id}`, { difficulty: diffId, hero: heroDef.id, boss_lv: b.lv, player_lv: powerLv() });
+        if (!G.room) bossTrack.start(`boss_${b.lair.dun || b.id}`, { difficulty: diffId, hero: heroDef.id, boss_lv: b.lv, player_lv: powerLv() });
         showBanner(b.def.name, `Lv${b.lv}  ・  ${tr('エリアの出口に結界が張られた!')}`, lvColor(b.lv - powerLv()) === '#ff5a5a' ? tr('危険!') : '', 3, '#ff8aa8');
         sfx('boss');
         G.shake = 6;
@@ -185,6 +185,22 @@ export function bossDefeated(b) {
   if (G.room) {
     showBanner(tr('{name} 撃破!', { name: b.def.name }), tr('メニューから、相手を選び直せる'), '', 4, '#ffd84a');
     sfx('liberate');
+    return;
+  }
+  // ダンジョンのボス: 特別な素材が手に入る (1 回だけ)。門・転移碑・クリアには関係しない
+  if (b.lair.dun) {
+    if (!prog.dungeons.includes(b.lair.dun)) prog.dungeons.push(b.lair.dun);
+    const gain = Math.round(goldGain(b.def.exp, b.def.gold, b.lv) * D.reward);
+    gainGold(gain);
+    hero.materials[b.def.mat] = (hero.materials[b.def.mat] || 0) + 1;
+    const area = G.areas[b.area];
+    if (area && !area.free) liberate(area);
+    showBanner(tr('{name} 撃破!', { name: b.def.name }), `+${money(gain)}  ・  ${MATERIALS[b.def.mat]}\n${tr('超必殺技の解放に使える特別な素材だ')}`, '', 5, '#ffd84a');
+    sfx('liberate');
+    for (let i = 0; i < 60; i++) addPart({ x: b.cx + rnd(-b.R, b.R), y: b.cy + rnd(-b.R, b.R), vx: 0, vy: rnd(-50, -10), life: rnd(0.8, 1.8), color: pick(['#ffd84a', '#fff3b0', '#c060ff']), size: rnd(1.5, 3), glow: true });
+    collectAllMats();
+    updateFlow();
+    writeSave();
     return;
   }
   const first = !prog.bosses.includes(b.id);

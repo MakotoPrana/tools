@@ -148,9 +148,9 @@ export function drawCutin() {
   // 帯の地は描かない (視界をさえぎらないように)。名前と武器の名前だけが、ななめに走りこむ
   // 名前 (少し遅れて、大きく光って出る)
   const tk = clamp((age - 0.08) / 0.15, 0, 1);
-  const size = (portrait ? 24 : 28) * (1.4 - 0.4 * ease(tk));
+  const size = (portrait ? 24 : 28) * (c.ultra ? 1.4 : 1) * (1.4 - 0.4 * ease(tk));
   ctx.globalAlpha = tk;
-  drawGlow(ctx, 0, -4, 70, c.color, 0.2);
+  drawGlow(ctx, 0, -4, c.ultra ? 130 : 70, c.color, c.ultra ? 0.35 : 0.2);
   txt(c.name, 0, -4, size, '#fff3c8', 'center', 'display');
   txt(c.sub, 0, h / 2 - 11, 8, c.color, 'center');
   ctx.restore();

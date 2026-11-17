@@ -28,7 +28,7 @@ export function showMods(id, shopId) {
     const ctx = { id, w, shop, cap, byId };
     // 枝: 基礎の改造 (とそこから派生する改造) と、必殺技の 3 つのつながり
     const modBranch = (m) => branch(`m:${m.id}`, mods.filter((x) => x.req && x.req[0] === m.id).map(modBranch), ctx);
-    const spBranch = (i) => branch(`sp:${i}`, i < 2 ? [spBranch(i + 1)] : [], ctx);
+    const spBranch = (i) => branch(`sp:${i}`, i < 3 ? [spBranch(i + 1)] : [], ctx);
     const kids = [...mods.filter((m) => !m.req).map(modBranch), spBranch(0)];
     const root = `<div class="tn open"><div class="tcard troot">
         <img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30">
@@ -71,8 +71,9 @@ function nodeInfo(key, ctx) {
   const c = spUnlockCost(id, i);
   const reqOk = spOwned(id, i - 1) && spLv(id, i - 1) >= c.req;
   const hearts = hero.materials.demonHeart || 0;
-  const ready = !!shop && reqOk && hero.gold >= c.gold && hearts >= c.hearts;
-  return { sp, i, own, lv: 0, max: RG.SP_MAX, reqOk, unlock: c, hearts, ready, name: sp.name, kind: 'sp', req: `Lv${c.req}` };
+  const hasMat = !c.mat || (hero.materials[c.mat] || 0) >= 1;
+  const ready = !!shop && reqOk && hasMat && hero.gold >= c.gold && hearts >= c.hearts;
+  return { sp, i, own, lv: 0, max: RG.SP_MAX, reqOk, unlock: c, hearts, hasMat, ready, name: sp.name, kind: 'sp', req: `Lv${c.req}` };
 }
 
 function branch(key, kids, ctx) {
@@ -83,7 +84,7 @@ function branch(key, kids, ctx) {
   const lvText = n.kind === 'sp' && !n.own ? (n.reqOk ? tr('未習得') : '🔒') : n.reqOk ? `Lv${n.lv}/${n.max}` : '🔒';
   return `<div class="tn ${n.reqOk ? 'open' : ''}">
     ${n.req ? `<span class="treq">${n.req}</span>` : ''}
-    <button class="tcard ${n.kind} ${state} ${n.ready ? 'ready' : ''} ${selKey === key ? 'sel' : ''}" data-act="selNode" data-id="${key}">
+    <button class="tcard ${n.kind} ${n.sp && n.sp.ultra ? 'ultra' : ''} ${state} ${n.ready ? 'ready' : ''} ${selKey === key ? 'sel' : ''}" data-act="selNode" data-id="${key}">
       <div class="tname">${n.kind === 'sp' ? '✦ ' : ''}${n.name}</div>
       <div class="tlv">${lvText}${n.set ? ` <span class="tset">${tr('セット中')}</span>` : ''}</div>
       ${pips}
@@ -114,7 +115,9 @@ function detail(key, ctx) {
       if (n.lv >= n.max) btns += `<span class="gold">${tr('最大')}</span>`;
       else if (shop && !capped) btns += big('spUp', `data-i="${n.i}"`, `${tr('強化')}<small>${money(n.cost)}</small>`, n.ready);
     } else {
-      note = n.reqOk ? tr('悪魔の心臓 {h}/{n}', { h: n.hearts, n: n.unlock.hearts }) : `🔒 ${tr('{name} Lv{n} が必要', { name: RG.SPECIALS[id][n.i - 1].name, n: n.unlock.req })}`;
+      if (!n.reqOk) note = `🔒 ${tr('{name} Lv{n} が必要', { name: RG.SPECIALS[id][n.i - 1].name, n: n.unlock.req })}`;
+      else if (n.unlock.mat) note = `${tr('特別な素材')}: ${RG.MATERIALS[n.unlock.mat]} ${n.hasMat ? '✓' : tr('（ダンジョンのボスが落とす）')}`;
+      else note = tr('悪魔の心臓 {h}/{n}', { h: n.hearts, n: n.unlock.hearts });
       if (shop) btns = big('spLearn', `data-i="${n.i}"`, `${tr('習得する')}<small>${money(n.unlock.gold)}</small>`, n.ready);
     }
   }
@@ -179,8 +182,9 @@ actions.spLearn = (d) => {
   const c = spUnlockCost(id, i);
   if (!spOwned(id, i - 1) || spLv(id, i - 1) < c.req) return;
   if (hero.gold < c.gold || (hero.materials.demonHeart || 0) < c.hearts) return;
+  if (c.mat && (hero.materials[c.mat] || 0) < 1) return;
   hero.gold -= c.gold;
-  hero.materials.demonHeart -= c.hearts;
+  hero.materials.demonHeart = (hero.materials.demonHeart || 0) - c.hearts;
   spState(id).lv[i] = 0;
   sfx('buy');
   rerender();

@@ -80,58 +80,84 @@ RG.BOARD = [
   { id: 'pot', name: '回復薬の所持数', max: 3, base: 400, fx: (r) => RG.t('{v} 個', { v: 3 + r }) },
 ];
 
-// 能力ボードの形 (スフィア盤): まん中から 6 本の腕がのび、とちゅうで 2 本の枝に分かれる。となりの腕どうしは輪でつながる
-//   ノード 1 つ = その能力 +2 ランク (回復薬は +1)。解放できるのは、解放ずみのノードとつながっているノードだけ
-//   ノードの値段 = その能力の、上がるランクぶんの値段の合計 (ランクが上がるほど高い)。能力が最大なら 0 G (道としてだけ使う)
+// 能力ボードの形 (スフィア盤・約 300 ノード): まん中から 6 本の腕がのび、先で 3 本のレーン (左・中・右) に分かれる
+//   ノード 1 つ = その能力 +1 ランク。全部の能力の最大ランクの合計 (約 300) と同じ数のノードがある
+//   解放できるのは、解放ずみのノードとつながっているノードだけ。ノードの値段 = そのノードで上がるランクの値段 (能力が最大なら 0 G。道としてだけ使う)
+//   つながり: 幹・レーン・レーンどうしの橋 (左↔中↔右)・となりの腕との輪
 //   ab: ノードの中に書く 1 文字
 RG.BOARD_AB = { hp: '体', atk: '攻', def: '防', spd: '速', rel: '装', crit: '会', critd: '撃', dodge: '避', sp: '必', gold: '金', mat: '素', pot: '薬' };
 RG.GRID = (() => {
   const STEP = 34;
-  // 腕: 名前・幹 (まん中に近い 4 つ)・左の枝・右の枝 [能力, ノードの数]
+  const LAT = 38; // レーンの間隔
+  const TRUNK = 6;
+  // 腕: 名前・能力と数 (全部の能力の最大ランクの数)。先頭の TRUNK 個は幹、残りは左・中・右のレーンに順に並べる
   const ARMS = [
-    { name: '力', trunk: ['atk', 'crit', 'atk', 'crit'], left: ['atk', 18], right: ['crit', 13] },
-    { name: '技', trunk: ['rel', 'critd', 'rel', 'critd'], left: ['rel', 8], right: ['critd', 13] },
-    { name: '魔', trunk: ['sp', 'pot', 'sp', 'sp'], left: ['sp', 10], right: ['pot', 2] },
-    { name: '運', trunk: ['gold', 'mat', 'gold', 'mat'], left: ['gold', 11], right: ['mat', 11] },
-    { name: '疾', trunk: ['spd', 'dodge', 'spd', 'dodge'], left: ['spd', 8], right: ['dodge', 6] },
-    { name: '守', trunk: ['hp', 'def', 'hp', 'def'], left: ['hp', 18], right: ['def', 13] },
+    { name: '力', stats: [['atk', 40]] },
+    { name: '技', stats: [['crit', 30], ['critd', 30], ['rel', 20]] },
+    { name: '魔', stats: [['sp', 25], ['pot', 3]] },
+    { name: '運', stats: [['gold', 25], ['mat', 25]] },
+    { name: '疾', stats: [['spd', 20], ['dodge', 15]] },
+    { name: '守', stats: [['hp', 40], ['def', 30]] },
   ];
   const nodes = [{ id: 'c', x: 0, y: 0, stat: null, v: 0 }];
   const links = [];
-  const val = (st) => (st === 'pot' ? 1 : 2);
+  const ids = {}; // `${腕}${レーン}${番号}` → ノードの id (橋・輪をかけるのに使う)
   ARMS.forEach((arm, i) => {
     const th = -Math.PI / 2 + (i / ARMS.length) * Math.PI * 2;
+    const fx = Math.cos(th);
+    const fy = Math.sin(th);
+    // 能力を、幹ぶんは交互に、のこりは並べて、順に取り出す
+    const left = arm.stats.map(([st, n]) => [st, n]);
+    const seq = [];
+    const trunkStats = [];
+    for (let k = 0; k < TRUNK; k++) {
+      const pick = left.filter((x) => x[1] > 0)[k % left.filter((x) => x[1] > 0).length];
+      pick[1]--;
+      trunkStats.push(pick[0]);
+    }
+    for (const [st, n] of left) for (let k = 0; k < n; k++) seq.push(st);
     let prev = 'c';
-    arm.trunk.forEach((st, k) => {
+    trunkStats.forEach((st, k) => {
       const id = `a${i}t${k}`;
-      nodes.push({ id, x: Math.cos(th) * STEP * (k + 1), y: Math.sin(th) * STEP * (k + 1), stat: st, v: val(st), arm: i });
+      nodes.push({ id, x: fx * STEP * (k + 1), y: fy * STEP * (k + 1), stat: st, v: 1, arm: i });
       links.push([prev, id]);
       prev = id;
+      ids[`${i}t${k}`] = id;
     });
-    const ex = Math.cos(th) * STEP * arm.trunk.length;
-    const ey = Math.sin(th) * STEP * arm.trunk.length;
-    for (const [side, [st, n], da] of [['l', arm.left, -0.3], ['r', arm.right, 0.3]]) {
+    // 3 本のレーン: 長さはほぼ同じ (左・右が短め)。レーンのはじめは、幹の先から横にひらく
+    const per = Math.ceil(seq.length / 3);
+    const lens = [Math.floor(seq.length / 3), seq.length - 2 * Math.floor(seq.length / 3), Math.floor(seq.length / 3)];
+    let at = 0;
+    ['l', 'c', 'r'].forEach((lane, li) => {
+      const side = li - 1;
       let p2 = prev;
-      for (let j = 0; j < n; j++) {
-        const id = `a${i}${side}${j}`;
-        // 枝は少しずつ外へ曲がる
-        const a = th + da * (1 + j * 0.035);
-        nodes.push({ id, x: ex + Math.cos(a) * STEP * (j + 1), y: ey + Math.sin(a) * STEP * (j + 1), stat: st, v: val(st), arm: i });
+      for (let j = 0; j < lens[li]; j++) {
+        const id = `a${i}${lane}${j}`;
+        const along = STEP * (TRUNK + 1 + j);
+        const lat = side * LAT * Math.min(j + 1, 2) * 0.9;
+        nodes.push({ id, x: fx * along - fy * lat, y: fy * along + fx * lat, stat: seq[at++], v: 1, arm: i });
         links.push([p2, id]);
         p2 = id;
+        ids[`${i}${lane}${j}`] = id;
       }
-    }
+    });
+    void per;
   });
-  // 輪: となりの腕の幹 2 つ目どうし・枝の 4 つ目どうし (右の枝 → となりの腕の左の枝)
-  const has = (id) => nodes.some((n) => n.id === id);
+  const has = (k) => ids[k];
+  const link = (a, b) => { if (has(a) && has(b)) links.push([ids[a], ids[b]]); };
   ARMS.forEach((arm, i) => {
     const j = (i + 1) % ARMS.length;
-    links.push([`a${i}t1`, `a${j}t1`]);
-    const r = `a${i}r${Math.min(3, arm.right[1] - 1)}`;
-    const l = `a${j}l${Math.min(3, ARMS[j].left[1] - 1)}`;
-    if (has(r) && has(l)) links.push([r, l]);
+    // 橋: 左↔中↔右のレーン (3 ノードおき)
+    for (let k = 2; k < 60; k += 3) {
+      link(`${i}l${k}`, `${i}c${k}`);
+      link(`${i}c${k}`, `${i}r${k}`);
+    }
+    // 輪: 幹どうし・となりの腕の右レーン ↔ 左レーン
+    link(`${i}t2`, `${j}t2`);
+    link(`${i}t4`, `${j}t4`);
+    for (const k of [0, 3, 7]) link(`${i}r${k}`, `${j}l${k}`);
   });
-  return { nodes, links, arms: ARMS.map((a) => a.name) };
+  return { ver: 3, nodes, links, arms: ARMS.map((a) => a.name) };
 })();
 
 // 武器スロット (最初は 2 つ。4 回開けて最大 6 つ)

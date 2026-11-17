@@ -566,6 +566,7 @@ body.btn-right .t-interact { left: auto; right: 3cqmin; }
 .tcard:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .tcard.uniq { border-color: rgba(200, 90, 255, 0.55); background: linear-gradient(180deg, rgba(48, 24, 54, 0.95), rgba(22, 10, 24, 0.95)); }
 .tcard.sp { border-color: rgba(255, 200, 90, 0.7); background: linear-gradient(180deg, rgba(74, 46, 14, 0.95), rgba(30, 18, 8, 0.95)); }
+.tcard.sp.ultra { border-color: #ffe680; box-shadow: 0 0 10px rgba(255, 220, 110, 0.6); background: linear-gradient(180deg, rgba(110, 60, 140, 0.95), rgba(40, 18, 52, 0.95)); }
 .tcard.locked { opacity: 0.45; }
 .tcard.open:not(.ready) { opacity: 0.8; }
 .tcard.max { border-color: var(--gold); box-shadow: 0 0 8px rgba(224, 184, 96, 0.3); }

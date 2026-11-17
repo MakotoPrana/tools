@@ -120,14 +120,14 @@ export function nestAttack(n, dt, dp) {
   const toP = Math.atan2(P.y - n.y, P.x - n.x);
   if (at.type === 'ring') {
     n.atkT = at.cd;
-    ring(n.x, n.y, at.n, at.speed, dmg, n.lv, Math.random(), '#f0e6c8');
+    ring(n.x, n.y, at.n + (D.moves ? 4 : 0), at.speed, dmg, n.lv, Math.random(), '#f0e6c8');
   } else if (at.type === 'aim') {
     if (!lineClear(n.x, n.y, P.x, P.y)) {
       n.atkT = 0.5;
       return;
     }
     n.atkT = at.cd;
-    for (let i = 0; i < at.n; i++) setTimeLater(i * 0.18, () => !n.dead && enemyShot(n.x, n.y, Math.atan2(P.y - n.y, P.x - n.x), at.speed, dmg, n.lv, '#ffd84a', 3.5));
+    for (let i = 0; i < at.n + (D.moves ? 2 : 0); i++) setTimeLater(i * 0.18, () => !n.dead && enemyShot(n.x, n.y, Math.atan2(P.y - n.y, P.x - n.x), at.speed, dmg, n.lv, '#ffd84a', 3.5));
   } else if (at.type === 'poison') {
     n.atkT = at.cd;
     // 主人公のまわりと、魔巣と主人公の間に毒の沼をまく

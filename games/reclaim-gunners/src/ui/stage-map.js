@@ -43,7 +43,7 @@ function openStageMap(mode, def) {
       const boss = def.lairs.filter((l) => {
         const ai = map.areaOf[l.y * map.w + l.x];
         return def.areas[ai] === a && BOSSES[l.boss].impl;
-      }).map((l) => `${BOSSES[l.boss].name}${prog.bosses.includes(l.boss) ? tr('（撃破）') : ''}`);
+      }).map((l) => (l.dun ? `${l.def.name}${prog.dungeons.includes(l.dun) ? tr('（撃破）') : ''}` : `${BOSSES[l.boss].name}${prog.bosses.includes(l.boss) ? tr('（撃破）') : ''}`));
       const shop = def.features.some((f) => f.shop && map.areaOf[f.door[1] * map.w + f.door[0]] === def.areas.indexOf(a));
       const btn = mode === 'view' ? '' : mode === 'select'
         ? `<button class="btn primary" data-act="startAt" data-id="${a.id}" ${canStart(a) ? '' : 'disabled'}>${canStart(a) ? (prog.travel.length ? tr('ここへ転移') : tr('ここから始める')) : tr('未解放（歩いて向かう）')}</button>`

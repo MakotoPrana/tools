@@ -1,6 +1,6 @@
 // タイトル・主人公選択・難易度
 import { CATS, DIFFS, DIFF_IDS, HEROES, money, tr } from '../core/config.js';
-import { allStagesOpen, newProgress, save, saveOk, setGoldAtSave } from '../core/save.js';
+import { allStagesOpen, getRecord, save, saveOk, setGoldAtSave, slotProgress } from '../core/save.js';
 import { D, diffId, hero, heroDef, prog, setD, setDiffId, setHero, setHeroDef, setProg } from '../game/hero.js';
 import { G, setG } from '../game/stage.js';
 import { clearEff } from '../game/weapon-mods.js';
@@ -90,8 +90,8 @@ actions.heroOk = () => {
 // テスト版で「全ステージに行ける」を ON にしていれば、難易度もすべて選べる
 export function diffOpen(id) {
   if (id === 'normal' || allStagesOpen()) return true;
-  if (id === 'hard') return !!(hero.progress.normal && hero.progress.normal.cleared);
-  return !!(hero.progress.hard && hero.progress.hard.cleared);
+  const p = slotProgress(heroDef.id, id === 'hard' ? 'normal' : 'hard');
+  return !!(p && p.cleared);
 }
 export function showDifficulty() {
   uiShow(() => `
@@ -101,11 +101,11 @@ export function showDifficulty() {
         ${DIFF_IDS.map((id) => {
           const d = DIFFS[id];
           const open = diffOpen(id);
-          const p = hero.progress[id];
+          const p = slotProgress(heroDef.id, id);
           const cond = id === 'hard' ? tr('ノーマルで魔王を倒すと開く') : id === 'extreme' ? tr('ハードで魔王を倒すと開く') : '';
           return `<button class="diff" data-act="pickDiff" data-id="${id}" ${open ? '' : 'disabled'}>
             <b style="color:${d.color}">${open ? '' : '🔒 '}${d.name}</b>
-            <span class="muted">${open ? `${tr('敵 Lv +{lv} ・ 湧く量 ×{cap}', { lv: d.lv, cap: d.cap })}${p ? ` ・ ${tr('解放 {n}', { n: p.areas.length })}` : ''}` : cond}</span>
+            <span class="muted">${open ? `${tr('敵 Lv +{lv} ・ 湧く量 ×{cap}', { lv: d.lv, cap: d.cap })}${d.moves ? ` ・ ${tr('敵の動きが一部変化')}` : ''}${p ? ` ・ ${tr('解放 {n}', { n: p.areas.length })}` : ''}` : cond}</span>
           </button>`;
         }).join('')}
       </div>
@@ -114,7 +114,9 @@ export function showDifficulty() {
 actions.pickDiff = (d) => {
   setDiffId(d.id);
   setD(DIFFS[diffId]);
-  if (!hero.progress[diffId]) hero.progress[diffId] = newProgress();
+  // 記録は 主人公 × 難易度 ごとに別 (お金・能力ボード・武器もふくめて、はじめから)
+  setHero(getRecord(heroDef.id, diffId));
+  clearEff();
   setProg(hero.progress[diffId]);
   setGoldAtSave(hero.gold);
   showWorld();

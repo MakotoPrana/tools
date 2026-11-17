@@ -24,9 +24,9 @@ export const tr = RG.t;
 
 // 難易度 (SPEC.md の「難易度」)
 export const DIFFS = {
-  normal: { name: 'ノーマル', lv: 0, cap: 1, interval: 1, elite: 0.05, reward: 1, mat: 1, color: '#6fd0ff' },
-  hard: { name: 'ハード', lv: 20, cap: 1.5, interval: 0.8, elite: 0.1, reward: 1.3, mat: 1.2, color: '#ffb84a' },
-  extreme: { name: 'エクストリーム', lv: 40, cap: 2, interval: 0.65, elite: 0.2, reward: 1.7, mat: 1.5, color: '#ff5a6a' },
+  normal: { name: 'ノーマル', lv: 0, cap: 1, interval: 1, elite: 0.05, reward: 1, mat: 1, moves: 0, color: '#6fd0ff' },
+  hard: { name: 'ハード', lv: 20, cap: 1.5, interval: 0.8, elite: 0.1, reward: 1.3, mat: 1.2, moves: 1, color: '#ffb84a' },
+  extreme: { name: 'エクストリーム', lv: 40, cap: 2, interval: 0.65, elite: 0.2, reward: 1.7, mat: 1.5, moves: 2, color: '#ff5a6a' },
 };
 export const DIFF_IDS = ['normal', 'hard', 'extreme'];
 RG.i18nExtra.push(DIFFS);

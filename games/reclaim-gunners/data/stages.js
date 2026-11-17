@@ -737,6 +737,17 @@ RG.STAGE_SCALE = 1.4;
     const v0 = p(v);
     return [v0, size === 1 ? 1 : Math.max(1, p(v + size) - v0)];
   };
+  // 魔巣を増やす: 広げたぶん、各エリアに元の 1.3 倍を足す (種類は、そのエリアにある魔巣から。大魔巣は足さない)
+  //   位置は、そのエリアの形 (layout) の中からほぼ決める。ほんとうの置き場所は mapgen が、すき間をあけて決める
+  const rngOf = (seed) => {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
   for (const st of RG.STAGES) {
     const w0 = st.w;
     const h0 = st.h;
@@ -761,10 +772,20 @@ RG.STAGE_SCALE = 1.4;
       f.rect = [x1, y1, rw, rh];
       if (f.door) f.door = [f.door[0] + x1 - x, f.door[1] + y1 - y];
     }
+    const rng = rngOf(st.seed * 31 + 5);
     for (const ar of st.areas) {
       for (const n of ar.nests) {
         n.x = p(n.x);
         n.y = p(n.y);
+      }
+      const cells = [];
+      st.layout.rows.forEach((row, r) => [...row].forEach((ch, c) => { if (st.layout.key[ch] === ar.id) cells.push([c, r]); }));
+      const types = [...new Set(ar.nests.map((n) => n.type))];
+      const pool = types.filter((t) => t !== 'big').length ? types.filter((t) => t !== 'big') : types;
+      const extra = ar.nests.length ? Math.ceil(ar.nests.length * 1.3) : 0;
+      for (let k = 0; k < extra && cells.length; k++) {
+        const [c, r] = cells[Math.floor(rng() * cells.length)];
+        ar.nests.push({ x: Math.round((c + rng()) * st.layout.scale), y: Math.round((r + rng()) * st.layout.scale), type: pool[Math.floor(rng() * pool.length)] });
       }
       ar.stone = ar.stone.map(p);
       if (ar.mimics) ar.mimics = ar.mimics.map((m) => m.map(p));
