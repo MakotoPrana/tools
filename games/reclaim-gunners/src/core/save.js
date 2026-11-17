@@ -14,14 +14,13 @@ export const newHero = () => ({
   slots: 0, // 開けた武器スロットの数 (最初の 2 つに足す数)
   weapons: { A1: 0 }, // 持っている武器
   mods: {}, // 武器の改造 { 武器の id: { 改造の id: Lv } }
-  grid: [], // 能力ボード (スフィア盤) で解放したノードの id
+  grid: [], // (前の版の能力ボードの記録。いまは使わない)
   sp: {}, // 必殺技 { 武器の id: { lv: [Lv, Lv, Lv] (-1 は未習得), set: セットしている番号 } }
   spGauge: 0, // 必殺技ゲージ (0〜100)
   equipped: ['A1', null],
   specials: [],
   materials: {},
   potions: 3,
-  gridVer: 0, // 能力ボードの版
   progress: { normal: newProgress(), hard: null, extreme: null },
   lastTravel: null,
   kills: 0,
@@ -40,16 +39,6 @@ function fixHero(hh, raw) {
     hh.gold += hh.exp;
     delete hh.exp;
   }
-  // 前の版の能力ボード (一覧の形 → 6 本の腕のスフィア盤 → 300 ノードの盤) で上げたランクは、使ったお金を返して、新しい盤ではじめからやり直す
-  if (!raw || !raw.grid || raw.gridVer !== RG.GRID.ver) {
-    for (const b of RG.BOARD) {
-      const r = hh.board[b.id] || 0;
-      for (let k = 1; k <= r; k++) hh.gold += Math.ceil(b.base * Math.pow(k, 1.5));
-    }
-    hh.board = {};
-    hh.grid = [];
-  }
-  hh.gridVer = RG.GRID.ver;
   while (hh.equipped.length < 2 + hh.slots) hh.equipped.push(null);
   // 前の版の「+強化値」は、改造の「威力」に移す
   for (const id in hh.weapons) {

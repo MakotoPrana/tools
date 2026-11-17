@@ -13,6 +13,8 @@ export const rank = (id) => hero.board[id] || 0;
 export const boardMax = (b) => (b.maxBy && b.maxBy[heroDef.id]) || b.max;
 export const boardCost = (b, next) => Math.ceil(b.base * Math.pow(next, 1.5));
 export const rankSum = () => Object.values(hero.board).reduce((a, b) => a + b, 0);
+// 防御: 受けるダメージの倍率 (上限なし。ランク 30 で約 0.53 倍)
+export const defMul = () => 1 / (1 + 0.03 * rank('def'));
 export const maxHp = () => heroDef.hp + rank('hp') * (heroDef.id === 'gald' ? 12 : 8);
 export const moveSpeed = () => ((120 * heroDef.speed) / 100) * (1 + 0.015 * rank('spd'));
 export const maxPotions = () => 3 + rank('pot');

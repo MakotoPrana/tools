@@ -1,6 +1,6 @@
 // 武器の強化 (スキルツリー) の画面
 import { sfx } from '../audio/sound.js';
-import { SHOPS, WEAPON, money, tr } from '../core/config.js';
+import { SHOPS, WEAPON, money, portrait, tr } from '../core/config.js';
 import { hero } from '../game/hero.js';
 import { spDesc, spLv, spOwned, spState, spUnlockCost, spUpCost } from '../game/specials.js';
 import { clearEff, modCost, modLv, modReqOk, modShow, modTotal } from '../game/weapon-mods.js';
@@ -27,9 +27,25 @@ export function showMods(id, shopId) {
     if (!selKey) selKey = `m:${mods[0].id}`;
     const ctx = { id, w, shop, cap, byId };
     // 枝: 基礎の改造 (とそこから派生する改造) と、必殺技の 3 つのつながり
+    ctx.vert = portrait || window.innerWidth < 600;
     const modBranch = (m) => branch(`m:${m.id}`, mods.filter((x) => x.req && x.req[0] === m.id).map(modBranch), ctx);
-    const spBranch = (i) => branch(`sp:${i}`, i < 3 ? [spBranch(i + 1)] : [], ctx);
-    const kids = [...mods.filter((m) => !m.req).map(modBranch), spBranch(0)];
+    // 必殺技 4 つは、横につなげず縦に並べる (ツリーの幅をせまくして、大きく表示できるように)
+    const spBranch = (i) => branch(`sp:${i}`, [], ctx);
+    const kids = [...mods.filter((m) => !m.req).map(modBranch), spBranch(0), spBranch(1), spBranch(2), spBranch(3)];
+    // スマホの縦持ちなど せまい画面は、縦に積むツリー (大きな行・枝は字下げと線でつなぐ)。広い画面は横に広がるツリー
+    const vert = portrait || window.innerWidth < 600;
+    if (vert) {
+      const rootV = `<div class="vtree"><div class="tcard troot vroot">
+        <img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30">
+        <div class="tname">${w.name}</div><div class="tlv gold">★${modTotal(id)}</div></div>
+      <div class="vkids">${kids.join('')}</div></div>`;
+      return `
+    <div class="overlay"><div class="panel tpanel">
+      ${head(`${tr('強化')} ・ ${w.name}`, `<span class="gold">${money(hero.gold)}</span>`)}
+      <div class="stree vert">${rootV}</div>
+      ${detail(selKey, ctx)}
+    </div></div>`;
+    }
     const root = `<div class="tn open"><div class="tcard troot">
         <img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30">
         <div class="tname">${w.name}</div><div class="tlv gold">★${modTotal(id)}</div></div>
@@ -82,6 +98,16 @@ function branch(key, kids, ctx) {
   const state = n.lv >= n.max ? 'max' : learned ? 'own' : n.reqOk ? 'open' : 'locked';
   const pips = learned ? `<div class="tpips">${Array.from({ length: n.max }, (_, k) => `<i class="${k < n.lv ? 'on' : ''}"></i>`).join('')}</div>` : '';
   const lvText = n.kind === 'sp' && !n.own ? (n.reqOk ? tr('未習得') : '🔒') : n.reqOk ? `Lv${n.lv}/${n.max}` : '🔒';
+  if (ctx.vert) {
+    return `<div class="vn ${n.reqOk ? 'open' : ''}">
+    <button class="tcard ${n.kind} ${n.sp && n.sp.ultra ? 'ultra' : ''} ${state} ${n.ready ? 'ready' : ''} ${selKey === key ? 'sel' : ''}" data-act="selNode" data-id="${key}">
+      <div class="tname">${n.kind === 'sp' ? '✦ ' : ''}${n.name}${n.req ? ` <span class="vreq">${n.req}</span>` : ''}</div>
+      <div class="tlv">${lvText}${n.set ? ` <span class="tset">${tr('セット中')}</span>` : ''}</div>
+      ${pips}
+    </button>
+    ${kids.length ? `<div class="vkids">${kids.join('')}</div>` : ''}
+  </div>`;
+  }
   return `<div class="tn ${n.reqOk ? 'open' : ''}">
     ${n.req ? `<span class="treq">${n.req}</span>` : ''}
     <button class="tcard ${n.kind} ${n.sp && n.sp.ultra ? 'ultra' : ''} ${state} ${n.ready ? 'ready' : ''} ${selKey === key ? 'sel' : ''}" data-act="selNode" data-id="${key}">
@@ -133,16 +159,18 @@ function detail(key, ctx) {
   </div>`;
 }
 
-// ツリーを枠に収まる大きさにして、まん中に置く (大きい画面では少しだけ大きくする)
+// ツリーを、枠の幅いっぱいまで大きくする (最大 1.7 倍)。縦が枠に入りきらないときは、縦にスクロールする
 function fitTree() {
   const box = document.querySelector('.stree');
   const root = box && box.firstElementChild;
-  if (!root) return;
+  if (!root || box.classList.contains('vert')) return;
   root.style.transform = '';
-  const s = Math.min(1.2, box.clientWidth / root.offsetWidth, box.clientHeight / root.offsetHeight);
-  const x = (box.clientWidth - root.offsetWidth * s) / 2;
-  const y = (box.clientHeight - root.offsetHeight * s) / 2;
-  root.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+  root.style.margin = '0';
+  const s = Math.min(1.7, (box.clientWidth - 8) / root.offsetWidth);
+  const x = Math.max(0, (box.clientWidth - root.offsetWidth * s) / 2);
+  const y = Math.max(0, (box.clientHeight - root.offsetHeight * s) / 2);
+  root.style.transform = `scale(${s})`;
+  root.style.margin = `${y}px 0 ${root.offsetHeight * (s - 1)}px ${x}px`;
 }
 window.addEventListener('resize', () => requestAnimationFrame(fitTree));
 

@@ -869,6 +869,8 @@ window.RG = window.RG || {};
     [`天の裁き・聖域`, `Heaven's Judgment: Sanctuary`, `天之裁决・圣域`, `하늘의 심판・성역`],
     [`暴食の宴`, `Feast of Gluttony`, `暴食之宴`, `폭식의 연회`],
     [`星喰い・終焉`, `Starcaster: Finality`, `噬星・终焉`, `별 먹기・종언`],
+    [`上限なし`, `No limit`, `无上限`, `상한 없음`],
+    [`攻撃力・防御は上限なし`, `Attack and Defense have no limit`, `攻击力和防御无上限`, `공격력과 방어는 상한 없음`],
     [`プレイルーム`, `Play Room`, `游戏室`, `플레이룸`],
     [`プレイルーム（テスト版）`, `Play Room (Test)`, `游戏室（测试版）`, `플레이룸(테스트판)`],
     [`相手を選ぶと、広場で戦える。ここで手に入れたお金や素材は、部屋を出ると元に戻る`, `Pick an opponent to fight in the arena. Gold and materials earned here are reverted when you leave.`, `选择对手即可在广场战斗。在此获得的金钱和素材会在离开后还原`, `상대를 고르면 광장에서 싸울 수 있다. 여기서 얻은 돈과 소재는 방을 나가면 원래대로 돌아간다`],

@@ -142,7 +142,7 @@ export function updateBosses(dt) {
 //   ためている間は赤く、最後の 0.15 秒は白く光る (この少し前に回避するとジャスト回避)。ハード以上は、すぐ 2 発目をつなげる
 export const SMASH = { swingArc: 1.0, swingR: 80, slamR: 62 };
 function updateSmash(b, dt) {
-  const s = b.smash || (b.smash = { mode: 'idle', cd: rnd(2.5, 4) });
+  const s = b.smash || (b.smash = { mode: 'idle', cd: rnd(2, 3) });
   const m = b.parts.find((p) => !p.clone && !p.dead && !p.hidden && !(p.h > 6));
   if (!m) {
     s.mode = 'idle';
@@ -154,7 +154,7 @@ function updateSmash(b, dt) {
   const dp = dist(m.x, m.y, P.x, P.y);
   if (s.mode === 'idle') {
     s.cd -= dt;
-    if (s.cd <= 0 && !G.dead && dp < m.r + 150) startSmash(s, m.x, m.y);
+    if (s.cd <= 0 && !G.dead && dp < m.r + 230) startSmash(s, m.x, m.y);
   } else if (s.mode === 'wind') {
     s.mt -= dt;
     if (s.mt > 0.25 && s.kind === 'swing') s.a += clamp(angNorm(Math.atan2(P.y - m.y, P.x - m.x) - s.a), -3 * dt, 3 * dt);
@@ -183,7 +183,7 @@ function updateSmash(b, dt) {
     s.mt -= dt;
     if (s.mt <= 0) {
       s.mode = 'idle';
-      s.cd = rnd(4, 6.5);
+      s.cd = rnd(3.5, 5.5);
     }
   }
   s.hitT = Math.max(0, (s.hitT || 0) - dt);
