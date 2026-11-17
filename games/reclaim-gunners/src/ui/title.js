@@ -1,13 +1,13 @@
 // タイトル・主人公選択・難易度
 import { CATS, DIFFS, DIFF_IDS, HEROES, money, tr } from '../core/config.js';
-import { allStagesOpen, getRecord, save, saveOk, setGoldAtSave, slotProgress } from '../core/save.js';
+import { allStagesOpen, getRecord, newProgress, save, saveOk, setGoldAtSave, slotProgress } from '../core/save.js';
 import { D, diffId, hero, heroDef, prog, setD, setDiffId, setHero, setHeroDef, setProg } from '../game/hero.js';
 import { G, setG } from '../game/stage.js';
 import { clearEff } from '../game/weapon-mods.js';
 import { drawHeroSprite } from '../render/player.js';
 import { actions, uiEl } from './actions.js';
 import { head, rerender, screen, setScreen, ui, uiShow } from './core.js';
-import { langBtns, showSettings } from './settings.js';
+import { showSettings } from './settings.js';
 import { showWorld } from './world-map.js';
 
 // ---------- タイトル ----------
@@ -25,7 +25,6 @@ export function showTitle() {
         <button class="btn primary" data-act="start">${tr('はじめる')}</button>
         <button class="btn" data-act="settings">${tr('設定')}</button>
       </div>
-      ${langBtns()}
       <p class="muted" style="margin-top:10px;font-size:0.82em">${HEROES.map((h) => {
         const hh = save.heroes[h.id];
         const n = hh.progress.normal ? hh.progress.normal.areas.length : 0;
@@ -114,8 +113,9 @@ export function showDifficulty() {
 actions.pickDiff = (d) => {
   setDiffId(d.id);
   setD(DIFFS[diffId]);
-  // 記録は 主人公 × 難易度 ごとに別 (お金・能力ボード・武器もふくめて、はじめから)
-  setHero(getRecord(heroDef.id, diffId));
+  // 成長 (お金・能力ボード・武器など) はどの難易度でも引きつぐ。進み具合 (エリア・ボス) だけ難易度ごとに別
+  setHero(getRecord(heroDef.id));
+  if (!hero.progress[diffId]) hero.progress[diffId] = newProgress();
   clearEff();
   setProg(hero.progress[diffId]);
   setGoldAtSave(hero.gold);

@@ -7,7 +7,7 @@ import { damageTarget, explode, forAllTargets, forTargets } from './damage.js';
 import { addPart, addText } from './fx.js';
 import { hero, rank } from './hero.js';
 import { G, P } from './stage.js';
-import { effW } from './weapon-mods.js';
+import { effW, lvCostMul } from './weapon-mods.js';
 import { segDist } from './weapons.js';
 
 export const SP_FULL = 100;
@@ -34,7 +34,7 @@ export function spParams(id, i) {
     p.parts = sp.parts.map((pt) => ({ ...pt, dmg: power0 * (pt.mul || 0) * (1 + 0.1 * lv) }));
     return p;
   }
-  if (sp.grow) p[sp.grow[0]] = sp[sp.grow[0]] + sp.grow[1] * Math.floor(lv / 5);
+  if (sp.grow) p[sp.grow[0]] = sp[sp.grow[0]] + sp.grow[1] * Math.min(2, Math.floor(lv / 5)); // 発数・半径などは Lv5 と Lv10 で増える (威力だけ上限なし)
   const w = effW(id);
   const power = w.dmg * (w.pellets || 1) * w.rate;
   p.dmg = power * (sp.mul || 0) * (1 + 0.1 * lv);
@@ -67,7 +67,7 @@ export function spUnlockCost(id, i) {
   const u = RG.SP_UNLOCK[i];
   return { gold: Math.max(u.min, Math.ceil((spBase(id) * u.mul) / 10) * 10), hearts: u.hearts, req: u.req, mat: u.mat ? RG.ULTRA_MAT[id] : null };
 }
-export const spUpCost = (id, i, lv) => Math.ceil((spBase(id) * 0.2 * [1, 1.5, 2.2, 3.2][i] * Math.pow(1.28, lv)) / 10) * 10;
+export const spUpCost = (id, i, lv) => Math.ceil((spBase(id) * 0.2 * [1, 1.5, 2.2, 3.2][i] * lvCostMul(lv)) / 10) * 10;
 
 // ---------- ゲージ ----------
 export function addGauge(n) {

@@ -53,8 +53,10 @@ function fixHero(hh, raw) {
   return hh;
 }
 
-// 記録は 主人公 × 難易度 ごとに別 (お金・能力ボード・武器・必殺技・素材・進み具合のすべて)
-//   ノーマルの記録は save.heroes[主人公]、ハード・エクストリームは save.slots['主人公:難易度']
+// 記録は 主人公ごとに 1 つ。成長 (お金・能力ボード・武器・改造・必殺技・素材) は、どの難易度でも引きつぐ。
+//   進み具合 (エリア・ボス・転移碑・ダンジョン) だけ、難易度ごとに別 (progress.normal / hard / extreme)
+//   一時期あった「主人公 × 難易度 ごとの別記録」(save.slots) は、ここで 1 つにまとめる
+const growthScore = (h) => h.gold / 1000 + Object.values(h.board || {}).reduce((a, b) => a + b, 0) + Object.values(h.mods || {}).reduce((a, m) => a + Object.values(m).reduce((x, y) => x + y, 0), 0) + Object.keys(h.weapons || {}).length * 5 + (h.kills || 0) / 100;
 export function loadSave() {
   let s = null;
   try {
@@ -63,42 +65,35 @@ export function loadSave() {
     s = null;
   }
   if (!s || s.version !== 1 || typeof s.heroes !== 'object') s = { version: 1, heroes: {} };
-  s.slots = s.slots || {};
+  const slots = s.slots || {};
+  delete s.slots;
   for (const h of HEROES) {
     const raw = s.heroes[h.id];
-    const hh = fixHero(Object.assign(newHero(), raw || {}), raw);
-    // 前の版では、ハード・エクストリームも同じ記録の中にあった。持ち物ごと写して、別の記録にする
+    let hh = fixHero(Object.assign(newHero(), raw || {}), raw);
+    // 別記録があれば、いちばん成長している記録を土台にして、難易度ごとの進み具合を集める
+    const prog = { normal: hh.progress.normal, hard: hh.progress.hard, extreme: hh.progress.extreme };
     for (const d of ['hard', 'extreme']) {
-      const k = `${h.id}:${d}`;
-      if (hh.progress[d] && !s.slots[k]) {
-        const c = JSON.parse(JSON.stringify(hh));
-        c.progress = { normal: null, hard: null, extreme: null, [d]: hh.progress[d] };
-        s.slots[k] = c;
-      }
-      hh.progress[d] = null;
+      const r = slots[`${h.id}:${d}`];
+      if (!r) continue;
+      const fx = fixHero(Object.assign(newHero(), r), r);
+      if (fx.progress[d]) prog[d] = fx.progress[d];
+      if (growthScore(fx) > growthScore(hh)) hh = fx;
     }
+    hh.progress = prog;
     if (!hh.progress.normal) hh.progress.normal = newProgress();
     s.heroes[h.id] = hh;
   }
-  for (const k of Object.keys(s.slots)) s.slots[k] = fixHero(Object.assign(newHero(), s.slots[k]), s.slots[k]);
   return s;
 }
 
 // 難易度ごとの進み具合 (まだなければ null)
 export function slotProgress(heroId, diff) {
-  const r = diff === 'normal' ? save.heroes[heroId] : save.slots[`${heroId}:${diff}`];
+  const r = save.heroes[heroId];
   return (r && r.progress[diff]) || null;
 }
-// 主人公 × 難易度 の記録 (なければ新しく作る)
-export function getRecord(heroId, diff) {
-  if (diff === 'normal') return save.heroes[heroId];
-  const k = `${heroId}:${diff}`;
-  if (!save.slots[k]) {
-    const r = fixHero(newHero(), null);
-    r.progress[diff] = newProgress();
-    save.slots[k] = r;
-  }
-  return save.slots[k];
+// 主人公の記録 (難易度によらず 1 つ)
+export function getRecord(heroId) {
+  return save.heroes[heroId];
 }
 
 export let save = loadSave();

@@ -5,6 +5,8 @@ import { touchEl, touchMode } from '../input/input.js';
 import { layout } from '../render/screen.js';
 import { actions, uiEl } from './actions.js';
 
+// スクロールする入れ物 (描き直しのとき、位置を覚えておく)
+const SCROLLERS = ['.panel', '.list', '.stree', '.stage-map', '.cards'];
 export let screen = 'title';
 export const ui = { open: false, stack: [] };
 
@@ -18,11 +20,20 @@ export function uiShow(fn, push = true) {
 export function renderUi() {
   const fn = ui.stack[ui.stack.length - 1];
   if (!fn) return;
-  const scrollEl = uiEl.querySelector('.panel');
-  const sc = scrollEl ? scrollEl.scrollTop : 0;
+  // 描き直しても、スクロールの位置は保つ (お店で強化するたびに、一覧の先頭に戻らないように)
+  const sc = SCROLLERS.map((sel) => Array.from(uiEl.querySelectorAll(sel)).map((el) => [el.scrollLeft, el.scrollTop]));
   uiEl.innerHTML = fn();
-  const p = uiEl.querySelector('.panel');
-  if (p && fn.keepScroll) p.scrollTop = sc;
+  if (fn.keepScroll) {
+    SCROLLERS.forEach((sel, i) => {
+      Array.from(uiEl.querySelectorAll(sel)).forEach((el, k) => {
+        const v = sc[i][k];
+        if (v) {
+          el.scrollLeft = v[0];
+          el.scrollTop = v[1];
+        }
+      });
+    });
+  }
   fn.keepScroll = false;
   if (fn.after) fn.after();
   updateChrome();

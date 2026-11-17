@@ -72,8 +72,9 @@ function nodeInfo(key, ctx) {
     const lv = modLv(id, m.id);
     const reqOk = modReqOk(id, m);
     const cost = modCost(w, m, lv);
-    const ready = !!shop && reqOk && lv < RG.MOD_MAX && lv < cap && hero.gold >= cost;
-    return { m, lv, max: RG.MOD_MAX, reqOk, cost, ready, name: m.name, kind: m.req ? 'uniq' : 'base', req: m.req ? `Lv${m.req[1]}` : '' };
+    const mx = RG.modMax(m);
+    const ready = !!shop && reqOk && lv < mx && (mx === Infinity || lv < cap) && hero.gold >= cost;
+    return { m, lv, max: mx, reqOk, cost, ready, name: m.name, kind: m.req ? 'uniq' : 'base', req: m.req ? `Lv${m.req[1]}` : '' };
   }
   const i = +k;
   const sp = RG.SPECIALS[id][i];
@@ -81,7 +82,7 @@ function nodeInfo(key, ctx) {
   const lv = spLv(id, i);
   if (own) {
     const cost = spUpCost(id, i, lv);
-    const ready = !!shop && lv < RG.SP_MAX && lv < cap && hero.gold >= cost;
+    const ready = !!shop && hero.gold >= cost;
     return { sp, i, own, lv, max: RG.SP_MAX, reqOk: true, cost, ready, name: sp.name, kind: 'sp', set: spState(id).set === i, req: i ? `Lv${RG.SP_UNLOCK[i].req}` : '' };
   }
   const c = spUnlockCost(id, i);
@@ -92,12 +93,15 @@ function nodeInfo(key, ctx) {
   return { sp, i, own, lv: 0, max: RG.SP_MAX, reqOk, unlock: c, hearts, hasMat, ready, name: sp.name, kind: 'sp', req: `Lv${c.req}` };
 }
 
+// Lv の表示 (上限なしのときは Lv だけ)
+const lvOf = (n) => (n.max === Infinity ? `Lv${n.lv}` : `Lv${n.lv}/${n.max}`);
+
 function branch(key, kids, ctx) {
   const n = nodeInfo(key, ctx);
   const learned = n.kind === 'sp' ? n.own : n.lv > 0;
   const state = n.lv >= n.max ? 'max' : learned ? 'own' : n.reqOk ? 'open' : 'locked';
-  const pips = learned ? `<div class="tpips">${Array.from({ length: n.max }, (_, k) => `<i class="${k < n.lv ? 'on' : ''}"></i>`).join('')}</div>` : '';
-  const lvText = n.kind === 'sp' && !n.own ? (n.reqOk ? tr('未習得') : '🔒') : n.reqOk ? `Lv${n.lv}/${n.max}` : '🔒';
+  const pips = learned && n.max !== Infinity ? `<div class="tpips">${Array.from({ length: n.max }, (_, k) => `<i class="${k < n.lv ? 'on' : ''}"></i>`).join('')}</div>` : '';
+  const lvText = n.kind === 'sp' && !n.own ? (n.reqOk ? tr('未習得') : '🔒') : n.reqOk ? lvOf(n) : '🔒';
   if (ctx.vert) {
     return `<div class="vn ${n.reqOk ? 'open' : ''}">
     <button class="tcard ${n.kind} ${n.sp && n.sp.ultra ? 'ultra' : ''} ${state} ${n.ready ? 'ready' : ''} ${selKey === key ? 'sel' : ''}" data-act="selNode" data-id="${key}">
@@ -123,7 +127,7 @@ function branch(key, kids, ctx) {
 function detail(key, ctx) {
   const { id, shop, cap, byId } = ctx;
   const n = nodeInfo(key, ctx);
-  const capped = shop && n.lv >= cap && n.lv < n.max;
+  const capped = shop && n.max !== Infinity && n.lv >= cap && n.lv < n.max;
   const big = (act, data, label, ok, primary = true) => `<button class="btn tbig ${ok && primary ? 'primary' : ''}" data-act="${act}" ${data} ${ok ? '' : 'disabled'}>${label}</button>`;
   let line = '';
   let note = '';
@@ -151,7 +155,7 @@ function detail(key, ctx) {
   if (!shop && !note) note = tr('強化は武器屋で行う');
   return `<div class="tdetail">
     <div class="tinfo">
-      <div class="t">${n.kind === 'sp' ? '✦ ' : ''}${n.name} <span class="muted">${n.kind === 'sp' && !n.own ? tr('未習得') : `Lv${n.lv}/${n.max}`}</span></div>
+      <div class="t">${n.kind === 'sp' ? '✦ ' : ''}${n.name} <span class="muted">${n.kind === 'sp' && !n.own ? tr('未習得') : lvOf(n)}</span></div>
       <div class="s">${line}</div>
       ${note ? `<div class="s muted">${note}</div>` : ''}
     </div>
@@ -197,7 +201,7 @@ actions.spUp = (d) => {
   const cap = shop.phases[shopPhase(shop) - 1].max;
   const lv = spLv(id, i);
   const cost = spUpCost(id, i, lv);
-  if (lv >= RG.SP_MAX || lv >= cap || hero.gold < cost) return;
+  if (hero.gold < cost) return;
   hero.gold -= cost;
   spState(id).lv[i] = lv + 1;
   sfx('buy');
@@ -226,7 +230,8 @@ actions.modUp = (d) => {
   const cap = shop.phases[shopPhase(shop) - 1].max;
   const lv = modLv(id, m.id);
   const cost = modCost(w, m, lv);
-  if (lv >= RG.MOD_MAX || lv >= cap || !modReqOk(id, m) || hero.gold < cost) return;
+  const mx = RG.modMax(m);
+  if (lv >= mx || (mx !== Infinity && lv >= cap) || !modReqOk(id, m) || hero.gold < cost) return;
   hero.gold -= cost;
   hero.mods[id] = hero.mods[id] || {};
   hero.mods[id][m.id] = lv + 1;

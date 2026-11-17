@@ -49,7 +49,7 @@ export function showShop(shopId) {
     } else if (shopTab === 'up') {
       const owned = WEAPONS.filter((w) => hero.weapons[w.id] != null && canEquip(w));
       body = owned.map((w) => `<div class="row erow"><img class="wicon" src="${RG.weaponIcon(w.id)}" alt="" width="60" height="30">
-          <div class="einfo"><div class="t"><span style="color:${CAT_COLORS[w.cat]}">${w.name}</span> <span class="gold">★${modTotal(w.id)}</span><span class="muted">/${RG.modsOf(w).length * RG.MOD_MAX}</span></div>
+          <div class="einfo"><div class="t"><span style="color:${CAT_COLORS[w.cat]}">${w.name}</span> <span class="gold">★${modTotal(w.id)}</span></div>
           <div class="s">${weaponStats(effW(w.id))}</div></div>
           <div class="ebtns"><button class="btn small primary" data-act="openMods" data-id="${w.id}">${tr('強化')}</button></div>
         </div>`).join('') || `<p class="muted">${tr('改造できる武器がない')}</p>`;
@@ -79,6 +79,8 @@ export function showShop(shopId) {
 actions.shopTab = (d) => {
   shopTab = d.id;
   rerender();
+  const l = document.querySelector('.list'); // タブを切りかえたときは、先頭から
+  if (l) l.scrollTop = 0;
 };
 actions.buyW = (d) => {
   const w = WEAPON[d.id];

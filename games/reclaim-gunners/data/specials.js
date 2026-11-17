@@ -163,7 +163,7 @@ window.RG = window.RG || {};
     RG.ULTRA_MAT[id] = RG.DUNGEON_MATS[Math.floor((i * RG.DUNGEON_MATS.length) / ORDER.length)];
   });
 
-  RG.SP_MAX = 10; // 必殺技の Lv の上限
+  RG.SP_MAX = Infinity; // 必殺技の Lv の上限 (なし。1 Lv ごとに威力 +10%)
   // 習得の条件と値段: 前の必殺技の Lv・お金 (武器の値段 × mul。下限 min)・悪魔の心臓 (中級悪魔が必ず落とす)
   RG.SP_UNLOCK = [
     null,

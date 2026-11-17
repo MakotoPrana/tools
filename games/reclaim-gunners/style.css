@@ -327,8 +327,13 @@ body.compact .world-panel .region-info .desc { display: none; }
 .region-info .grow { flex: 1; min-width: 12em; }
 
 /* ステージ図 */
+.panel.smap { display: flex; flex-direction: column; }
+.stage-wrap { position: relative; flex: 0 1 auto; min-height: 220px; display: flex; flex-direction: column; }
+.stage-wrap .stage-map { flex: 0 1 auto; min-height: 0; overflow: auto; }
+.mapzoom { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; }
+.mapzoom .btn { min-width: 40px; background: rgba(20, 12, 10, 0.85); }
 .stage-map { position: relative; }
-.stage-map canvas { display: block; width: 100%; height: auto; border-radius: 8px; cursor: pointer; image-rendering: pixelated; }
+.stage-map canvas { display: block; height: auto; max-width: none; border-radius: 8px; cursor: pointer; image-rendering: pixelated; }
 
 /* 一覧 (お店・能力ボード・装備) */
 .list { display: grid; gap: 6px; }

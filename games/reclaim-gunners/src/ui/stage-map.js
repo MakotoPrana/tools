@@ -1,7 +1,7 @@
 // ステージ図と、プレイへの出入り
 import { areaTrack, bossTrack } from '../core/analytics.js';
 import { sfx } from '../audio/sound.js';
-import { BOSSES, TAU, TILE, tr } from '../core/config.js';
+import { BOSSES, TAU, TILE, portrait, tr } from '../core/config.js';
 import { D, diffId, hero, lvColor, powerLv, prog } from '../game/hero.js';
 import { travelTo } from '../game/interact.js';
 import { collectAllMats } from '../game/pickups.js';
@@ -53,18 +53,44 @@ function openStageMap(mode, def) {
     }
     const gateBtns = mode === 'view' ? '' : points.filter((p) => p.id.startsWith('g')).map((p) => `<button class="btn small" data-act="${mode === 'select' ? 'startAt' : 'travel'}" data-id="${p.id}">${tr('{name}へ', { name: p.name })}</button>`).join('');
     return `
-    <div class="overlay"><div class="panel full">
+    <div class="overlay"><div class="panel full smap">
       ${head(`${def.id}. ${def.name}`, mode === 'travel' ? tr('転移先を選ぶ') : mode === 'view' ? tr('マップ') : tr('エリアを選ぶ'))}
-      <div class="stage-map"><canvas id="stage-canvas" width="${Math.round(map.w * Q)}" height="${Math.round(map.h * Q)}"></canvas></div>
+      <div class="stage-wrap">
+        <div class="stage-map"><canvas id="stage-canvas" width="${Math.round(map.w * Q)}" height="${Math.round(map.h * Q)}" style="width:${curZ() ? `${Math.round(map.w * Q * curZ())}px` : '100%'}"></canvas></div>
+        <div class="mapzoom"><button class="btn small" data-act="mapZoom" data-id="out" aria-label="${tr('小さく')}">－</button><button class="btn small" data-act="mapZoom" data-id="in" aria-label="${tr('大きく')}">＋</button></div>
+      </div>
       <div class="region-info">${info}</div>
       ${gateBtns ? `<div class="btn-row">${gateBtns}</div>` : ''}
       ${mode === 'travel' ? `<div class="btn-row"><button class="btn" data-act="toWorld">${tr('全体図へ戻る')}</button></div>` : ''}
     </div></div>`;
   };
-  fn.after = () => drawStageCanvas(def, map, mode);
+  fn.after = () => {
+    drawStageCanvas(def, map, mode);
+    // 開いたとき: いる場所 (なければはじめの転移碑) が見えるように、地図をスクロールする
+    if (!fn.scrolled) {
+      fn.scrolled = true;
+      const box = document.querySelector('.stage-map');
+      const c = document.getElementById('stage-canvas');
+      if (!box || !c) return;
+      const here = G && G.def === def ? [P.x / TILE, P.y / TILE] : (def.areas.find((a) => a.start || a.town) || def.areas[0]).stone;
+      const k = c.clientWidth / map.w;
+      box.scrollLeft = here[0] * k - box.clientWidth / 2;
+      box.scrollTop = here[1] * k - box.clientHeight / 2;
+    }
+  };
   uiShow(fn);
 }
 
+// ステージ図の大きさ (拡大率。0 は幅いっぱい)。スマホの縦持ちは、字が読める大きさ (1 = 元の大きさ) から、横にスクロールして見る
+let mapZ = null; // null: まだ決めていない (開くときに、画面の向きで決める)
+const curZ = () => (mapZ == null ? (portrait ? 1 : 0) : mapZ);
+const ZOOMS = [0, 0.6, 1, 1.5, 2];
+actions.mapZoom = (d) => {
+  let i = ZOOMS.indexOf(curZ());
+  i = Math.max(0, Math.min(ZOOMS.length - 1, i + (d.id === 'in' ? 1 : -1)));
+  mapZ = ZOOMS[i];
+  rerender();
+};
 // ステージ図の 1 タイルの大きさ (px)。ステージを引きのばした分だけ小さくして、絵と文字の大きさは元のまま
 const Q = 8 / RG.STAGE_SCALE;
 

@@ -10,6 +10,8 @@
 window.RG = window.RG || {};
 
 RG.MOD_MAX = 10;
+// 基礎の「威力」の改造は、Lv の上限なし (1 Lv ごとに威力 +5〜6%)
+RG.modMax = (m) => (m.id === 'dmg' ? Infinity : RG.MOD_MAX);
 
 (() => {
 
