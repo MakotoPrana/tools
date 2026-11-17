@@ -15,7 +15,7 @@ export let P = null;
 
 export function stageDef(id) {
   if (id === 'room') return RG.ROOM; // プレイルーム (テスト版)
-  return STAGES.find((s) => s.id === id);
+  return STAGES.find((s) => s.id === id) || RG.DUNGEON[id];
 }
 
 // opt.hp: 門を通ってきたときは、体力をそのまま持ち越す
@@ -89,6 +89,11 @@ export function startStage(stageId, pointId, opt = {}) {
   // ボス
   for (const l of def.lairs) {
     const bd = BOSSES[l.boss];
+    // ダンジョンのボス: 倒していなければ、決闘場にいる (倒したかは prog.dungeons に残る)
+    if (l.dun) {
+      if (!prog.dungeons.includes(l.dun)) G.bosses.push(makeBoss(l.boss, l));
+      continue;
+    }
     if (l.travel) G.stones.push({ id: l.travel, kind: 'gate', lair: l, x: tc(l.x), y: tc(l.y), name: l.name });
     if (!bd.impl || prog.bosses.includes(l.boss)) continue;
     G.bosses.push(makeBoss(l.boss, l));

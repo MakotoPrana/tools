@@ -2,7 +2,7 @@
 import { out, sfx } from '../audio/sound.js';
 import { BOSSES, MATERIALS, MOVE_BLOCK, SHOT_BLOCK, STAGES, T, TILE, lvMul, goldGain, money, tr } from '../core/config.js';
 import { writeSave } from '../core/save.js';
-import { dist, pick, rnd, tc } from '../core/util.js';
+import { angNorm, clamp, dist, pick, rnd, tc } from '../core/util.js';
 import { updateBlob, updateDragon, updateGolem, updateSiren, updateToad } from './boss-ai.js';
 import { clampBody, phoenixEgg, resetBoss2, updateBoss2 } from './boss-ai2.js';
 import { gainGold } from './enemies.js';
@@ -12,12 +12,12 @@ import { D, diffId, hero, heroDef, lvColor, powerLv, prog } from './hero.js';
 import { updateFlow } from './pathfinding.js';
 import { liberate } from './nests.js';
 import { collectAllMats } from './pickups.js';
-import { hurtPlayer } from './player.js';
+import { hurtPlayer, physHit, physPos } from './player.js';
 import { G, P, stageDef } from './stage.js';
 import { toast } from '../ui/toast.js';
 
 export function makeBoss(id, l) {
-  const def = BOSSES[id];
+  const def = l.def || BOSSES[id];
   const lv = Math.min(99, def.lv + D.lv);
   const total = def.hp * lvMul.hp(lv);
   const b = { id, def, lair: l, lv, total, state: 'sleep', t: 0, parts: [], atk: def.atk * lvMul.atk(lv), cx: tc(l.x), cy: tc(l.y), R: l.r * TILE, act: 0, step: 0 };
@@ -58,6 +58,7 @@ export function resetBoss(b) {
   b.act = 0;
   b.step = 0;
   b.phase2 = false;
+  b.smash = null;
   if (b.id === 'G1') b.parts = [bossPart(b, b.cx, b.cy, 34, b.total * 0.4, { size: 2, mode: 'rest', h: 0 })];
   else if (b.id === 'G2') b.parts = [bossPart(b, b.cx, b.cy - 10, 24, b.total, { facing: Math.PI / 2, mode: 'walk' })];
   else if (b.id === 'N1') b.parts = [bossPart(b, b.cx, b.cy, 28, b.total, { mode: 'idle' })];
@@ -96,7 +97,7 @@ export function updateBosses(dt) {
       if (!G.dead && !G.lock && dp < b.R - 4) {
         b.state = 'fight';
         G.lock = b;
-        if (!G.room) bossTrack.start(`boss_${b.id}`, { difficulty: diffId, hero: heroDef.id, boss_lv: b.lv, player_lv: powerLv() });
+        if (!G.room) bossTrack.start(`boss_${b.lair.dun || b.id}`, { difficulty: diffId, hero: heroDef.id, boss_lv: b.lv, player_lv: powerLv() });
         showBanner(b.def.name, `Lv${b.lv}  ・  ${tr('エリアの出口に結界が張られた!')}`, lvColor(b.lv - powerLv()) === '#ff5a5a' ? tr('危険!') : '', 3, '#ff8aa8');
         sfx('boss');
         G.shake = 6;
@@ -114,6 +115,7 @@ export function updateBosses(dt) {
     else if (b.id === 'G3') updateSiren(b, dt);
     else if (b.id === 'N2') updateToad(b, dt);
     else updateBoss2(b, dt);
+    updateSmash(b, dt);
     clampBody(b);
     for (const p of b.parts) {
       if (p.dead) continue;
@@ -134,6 +136,63 @@ export function updateBosses(dt) {
     b.parts = b.parts.filter((p) => !p.dead);
     if (!b.parts.length) bossDefeated(b);
   }
+}
+
+// 全ボス共通の物理攻撃 (ジャスト回避できる): 近くにいると、ためてから「大振り (前方の扇)」か「衝撃 (まわり全部)」を出す
+//   ためている間は赤く、最後の 0.15 秒は白く光る (この少し前に回避するとジャスト回避)。ハード以上は、すぐ 2 発目をつなげる
+export const SMASH = { swingArc: 1.0, swingR: 80, slamR: 62 };
+function updateSmash(b, dt) {
+  const s = b.smash || (b.smash = { mode: 'idle', cd: rnd(2, 3) });
+  const m = b.parts.find((p) => !p.clone && !p.dead && !p.hidden && !(p.h > 6));
+  if (!m) {
+    s.mode = 'idle';
+    return;
+  }
+  s.x = m.x;
+  s.y = m.y;
+  s.r = m.r;
+  const dp = dist(m.x, m.y, P.x, P.y);
+  if (s.mode === 'idle') {
+    s.cd -= dt;
+    if (s.cd <= 0 && !G.dead && dp < m.r + 230) startSmash(s, m.x, m.y);
+  } else if (s.mode === 'wind') {
+    s.mt -= dt;
+    if (s.mt > 0.25 && s.kind === 'swing') s.a += clamp(angNorm(Math.atan2(P.y - m.y, P.x - m.x) - s.a), -3 * dt, 3 * dt);
+    if (s.mt <= 0) {
+      const pp = physPos();
+      const d = dist(m.x, m.y, pp.x, pp.y);
+      const off = Math.abs(angNorm(Math.atan2(pp.y - m.y, pp.x - m.x) - s.a));
+      const reach = (s.kind === 'swing' ? SMASH.swingR : SMASH.slamR) + m.r;
+      const hit = s.kind === 'swing' ? d < m.r + P.r || (d < reach + P.r && off < SMASH.swingArc) : d < reach + P.r;
+      sfx('swing');
+      G.shake = Math.max(G.shake, 4);
+      s.hitT = 0.25;
+      if (hit && !G.dead) physHit(b.atk * 1.6, b.lv, { x: m.x, y: m.y, dead: false });
+      for (let i = 0; i < 14; i++) addPart({ x: m.x + Math.cos(s.a) * m.r, y: m.y + Math.sin(s.a) * m.r, vx: rnd(-90, 90), vy: rnd(-90, 90), life: 0.4, color: '#e8e2d0', size: 3 });
+      if (D.moves && !s.chain) {
+        s.chain = true;
+        startSmash(s, m.x, m.y);
+        s.mt = s.windT = 0.55;
+      } else {
+        s.chain = false;
+        s.mode = 'recover';
+        s.mt = 0.7;
+      }
+    }
+  } else {
+    s.mt -= dt;
+    if (s.mt <= 0) {
+      s.mode = 'idle';
+      s.cd = rnd(3.5, 5.5);
+    }
+  }
+  s.hitT = Math.max(0, (s.hitT || 0) - dt);
+}
+function startSmash(s, x, y) {
+  s.mode = 'wind';
+  s.kind = Math.random() < 0.55 ? 'swing' : 'slam';
+  s.mt = s.windT = s.kind === 'swing' ? 0.8 : 0.9;
+  s.a = Math.atan2(P.y - y, P.x - x);
 }
 
 // 少しあとに何かをする (ゲームの時間で数える)
@@ -185,6 +244,22 @@ export function bossDefeated(b) {
   if (G.room) {
     showBanner(tr('{name} 撃破!', { name: b.def.name }), tr('メニューから、相手を選び直せる'), '', 4, '#ffd84a');
     sfx('liberate');
+    return;
+  }
+  // ダンジョンのボス: 特別な素材が手に入る (1 回だけ)。門・転移碑・クリアには関係しない
+  if (b.lair.dun) {
+    if (!prog.dungeons.includes(b.lair.dun)) prog.dungeons.push(b.lair.dun);
+    const gain = Math.round(goldGain(b.def.exp, b.def.gold, b.lv) * D.reward);
+    gainGold(gain);
+    hero.materials[b.def.mat] = (hero.materials[b.def.mat] || 0) + 1;
+    const area = G.areas[b.area];
+    if (area && !area.free) liberate(area);
+    showBanner(tr('{name} 撃破!', { name: b.def.name }), `+${money(gain)}  ・  ${MATERIALS[b.def.mat]}\n${tr('超必殺技の解放に使える特別な素材だ')}`, '', 5, '#ffd84a');
+    sfx('liberate');
+    for (let i = 0; i < 60; i++) addPart({ x: b.cx + rnd(-b.R, b.R), y: b.cy + rnd(-b.R, b.R), vx: 0, vy: rnd(-50, -10), life: rnd(0.8, 1.8), color: pick(['#ffd84a', '#fff3b0', '#c060ff']), size: rnd(1.5, 3), glow: true });
+    collectAllMats();
+    updateFlow();
+    writeSave();
     return;
   }
   const first = !prog.bosses.includes(b.id);

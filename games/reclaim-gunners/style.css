@@ -327,8 +327,13 @@ body.compact .world-panel .region-info .desc { display: none; }
 .region-info .grow { flex: 1; min-width: 12em; }
 
 /* ステージ図 */
+.panel.smap { display: flex; flex-direction: column; }
+.stage-wrap { position: relative; flex: 0 1 auto; min-height: 220px; display: flex; flex-direction: column; }
+.stage-wrap .stage-map { flex: 0 1 auto; min-height: 0; overflow: auto; }
+.mapzoom { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; }
+.mapzoom .btn { min-width: 40px; background: rgba(20, 12, 10, 0.85); }
 .stage-map { position: relative; }
-.stage-map canvas { display: block; width: 100%; height: auto; border-radius: 8px; cursor: pointer; image-rendering: pixelated; }
+.stage-map canvas { display: block; height: auto; max-width: none; border-radius: 8px; cursor: pointer; image-rendering: pixelated; }
 
 /* 一覧 (お店・能力ボード・装備) */
 .list { display: grid; gap: 6px; }
@@ -545,9 +550,9 @@ body.btn-right .t-interact { left: auto; right: 3cqmin; }
 /* 武器の強化 (スキルツリー): 武器を根に、左から右へ枝分かれする。線は .kids と .tn の擬似要素で引く */
 .tpanel { height: 100%; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
 .tpanel .panel-head { margin-bottom: 2px; }
-.stree { position: relative; flex: 1; min-height: 0; overflow: hidden; --line: rgba(200, 160, 90, 0.28); --line-on: rgba(232, 192, 104, 0.85); }
+.stree { position: relative; flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; --line: rgba(200, 160, 90, 0.28); --line-on: rgba(232, 192, 104, 0.85); }
 .tn { position: relative; display: flex; align-items: center; }
-.stree > .tn { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.stree > .tn { position: relative; transform-origin: 0 0; width: max-content; }
 .kids { position: relative; display: flex; flex-direction: column; gap: 8px; padding-left: 34px; }
 .kids::before { content: ""; position: absolute; left: 0; top: 50%; width: 17px; border-top: 2px solid var(--line-on); }
 .kids > .tn::before { content: ""; position: absolute; left: -17px; top: 50%; width: 17px; border-top: 2px solid var(--line); }
@@ -566,6 +571,7 @@ body.btn-right .t-interact { left: auto; right: 3cqmin; }
 .tcard:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .tcard.uniq { border-color: rgba(200, 90, 255, 0.55); background: linear-gradient(180deg, rgba(48, 24, 54, 0.95), rgba(22, 10, 24, 0.95)); }
 .tcard.sp { border-color: rgba(255, 200, 90, 0.7); background: linear-gradient(180deg, rgba(74, 46, 14, 0.95), rgba(30, 18, 8, 0.95)); }
+.tcard.sp.ultra { border-color: #ffe680; box-shadow: 0 0 10px rgba(255, 220, 110, 0.6); background: linear-gradient(180deg, rgba(110, 60, 140, 0.95), rgba(40, 18, 52, 0.95)); }
 .tcard.locked { opacity: 0.45; }
 .tcard.open:not(.ready) { opacity: 0.8; }
 .tcard.max { border-color: var(--gold); box-shadow: 0 0 8px rgba(224, 184, 96, 0.3); }
@@ -579,6 +585,19 @@ body.btn-right .t-interact { left: auto; right: 3cqmin; }
 .tpips { display: flex; gap: 1px; }
 .tpips i { flex: 1; height: 3px; background: rgba(0, 0, 0, 0.55); }
 .tpips i.on { background: #e8c068; }
+.stree.vert { padding: 6px 4px 10px; }
+.vtree { display: flex; flex-direction: column; gap: 6px; --line-on: rgba(232, 192, 104, 0.85); }
+.vroot { width: 100%; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; text-align: left; padding: 8px 12px; }
+.vroot .tname { font-size: 1.05em; }
+.vroot .tlv { margin-left: auto; font-size: 0.95em; }
+.vkids { display: flex; flex-direction: column; gap: 6px; margin-left: 14px; padding-left: 12px; border-left: 2px solid var(--line-on); }
+.vn { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.vn::before { content: ""; position: absolute; left: -12px; top: 22px; width: 12px; border-top: 2px solid var(--line-on); }
+.vn > .tcard { width: 100%; padding: 8px 12px; gap: 3px; }
+.vn .tname { font-size: 1em; }
+.vn .tlv { font-size: 0.82em; }
+.vn .tpips i { height: 4px; }
+.vreq { font-size: 0.72em; font-weight: 600; color: #c8a8e8; margin-left: 4px; }
 .tdetail {
   flex: none; display: flex; align-items: center; gap: 10px; margin: 0 -14px; padding: 8px 14px 10px;
   border-top: 1px solid rgba(200, 160, 90, 0.45); background: rgba(16, 9, 8, 0.97);
@@ -640,6 +659,13 @@ body.tall .tut { top: 46cqw; }
 .ehead .muted { display: block; }
 
 /* 武器屋: 装備の画面と同じ 2 行の行。道具は名前と説明を 1 行ずつ */
+.brow { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 6px; padding: 8px 10px; }
+.brow .einfo { display: block; min-width: 0; }
+.brow .einfo .t, .brow .einfo .s { grid-area: auto; }
+.brow .ebtns { grid-area: auto; }
+.brow .einfo .t, .brow .einfo .s { white-space: normal; overflow: visible; }
+.brow .ebtns { flex-direction: row; }
+.brow .ebtns .btn { flex: 1; white-space: nowrap; min-height: 38px; }
 .irow { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name btns" "stats btns"; align-items: center; column-gap: 8px; row-gap: 2px; padding: 6px 10px; }
 .shint { margin: 2px 2px 0; font-size: 0.78em; line-height: 1.4; }
 .tabs { flex-wrap: nowrap; }

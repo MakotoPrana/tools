@@ -1,6 +1,6 @@
 // 武器の強化 (スキルツリー) の画面
 import { sfx } from '../audio/sound.js';
-import { SHOPS, WEAPON, money, tr } from '../core/config.js';
+import { SHOPS, WEAPON, money, portrait, tr } from '../core/config.js';
 import { hero } from '../game/hero.js';
 import { spDesc, spLv, spOwned, spState, spUnlockCost, spUpCost } from '../game/specials.js';
 import { clearEff, modCost, modLv, modReqOk, modShow, modTotal } from '../game/weapon-mods.js';
@@ -27,9 +27,25 @@ export function showMods(id, shopId) {
     if (!selKey) selKey = `m:${mods[0].id}`;
     const ctx = { id, w, shop, cap, byId };
     // 枝: 基礎の改造 (とそこから派生する改造) と、必殺技の 3 つのつながり
+    ctx.vert = portrait || window.innerWidth < 600;
     const modBranch = (m) => branch(`m:${m.id}`, mods.filter((x) => x.req && x.req[0] === m.id).map(modBranch), ctx);
-    const spBranch = (i) => branch(`sp:${i}`, i < 2 ? [spBranch(i + 1)] : [], ctx);
-    const kids = [...mods.filter((m) => !m.req).map(modBranch), spBranch(0)];
+    // 必殺技 4 つは、横につなげず縦に並べる (ツリーの幅をせまくして、大きく表示できるように)
+    const spBranch = (i) => branch(`sp:${i}`, [], ctx);
+    const kids = [...mods.filter((m) => !m.req).map(modBranch), spBranch(0), spBranch(1), spBranch(2), spBranch(3)];
+    // スマホの縦持ちなど せまい画面は、縦に積むツリー (大きな行・枝は字下げと線でつなぐ)。広い画面は横に広がるツリー
+    const vert = portrait || window.innerWidth < 600;
+    if (vert) {
+      const rootV = `<div class="vtree"><div class="tcard troot vroot">
+        <img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30">
+        <div class="tname">${w.name}</div><div class="tlv gold">★${modTotal(id)}</div></div>
+      <div class="vkids">${kids.join('')}</div></div>`;
+      return `
+    <div class="overlay"><div class="panel tpanel">
+      ${head(`${tr('強化')} ・ ${w.name}`, `<span class="gold">${money(hero.gold)}</span>`)}
+      <div class="stree vert">${rootV}</div>
+      ${detail(selKey, ctx)}
+    </div></div>`;
+    }
     const root = `<div class="tn open"><div class="tcard troot">
         <img class="wicon" src="${RG.weaponIcon(id)}" alt="" width="60" height="30">
         <div class="tname">${w.name}</div><div class="tlv gold">★${modTotal(id)}</div></div>
@@ -56,8 +72,9 @@ function nodeInfo(key, ctx) {
     const lv = modLv(id, m.id);
     const reqOk = modReqOk(id, m);
     const cost = modCost(w, m, lv);
-    const ready = !!shop && reqOk && lv < RG.MOD_MAX && lv < cap && hero.gold >= cost;
-    return { m, lv, max: RG.MOD_MAX, reqOk, cost, ready, name: m.name, kind: m.req ? 'uniq' : 'base', req: m.req ? `Lv${m.req[1]}` : '' };
+    const mx = RG.modMax(m);
+    const ready = !!shop && reqOk && lv < mx && (mx === Infinity || lv < cap) && hero.gold >= cost;
+    return { m, lv, max: mx, reqOk, cost, ready, name: m.name, kind: m.req ? 'uniq' : 'base', req: m.req ? `Lv${m.req[1]}` : '' };
   }
   const i = +k;
   const sp = RG.SPECIALS[id][i];
@@ -65,25 +82,39 @@ function nodeInfo(key, ctx) {
   const lv = spLv(id, i);
   if (own) {
     const cost = spUpCost(id, i, lv);
-    const ready = !!shop && lv < RG.SP_MAX && lv < cap && hero.gold >= cost;
+    const ready = !!shop && hero.gold >= cost;
     return { sp, i, own, lv, max: RG.SP_MAX, reqOk: true, cost, ready, name: sp.name, kind: 'sp', set: spState(id).set === i, req: i ? `Lv${RG.SP_UNLOCK[i].req}` : '' };
   }
   const c = spUnlockCost(id, i);
   const reqOk = spOwned(id, i - 1) && spLv(id, i - 1) >= c.req;
   const hearts = hero.materials.demonHeart || 0;
-  const ready = !!shop && reqOk && hero.gold >= c.gold && hearts >= c.hearts;
-  return { sp, i, own, lv: 0, max: RG.SP_MAX, reqOk, unlock: c, hearts, ready, name: sp.name, kind: 'sp', req: `Lv${c.req}` };
+  const hasMat = !c.mat || (hero.materials[c.mat] || 0) >= 1;
+  const ready = !!shop && reqOk && hasMat && hero.gold >= c.gold && hearts >= c.hearts;
+  return { sp, i, own, lv: 0, max: RG.SP_MAX, reqOk, unlock: c, hearts, hasMat, ready, name: sp.name, kind: 'sp', req: `Lv${c.req}` };
 }
+
+// Lv の表示 (上限なしのときは Lv だけ)
+const lvOf = (n) => (n.max === Infinity ? `Lv${n.lv}` : `Lv${n.lv}/${n.max}`);
 
 function branch(key, kids, ctx) {
   const n = nodeInfo(key, ctx);
   const learned = n.kind === 'sp' ? n.own : n.lv > 0;
   const state = n.lv >= n.max ? 'max' : learned ? 'own' : n.reqOk ? 'open' : 'locked';
-  const pips = learned ? `<div class="tpips">${Array.from({ length: n.max }, (_, k) => `<i class="${k < n.lv ? 'on' : ''}"></i>`).join('')}</div>` : '';
-  const lvText = n.kind === 'sp' && !n.own ? (n.reqOk ? tr('未習得') : '🔒') : n.reqOk ? `Lv${n.lv}/${n.max}` : '🔒';
+  const pips = learned && n.max !== Infinity ? `<div class="tpips">${Array.from({ length: n.max }, (_, k) => `<i class="${k < n.lv ? 'on' : ''}"></i>`).join('')}</div>` : '';
+  const lvText = n.kind === 'sp' && !n.own ? (n.reqOk ? tr('未習得') : '🔒') : n.reqOk ? lvOf(n) : '🔒';
+  if (ctx.vert) {
+    return `<div class="vn ${n.reqOk ? 'open' : ''}">
+    <button class="tcard ${n.kind} ${n.sp && n.sp.ultra ? 'ultra' : ''} ${state} ${n.ready ? 'ready' : ''} ${selKey === key ? 'sel' : ''}" data-act="selNode" data-id="${key}">
+      <div class="tname">${n.kind === 'sp' ? '✦ ' : ''}${n.name}${n.req ? ` <span class="vreq">${n.req}</span>` : ''}</div>
+      <div class="tlv">${lvText}${n.set ? ` <span class="tset">${tr('セット中')}</span>` : ''}</div>
+      ${pips}
+    </button>
+    ${kids.length ? `<div class="vkids">${kids.join('')}</div>` : ''}
+  </div>`;
+  }
   return `<div class="tn ${n.reqOk ? 'open' : ''}">
     ${n.req ? `<span class="treq">${n.req}</span>` : ''}
-    <button class="tcard ${n.kind} ${state} ${n.ready ? 'ready' : ''} ${selKey === key ? 'sel' : ''}" data-act="selNode" data-id="${key}">
+    <button class="tcard ${n.kind} ${n.sp && n.sp.ultra ? 'ultra' : ''} ${state} ${n.ready ? 'ready' : ''} ${selKey === key ? 'sel' : ''}" data-act="selNode" data-id="${key}">
       <div class="tname">${n.kind === 'sp' ? '✦ ' : ''}${n.name}</div>
       <div class="tlv">${lvText}${n.set ? ` <span class="tset">${tr('セット中')}</span>` : ''}</div>
       ${pips}
@@ -96,7 +127,7 @@ function branch(key, kids, ctx) {
 function detail(key, ctx) {
   const { id, shop, cap, byId } = ctx;
   const n = nodeInfo(key, ctx);
-  const capped = shop && n.lv >= cap && n.lv < n.max;
+  const capped = shop && n.max !== Infinity && n.lv >= cap && n.lv < n.max;
   const big = (act, data, label, ok, primary = true) => `<button class="btn tbig ${ok && primary ? 'primary' : ''}" data-act="${act}" ${data} ${ok ? '' : 'disabled'}>${label}</button>`;
   let line = '';
   let note = '';
@@ -114,7 +145,9 @@ function detail(key, ctx) {
       if (n.lv >= n.max) btns += `<span class="gold">${tr('最大')}</span>`;
       else if (shop && !capped) btns += big('spUp', `data-i="${n.i}"`, `${tr('強化')}<small>${money(n.cost)}</small>`, n.ready);
     } else {
-      note = n.reqOk ? tr('悪魔の心臓 {h}/{n}', { h: n.hearts, n: n.unlock.hearts }) : `🔒 ${tr('{name} Lv{n} が必要', { name: RG.SPECIALS[id][n.i - 1].name, n: n.unlock.req })}`;
+      if (!n.reqOk) note = `🔒 ${tr('{name} Lv{n} が必要', { name: RG.SPECIALS[id][n.i - 1].name, n: n.unlock.req })}`;
+      else if (n.unlock.mat) note = `${tr('特別な素材')}: ${RG.MATERIALS[n.unlock.mat]} ${n.hasMat ? '✓' : tr('（ダンジョンのボスが落とす）')}`;
+      else note = tr('悪魔の心臓 {h}/{n}', { h: n.hearts, n: n.unlock.hearts });
       if (shop) btns = big('spLearn', `data-i="${n.i}"`, `${tr('習得する')}<small>${money(n.unlock.gold)}</small>`, n.ready);
     }
   }
@@ -122,7 +155,7 @@ function detail(key, ctx) {
   if (!shop && !note) note = tr('強化は武器屋で行う');
   return `<div class="tdetail">
     <div class="tinfo">
-      <div class="t">${n.kind === 'sp' ? '✦ ' : ''}${n.name} <span class="muted">${n.kind === 'sp' && !n.own ? tr('未習得') : `Lv${n.lv}/${n.max}`}</span></div>
+      <div class="t">${n.kind === 'sp' ? '✦ ' : ''}${n.name} <span class="muted">${n.kind === 'sp' && !n.own ? tr('未習得') : lvOf(n)}</span></div>
       <div class="s">${line}</div>
       ${note ? `<div class="s muted">${note}</div>` : ''}
     </div>
@@ -130,16 +163,18 @@ function detail(key, ctx) {
   </div>`;
 }
 
-// ツリーを枠に収まる大きさにして、まん中に置く (大きい画面では少しだけ大きくする)
+// ツリーを、枠の幅いっぱいまで大きくする (最大 1.7 倍)。縦が枠に入りきらないときは、縦にスクロールする
 function fitTree() {
   const box = document.querySelector('.stree');
   const root = box && box.firstElementChild;
-  if (!root) return;
+  if (!root || box.classList.contains('vert')) return;
   root.style.transform = '';
-  const s = Math.min(1.2, box.clientWidth / root.offsetWidth, box.clientHeight / root.offsetHeight);
-  const x = (box.clientWidth - root.offsetWidth * s) / 2;
-  const y = (box.clientHeight - root.offsetHeight * s) / 2;
-  root.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+  root.style.margin = '0';
+  const s = Math.min(1.7, (box.clientWidth - 8) / root.offsetWidth);
+  const x = Math.max(0, (box.clientWidth - root.offsetWidth * s) / 2);
+  const y = Math.max(0, (box.clientHeight - root.offsetHeight * s) / 2);
+  root.style.transform = `scale(${s})`;
+  root.style.margin = `${y}px 0 ${root.offsetHeight * (s - 1)}px ${x}px`;
 }
 window.addEventListener('resize', () => requestAnimationFrame(fitTree));
 
@@ -166,7 +201,7 @@ actions.spUp = (d) => {
   const cap = shop.phases[shopPhase(shop) - 1].max;
   const lv = spLv(id, i);
   const cost = spUpCost(id, i, lv);
-  if (lv >= RG.SP_MAX || lv >= cap || hero.gold < cost) return;
+  if (hero.gold < cost) return;
   hero.gold -= cost;
   spState(id).lv[i] = lv + 1;
   sfx('buy');
@@ -179,8 +214,9 @@ actions.spLearn = (d) => {
   const c = spUnlockCost(id, i);
   if (!spOwned(id, i - 1) || spLv(id, i - 1) < c.req) return;
   if (hero.gold < c.gold || (hero.materials.demonHeart || 0) < c.hearts) return;
+  if (c.mat && (hero.materials[c.mat] || 0) < 1) return;
   hero.gold -= c.gold;
-  hero.materials.demonHeart -= c.hearts;
+  hero.materials.demonHeart = (hero.materials.demonHeart || 0) - c.hearts;
   spState(id).lv[i] = 0;
   sfx('buy');
   rerender();
@@ -194,7 +230,8 @@ actions.modUp = (d) => {
   const cap = shop.phases[shopPhase(shop) - 1].max;
   const lv = modLv(id, m.id);
   const cost = modCost(w, m, lv);
-  if (lv >= RG.MOD_MAX || lv >= cap || !modReqOk(id, m) || hero.gold < cost) return;
+  const mx = RG.modMax(m);
+  if (lv >= mx || (mx !== Infinity && lv >= cap) || !modReqOk(id, m) || hero.gold < cost) return;
   hero.gold -= cost;
   hero.mods[id] = hero.mods[id] || {};
   hero.mods[id][m.id] = lv + 1;

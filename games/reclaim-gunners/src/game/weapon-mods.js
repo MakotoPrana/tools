@@ -5,7 +5,9 @@ import { D, hero } from './hero.js';
 export const modLv = (id, mid) => (hero.mods[id] && hero.mods[id][mid]) || 0;
 export const modTotal = (id) => Object.values(hero.mods[id] || {}).reduce((a, b) => a + b, 0);
 // 改造 1 Lv の値段。もとにする値段は武器の値段 (隠し武器は 15 万)
-export const modCost = (w, m, lv) => Math.ceil(((w.price || w.basePrice || 150000) * 0.15 * m.cost * Math.pow(1.28, lv)) / 10) * 10;
+// Lv10 までは 1.28 倍ずつ。それより上は、1 Lv ごとに +30% ずつ (上限なしでも、値段が天文学的にならないように)
+export const lvCostMul = (lv) => Math.pow(1.28, Math.min(lv, 10)) * (1 + 0.3 * Math.max(0, lv - 10));
+export const modCost = (w, m, lv) => Math.ceil(((w.price || w.basePrice || 150000) * 0.15 * m.cost * lvCostMul(lv)) / 10) * 10;
 export const modValue = (m, lv) => (m.mode === 'step' ? Math.floor(lv / m.step) * m.per : m.per * lv);
 // 説明の {v} に入れる数
 export function modShow(m, lv) {

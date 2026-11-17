@@ -722,6 +722,93 @@ RG.STAGES = [
   },
 ];
 
+// ステージの広さ: 上のデータは元の大きさ (たて・よこ 1 倍) で書いてあり、読みこむときに
+//   たて・よこを STAGE_SCALE 倍 (広さでおよそ 2 倍) に引きのばす
+//   位置はすべて引きのばす。家やお店・決闘場の大きさ、壁の太さ、門の幅は変えない
+//   水 (川・池) と壁の長さは一緒にのばす。木や岩の数は広さに合わせて増やす
+RG.STAGE_SCALE = 1.4;
+(() => {
+  const K = RG.STAGE_SCALE;
+  const p = (v) => Math.round(v * K);
+  // 大きさを変えずに、まん中の位置だけ引きのばす
+  const move = (v, size) => Math.round((v + size / 2) * K - size / 2);
+  // 位置も長さも引きのばす (元の太さが 1 のものは 1 のまま)
+  const stretch = (v, size) => {
+    const v0 = p(v);
+    return [v0, size === 1 ? 1 : Math.max(1, p(v + size) - v0)];
+  };
+  // 魔巣を増やす: 広げたぶん、各エリアに元の 1.3 倍を足す (種類は、そのエリアにある魔巣から。大魔巣は足さない)
+  //   位置は、そのエリアの形 (layout) の中からほぼ決める。ほんとうの置き場所は mapgen が、すき間をあけて決める
+  const rngOf = (seed) => {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
+  for (const st of RG.STAGES) {
+    const w0 = st.w;
+    const h0 = st.h;
+    st.w = p(w0);
+    st.h = p(h0);
+    st.layout.scale *= K;
+    st.walls = st.walls.map(([x, y, rw, rh]) => {
+      const [x1, w1] = stretch(x, rw);
+      const [y1, h1] = stretch(y, rh);
+      return [x1, y1, w1, h1];
+    });
+    for (const f of st.features) {
+      const [x, y, rw, rh] = f.rect;
+      if (f.type === 'water') {
+        const [x1, w1] = stretch(x, rw);
+        const [y1, h1] = stretch(y, rh);
+        f.rect = [x1, y1, w1, h1];
+        continue;
+      }
+      const x1 = move(x, rw);
+      const y1 = move(y, rh);
+      f.rect = [x1, y1, rw, rh];
+      if (f.door) f.door = [f.door[0] + x1 - x, f.door[1] + y1 - y];
+    }
+    const rng = rngOf(st.seed * 31 + 5);
+    for (const ar of st.areas) {
+      for (const n of ar.nests) {
+        n.x = p(n.x);
+        n.y = p(n.y);
+      }
+      const cells = [];
+      st.layout.rows.forEach((row, r) => [...row].forEach((ch, c) => { if (st.layout.key[ch] === ar.id) cells.push([c, r]); }));
+      const types = [...new Set(ar.nests.map((n) => n.type))];
+      const pool = types.filter((t) => t !== 'big').length ? types.filter((t) => t !== 'big') : types;
+      const extra = ar.nests.length ? Math.ceil(ar.nests.length * 1.3) : 0;
+      for (let k = 0; k < extra && cells.length; k++) {
+        const [c, r] = cells[Math.floor(rng() * cells.length)];
+        ar.nests.push({ x: Math.round((c + rng()) * st.layout.scale), y: Math.round((r + rng()) * st.layout.scale), type: pool[Math.floor(rng() * pool.length)] });
+      }
+      ar.stone = ar.stone.map(p);
+      if (ar.mimics) ar.mimics = ar.mimics.map((m) => m.map(p));
+    }
+    for (const sc of st.scatter) sc.n = Math.round(sc.n * K * K);
+    for (const g of st.gates) {
+      const [x, y, rw, rh] = g.rect;
+      // マップのふちにある門は、ふちに付けたままにする
+      const x1 = x === 0 ? 0 : x + rw === w0 ? st.w - rw : move(x, rw);
+      const y1 = y === 0 ? 0 : y + rh === h0 ? st.h - rh : move(y, rh);
+      g.rect = [x1, y1, rw, rh];
+    }
+    for (const l of st.lairs) {
+      l.x = p(l.x);
+      l.y = p(l.y);
+    }
+    for (const en of st.entries || []) {
+      en.x = p(en.x);
+      en.y = p(en.y);
+    }
+  }
+})();
+
 // ステージのつながり (どの守護者を倒すと開くか)
 RG.LINKS = [
   { a: 1, b: 2, boss: 'G1' }, { a: 1, b: 3, boss: 'G2' }, { a: 2, b: 4, boss: 'G3' }, { a: 3, b: 4, boss: 'G4' },

@@ -7,7 +7,7 @@ import { damageTarget, explode, forAllTargets, forTargets } from './damage.js';
 import { addPart, addText } from './fx.js';
 import { hero, rank } from './hero.js';
 import { G, P } from './stage.js';
-import { effW } from './weapon-mods.js';
+import { effW, lvCostMul } from './weapon-mods.js';
 import { segDist } from './weapons.js';
 
 export const SP_FULL = 100;
@@ -16,7 +16,8 @@ export const SP_FULL = 100;
 // 1 つ目はどの武器でも最初から持っている
 export function spState(id) {
   hero.sp = hero.sp || {};
-  if (!hero.sp[id]) hero.sp[id] = { lv: [0, -1, -1], set: 0 };
+  if (!hero.sp[id]) hero.sp[id] = { lv: [0, -1, -1, -1], set: 0 };
+  while (hero.sp[id].lv.length < 4) hero.sp[id].lv.push(-1);
   return hero.sp[id];
 }
 export const spOwned = (id, i) => spState(id).lv[i] >= 0;
@@ -27,7 +28,13 @@ export function spParams(id, i) {
   const sp = RG.SPECIALS[id][i];
   const lv = spLv(id, i);
   const p = { ...sp, lv };
-  if (sp.grow) p[sp.grow[0]] = sp[sp.grow[0]] + sp.grow[1] * Math.floor(lv / 5);
+  if (sp.parts) {
+    const w0 = effW(id);
+    const power0 = w0.dmg * (w0.pellets || 1) * w0.rate;
+    p.parts = sp.parts.map((pt) => ({ ...pt, dmg: power0 * (pt.mul || 0) * (1 + 0.1 * lv) }));
+    return p;
+  }
+  if (sp.grow) p[sp.grow[0]] = sp[sp.grow[0]] + sp.grow[1] * Math.min(2, Math.floor(lv / 5)); // 発数・半径などは Lv5 と Lv10 で増える (威力だけ上限なし)
   const w = effW(id);
   const power = w.dmg * (w.pellets || 1) * w.rate;
   p.dmg = power * (sp.mul || 0) * (1 + 0.1 * lv);
@@ -37,6 +44,10 @@ export function spParams(id, i) {
 // 説明の文 (Lv を入れた値で)
 export function spDesc(id, i) {
   const p = spParams(id, i);
+  if (p.parts) return p.parts.map(descOf).join(' ＋ ');
+  return descOf(p);
+}
+function descOf(p) {
   const d = Math.round(p.dmg);
   switch (p.kind) {
     case 'fan': return tr('前方の扇状に {n} 発を一気に撃つ（1 発 {d}）', { n: p.n, d });
@@ -54,9 +65,9 @@ export function spDesc(id, i) {
 export const spBase = (id) => WEAPON[id].price || WEAPON[id].basePrice || 150000;
 export function spUnlockCost(id, i) {
   const u = RG.SP_UNLOCK[i];
-  return { gold: Math.max(u.min, Math.ceil((spBase(id) * u.mul) / 10) * 10), hearts: u.hearts, req: u.req };
+  return { gold: Math.max(u.min, Math.ceil((spBase(id) * u.mul) / 10) * 10), hearts: u.hearts, req: u.req, mat: u.mat ? RG.ULTRA_MAT[id] : null };
 }
-export const spUpCost = (id, i, lv) => Math.ceil((spBase(id) * 0.2 * [1, 1.5, 2.2][i] * Math.pow(1.28, lv)) / 10) * 10;
+export const spUpCost = (id, i, lv) => Math.ceil((spBase(id) * 0.2 * [1, 1.5, 2.2, 3.2][i] * lvCostMul(lv)) / 10) * 10;
 
 // ---------- ゲージ ----------
 export function addGauge(n) {
@@ -154,23 +165,33 @@ export function castSpecial(id, src, mul = 1, tier = 0) {
   const i = st.set;
   const p = spParams(id, i);
   p.dmg *= mul;
+  if (p.parts) for (const pt of p.parts) pt.dmg *= mul;
+  const ultra = !!p.ultra;
   const w = effW(id);
   const elem = () => (w.elem === 'cycle' ? pick(['fire', 'ice', 'thunder']) : w.elem);
   const look = tier ? RG.JUST_TIERS[tier - 1] : null;
   const color = look ? look.color : ELEMS[w.elem] ? ELEMS[w.elem].color : '#ffd84a';
   const fx = look ? look.fx : 1;
   const { a, x: tx, y: ty } = aimAt(src);
-  P.inv = Math.max(P.inv, 0.5); // 出した瞬間の 0.5 秒だけ無敵
+  P.inv = Math.max(P.inv, ultra ? 1.2 : 0.5); // 出した瞬間の 0.5 秒だけ無敵 (超必殺技は 1.2 秒)
   P.aim = a;
   sfx('special');
   // 派手な演出: 名前の帯 (カットイン)・一瞬の時間止め・金色の光・主人公から広がる光の筋と輪
-  G.spFlash = 0.45;
-  G.spFlashRgb = look ? look.rgb : [255, 220, 120];
-  G.shake = Math.max(G.shake, 6 * fx);
-  G.slowT = Math.max(G.slowT || 0, 0.22);
-  G.cutin = { name: RG.SPECIALS[id][i].name, sub: look ? `${look.name}  ×${look.mul}  ・  ${WEAPON[id].name}` : WEAPON[id].name, color, t: 1.3, max: 1.3 };
-  G.spBurst = { x: P.x, y: P.y, t: 0.7 * fx, max: 0.7 * fx, color, n: Math.round(18 * fx), seed: Math.random() * TAU };
-  const rings = Math.round(3 * fx);
+  G.spFlash = ultra ? 0.9 : 0.45;
+  G.spFlashRgb = ultra ? [255, 245, 220] : look ? look.rgb : [255, 220, 120];
+  G.shake = Math.max(G.shake, (ultra ? 14 : 6) * fx);
+  G.slowT = Math.max(G.slowT || 0, ultra ? 0.6 : 0.22);
+  if (ultra) {
+    // 超必殺技: 時間が一瞬ほぼ止まり、画面いっぱいに光が広がる
+    G.freezeT = 0.4;
+    G.freezeMax = 0.4;
+    G.justTier = Math.max(G.justTier || 1, 3);
+    sfx('just');
+  }
+  const sub0 = look ? `${look.name}  ×${look.mul}  ・  ${WEAPON[id].name}` : WEAPON[id].name;
+  G.cutin = { name: RG.SPECIALS[id][i].name, sub: ultra ? `${tr('超必殺技')}  ・  ${sub0}` : sub0, color: ultra ? '#ffd84a' : color, t: ultra ? 1.9 : 1.3, max: ultra ? 1.9 : 1.3, ultra };
+  G.spBurst = { x: P.x, y: P.y, t: 0.7 * fx * (ultra ? 1.6 : 1), max: 0.7 * fx * (ultra ? 1.6 : 1), color, n: Math.round(18 * fx * (ultra ? 2 : 1)), seed: Math.random() * TAU };
+  const rings = Math.round(3 * fx * (ultra ? 2 : 1));
   for (let k = 0; k < rings; k++) setTimeLater(k * 0.09, () => addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.45, color: k % 2 ? '#fff6d0' : color, size: 40 + k * 30, ring: true }));
   addPart({ x: P.x, y: P.y, vx: 0, vy: 0, life: 0.5, color, size: 120 * fx, light: true });
   for (let k = 0; k < Math.round(28 * fx); k++) {
@@ -178,18 +199,25 @@ export function castSpecial(id, src, mul = 1, tier = 0) {
     const sp = rnd(120, 320);
     addPart({ x: P.x, y: P.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: rnd(0.3, 0.7), color: k % 3 ? color : '#fff6d0', size: rnd(2, 4), glow: true });
   }
-  const shot = (ang, extra = {}) => {
+  const shot = (pp, ang, extra = {}) => {
     G.bullets.push({
       type: w.kind === 'magic' ? 'magic' : 'gun', w, x: P.x + Math.cos(ang) * 10, y: P.y + Math.sin(ang) * 10, vx: Math.cos(ang) * 480, vy: Math.sin(ang) * 480, sp: 480,
-      travel: 0, range: 420, dmg: p.dmg, elem: elem(), pierce: p.pierce || 0, hit: new Set(), r: 4.5, homing: false, life: 0, special: true, ...extra,
+      travel: 0, range: 420, dmg: pp.dmg, elem: elem(), pierce: pp.pierce || 0, hit: new Set(), r: 4.5, homing: false, life: 0, special: true, ...extra,
     });
   };
+  const fire = (p) => {
   switch (p.kind) {
+    case 'multi':
+      for (const pt of p.parts) {
+        if (pt.at) setTimeLater(pt.at, () => !G.dead && fire(pt));
+        else fire(pt);
+      }
+      break;
     case 'fan':
-      for (let k = 0; k < p.n; k++) shot(a + (p.n > 1 ? (k / (p.n - 1) - 0.5) * p.arc : 0));
+      for (let k = 0; k < p.n; k++) shot(p, a + (p.n > 1 ? (k / (p.n - 1) - 0.5) * p.arc : 0));
       break;
     case 'nova':
-      for (let k = 0; k < p.n; k++) shot(a + (k / p.n) * TAU);
+      for (let k = 0; k < p.n; k++) shot(p, a + (k / p.n) * TAU);
       break;
     case 'rapid':
       P.rapid = { id, t: p.t, k: p.k };
@@ -216,8 +244,9 @@ export function castSpecial(id, src, mul = 1, tier = 0) {
     case 'lance': {
       const sx = P.x;
       const sy = P.y;
-      const ex = sx + Math.cos(a) * p.len;
-      const ey = sy + Math.sin(a) * p.len;
+      const aa = a + (p.rot || 0);
+      const ex = sx + Math.cos(aa) * p.len;
+      const ey = sy + Math.sin(aa) * p.len;
       G.lances = G.lances || [];
       G.lances.push({ sx, sy, ex, ey, w: p.w, t: 0.55, max: 0.55, color });
       for (let k = 0; k < 30; k++) {
@@ -226,7 +255,7 @@ export function castSpecial(id, src, mul = 1, tier = 0) {
       }
       G.shake = Math.max(G.shake, 8);
       forAllTargets((t) => {
-        if (segDist(t.x, t.y, sx, sy, ex, ey) < t.r + p.w / 2) damageTarget(t, p.dmg, { elem: elem(), w, dirx: Math.cos(a), diry: Math.sin(a), knock: 160, sx: P.x, sy: P.y });
+        if (segDist(t.x, t.y, sx, sy, ex, ey) < t.r + p.w / 2) damageTarget(t, p.dmg, { elem: elem(), w, dirx: Math.cos(aa), diry: Math.sin(aa), knock: 160, sx: P.x, sy: P.y });
       });
       break;
     }
@@ -267,6 +296,8 @@ export function castSpecial(id, src, mul = 1, tier = 0) {
       break;
     default: break;
   }
+  };
+  fire(p);
 }
 
 // 毎フレーム: 連射の必殺技の残り時間・一撃の光の消え方

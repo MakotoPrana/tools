@@ -1,7 +1,7 @@
 // ステージ図と、プレイへの出入り
 import { areaTrack, bossTrack } from '../core/analytics.js';
 import { sfx } from '../audio/sound.js';
-import { BOSSES, TAU, TILE, tr } from '../core/config.js';
+import { BOSSES, TAU, TILE, portrait, tr } from '../core/config.js';
 import { D, diffId, hero, lvColor, powerLv, prog } from '../game/hero.js';
 import { travelTo } from '../game/interact.js';
 import { collectAllMats } from '../game/pickups.js';
@@ -43,7 +43,7 @@ function openStageMap(mode, def) {
       const boss = def.lairs.filter((l) => {
         const ai = map.areaOf[l.y * map.w + l.x];
         return def.areas[ai] === a && BOSSES[l.boss].impl;
-      }).map((l) => `${BOSSES[l.boss].name}${prog.bosses.includes(l.boss) ? tr('（撃破）') : ''}`);
+      }).map((l) => (l.dun ? `${l.def.name}${prog.dungeons.includes(l.dun) ? tr('（撃破）') : ''}` : `${BOSSES[l.boss].name}${prog.bosses.includes(l.boss) ? tr('（撃破）') : ''}`));
       const shop = def.features.some((f) => f.shop && map.areaOf[f.door[1] * map.w + f.door[0]] === def.areas.indexOf(a));
       const btn = mode === 'view' ? '' : mode === 'select'
         ? `<button class="btn primary" data-act="startAt" data-id="${a.id}" ${canStart(a) ? '' : 'disabled'}>${canStart(a) ? (prog.travel.length ? tr('ここへ転移') : tr('ここから始める')) : tr('未解放（歩いて向かう）')}</button>`
@@ -53,23 +53,52 @@ function openStageMap(mode, def) {
     }
     const gateBtns = mode === 'view' ? '' : points.filter((p) => p.id.startsWith('g')).map((p) => `<button class="btn small" data-act="${mode === 'select' ? 'startAt' : 'travel'}" data-id="${p.id}">${tr('{name}へ', { name: p.name })}</button>`).join('');
     return `
-    <div class="overlay"><div class="panel full">
+    <div class="overlay"><div class="panel full smap">
       ${head(`${def.id}. ${def.name}`, mode === 'travel' ? tr('転移先を選ぶ') : mode === 'view' ? tr('マップ') : tr('エリアを選ぶ'))}
-      <div class="stage-map"><canvas id="stage-canvas" width="${map.w * 8}" height="${map.h * 8}"></canvas></div>
+      <div class="stage-wrap">
+        <div class="stage-map"><canvas id="stage-canvas" width="${Math.round(map.w * Q)}" height="${Math.round(map.h * Q)}" style="width:${curZ() ? `${Math.round(map.w * Q * curZ())}px` : '100%'}"></canvas></div>
+        <div class="mapzoom"><button class="btn small" data-act="mapZoom" data-id="out" aria-label="${tr('小さく')}">－</button><button class="btn small" data-act="mapZoom" data-id="in" aria-label="${tr('大きく')}">＋</button></div>
+      </div>
       <div class="region-info">${info}</div>
       ${gateBtns ? `<div class="btn-row">${gateBtns}</div>` : ''}
       ${mode === 'travel' ? `<div class="btn-row"><button class="btn" data-act="toWorld">${tr('全体図へ戻る')}</button></div>` : ''}
     </div></div>`;
   };
-  fn.after = () => drawStageCanvas(def, map, mode);
+  fn.after = () => {
+    drawStageCanvas(def, map, mode);
+    // 開いたとき: いる場所 (なければはじめの転移碑) が見えるように、地図をスクロールする
+    if (!fn.scrolled) {
+      fn.scrolled = true;
+      const box = document.querySelector('.stage-map');
+      const c = document.getElementById('stage-canvas');
+      if (!box || !c) return;
+      const here = G && G.def === def ? [P.x / TILE, P.y / TILE] : (def.areas.find((a) => a.start || a.town) || def.areas[0]).stone;
+      const k = c.clientWidth / map.w;
+      box.scrollLeft = here[0] * k - box.clientWidth / 2;
+      box.scrollTop = here[1] * k - box.clientHeight / 2;
+    }
+  };
   uiShow(fn);
 }
+
+// ステージ図の大きさ (拡大率。0 は幅いっぱい)。スマホの縦持ちは、字が読める大きさ (1 = 元の大きさ) から、横にスクロールして見る
+let mapZ = null; // null: まだ決めていない (開くときに、画面の向きで決める)
+const curZ = () => (mapZ == null ? (portrait ? 1 : 0) : mapZ);
+const ZOOMS = [0, 0.6, 1, 1.5, 2];
+actions.mapZoom = (d) => {
+  let i = ZOOMS.indexOf(curZ());
+  i = Math.max(0, Math.min(ZOOMS.length - 1, i + (d.id === 'in' ? 1 : -1)));
+  mapZ = ZOOMS[i];
+  rerender();
+};
+// ステージ図の 1 タイルの大きさ (px)。ステージを引きのばした分だけ小さくして、絵と文字の大きさは元のまま
+const Q = 8 / RG.STAGE_SCALE;
 
 export function drawStageCanvas(def, map, mode) {
   const c = document.getElementById('stage-canvas');
   if (!c) return;
   const g = c.getContext('2d');
-  const k = 8 / TILE;
+  const k = Q / TILE;
   g.imageSmoothingEnabled = true;
   g.drawImage(map.bg, 0, 0, c.width, c.height);
   const free = (a) => (G && G.def === def ? G.areas.find((x) => x.def === a).free : prog.areas.includes(a.id));
@@ -84,8 +113,8 @@ export function drawStageCanvas(def, map, mode) {
   });
   def.areas.forEach((a, ai) => {
     const ctr = map.centers[ai];
-    const x = ctr.x * 8 + 4;
-    const y = ctr.y * 8 + 4;
+    const x = ctr.x * Q + Q / 2;
+    const y = ctr.y * Q + Q / 2;
     g.font = `400 24px ${RG.FONTS.display}`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
@@ -101,8 +130,8 @@ export function drawStageCanvas(def, map, mode) {
     g.strokeText(sub, x, y + 12);
     g.fillText(sub, x, y + 12);
     // 転移碑
-    const sx = a.stone[0] * 8 + 4;
-    const sy = a.stone[1] * 8 + 4;
+    const sx = a.stone[0] * Q + Q / 2;
+    const sy = a.stone[1] * Q + Q / 2;
     g.fillStyle = prog.travel.includes(a.id) ? '#6ad0ff' : '#444';
     g.beginPath();
     g.arc(sx, sy, 6, 0, TAU);
@@ -114,7 +143,7 @@ export function drawStageCanvas(def, map, mode) {
       for (const n of a.nests) {
         g.fillStyle = '#ff3a5a';
         g.beginPath();
-        g.arc(n.x * 8 + 4, n.y * 8 + 4, 4, 0, TAU);
+        g.arc(n.x * Q + Q / 2, n.y * Q + Q / 2, 4, 0, TAU);
         g.fill();
       }
     }
@@ -125,7 +154,7 @@ export function drawStageCanvas(def, map, mode) {
     g.lineWidth = 2;
     g.setLineDash([5, 4]);
     g.beginPath();
-    g.arc(l.x * 8 + 4, l.y * 8 + 4, l.r * 8, 0, TAU);
+    g.arc(l.x * Q + Q / 2, l.y * Q + Q / 2, l.r * Q, 0, TAU);
     g.stroke();
     g.setLineDash([]);
   }
@@ -135,7 +164,7 @@ export function drawStageCanvas(def, map, mode) {
     if (!prog.travel.includes(st.id)) continue;
     g.fillStyle = '#6ad0ff';
     g.beginPath();
-    g.arc(st.x * 8 + 4, st.y * 8 + 4, 6, 0, TAU);
+    g.arc(st.x * Q + Q / 2, st.y * Q + Q / 2, 6, 0, TAU);
     g.fill();
     g.strokeStyle = '#000';
     g.lineWidth = 2;
@@ -147,8 +176,8 @@ export function drawStageCanvas(def, map, mode) {
     g.font = `800 14px ${RG.FONTS.ui}`;
     g.strokeStyle = '#000';
     g.lineWidth = 4;
-    g.strokeText(tr('武器屋'), f.door[0] * 8 + 4, f.door[1] * 8 + 14);
-    g.fillText(tr('武器屋'), f.door[0] * 8 + 4, f.door[1] * 8 + 14);
+    g.strokeText(tr('武器屋'), f.door[0] * Q + Q / 2, f.door[1] * Q + 14);
+    g.fillText(tr('武器屋'), f.door[0] * Q + Q / 2, f.door[1] * Q + 14);
   }
   if (G && G.def === def) {
     g.fillStyle = '#fff';

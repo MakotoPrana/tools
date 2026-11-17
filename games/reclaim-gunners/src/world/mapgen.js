@@ -195,6 +195,9 @@ export function buildMap(def) {
   });
   for (const l of def.lairs) [l.x, l.y] = snap(l.x, l.y, aIndex[l.area], Math.max(3, l.r - 1.5));
   for (const en of def.entries || []) [en.x, en.y] = snap(en.x, en.y, aIndex[en.area], 2, 3);
+  // ダンジョンの入口 (ステージ側) と出口 (ダンジョン側の、はじめの転移碑のとなり)
+  for (const dg of def.dungeons || []) [dg.x, dg.y] = snap(dg.x, dg.y, aIndex[dg.area], 3, 5);
+  if (def.dungeon) def.exit = snap(def.areas[0].stone[0] + 3, def.areas[0].stone[1] + 1, 0, 2.5, 3);
 
   // 物を置かない所
   for (const a of def.areas) {
@@ -204,6 +207,8 @@ export function buildMap(def) {
   }
   for (const l of def.lairs) mark(l.x, l.y, l.r + 0.5);
   for (const en of def.entries || []) mark(en.x, en.y, 2.5);
+  for (const dg of def.dungeons || []) mark(dg.x, dg.y, 3);
+  if (def.exit) mark(def.exit[0], def.exit[1], 2.5);
   for (const g of def.gates) mark(g.rect[0] + g.rect[2] / 2, g.rect[1] + g.rect[3] / 2, 4);
   for (const f of def.features) {
     if (f.door) mark(f.door[0], f.door[1], 2);

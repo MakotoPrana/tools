@@ -192,7 +192,7 @@ export function updateEnemyAI(e, dt, dp) {
         moveEnemy(e, chaseAngle(e, dp), e.speed, dt);
         if (dp < 170 && e.los && e.cd <= 0) {
           e.mode = 'wind';
-          e.mt = 0.5;
+          e.mt = D.moves ? 0.4 : 0.5;
           e.dashA = toP;
         }
       } else if (e.mode === 'wind') {
@@ -206,8 +206,16 @@ export function updateEnemyAI(e, dt, dp) {
         e.mt -= dt;
         moveEnemy(e, e.dashA, 330, dt);
         if (e.mt <= 0) {
-          e.mode = 'rest';
-          e.mt = 0.8;
+          // ハード以上: すかさず向きを変えて、もう一度突進する (2 連続)
+          if (D.moves && !e.again) {
+            e.again = true;
+            e.mode = 'wind';
+            e.mt = 0.3;
+          } else {
+            e.again = false;
+            e.mode = 'rest';
+            e.mt = D.moves ? 0.6 : 0.8;
+          }
         }
       } else {
         e.mt -= dt;
@@ -222,10 +230,11 @@ export function updateEnemyAI(e, dt, dp) {
       const want = def.id === 'archd' ? 180 : 190;
       if (dp > want + 50 || !e.los) moveEnemy(e, chaseAngle(e, dp), e.speed, dt);
       else if (dp < want - 60) moveEnemy(e, toP + Math.PI, e.speed * 0.8, dt);
-      else moveEnemy(e, toP + Math.PI / 2 * (Math.sin(e.t * 0.7) > 0 ? 1 : -1), e.speed * 0.4, dt);
+      else moveEnemy(e, toP + Math.PI / 2 * (Math.sin(e.t * 0.7) > 0 ? 1 : -1), e.speed * (D.moves ? 0.8 : 0.4), dt);
       if (e.cd <= 0 && e.los && dp < 330) {
-        e.cd = def.shot.cd * rnd(0.85, 1.15);
-        const n = def.shot.n;
+        e.cd = def.shot.cd * rnd(0.85, 1.15) * (D.moves ? 0.85 : 1);
+        // ハード以上: 1 発の敵は 3 方向に撃ち、扇の弾は 2 発ふえる
+        const n = D.moves && def.shot.n < 8 ? (def.shot.n === 1 ? 3 : def.shot.n + 2) : def.shot.n;
         const col = def.slowShot ? '#8fd8ff' : def.id === 'skel' ? '#f0e6c8' : '#ff5a8a';
         if (n >= 8) ring(e.x, e.y, n, def.shot.speed, e.atk, e.lv, e.t);
         else for (let i = 0; i < n; i++) enemyShot(e.x, e.y, toP + (n > 1 ? (i / (n - 1) - 0.5) * 0.5 : 0), def.shot.speed, e.atk, e.lv, col, 3.5, 3, !!def.slowShot);
@@ -268,14 +277,28 @@ export function updateEnemyAI(e, dt, dp) {
         const turn = 1.4 * dt;
         e.facing += clamp(angNorm(toP - e.facing), -turn, turn);
       }
-      moveEnemy(e, chaseAngle(e, dp), e.speed * (e.facing == null ? 1.15 : 1), dt);
+      // ハード以上: ときどき盾を構えたまま、すばやく突っ込んでくる
+      if (D.moves && e.facing != null) {
+        e.rushT = (e.rushT == null ? rnd(2, 4) : e.rushT) - dt;
+        if (e.rushT <= 0) {
+          e.rushing = 0.6;
+          e.rushT = rnd(3.5, 5);
+        }
+      }
+      let rushMul = 1;
+      if (e.rushing > 0) {
+        e.rushing -= dt;
+        rushMul = 2.4;
+        if (Math.random() < 0.4) addPart({ x: e.x, y: e.y + e.r * 0.6, vx: rnd(-20, 20), vy: rnd(-10, 0), life: 0.3, color: '#7a6a50', size: 2.5 });
+      }
+      moveEnemy(e, chaseAngle(e, dp), e.speed * (e.facing == null ? 1.15 : 1) * rushMul, dt);
       break;
     }
     case 'bomber': {
       // 爆裂ワーム: 近づくと 0.7 秒光って自爆する (まわり 40px にダメージ)
       if (e.fuse == null) {
         moveEnemy(e, chaseAngle(e, dp), e.speed, dt);
-        if (dp < 30) e.fuse = 0.7;
+        if (dp < (D.moves ? 42 : 30)) e.fuse = D.moves ? 0.5 : 0.7;
       } else {
         e.fuse -= dt;
         if (e.fuse <= 0) {
@@ -284,6 +307,8 @@ export function updateEnemyAI(e, dt, dp) {
           addPart({ x: e.x, y: e.y, vx: 0, vy: 0, life: 0.25, color: '#ffcf6a', size: 40, ring: true });
           sfx('explode');
           G.shake = Math.max(G.shake, 3);
+          // ハード以上: 爆発のあと、まわりに破片が飛び散る
+          if (D.moves) ring(e.x, e.y, 6, 110, e.atk * 0.5, e.lv, Math.random(), '#ffb84a');
           killEnemy(e, null, true);
         }
       }
@@ -311,8 +336,16 @@ export function updateEnemyAI(e, dt, dp) {
             const d = dist(e.x, e.y, pp.x, pp.y);
             const off = Math.abs(angNorm(Math.atan2(pp.y - e.y, pp.x - e.x) - e.atkA));
             if (d < e.r + P.r || (d < BRUTE.swingR + e.r + P.r && off < BRUTE.swingArc)) physHit(e.atk * 1.5, e.lv, e);
-            e.mode = 'recover';
-            e.mt = 0.9;
+            // ハード以上: 大振りのあと、すぐもう一度振りかぶる (2 連撃)。2 発目の合図は少し短い
+            if (D.moves && !e.chain) {
+              e.chain = true;
+              startBrute(e, 'swing', toP);
+              e.mt = e.windT = 0.55;
+            } else {
+              e.chain = false;
+              e.mode = 'recover';
+              e.mt = 0.9;
+            }
           } else {
             e.mode = 'dash';
             e.mt = 0.5;
@@ -329,8 +362,16 @@ export function updateEnemyAI(e, dt, dp) {
         }
         if (Math.random() < 0.5) addPart({ x: e.x, y: e.y + e.r * 0.6, vx: rnd(-20, 20), vy: rnd(-10, 0), life: 0.3, color: '#5a3a3a', size: 2.5 });
         if (e.mt <= 0) {
-          e.mode = 'recover';
-          e.mt = 0.8;
+          // エクストリーム: 突進のあと、そのまま大振りにつなげる
+          if (D.moves >= 2 && !e.chain) {
+            e.chain = true;
+            startBrute(e, 'swing', toP);
+            e.mt = e.windT = 0.55;
+          } else {
+            e.chain = false;
+            e.mode = 'recover';
+            e.mt = 0.8;
+          }
         }
       } else {
         e.mt -= dt;
@@ -365,6 +406,8 @@ export function updateEnemyAI(e, dt, dp) {
           e.mode = 'stun';
           e.mt = 2;
           G.shake = Math.max(G.shake, 4);
+          // ハード以上: 壁にぶつかると、まわりに衝撃波の弾が走る
+          if (D.moves) ring(e.x, e.y, 8, 140, e.atk * 0.4, e.lv, Math.random(), '#c8b8a0');
           for (let i = 0; i < 10; i++) addPart({ x: e.x + Math.cos(e.dashA) * e.r, y: e.y + Math.sin(e.dashA) * e.r, vx: rnd(-60, 60), vy: rnd(-60, 60), life: 0.4, color: '#c8b8a0', size: 3 });
         } else if (e.mt <= 0) {
           e.mode = 'approach';
@@ -379,8 +422,11 @@ export function updateEnemyAI(e, dt, dp) {
       }
       break;
     }
-    default:
-      moveEnemy(e, chaseAngle(e, dp), e.speed * (def.ai === 'mimic' ? 1.1 : 1), dt);
+    default: {
+      // ハード以上: すばやい敵は、近づくときジグザグに走って狙いにくくなる
+      const sway = D.moves && def.speed >= 60 && e.los && dp < 260 && dp > 40 ? Math.sin(e.t * 3.2 + e.hx) * 0.7 : 0;
+      moveEnemy(e, chaseAngle(e, dp) + sway, e.speed * (def.ai === 'mimic' ? 1.1 : 1), dt);
+    }
   }
 }
 

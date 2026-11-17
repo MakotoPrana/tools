@@ -30,6 +30,14 @@ export function drawMinimap() {
     ctx.fillStyle = stoneActive(s) ? '#6ad0ff' : '#555';
     ctx.fillRect(x + (s.x / TILE) * k - 1, y + (s.y / TILE) * k - 1, 2.5, 2.5);
   }
+  for (const d of G.def.dungeons || []) {
+    ctx.fillStyle = '#d28aff';
+    ctx.fillRect(x + d.x * k - 2, y + d.y * k - 2, 4, 4);
+  }
+  if (G.def.exit) {
+    ctx.fillStyle = '#d28aff';
+    ctx.fillRect(x + G.def.exit[0] * k - 2, y + G.def.exit[1] * k - 2, 4, 4);
+  }
   for (const f of G.def.features) {
     if (!f.shop) continue;
     const sx = x + f.door[0] * k;

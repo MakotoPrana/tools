@@ -5,7 +5,7 @@ import { angNorm, clamp, dist2, lerp, rnd } from '../core/util.js';
 import { tileAt } from './collision.js';
 import { chainLightning, damageTarget, explode, forAllTargets, forTargets } from './damage.js';
 import { addPart, addText } from './fx.js';
-import { powerLv, rank, recvMul } from './hero.js';
+import { defMul, powerLv, recvMul } from './hero.js';
 import { hurtPlayer, physHit, physPos } from './player.js';
 import { G, P } from './stage.js';
 
@@ -126,7 +126,7 @@ export function updateHazards(dt) {
   for (const z of G.hazards) {
     z.t -= dt;
     if (tick && !G.dead && P.rollT <= 0 && P.inv <= 0.7 && dist2(z.x, z.y, P.x, P.y) < (z.r + P.r * 0.5) ** 2) {
-      const d = Math.max(1, Math.round(z.dps * 0.5 * recvMul(z.lv - powerLv()) * (1 - Math.min(0.45, 0.015 * rank('def')))));
+      const d = Math.max(1, Math.round(z.dps * 0.5 * recvMul(z.lv - powerLv()) * defMul()));
       P.hp -= d;
       addText(P.x + rnd(-4, 4), P.y - 12, `-${d}`, '#b8ff5a', 8);
       if (P.hp <= 0) {

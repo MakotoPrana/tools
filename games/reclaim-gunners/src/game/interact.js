@@ -1,6 +1,7 @@
 // 調べる: 転移碑・お店・門
 import { sfx } from '../audio/sound.js';
 import { areaTrack } from '../core/analytics.js';
+import { allStagesOpen } from '../core/save.js';
 import { TILE, tr } from '../core/config.js';
 import { dist, dist2, rnd, tc } from '../core/util.js';
 import { addPart, showBanner } from './fx.js';
@@ -51,6 +52,21 @@ export function updateInteract() {
       G.interact = { type: 'shop', f, label: tr('武器屋に入る') };
     }
   }
+  // ダンジョンの入口 (ステージ側) と出口 (ダンジョン側)
+  for (const dg of G.def.dungeons || []) {
+    const d = dist2(P.x, P.y, tc(dg.x), tc(dg.y));
+    if (d < best) {
+      best = d;
+      G.interact = { type: 'dungeon', dg, label: tr('ダンジョンに入る') };
+    }
+  }
+  if (G.def.exit) {
+    const d = dist2(P.x, P.y, tc(G.def.exit[0]), tc(G.def.exit[1]));
+    if (d < best) {
+      best = d;
+      G.interact = { type: 'exit', label: tr('ダンジョンを出る') };
+    }
+  }
   // 開いた門
   G.gateMsgT = Math.max(0, G.gateMsgT - 1 / 60);
   for (const gt of G.def.gates) {
@@ -84,6 +100,10 @@ export function doInteract() {
       return;
     }
     useStone(it.s);
+  } else if (it.type === 'dungeon') {
+    enterDungeon(it.dg);
+  } else if (it.type === 'exit') {
+    leaveDungeon();
   } else if (it.type === 'shop') {
     if (!shopOpen(it.f)) {
       toast(tr('武器屋は悪魔に占拠されている\n（町を解放すると開く）'), 2);
@@ -92,6 +112,46 @@ export function doInteract() {
     hero.shopSeen = Object.assign({}, hero.shopSeen, { [it.f.shop]: true });
     showShop(it.f.shop);
   }
+}
+
+// ダンジョン: 入口のあるエリアを解放すると入れる。別のマップへ移り (体力はそのまま)、出ると入口の前に戻る
+export function enterDungeon(dg) {
+  const a = G.areas.find((x) => x.def.id === dg.area);
+  if (a && !a.free && !allStagesOpen()) {
+    toast(tr('このエリアを解放すると、ダンジョンに入れる'), 2);
+    return;
+  }
+  const to = stageDef(dg.id);
+  const hp = P.hp;
+  collectAllMats();
+  withMaps([to], () => {
+    startStage(to.id, null, { hp });
+    hero.lastTravel = { difficulty: diffId, stage: to.id, point: null };
+    G.gateMsgT = 3;
+    showBanner(to.name, tr('ダンジョン ・ 最深部のボスが特別な素材を持っている'), '', 3.5, '#c060ff');
+    sfx('pick');
+  });
+}
+export function leaveDungeon() {
+  if (G.lock) {
+    toast(tr('ボス戦の最中は出られない'), 1.6);
+    return;
+  }
+  const dun = G.def;
+  const parent = stageDef(dun.parent);
+  const dg = parent.dungeons.find((x) => x.id === dun.id);
+  const hp = P.hp;
+  collectAllMats();
+  withMaps([parent], () => {
+    startStage(parent.id, null, { hp });
+    P.x = tc(dg.x);
+    P.y = tc(dg.y) + 26;
+    G.cam.x = P.x;
+    G.cam.y = P.y;
+    updateFlow();
+    hero.lastTravel = { difficulty: diffId, stage: parent.id, point: dg.area };
+    sfx('pick');
+  });
 }
 
 // お店は、建物のあるエリア (町) を解放すると開く

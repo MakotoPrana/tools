@@ -4,7 +4,7 @@ import { clamp, dist, rnd } from '../core/util.js';
 import { lvColor, powerLv } from '../game/hero.js';
 import { G, P } from '../game/stage.js';
 import { BG_SCALE } from './background.js';
-import { drawBoss } from './boss.js';
+import { drawBoss, drawBossSmash } from './boss.js';
 import { canvas, ctx } from './canvas.js';
 import { drawEnemy } from './enemy.js';
 import { drawHud } from './hud.js';
@@ -13,7 +13,7 @@ import { drawPlayer } from './player.js';
 import { txt } from './primitives.js';
 import { drawBeam, drawBullet, drawEBullet, drawLance, drawParts } from './projectiles.js';
 import { resize, scale } from './screen.js';
-import { drawFeaturesLive, drawFog, drawHazard, drawLairs, drawLakeShimmer, drawMist, drawPickup, drawSeals, drawShops, drawStone, drawTele, drawVignette } from './world.js';
+import { drawFeaturesLive, drawFog, drawHazard, drawLairs, drawLakeShimmer, drawMist, drawPickup, drawSeals, drawDungeonMarks, drawShops, drawStone, drawTele, drawVignette } from './world.js';
 import { screen } from '../ui/core.js';
 import { getMap, mapCache } from '../world/mapgen.js';
 import { drawTutorialWorld } from '../game/tutorial.js';
@@ -86,10 +86,14 @@ export function renderPlay() {
   for (const z of G.hazards) if (inView(z.x, z.y, z.r)) drawHazard(z);
   for (const t of G.teles) drawTele(t);
   for (const s of G.stones) if (inView(s.x, s.y, 20)) drawStone(s);
+  drawDungeonMarks(inView);
   for (const p of G.pickups) if (inView(p.x, p.y)) drawPickup(p);
   for (const n of G.nests) if (inView(n.x, n.y, n.r + 20)) drawNest(n);
   for (const e of G.enemies) if (inView(e.x, e.y, e.r)) drawEnemy(e);
-  for (const b of G.bosses) drawBoss(b);
+  for (const b of G.bosses) {
+    drawBoss(b);
+    drawBossSmash(b);
+  }
   if (!G.dead) drawPlayer();
   drawTutorialWorld();
   drawSpecialWorld();

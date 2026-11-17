@@ -7,7 +7,7 @@ import { hitsTiles, lineClear, lockArea, moveCircle, tileAt } from './collision.
 import { damageTarget, forTargets } from './damage.js';
 import { addPart, addText, showBanner } from './fx.js';
 import { areaTrack } from '../core/analytics.js';
-import { D, diffId, hero, heroDef, maxHp, moveSpeed, powerLv, rank, recvMul } from './hero.js';
+import { D, defMul, diffId, hero, heroDef, maxHp, moveSpeed, powerLv, rank, recvMul } from './hero.js';
 import { updateInteract } from './interact.js';
 import { G, P, ensureWs } from './stage.js';
 import { justDodge } from './specials.js';
@@ -246,7 +246,7 @@ export function physHit(raw, srcLv, src) {
 
 export function hurtPlayer(raw, srcLv) {
   if (P.inv > 0 || G.dead) return;
-  let d = raw * recvMul(srcLv - powerLv()) * (1 - Math.min(0.45, 0.015 * rank('def')));
+  let d = raw * recvMul(srcLv - powerLv()) * defMul();
   if (heroDef.id === 'gald') d *= 0.9;
   if (P.tackleT > 0) d *= 0.3;
   d = Math.max(1, Math.round(d));
