@@ -1,9 +1,43 @@
 // ボスの描画
 import { TAU } from '../core/config.js';
+import { SMASH } from '../game/bosses.js';
+import { clamp } from '../core/util.js';
 import { G } from '../game/stage.js';
 import { ctx } from './canvas.js';
 import { BOSS2, drawBoss2 } from './boss2.js';
 import { circle, drawShade, roundRect, txt } from './primitives.js';
+
+// 全ボス共通の物理攻撃の予兆 (ためている間は赤、最後の 0.15 秒は白) と、当たった瞬間の光
+export function drawBossSmash(b) {
+  const s = b.smash;
+  if (!s || b.state !== 'fight') return;
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  if (s.mode === 'wind') {
+    const k = clamp(1 - s.mt / s.windT, 0, 1);
+    const hot = s.mt <= 0.15;
+    ctx.fillStyle = hot ? 'rgba(255,255,255,0.45)' : `rgba(255,40,40,${0.12 + k * 0.25})`;
+    ctx.strokeStyle = hot ? '#ffffff' : 'rgba(255,90,90,0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (s.kind === 'swing') {
+      ctx.rotate(s.a);
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, SMASH.swingR + s.r, -SMASH.swingArc, SMASH.swingArc);
+      ctx.closePath();
+    } else ctx.arc(0, 0, SMASH.slamR + s.r, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  } else if (s.hitT > 0) {
+    ctx.strokeStyle = `rgba(255,240,230,${s.hitT * 4})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    if (s.kind === 'swing') ctx.arc(0, 0, SMASH.swingR + s.r - 6, s.a - SMASH.swingArc, s.a + SMASH.swingArc);
+    else ctx.arc(0, 0, SMASH.slamR + s.r - 4, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 
 export function drawBoss(b) {
   if (BOSS2.has(b.id)) {

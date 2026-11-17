@@ -2,7 +2,7 @@
 import { out, sfx } from '../audio/sound.js';
 import { BOSSES, MATERIALS, MOVE_BLOCK, SHOT_BLOCK, STAGES, T, TILE, lvMul, goldGain, money, tr } from '../core/config.js';
 import { writeSave } from '../core/save.js';
-import { dist, pick, rnd, tc } from '../core/util.js';
+import { angNorm, clamp, dist, pick, rnd, tc } from '../core/util.js';
 import { updateBlob, updateDragon, updateGolem, updateSiren, updateToad } from './boss-ai.js';
 import { clampBody, phoenixEgg, resetBoss2, updateBoss2 } from './boss-ai2.js';
 import { gainGold } from './enemies.js';
@@ -12,7 +12,7 @@ import { D, diffId, hero, heroDef, lvColor, powerLv, prog } from './hero.js';
 import { updateFlow } from './pathfinding.js';
 import { liberate } from './nests.js';
 import { collectAllMats } from './pickups.js';
-import { hurtPlayer } from './player.js';
+import { hurtPlayer, physHit, physPos } from './player.js';
 import { G, P, stageDef } from './stage.js';
 import { toast } from '../ui/toast.js';
 
@@ -58,6 +58,7 @@ export function resetBoss(b) {
   b.act = 0;
   b.step = 0;
   b.phase2 = false;
+  b.smash = null;
   if (b.id === 'G1') b.parts = [bossPart(b, b.cx, b.cy, 34, b.total * 0.4, { size: 2, mode: 'rest', h: 0 })];
   else if (b.id === 'G2') b.parts = [bossPart(b, b.cx, b.cy - 10, 24, b.total, { facing: Math.PI / 2, mode: 'walk' })];
   else if (b.id === 'N1') b.parts = [bossPart(b, b.cx, b.cy, 28, b.total, { mode: 'idle' })];
@@ -114,6 +115,7 @@ export function updateBosses(dt) {
     else if (b.id === 'G3') updateSiren(b, dt);
     else if (b.id === 'N2') updateToad(b, dt);
     else updateBoss2(b, dt);
+    updateSmash(b, dt);
     clampBody(b);
     for (const p of b.parts) {
       if (p.dead) continue;
@@ -134,6 +136,63 @@ export function updateBosses(dt) {
     b.parts = b.parts.filter((p) => !p.dead);
     if (!b.parts.length) bossDefeated(b);
   }
+}
+
+// 全ボス共通の物理攻撃 (ジャスト回避できる): 近くにいると、ためてから「大振り (前方の扇)」か「衝撃 (まわり全部)」を出す
+//   ためている間は赤く、最後の 0.15 秒は白く光る (この少し前に回避するとジャスト回避)。ハード以上は、すぐ 2 発目をつなげる
+export const SMASH = { swingArc: 1.0, swingR: 80, slamR: 62 };
+function updateSmash(b, dt) {
+  const s = b.smash || (b.smash = { mode: 'idle', cd: rnd(2.5, 4) });
+  const m = b.parts.find((p) => !p.clone && !p.dead && !p.hidden && !(p.h > 6));
+  if (!m) {
+    s.mode = 'idle';
+    return;
+  }
+  s.x = m.x;
+  s.y = m.y;
+  s.r = m.r;
+  const dp = dist(m.x, m.y, P.x, P.y);
+  if (s.mode === 'idle') {
+    s.cd -= dt;
+    if (s.cd <= 0 && !G.dead && dp < m.r + 150) startSmash(s, m.x, m.y);
+  } else if (s.mode === 'wind') {
+    s.mt -= dt;
+    if (s.mt > 0.25 && s.kind === 'swing') s.a += clamp(angNorm(Math.atan2(P.y - m.y, P.x - m.x) - s.a), -3 * dt, 3 * dt);
+    if (s.mt <= 0) {
+      const pp = physPos();
+      const d = dist(m.x, m.y, pp.x, pp.y);
+      const off = Math.abs(angNorm(Math.atan2(pp.y - m.y, pp.x - m.x) - s.a));
+      const reach = (s.kind === 'swing' ? SMASH.swingR : SMASH.slamR) + m.r;
+      const hit = s.kind === 'swing' ? d < m.r + P.r || (d < reach + P.r && off < SMASH.swingArc) : d < reach + P.r;
+      sfx('swing');
+      G.shake = Math.max(G.shake, 4);
+      s.hitT = 0.25;
+      if (hit && !G.dead) physHit(b.atk * 1.6, b.lv, { x: m.x, y: m.y, dead: false });
+      for (let i = 0; i < 14; i++) addPart({ x: m.x + Math.cos(s.a) * m.r, y: m.y + Math.sin(s.a) * m.r, vx: rnd(-90, 90), vy: rnd(-90, 90), life: 0.4, color: '#e8e2d0', size: 3 });
+      if (D.moves && !s.chain) {
+        s.chain = true;
+        startSmash(s, m.x, m.y);
+        s.mt = s.windT = 0.55;
+      } else {
+        s.chain = false;
+        s.mode = 'recover';
+        s.mt = 0.7;
+      }
+    }
+  } else {
+    s.mt -= dt;
+    if (s.mt <= 0) {
+      s.mode = 'idle';
+      s.cd = rnd(4, 6.5);
+    }
+  }
+  s.hitT = Math.max(0, (s.hitT || 0) - dt);
+}
+function startSmash(s, x, y) {
+  s.mode = 'wind';
+  s.kind = Math.random() < 0.55 ? 'swing' : 'slam';
+  s.mt = s.windT = s.kind === 'swing' ? 0.8 : 0.9;
+  s.a = Math.atan2(P.y - y, P.x - x);
 }
 
 // 少しあとに何かをする (ゲームの時間で数える)
