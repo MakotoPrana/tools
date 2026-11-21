@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4VLZW1VMVC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4VLZW1VMVC');
+  </script>
+  <title>ぜんぶ削る</title>
+  <meta name="description" content="鉛筆1本から始めて、レンガ、家、東京ドーム、富士山、月、地球、そして太陽まで。実寸大の体積を削り続ける放置系インクリメンタルゲーム。" />
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any" />
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <a class="back" href="../">‹ ゲーム一覧</a>
+      <h1>ぜんぶ削る</h1>
+    </header>
+
+    <section class="hud">
+      <div class="money">
+        <span class="label">削りカス</span>
+        <strong id="money">0</strong>
+      </div>
+      <div class="rate">
+        <span class="label">毎秒</span>
+        <strong id="dps">0</strong>
+      </div>
+    </section>
+
+    <section class="stage" id="stage">
+      <div class="stage-head">
+        <span class="stage-no" id="stage-no">STAGE 1 / 15</span>
+        <h2 class="stage-name" id="stage-name">鉛筆</h2>
+        <p class="stage-note" id="stage-note"></p>
+      </div>
+      <button type="button" class="target" id="target" aria-label="タップして削る">
+        <span class="obj ghost" id="obj-ghost" aria-hidden="true">✏️</span>
+        <span class="obj" id="obj" aria-hidden="true">✏️</span>
+        <span class="cracks" id="cracks" aria-hidden="true"></span>
+      </button>
+      <div class="fx" id="fx" aria-hidden="true"></div>
+      <p class="tap-hint" id="tap-hint">タップで削る</p>
+    </section>
+
+    <section class="progress">
+      <div class="bar"><i id="bar-fill"></i></div>
+      <div class="progress-row">
+        <span id="remain">残り 7cm³</span>
+        <span id="pct">0%</span>
+      </div>
+      <p class="eta">完了まであと <strong id="eta">—</strong></p>
+      <p class="compare" id="compare">これまでに削った量: —</p>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button type="button" class="tab on" data-tab="tools" role="tab">道具</button>
+      <button type="button" class="tab" data-tab="upgrades" role="tab">強化</button>
+      <button type="button" class="tab" data-tab="rebirth" role="tab">転生<i class="dot" id="rebirth-dot" hidden></i></button>
+      <button type="button" class="tab" data-tab="ach" role="tab">実績</button>
+      <button type="button" class="tab" data-tab="settings" role="tab">設定</button>
+    </nav>
+
+    <section class="panel" id="panel-tools">
+      <div class="buy-mode" id="buy-mode">
+        <span>まとめ買い</span>
+        <button type="button" data-n="1" class="on">×1</button>
+        <button type="button" data-n="10">×10</button>
+        <button type="button" data-n="max">最大</button>
+      </div>
+      <ul class="list" id="tool-list"></ul>
+    </section>
+    <section class="panel" id="panel-upgrades" hidden><ul class="list" id="upg-list"></ul></section>
+    <section class="panel" id="panel-rebirth" hidden><div id="rebirth-box"></div><ul class="list" id="skill-list"></ul></section>
+    <section class="panel" id="panel-ach" hidden><p class="ach-sum" id="ach-sum"></p><ul class="ach-grid" id="ach-list"></ul></section>
+    <section class="panel" id="panel-settings" hidden>
+      <div class="setting">
+        <span>数字の表し方</span>
+        <div class="seg" id="notation">
+          <button type="button" data-v="ja">万・億・兆</button>
+          <button type="button" data-v="sci">1.2e+8</button>
+        </div>
+      </div>
+      <div class="setting" id="auto-row" hidden>
+        <span>自動発注</span>
+        <div class="seg" id="auto">
+          <button type="button" data-v="on">ON</button>
+          <button type="button" data-v="off">OFF</button>
+        </div>
+      </div>
+      <div class="setting" id="test-row" hidden>
+        <span>テスト用の早送り</span>
+        <div class="seg" id="speed">
+          <button type="button" data-v="1" class="on">×1</button>
+          <button type="button" data-v="10">×10</button>
+          <button type="button" data-v="100">×100</button>
+          <button type="button" data-v="1000">×1000</button>
+        </div>
+      </div>
+      <div class="setting">
+        <span>プレイ時間 (この周)</span>
+        <strong id="run-time">0秒</strong>
+      </div>
+      <div class="setting">
+        <span>セーブデータ</span>
+        <button type="button" class="danger" id="reset">はじめからやり直す</button>
+      </div>
+    </section>
+
+    <section class="help">
+      <h2>遊び方</h2>
+      <p>鉛筆1本から始めて、実在する物を実寸大の体積のまま削っていく放置ゲームです。削った体積はそのまま「削りカス」になり、削りカスで道具を買うと自動で削る速さが上がります。</p>
+      <ul>
+        <li>画面の対象をタップすると手で削れます。</li>
+        <li>対象を削り切ると、次のもっと大きい対象に進みます。壊すたびに全体の破壊量が1.5倍になります。</li>
+        <li>同じ道具を10・25・50・100台…とそろえると、その道具の破壊量が2倍になります。</li>
+        <li>ページを閉じている間も、最大8時間ぶん削り続けます (効率は半分)。</li>
+        <li>富士山を削り切ると「転生」できます。最初からやり直す代わりに「破壊の記憶」を得て、ずっと強くなります。</li>
+      </ul>
+      <p class="small">対象の体積は外形からの概算です。</p>
+    </section>
+  </main>
+
+  <div class="modal" id="modal" hidden><div class="sheet" id="sheet"></div></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="data.js?v=1"></script>
+  <script src="engine.js?v=1"></script>
+  <script src="game.js?v=1"></script>
+</body>
+</html>

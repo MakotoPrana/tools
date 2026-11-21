@@ -32,7 +32,9 @@ CrazyGames 版・itch.io 版は Google タグを外すので、何も送らな�
 | `beethoven_baton` | `<ステージ番号>-road` (道中) / `<ステージ番号>-boss` (ボス戦)。例 `2-boss` | 道の終わりに着いた・ボスを倒した / 体力が尽きた。道中をクリアするとそのままボス戦を始める。「ボスから」はボス戦だけを始める | 終わり: `score`。ボスのクリアは `rank`、失敗は `at` (`street`・`boss`) |
 | `composer_survivors` | 曲の id (`k2`・`elise`・`spring1` など)。パートは `_p` + 番号 (`elise_p2`) | 通しはボスを倒した・パートは音符をすべて倒すか通した / 力尽きた | 始め: `mode` (難しさ: `normal`・`hard`・`virtuoso`)、`character` (作曲家の id)。終わり: `mode`、`character`。失敗は `progress_pct` (曲の何 % まで弾けたか) |
 | `reclaim_gunners` | エリアの解放はエリアの id (`s1a3` など)、ボス戦は `boss_` + ボスの id (`boss_G1` など) | エリアを解放した・ボスを倒した / 力尽きた | 始め: `difficulty`、`hero`、`player_lv` (ボス戦は `boss_lv` も)。終わり: `reinvade` (エリア) |
+| `zenbu_kezuru` | ステージ番号 (1〜15。1が鉛筆、15が太陽) | 対象を削り切った / 失敗はない。ページを閉じた・転生した・データを消したときは途中でやめたことにする | 始め: `rebirths` (転生した回数)。終わり: `rebirths`。放置中に削り切ったときは `offline` (true) |
 
+- zenbu-kezuru は放置中に複数の対象を削り切ることがある。そのときは削り切った対象ごとに `stage_start` と `stage_end` を続けて送る (このときの `play_sec` は0に近い)
 - reclaim-gunners はステージの区切りがないので、まだ解放していないエリアに入ったときをエリアの開始とする。エリアを出入りしても同じ挑戦のまま。別の未解放エリアに入る・全体図へ戻る・別のステージへ移ると、途中でやめたことになる。力尽きたあとにまたそのエリアに入ると失敗リトライ、解放したエリアを「再侵攻」すると成功リトライ
 - mole の `stage_start` / `stage_end` は以前から `stage_no` で送っていたので、続けて見られるように `stage_no` も残す
 - voxel-grenade・paper-plane のゲーム専用のイベント (`voxel_grenade_start` など) もそのまま送る
