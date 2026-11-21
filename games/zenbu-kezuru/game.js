@@ -41,6 +41,9 @@
   let s = load();
   let buyN = 1;
   let tab = 'tools';
+  // テストプレイ用の早送り (body に data-test があるときだけ設定に出す)
+  const TEST = document.body.hasAttribute('data-test');
+  let speed = 1;
 
   function load() {
     try {
@@ -463,6 +466,15 @@
       afterChange(true);
     });
   });
+  if (TEST) {
+    $('test-row').hidden = false;
+    for (const b of $('speed').children) {
+      b.addEventListener('click', () => {
+        speed = +b.dataset.v;
+        for (const x of $('speed').children) x.classList.toggle('on', x === b);
+      });
+    }
+  }
   $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });
 
   function afterChange(full) {
@@ -514,7 +526,7 @@
       dt = 0;
     }
     if (dt > 0) {
-      const cleared = K.tick(s, dt);
+      const cleared = K.tick(s, dt * speed);
       if (cleared.length) { onCleared(cleared); showCleared(cleared); afterChange(); }
     }
     uiTimer += dt;
