@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <main class="app">
@@ -47,9 +47,8 @@
         <p class="stage-note" id="stage-note"></p>
       </div>
       <button type="button" class="target" id="target" aria-label="タップして削る">
-        <span class="obj ghost" id="obj-ghost" aria-hidden="true">✏️</span>
-        <span class="obj" id="obj" aria-hidden="true">✏️</span>
-        <span class="cracks" id="cracks" aria-hidden="true"></span>
+        <canvas class="vox" id="vox" aria-hidden="true"></canvas>
+        <span class="done-mark" id="done-mark" aria-hidden="true" hidden>✨</span>
       </button>
       <div class="fx" id="fx" aria-hidden="true"></div>
       <p class="tap-hint" id="tap-hint">タップで削る</p>
@@ -138,6 +137,7 @@
 
   <script src="data.js?v=1"></script>
   <script src="engine.js?v=1"></script>
-  <script src="game.js?v=1"></script>
+  <script src="voxel.js?v=1"></script>
+  <script src="game.js?v=2"></script>
 </body>
 </html>

@@ -72,47 +72,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
   user-select: none;
   -webkit-user-select: none;
 }
-.obj {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  font-size: 170px;
-  line-height: 1;
-  transform: translateX(-50%);
-  transition: clip-path 0.25s linear;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.5));
-}
-.obj.ghost { opacity: 0.13; filter: grayscale(1); }
-.obj.hit { animation: hit 0.12s ease-out; }
-@keyframes hit {
-  0% { transform: translateX(-50%) scale(1); }
-  40% { transform: translateX(calc(-50% + 3px)) scale(0.96); }
-  100% { transform: translateX(-50%) scale(1); }
-}
-.cracks {
+.vox {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-  background-repeat: no-repeat;
-  background-position: center 60%;
-  background-size: 200px 200px;
+  width: 100%;
+  height: 100%;
+}
+.done-mark {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  font-size: 120px;
+  line-height: 1;
+  transform: translateX(-50%);
 }
 .tap-hint { margin: 0; font-size: 0.75rem; color: var(--muted); }
 .tap-hint.gone { visibility: hidden; }
 
 /* 削りカスと数字のエフェクト */
 .fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.chipfx {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  background: var(--accent);
-  animation: chip 0.7s ease-out forwards;
-}
-@keyframes chip {
-  to { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
-}
 .num {
   position: absolute;
   font-weight: 900;

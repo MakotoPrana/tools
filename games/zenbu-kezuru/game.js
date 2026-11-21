@@ -106,43 +106,25 @@
   }
 
   // ---------- 対象の表示 ----------
-  const CRACKS = [
-    'M100 40 L92 70 L104 92 L95 120',
-    'M60 90 L82 98 L90 120 L118 128',
-    'M140 70 L126 96 L136 118',
-    'M70 140 L94 146 L102 168 L126 172',
-    'M120 150 L142 158 L150 182',
-    'M48 112 L62 130 L58 156',
-  ];
-  function crackImage(n) {
-    if (n <= 0) return 'none';
-    const paths = CRACKS.slice(0, n).map((d) => `<path d='${d}'/>`).join('');
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><g fill='none' stroke='rgba(20,12,4,0.75)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'>${paths}</g></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
+  // 対象はブロックの集まりとして描き、削った量に合わせて外側から剥がしていく (voxel.js)
+  const vox = window.KZ_VOXEL.create($('vox'));
   let shownStage = -1;
-  let shownCrack = -1;
+  function stageRatio() {
+    if (s.stage >= D.STAGES.length) return 0;
+    return Math.min(1, s.removed / D.STAGES[s.stage].vol);
+  }
   function renderStage() {
     const done = s.stage >= D.STAGES.length;
     const st = done ? null : D.STAGES[s.stage];
     if (shownStage !== s.stage) {
       shownStage = s.stage;
-      shownCrack = -1;
+      vox.setIcon(done ? null : st.icon);
+      $('done-mark').hidden = !done;
       $('stage-no').textContent = done ? 'COMPLETE' : `STAGE ${s.stage + 1} / ${D.STAGES.length}`;
       $('stage-name').textContent = done ? 'もう削るものがない' : st.name;
       $('stage-note').textContent = done ? '宇宙はすっかり削り尽くされた' : `${st.note} ・ 体積 ${fmtVol(st.vol)}`;
-      $('obj').textContent = done ? '✨' : st.icon;
-      $('obj-ghost').textContent = done ? '' : st.icon;
     }
-    const ratio = done ? 0 : Math.min(1, s.removed / st.vol);
-    const clip = done ? 'none' : `inset(${(ratio * 92).toFixed(2)}% 0 0 0)`;
-    $('obj').style.clipPath = clip;
-    $('cracks').style.clipPath = clip;
-    const crack = done ? 0 : Math.min(CRACKS.length, Math.floor(ratio * (CRACKS.length + 1)));
-    if (crack !== shownCrack) {
-      shownCrack = crack;
-      $('cracks').style.backgroundImage = crackImage(crack);
-    }
+    const ratio = stageRatio();
     $('bar-fill').style.width = (done ? 100 : ratio * 100).toFixed(2) + '%';
     $('remain').textContent = done ? '残り 0' : `残り ${fmtVol(st.vol - s.removed)}`;
     $('pct').textContent = done ? '100%' : (ratio * 100 < 10 ? (ratio * 100).toFixed(2) : (ratio * 100).toFixed(1)) + '%';
@@ -389,18 +371,6 @@
 
   function spawnFx(x, y, power) {
     const fx = $('fx');
-    for (let k = 0; k < 6; k++) {
-      const c = document.createElement('i');
-      c.className = 'chipfx';
-      c.style.left = x + 'px';
-      c.style.top = y + 'px';
-      c.style.setProperty('--dx', (Math.random() * 120 - 60) + 'px');
-      c.style.setProperty('--dy', (Math.random() * 70 + 20) + 'px');
-      c.style.setProperty('--rot', (Math.random() * 360) + 'deg');
-      c.style.background = k % 2 ? 'var(--accent)' : 'var(--muted)';
-      fx.appendChild(c);
-      setTimeout(() => c.remove(), 750);
-    }
     const n = document.createElement('span');
     n.className = 'num';
     n.style.left = x + 'px';
@@ -416,10 +386,8 @@
     const r = $('stage').getBoundingClientRect();
     const { power, cleared } = K.tap(s);
     spawnFx(e.clientX - r.left, e.clientY - r.top, power);
-    const obj = $('obj');
-    obj.classList.remove('hit');
-    void obj.offsetWidth;
-    obj.classList.add('hit');
+    vox.hit();
+    vox.setRatio(stageRatio());
     if (cleared.length) { onCleared(cleared); showCleared(cleared); }
     checkAch();
   });
@@ -529,6 +497,8 @@
       const cleared = K.tick(s, dt * speed);
       if (cleared.length) { onCleared(cleared); showCleared(cleared); afterChange(); }
     }
+    if (shownStage === s.stage) vox.setRatio(stageRatio());
+    vox.step(Math.min(dt, 0.05));
     uiTimer += dt;
     saveTimer += dt;
     if (uiTimer >= 0.1) { uiTimer = 0; renderAll(); }
