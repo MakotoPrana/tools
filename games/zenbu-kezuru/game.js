@@ -106,8 +106,9 @@
   }
 
   // ---------- 対象の表示 ----------
-  // 対象はブロックの集まりとして描き、削った量に合わせて外側から剥がしていく (voxel.js)
-  const vox = window.KZ_VOXEL.create($('vox'));
+  // 対象はブロックの集まりとして描き、削った量に合わせて外側から剥がしていく。
+  // 立体の浮き彫り (relief.js) が使えなければ、平面のブロック絵 (voxel.js)
+  const vox = (window.KZ_RELIEF && window.KZ_RELIEF.create($('vox'))) || window.KZ_VOXEL.create($('vox'));
   let shownStage = -1;
   function stageRatio() {
     if (s.stage >= D.STAGES.length) return 0;

@@ -33,7 +33,8 @@
         const avg = a / (SAMPLE * SAMPLE * 255);
         if (avg < 0.45) continue;
         solid[y * GRID + x] = 1;
-        cells.push({ x, y, color: `rgb(${Math.round(r / a)},${Math.round(gg / a)},${Math.round(b / a)})` });
+        const rgb = [Math.round(r / a), Math.round(gg / a), Math.round(b / a)];
+        cells.push({ x, y, rgb, color: `rgb(${rgb[0]},${rgb[1]},${rgb[2]})` });
       }
     }
     return { cells: orderCells(cells, solid), solid };
@@ -208,5 +209,5 @@
     return { setIcon, setRatio, hit, step, layout, count: () => (blocks ? blocks.length : 0) };
   }
 
-  window.KZ_VOXEL = { create };
+  window.KZ_VOXEL = { create, blocksFromIcon, GRID };
 })();
