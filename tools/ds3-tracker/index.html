@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DS3 完全収集トラッカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Noto+Sans+JP:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 静かで荘厳、篝火の前で記録をつける巡礼者の帳面
+   IDEA: 篝火に照らされた古い台帳。進捗は燃え広がる残り火
+   PICTURE: 上部に大きな進捗リング（篝火の炎色）と三つの数字
+   COLOUR and TYPE: 灰黒の地・羊皮紙の文字・残り火の橙。見出しは明朝（Shippori Mincho）、本文はNoto Sans JP
+   LAYOUT: タブ（進捗/一覧/データ）。一覧は検索とフィルタ、行をタップで変質ごとの強化値を編集 */
+:root{color-scheme:light dark;
+--bg:light-dark(#efe9dd,#121110);--panel:light-dark(#fbf8f1,#1c1a18);--line:light-dark(#d8cfbd,#2e2a26);
+--ink:light-dark(#231e18,#e9e1d1);--mute:light-dark(#6f6556,#9a8f7d);--ember:light-dark(#b9481b,#f07a35);
+--ember2:light-dark(#d98a2b,#ffb35c);--ok:light-dark(#5b6e2c,#a9c25e);--chip:light-dark(#e6dece,#26231f)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans JP",system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:"Shippori Mincho",serif;font-weight:800;line-height:1.1;margin:0}
+header{padding:18px max(4vw,14px) 0;max-width:1100px;margin:auto}
+h1{font-size:clamp(26px,6vw,40px);text-wrap:balance}
+.sub{color:var(--mute);font-size:13px;margin-top:4px}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:4px;padding:8px max(4vw,14px);max-width:1100px;margin:auto}
+nav button{flex:1;min-height:44px;border:0;border-radius:10px;background:transparent;color:var(--mute);font:600 15px "Noto Sans JP",sans-serif}
+nav button[aria-selected=true]{background:var(--chip);color:var(--ink)}
+main{max-width:1100px;margin:auto;padding:16px max(4vw,14px) 80px}
+section[hidden]{display:none}
+.hero{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
+.ring{position:relative;aspect-ratio:1}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .c{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring .big{font:800 clamp(30px,8vw,44px)/1 "Shippori Mincho",serif;color:var(--ember)}
+.ring .lbl{font-size:13px;color:var(--mute)}
+.stats{display:grid;gap:12px}
+.stat .row{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.stat b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.bar{height:8px;border-radius:5px;background:var(--chip);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ember),var(--ember2));border-radius:5px;transition:width .5s}
+@media(prefers-reduced-motion:reduce){.bar i{transition:none}}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.card h2{font-size:20px;margin-bottom:10px}
+.mini{display:grid;gap:9px}
+.mini .stat .row{font-size:13px}
+.controls{display:grid;gap:8px;margin-bottom:12px}
+.controls .r{display:flex;gap:8px;flex-wrap:wrap}
+input,select,textarea{font:16px "Noto Sans JP",sans-serif;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
+input[type=search]{width:100%}
+.controls select{flex:1 1 140px}
+input:focus-visible,select:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);font:600 14px "Noto Sans JP",sans-serif;cursor:pointer}
+.btn.pri{background:var(--ember);border-color:var(--ember);color:#fff}
+.btn.sm{min-height:36px;padding:0 10px;font-size:13px}
+.count{font-size:13px;color:var(--mute);margin:4px 2px 8px}
+.list{display:grid;gap:8px}
+.it{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.it>.hd{display:flex;align-items:center;gap:10px;padding:10px 12px;min-height:56px;cursor:pointer}
+.chk{flex:none;width:28px;height:28px;border-radius:8px;border:2px solid var(--line);display:grid;place-content:center;background:transparent;color:transparent;cursor:pointer;font-size:16px}
+.chk.on{background:var(--ember);border-color:var(--ember);color:#fff}
+.nm{flex:1}
+.nm .j{font-weight:600;line-height:1.3}
+.nm .e{font-size:13px;color:var(--mute);line-height:1.3}
+.tag{flex:none;font-size:13px;font-variant-numeric:tabular-nums;color:var(--mute);text-align:right;white-space:nowrap}
+.tag.done{color:var(--ok);font-weight:600}
+.body{border-top:1px solid var(--line);padding:12px}
+.vars{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.v{display:flex;align-items:center;gap:6px;background:var(--chip);border-radius:10px;padding:6px 8px}
+.v .n{flex:1;font-size:13px;line-height:1.2}
+.v .n small{display:block;color:var(--mute);font-size:13px}
+.v select{min-height:36px;padding:4px 6px;font-size:15px;width:72px}
+.v.max{box-shadow:inset 0 0 0 2px var(--ok)}
+.v.has{box-shadow:inset 0 0 0 1px var(--ember2)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.meta{font-size:13px;color:var(--mute);margin-bottom:8px}
+.empty{padding:30px;text-align:center;color:var(--mute)}
+.more{display:flex;justify-content:center;margin-top:12px}
+.form{display:grid;gap:10px}
+.form label{display:grid;gap:4px;font-size:14px}
+.note{font-size:13px;color:var(--mute)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+.sync{font-size:13px;color:var(--mute)}
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink);max-width:480px;width:calc(100% - 24px)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+@media(max-width:600px){.hero{grid-template-columns:1fr;justify-items:center}.ring{width:min(220px,70vw)}.stats{width:100%}}
+</style>
+</head>
+<body>
+<header>
+<h1>灰の巡礼帳 — DS3完全収集</h1>
+<div class="sub">全アイテム収集・全武器の全変質・最大強化を記録する <span class="sync" id="sync">保存先：確認中…</span></div>
+</header>
+<nav role="tablist">
+<button role="tab" data-t="prog" aria-selected="true">進捗</button>
+<button role="tab" data-t="list" aria-selected="false">一覧・検索</button>
+<button role="tab" data-t="data" aria-selected="false">データ</button>
+</nav>
+<main>
+<section id="prog">
+<div class="hero">
+<div class="ring" id="ring"></div>
+<div class="stats" id="heroStats"></div>
+</div>
+<div class="grid2">
+<div class="card"><h2>カテゴリ別</h2><div class="mini" id="catStats"></div></div>
+<div class="card"><h2>変質別の最大強化</h2><div class="mini" id="infStats"></div></div>
+</div>
+</section>
+
+<section id="list" hidden>
+<div class="controls">
+<input type="search" id="q" placeholder="名前で検索（日本語・英語）" autocomplete="off">
+<div class="r">
+<select id="fc"></select>
+<select id="fs">
+<option value="">すべての状態</option>
+<option value="none">未入手</option>
+<option value="own">入手済み</option>
+<option value="infTodo">変質が未完成</option>
+<option value="maxTodo">最大強化が未完成</option>
+<option value="done">完了</option>
+<option value="todo">未完了すべて</option>
+</select>
+</div>
+</div>
+<div class="count" id="cnt"></div>
+<div class="list" id="items"></div>
+<div class="more"><button class="btn" id="moreBtn" hidden>さらに表示</button></div>
+</section>
+
+<section id="data" hidden>
+<div class="grid2" style="margin-top:0">
+<div class="card">
+<h2>アイテムを追加</h2>
+<form class="form" id="addForm">
+<label>日本語名<input id="aj" required></label>
+<label>英語名（任意）<input id="ae"></label>
+<label>カテゴリ<select id="ac"></select></label>
+<label>強化・変質<select id="af">
+<option value="i">変質可・最大+10</option>
+<option value="t">変質不可・最大+10</option>
+<option value="u">変質不可・最大+5</option>
+<option value="n">強化なし（武器）</option>
+<option value="c">収集のみ（指輪・魔法・防具など）</option>
+</select></label>
+<button class="btn pri" type="submit">追加する</button>
+</form>
+</div>
+<div class="card">
+<h2>バックアップ</h2>
+<p class="note">進捗と追加・修正したデータをまとめたJSONです。コピーして保存し、別の端末で貼り付けて読み込めます。</p>
+<div class="acts"><button class="btn" id="expBtn">JSONをコピー</button><button class="btn" id="impBtn">JSONを読み込む</button></div>
+<textarea id="io" rows="5" style="width:100%;margin-top:10px" placeholder="ここにJSONを貼り付け"></textarea>
+<div class="acts"><button class="btn" id="resetBtn">進捗をすべてリセット</button></div>
+</div>
+<div class="card">
+<h2>データについて</h2>
+<p class="note">変質は15種類（重厚・鋭利・熟練・澄んだ・結晶・炎・混沌・雷・深み・闇・毒・出血・生まれ・祝福・亡者）＋ノーマルの16形態で数えます。変質できない武器は1形態（+10または+5が最大）です。</p>
+<p class="note">収録データは手入力の初期値です。名前や変質可否・最大強化値がゲームと違う場合は、一覧で行を開いて「編集」から直せます。</p>
+</div>
+</div>
+</section>
+</main>
+<footer class="note" style="max-width:1100px;margin:auto;padding:0 max(4vw,14px) 32px">非公式のファンメイドツールです。DARK SOULS IIIの権利は各権利者に帰属します。</footer>
+
+<dialog id="dlg"><form method="dialog" class="form" id="editForm">
+<h3 id="dlgT">アイテムを編集</h3>
+<label>日本語名<input id="ej" required></label>
+<label>英語名<input id="ee"></label>
+<label>強化・変質<select id="ef">
+<option value="i">変質可・最大+10</option><option value="t">変質不可・最大+10</option><option value="u">変質不可・最大+5</option><option value="n">強化なし（武器）</option><option value="c">収集のみ</option>
+</select></label>
+<label><span><input type="checkbox" id="ehide" style="min-height:auto"> 集計から除外する（ゲームに存在しない等）</span></label>
+<div class="acts"><button class="btn pri" value="save" id="eSave">保存</button><button class="btn" value="cancel">キャンセル</button><button class="btn" id="eDel" value="del" hidden>削除</button></div>
+</form></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+{
+/* ---------- 初期データ  "日本語名|English|フラグ"  i=変質可+10 t=変質不可+10 u=変質不可+5 n=強化なし c=収集のみ ---------- */
+const RAW = {
+"短剣":`ダガー|Dagger|i;盗賊の短刀|Bandit's Knife|i;パリングダガー|Parrying Dagger|i;山賊の双短刀|Brigand Twindaggers|i;鴉人の大鉈|Corvian Greatknife|i;メイルブレイカー|Mail Breaker|i;ハルペー|Harpe|i;学者の燭台|Scholar's Candlestick|u;尾骨の短剣|Tailbone Short Sword|i;アクアマリンのダガー|Aquamarine Dagger|i;濁った手鎌|Murky Hand Scythe|i;腐れたグルーの短剣|Rotten Ghru Dagger|i`,
+"直剣":`ロングソード|Long Sword|i;ブロードソード|Broadsword|i;ショートソード|Shortsword|i;折れた直剣|Broken Straight Sword|i;アストラの直剣|Astora Straight Sword|i;ダークソード|Dark Sword|i;太陽の直剣|Sunlight Straight Sword|i;ロスリック騎士の剣|Lothric Knight Sword|i;棘の直剣|Barbed Straight Sword|i;モリオンブレード|Morion Blade|i;アンリの直剣|Anri's Straight Sword|i;イルシールの直剣|Irithyll Straight Sword|u;聖職者の燭台|Cleric's Candlestick|u;ロスリックの聖剣|Lothric's Holy Sword|u;輪の騎士の直剣|Ringed Knight Straight Sword|u`,
+"大剣":`バスタードソード|Bastard Sword|i;クレイモア|Claymore|i;フランベルジェ|Flamberge|i;執行者の大剣|Executioner's Greatsword|u;ウォルニールの聖剣|Wolnir's Holy Sword|u;月光の大剣|Moonlight Greatsword|u;狼騎士の大剣|Wolf Knight's Greatsword|u;ファランの大剣|Farron Greatsword|u;亡者狩りの大剣|Hollowslayer Greatsword|u;ストームルーラー|Storm Ruler|u;黒騎士の剣|Black Knight Sword|u;双王子の大剣|Twin Princes' Greatsword|u;竜血の大剣|Drakeblood Greatsword|u;火継ぎの大剣|Firelink Greatsword|u;裁きの大剣|Greatsword of Judgment|u;ゲールの大剣|Gael's Greatsword|u;オニキスブレード|Onyx Blade|u;汚れた大剣|Defiled Greatsword|u;ロリアンの大剣|Lorian's Greatsword|u`,
+"特大剣":`ツヴァイヘンダー|Zweihander|i;グレートソード|Greatsword|i;アストラの大剣|Astora Greatsword|i;ロスリック騎士の大剣|Lothric Knight Greatsword|i;大聖堂騎士の大剣|Cathedral Knight Greatsword|i;煙の特大剣|Fume Ultra Greatsword|u;冒涜の大剣|Profaned Greatsword|u;輪の騎士の双大剣|Ringed Knight Paired Greatswords|u`,
+"曲剣":`シミター|Scimitar|i;ファルシオン|Falchion|i;ショーテル|Shotel|i;カーサスの曲刀|Carthus Curved Sword|i;カーサスのショーテル|Carthus Shotel|i;法王騎士の曲剣|Pontiff Knight Curved Sword|u;嵐の曲剣|Storm Curved Sword|u;絵画守りの曲刀|Painting Guardian's Curved Sword|i;三日月の剣|Crescent Moon Sword|u;腐れたグルーの曲剣|Rotten Ghru Curved Sword|i;踊り子の双魔剣|Dancer's Enchanted Swords|u;傭兵の双刀|Sellsword Twinblades|i;番人の双刀|Warden Twinblades|i;追従者のサーベル|Follower Sabre|i;デーモンの傷跡|Demon's Scar|u`,
+"大曲剣":`逐われ人の大剣|Exile Greatsword|i;老狼の曲剣|Old Wolf Curved Sword|u;ハラルドの大曲剣|Harald Curved Greatsword|i;叢雲|Murakumo|i;カーサスの大曲剣|Carthus Curved Greatsword|i`,
+"刀":`打刀|Uchigatana|i;物干し竿|Washing Pole|i;黒刀|Black Blade|i;血狂い|Bloodlust|i;混沌の刃|Chaos Blade|u;闇朧|Darkdrift|u;擦り切れた刀|Frayed Blade|u;鬼切と姥断|Onikiri and Ubadachi|i`,
+"刺剣":`エストック|Estoc|i;レイピア|Rapier|i;リカールの刺剣|Ricard's Rapier|i;結晶老の刺剣|Crystal Sage's Rapier|u;イルシールの刺剣|Irithyll Rapier|i`,
+"斧":`ハンドアクス|Hand Axe|i;バトルアクス|Battle Axe|i;竜狩りの斧|Dragonslayer's Axe|u;山賊の斧|Brigand Axe|i;肉断ち包丁|Butcher Knife|i;深みのバトルアクス|Deep Battle Axe|u;エレオノーラ|Eleonora|i;蛇人の手斧|Man Serpent Hatchet|i;隷属の斧|Thrall Axe|i;有翼騎士の双斧|Winged Knight Twinaxes|i;ミルウッドのバトルアクス|Millwood Battle Axe|i`,
+"大斧":`グレートアクス|Greataxe|i;黒騎士の大斧|Black Knight Greataxe|u;竜狩りの大斧|Dragonslayer Greataxe|u;デーモンの大斧|Demon's Greataxe|u;ヨームの大鉈|Yhorm's Great Machete|u;大地を探す者|Earth Seeker|u`,
+"槌":`クラブ|Club|i;メイス|Mace|i;モーニングスター|Morning Star|i;ウォーピック|Warpick|i;つるはし|Pickaxe|i;補強された棍棒|Reinforced Club|i;鍛冶屋の金槌|Blacksmith Hammer|i;ヘイゼルのつるはし|Heysel Pick|u;棘付きメイス|Spiked Mace|i`,
+"大槌":`大きな棍棒|Large Club|i;大棍棒|Great Club|i;グレートメイス|Great Mace|i;ガーゴイルの炎槌|Gargoyle Flame Hammer|i;ボルドの大槌|Vordt's Great Hammer|u;古き王の大槌|Old King's Great Hammer|u;スモウの大槌|Smough's Great Hammer|u;モーンの大槌|Morne's Great Hammer|u;レドの大槌|Ledo's Great Hammer|u;震える石槌|Quakestone Hammer|i;大竜牙|Dragon Tooth|i;大木槌|Great Wooden Hammer|i`,
+"拳・爪":`セスタス|Caestus|i;鉤爪|Claw|i;傀儡の鉤爪|Manikin Claws|i;暗い手|Dark Hand|n;デーモンの拳|Demon's Fist|u;鴉の鉤爪|Crow Talons|i`,
+"槍":`スピア|Spear|i;ウィングドスピア|Winged Spear|i;パルチザン|Partizan|i;パイク|Pike|i;ロスリック騎士の長槍|Lothric Knight Long Spear|i;ガーゴイルの炎槍|Gargoyle Flame Spear|i;腐れたグルーの槍|Rotten Ghru Spear|i;尾骨の槍|Tailbone Spear|i;はんだごて|Soldering Iron|i;竜狩りの剣槍|Dragonslayer Swordspear|u;ヨルシカの槍|Yorshka's Spear|u;アルスターの槍|Arstor's Spear|u;聖なる二又槍|Saint Bident|i;ドラングの双槍|Drang Twinspears|i;輪の騎士の槍|Ringed Knight Spear|u;竜狩りの槍|Dragonslayer Spear|u`,
+"斧槍":`ハルバード|Halberd|i;ルッツェルン|Lucerne|i;グレイブ|Glaive|i;黒騎士の斧槍|Black Knight Glaive|u;赤柄の斧槍|Red Hilted Halberd|i;焼却の火口|Immolation Tinder|u;グンダの斧槍|Gundyr's Halberd|u;有翼騎士の斧槍|Winged Knight Halberd|i;三日月斧|Crescent Axe|u;割れ葉の大剣|Splitleaf Greatsword|i;ドラングのハンマー|Drang Hammers|i`,
+"鎌":`大鎌|Great Scythe|i;命狩りの鎌|Lifehunt Scythe|u;法王騎士の大鎌|Pontiff Knight Great Scythe|i;フリーデの大鎌|Friede's Great Scythe|u;鴉人の大鎌|Great Corvian Scythe|i`,
+"鞭":`ウィップ|Whip|i;ノッチドウィップ|Notched Whip|i;斑の鞭|Spotted Whip|i;魔女の髪|Witch's Locks|u;アリアンデルの薔薇|Rose of Ariandel|u`,
+"弓・クロスボウ":`ショートボウ|Short Bow|t;コンポジットボウ|Composite Bow|t;ロングボウ|Longbow|t;ファリスの黒弓|Black Bow of Pharis|t;暗月の長弓|Darkmoon Longbow|u;鬼殺しの大弓|Onislayer Greatbow|u;竜狩りの大弓|Dragonslayer Greatbow|u;白樺の弓|White Birch Bow|t;ミルウッドの大弓|Millwood Greatbow|t;ライトクロスボウ|Light Crossbow|t;アーバレスト|Arbalest|t;ヘビークロスボウ|Heavy Crossbow|t;スナイパークロス|Sniper Crossbow|t;アヴェリン|Avelyn|t;騎士のクロスボウ|Knight's Crossbow|t;連射クロスボウ|Repeating Crossbow|t`,
+"触媒":`魔術師の杖|Sorcerer's Staff|t;宮廷魔術師の杖|Court Sorcerer's Staff|t;異端の杖|Heretic's Staff|t;魔女樹の枝|Witchtree Branch|t;語り部の杖|Storyteller's Staff|t;物乞いの杖|Mendicant's Staff|t;蛆人の杖|Man-grub's Staff|t;大司教の大杖|Archdeacon's Great Staff|t;イザリスの杖|Izalith Staff|t;賢者の結晶杖|Sage's Crystal Staff|u;黄金の儀式槍|Golden Ritual Spear|t;濁った長杖|Murky Longstaff|t;呪術の火|Pyromancy Flame|t;タリスマン|Talisman|t;聖女のタリスマン|Saint's Talisman|t;太陽なきタリスマン|Sunless Talisman|t;白髪のタリスマン|White Hair Talisman|t;布のタリスマン|Canvas Talisman|t;聖職者の聖鈴|Cleric's Sacred Chime|t;司祭の聖鈴|Priest's Chime|t;ヨルシカの聖鈴|Yorshka's Chime|t;カイザの聖鈴|Caitha's Chime|t;結晶の聖鈴|Crystal Chime|t;フィリアノールの聖鈴|Sacred Chime of Filianore|t;聖樹の鈴草|Saint-tree Bellvine|t`,
+"盾":`バックラー|Buckler|i;小さな革の盾|Small Leather Shield|i;ターゲットシールド|Target Shield|i;戦士の円盾|Warrior's Round Shield|i;鉄の円盾|Iron Round Shield|i;カドゥケウスの円盾|Caduceus Round Shield|i;結晶輪の盾|Crystal Ring Shield|u;聖花の盾|Sacred Bloom Shield|i;霊木の盾|Ethereal Oak Shield|i;豚の盾|Porcine Shield|i;板の盾|Plank Shield|i;革の盾|Leather Shield|i;騎士の盾|Knight Shield|i;草紋の盾|Grass Crest Shield|i;カイトシールド|Kite Shield|i;ロスリック騎士の盾|Lothric Knight Shield|i;太陽の盾|Sunlight Shield|i;銀騎士の盾|Silver Knight Shield|i;精霊樹の紋章盾|Spirit Tree Crest Shield|i;青い木の盾|Blue Wooden Shield|i;紅白の円盾|Red and White Round Shield|i;エルクホーンの円盾|Elkhorn Round Shield|i;ルウェリンの盾|Llewellyn Shield|i;竜紋章の盾|Dragon Crest Shield|i;欲する盾|Shield of Want|i;スパイクシールド|Spiked Shield|i;ピアスシールド|Pierce Shield|i;カーサスの盾|Carthus Shield|i;法王騎士の盾|Pontiff Knight Shield|i;金翼の紋章盾|Golden Wing Crest Shield|i;黒騎士の盾|Black Knight Shield|u;東国の鉄盾|Eastern Iron Shield|i;軍神の木盾|Wargod Wooden Shield|i;東西の盾|East-West Shield|i;ホークウッドの盾|Hawkwood's Shield|i;紋章の盾|Crest Shield|i;竜頭の盾|Dragonhead Shield|i;銀鷲のカイトシールド|Silver Eagle Kite Shield|i;金鷹の盾|Golden Falcon Shield|i;嘆きの盾|Moaning Shield|u;骨車の盾|Bonewheel Shield|i;石のパルマ|Stone Parma|i;追従者の盾|Follower Shield|i`,
+"大盾":`ロスリック騎士の大盾|Lothric Knight Greatshield|i;大聖堂騎士の大盾|Cathedral Knight Greatshield|i;狼騎士の大盾|Wolf Knight's Greatshield|i;ハベルの大盾|Havel's Greatshield|i;栄光の大盾|Greatshield of Glory|i;竜狩りの大盾|Dragonslayer Greatshield|i;古竜の大盾|Ancient Dragon Greatshield|u;双竜の大盾|Twin Dragon Greatshield|i;ヨームの大盾|Yhorm's Greatshield|u;呪い除けの大盾|Curse Ward Greatshield|i;巨人の扉盾|Giant Door Shield|i;黒騎士の大盾|Black Iron Greatshield|i;石の大盾|Stone Greatshield|i`,
+"指輪":`生命の指輪|Life Ring|c;生命の指輪+1|Life Ring+1|c;生命の指輪+2|Life Ring+2|c;生命の指輪+3|Life Ring+3|c;緑花の指輪|Chloranthy Ring|c;緑花の指輪+1|Chloranthy Ring+1|c;緑花の指輪+2|Chloranthy Ring+2|c;緑花の指輪+3|Chloranthy Ring+3|c;ハベルの指輪|Havel's Ring|c;ハベルの指輪+1|Havel's Ring+1|c;ハベルの指輪+2|Havel's Ring+2|c;ハベルの指輪+3|Havel's Ring+3|c;寵愛の指輪|Ring of Favor|c;寵愛の指輪+1|Ring of Favor+1|c;寵愛の指輪+2|Ring of Favor+2|c;寵愛の指輪+3|Ring of Favor+3|c;鉄の加護の指輪|Ring of Steel Protection|c;鉄の加護の指輪+1|Ring of Steel Protection+1|c;鉄の加護の指輪+2|Ring of Steel Protection+2|c;鉄の加護の指輪+3|Ring of Steel Protection+3|c;炎石の指輪|Flame Stoneplate Ring|c;炎石の指輪+1|Flame Stoneplate Ring+1|c;炎石の指輪+2|Flame Stoneplate Ring+2|c;炎石の指輪+3|Flame Stoneplate Ring+3|c;雷石の指輪|Thunder Stoneplate Ring|c;雷石の指輪+1|Thunder Stoneplate Ring+1|c;雷石の指輪+2|Thunder Stoneplate Ring+2|c;雷石の指輪+3|Thunder Stoneplate Ring+3|c;魔石の指輪|Magic Stoneplate Ring|c;魔石の指輪+1|Magic Stoneplate Ring+1|c;魔石の指輪+2|Magic Stoneplate Ring+2|c;魔石の指輪+3|Magic Stoneplate Ring+3|c;闇石の指輪|Dark Stoneplate Ring|c;闇石の指輪+1|Dark Stoneplate Ring+1|c;闇石の指輪+2|Dark Stoneplate Ring+2|c;闇石の指輪+3|Dark Stoneplate Ring+3|c;まだら石の指輪|Speckled Stoneplate Ring|c;まだら石の指輪+1|Speckled Stoneplate Ring+1|c;血咬の指輪|Bloodbite Ring|c;血咬の指輪+1|Bloodbite Ring+1|c;毒咬の指輪|Poisonbite Ring|c;毒咬の指輪+1|Poisonbite Ring+1|c;冷咬の指輪|Chillbite Ring|c;呪咬の指輪|Cursebite Ring|c;肉咬の指輪|Fleshbite Ring|c;肉咬の指輪+1|Fleshbite Ring+1|c;木目の指輪|Wood Grain Ring|c;木目の指輪+1|Wood Grain Ring+1|c;木目の指輪+2|Wood Grain Ring+2|c;学者の指輪|Scholar Ring|c;聖女の指輪|Priestess Ring|c;赤い涙石の指輪|Red Tearstone Ring|c;青い涙石の指輪|Blue Tearstone Ring|c;狼の指輪|Wolf Ring|c;狼の指輪+1|Wolf Ring+1|c;狼の指輪+2|Wolf Ring+2|c;狼の指輪+3|Wolf Ring+3|c;獅子の指輪|Leo Ring|c;犠牲の指輪|Ring of Sacrifice|c;若竜の指輪|Young Dragon Ring|c;咆哮の竜印の指輪|Bellowing Dragoncrest Ring|c;大沼の指輪|Great Swamp Ring|c;魔女の指輪|Witch's Ring|c;モーンの指輪|Morne's Ring|c;太陽の長子の指輪|Ring of the Sun's First Born|c;長い竜印の指輪|Lingering Dragoncrest Ring|c;長い竜印の指輪+1|Lingering Dragoncrest Ring+1|c;長い竜印の指輪+2|Lingering Dragoncrest Ring+2|c;長い竜印の指輪+3|Lingering Dragoncrest Ring+3|c;賢者の指輪|Sage Ring|c;賢者の指輪+1|Sage Ring+1|c;賢者の指輪+2|Sage Ring+2|c;眠り竜の指輪|Slumbering Dragoncrest Ring|c;狩人の指輪|Hunter's Ring|c;騎士の指輪|Knight's Ring|c;ロイドの剣の指輪|Lloyd's Sword Ring|c;ロイドの盾の指輪|Lloyd's Shield Ring|c;エストの指輪|Estus Ring|c;灰のエストの指輪|Ashen Estus Ring|c;馬蹄の指輪|Horsehoof Ring|c;カーサスの血指輪|Carthus Bloodring|c;カーサスの乳指輪|Carthus Milkring|c;反転の指輪|Reversal Ring|c;法王の右眼|Pontiff's Right Eye|c;法王の左眼|Pontiff's Left Eye|c;宵闇の冠の指輪|Dusk Crown Ring|c;暗月の指輪|Darkmoon Ring|c;スズメバチの指輪|Hornet Ring|c;邪眼の指輪|Ring of the Evil Eye|c;邪眼の指輪+1|Ring of the Evil Eye+1|c;邪眼の指輪+2|Ring of the Evil Eye+2|c;邪眼の指輪+3|Ring of the Evil Eye+3|c;鷹の指輪|Hawk Ring|c;貪欲な金蛇の指輪|Covetous Gold Serpent Ring|c;貪欲な金蛇の指輪+1|Covetous Gold Serpent Ring+1|c;貪欲な金蛇の指輪+2|Covetous Gold Serpent Ring+2|c;貪欲な金蛇の指輪+3|Covetous Gold Serpent Ring+3|c;貪欲な銀蛇の指輪|Covetous Silver Serpent Ring|c;貪欲な銀蛇の指輪+1|Covetous Silver Serpent Ring+1|c;貪欲な銀蛇の指輪+2|Covetous Silver Serpent Ring+2|c;貪欲な銀蛇の指輪+3|Covetous Silver Serpent Ring+3|c;太陽の王女の指輪|Sun Princess Ring|c;銀猫の指輪|Silvercat Ring|c;隠密の指輪|Obscuring Ring|c;偽りの闇の指輪|Untrue Dark Ring|c;偽りの白の指輪|Untrue White Ring|c;髑髏の指輪|Skull Ring|c;災厄の指輪|Calamity Ring|c;ファランの指輪|Farron Ring|c;アルドリッチの蒼玉|Aldrich's Sapphire|c;アルドリッチの紅玉|Aldrich's Ruby|c;雷の鉤爪の指輪|Lightning Clutch Ring|c;炎の鉤爪の指輪|Fire Clutch Ring|c;闇の鉤爪の指輪|Dark Clutch Ring|c;魔力の鉤爪の指輪|Magic Clutch Ring|c;フリンの指輪|Flynn's Ring|c;囚人の鎖|Prisoner's Chain|c;竜鱗の指輪|Dragonscale Ring|c;聖者の指輪|Saint's Ring|c;深みの指輪|Deep Ring|c;騎士殺しの指輪|Knight Slayer's Ring|c`,
+"魔術":`ソウルの矢|Soul Arrow|c;強いソウルの矢|Great Soul Arrow|c;ソウルの太矢|Heavy Soul Arrow|c;強いソウルの太矢|Great Heavy Soul Arrow|c;追尾するソウルの結晶塊|Homing Soulmass|c;追尾する結晶塊|Homing Crystal Soulmass|c;ソウルの槍|Soul Spear|c;結晶の槍|Crystal Soul Spear|c;深みのソウル|Deep Soul|c;強い深みのソウル|Great Deep Soul|c;魔力の武器|Magic Weapon|c;強い魔力の武器|Great Magic Weapon|c;結晶の魔力の武器|Crystal Magic Weapon|c;魔力の盾|Magic Shield|c;強い魔力の盾|Great Magic Shield|c;見えない武器|Hidden Weapon|c;見えない体|Hidden Body|c;照らす光|Cast Light|c;修理|Repair|c;音無し|Spook|c;音寄せ|Aural Decoy|c;カメレオン|Chameleon|c;ファランの矢|Farron Dart|c;強いファランの矢|Great Farron Dart|c;ファランの雹|Farron Hail|c;ファランの瞬剣|Farron Flashsword|c;病み霧|Pestilent Mist|c;ソウルの大剣|Soul Greatsword|c;ソウルの奔流|Soul Stream|c;古い月光|Old Moonlight|c;白竜の息|White Dragon Breath|c;歪んだ光の壁|Twisted Wall of Light|c;瞬間凍結|Snap Freeze|c;親和|Affinity|c;結晶の雹|Crystal Hail|c`,
+"呪術":`火の玉|Fireball|c;火球|Fire Orb|c;発火|Combustion|c;大発火|Great Combustion|c;炎の鞭|Fire Whip|c;混沌の苗床の残滓|Chaos Bed Vestiges|c;大きな混沌の火球|Great Chaos Fire Orb|c;炎の奔流|Fire Surge|c;炎の嵐|Firestorm|c;混沌の嵐|Chaos Storm|c;毒の霧|Poison Mist|c;猛毒の霧|Toxic Mist|c;酸の噴射|Acid Surge|c;鉄の体|Iron Flesh|c;発汗|Flash Sweat|c;カーサスの炎弧|Carthus Flame Arc|c;カーサスの烽火|Carthus Beacon|c;内なる大力|Power Within|c;聖なる炎|Sacred Flame|c;冒涜の炎|Profaned Flame|c;魅了|Rapport|c;ぬくもりの火|Warmth|c;岩投げ|Boulder Heave|c;弾ける火の玉|Bursting Fireball|c;黒蛇|Black Serpent|c;黒炎の火球|Black Fire Orb|c;黒炎|Black Flame|c;煮えたぎる混沌|Seething Chaos|c;浮遊する混沌|Floating Chaos|c;炎の扇|Flame Fan|c`,
+"奇跡":`回復|Heal|c;中回復|Med Heal|c;大回復|Great Heal|c;大回復の抜粋|Great Heal Excerpt|c;太陽の光の癒し|Soothing Sunlight|c;太陽の光の恵み|Bountiful Sunlight|c;継続回復|Replenishment|c;大きな継続回復|Bountiful Light|c;癒しの涙|Caressing Tears|c;拒絶の涙|Tears of Denial|c;帰還|Homeward|c;フォース|Force|c;神の怒り|Wrath of the Gods|c;放つフォース|Emit Force|c;雷の槍|Lightning Spear|c;大きな雷の槍|Great Lightning Spear|c;太陽の光の槍|Sunlight Spear|c;雷の嵐|Lightning Storm|c;雷の杭|Lightning Stake|c;蝕み|Gnaw|c;ドーリスの蝕み|Dorhys' Gnawing|c;魔法防護|Magic Barrier|c;大魔法防護|Great Magic Barrier|c;祝福の武器|Blessed Weapon|c;誓約の刃|Sacred Oath|c;暗月の剣|Darkmoon Blade|c;沈黙の禁則|Vow of Silence|c;深みの加護|Deep Protection|c;贖罪|Atonement|c;闇の剣|Dark Blade|c;死者の活性|Dead Again|c;雷の矢|Lightning Arrow|c;回復の投射|Projected Heal|c;神の光の柱|Divine Pillars of Light|c;白い冠の道|Way of White Corona|c;導きを求める|Seek Guidance|c;命狩りの鎌|Lifehunt Scythe (Miracle)|c;雷の武器|Lightning Blade|c`,
+"防具セット":`騎士セット|Knight Set|c;伝令セット|Herald Set|c;傭兵セット|Sellsword Set|c;戦士セット|Warrior Set|c;暗殺者セット|Assassin Set|c;魔術師セット|Sorcerer Set|c;呪術師セット|Pyromancer Set|c;聖職者セット|Cleric Set|c;持たざる者セット|Deprived Set|c;ロスリック騎士セット|Lothric Knight Set|c;黒騎士セット|Black Knight Set|c;ハベルセット|Havel's Set|c;堕ちた騎士セット|Fallen Knight Set|c;カタリナセット|Catarina Set|c;狼騎士セット|Wolf Knight Set|c;遠征騎士セット|Outrider Knight Set|c;逐われ人セット|Exile Set|c;竜狩りセット|Dragonslayer Set|c;大聖堂騎士セット|Cathedral Knight Set|c;法王騎士セット|Pontiff Knight Set|c;ファーナムセット|Faraam Set|c;山賊セット|Brigand Set|c;上級騎士セット|Elite Knight Set|c;竜血の騎士セット|Drakeblood Set|c;モーンセット|Morne's Set|c;グンダセット|Gundyr's Set|c;スモウセット|Smough's Set|c;大司教セット|Archdeacon Set|c;影セット|Shadow Set|c;黒鉄セット|Black Iron Set|c;火の魔女セット|Fire Witch Set|c;輪の騎士セット|Ringed Knight Set|c;ハラルド軍団セット|Harald Legion Set|c;奴隷騎士セット|Slave Knight Set|c;ミルウッド騎士セット|Millwood Knight Set|c`
+};
+const WEAPON_CATS = ["短剣","直剣","大剣","特大剣","曲剣","大曲剣","刀","刺剣","斧","大斧","槌","大槌","拳・爪","槍","斧槍","鎌","鞭","弓・クロスボウ","触媒","盾","大盾"];
+const INF = [["n","ノーマル","Normal"],["hv","重厚","Heavy"],["sh","鋭利","Sharp"],["rf","熟練","Refined"],["sm","澄んだ","Simple"],["cr","結晶","Crystal"],["fi","炎","Fire"],["ch","混沌","Chaos"],["li","雷","Lightning"],["dp","深み","Deep"],["dk","闇","Dark"],["po","毒","Poison"],["bl","出血","Blood"],["rw","生まれ","Raw"],["bs","祝福","Blessed"],["ho","亡者","Hollow"]];
+const CATS = Object.keys(RAW);
+const slug = s => s.toLowerCase().replace(/[^a-z0-9+]+/g,"-").replace(/^-|-$/g,"");
+const BASE = [];
+for (const c of CATS) RAW[c].split(";").forEach(line=>{const [j,e,f]=line.split("|").map(x=>x.trim());BASE.push({id:c+":"+(slug(e)||j),j,e,f,c})});
+
+const esc = s => String(s??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+const $ = id => document.getElementById(id);
+const toast = m => {const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("show"),1800)};
+
+/* ---------- 状態 ---------- */
+// S = {own:{id:1}, lv:{id:{inf:level}}, edits:{id:{j,e,f,hide}}, custom:[{id,j,e,f,c}], ts}
+let S = {own:{},lv:{},edits:{},custom:[],ts:0};
+const LSK = "ds3-tracker-v1";
+try{const x=JSON.parse(localStorage.getItem(LSK)||"null");if(x)S=Object.assign(S,x)}catch(e){}
+
+const items = () => {
+  const arr = BASE.concat(S.custom||[]).map(b=>Object.assign({},b,(S.edits||{})[b.id]||{}));
+  return arr.filter(x=>!x.del);
+};
+const maxLv = f => f==="i"||f==="t"?10:f==="u"?5:0;
+const slots = it => it.f==="i"?INF.map(x=>x[0]):(it.f==="c"?[]:["n"]);
+function info(it){
+  const sl = slots(it), lv=(S.lv[it.id]||{}), m=maxLv(it.f);
+  if(!sl.length){const o=!!S.own[it.id];return {own:o,has:o?1:0,max:o?1:0,tot:1,done:o,isCol:true}}
+  let has=0,mx=0;for(const k of sl){const v=lv[k];if(v!=null&&v!==""){has++;if(+v>=m)mx++}}
+  const own = has>0 || !!S.own[it.id];
+  return {own,has,max:mx,tot:sl.length,done:own&&mx===sl.length};
+}
+
+/* ---------- 保存（端末をまたぐ保存: db、なければこのブラウザ内） ---------- */
+let db=null, docRef=null, saveTimer=null;
+function save(){
+  S.ts=Date.now();
+  try{localStorage.setItem(LSK,JSON.stringify(S))}catch(e){}
+  clearTimeout(saveTimer);
+  if(docRef) saveTimer=setTimeout(()=>{docRef.set({state:JSON.stringify(S)}).then(()=>$("sync").textContent="保存先：アカウント（同期済み）").catch(()=>$("sync").textContent="保存先：この端末（同期失敗）")},700);
+}
+const unwrap = snap => { if(!snap) return null; if(typeof snap.data==="function") return snap.data(); if(snap.data&&typeof snap.data==="object") return snap.data; return snap; };
+(async()=>{
+  try{
+    if(!window.claude||!claude.use){$("sync").textContent="保存先：この端末";return}
+    const timer=setTimeout(()=>{if(!docRef)$("sync").textContent="保存先：この端末"},10000);
+    const [d,u]=await Promise.all([claude.use("db"),claude.use("user")]);
+    if(!d||!u){clearTimeout(timer);$("sync").textContent="保存先：この端末";return}
+    const id=await u.id(); db=d;
+    docRef=db.collection("data/users/"+id).doc("progress");
+    const v=unwrap(await docRef.get());clearTimeout(timer);
+    if(v&&v.state){const r=JSON.parse(v.state);if((r.ts||0)>(S.ts||0)){S=Object.assign({own:{},lv:{},edits:{},custom:[]},r);try{localStorage.setItem(LSK,JSON.stringify(S))}catch(e){}renderAll()}else if((S.ts||0)>(r.ts||0))save()}
+    else if(S.ts) save();
+    $("sync").textContent="保存先：アカウント（同期済み）";
+  }catch(e){$("sync").textContent="保存先：この端末"}
+})();
+
+/* ---------- 進捗 ---------- */
+function bar(label,a,b){const p=b?a/b*100:0;return `<div class="stat"><div class="row"><span>${esc(label)}</span><b>${a} / ${b}　${p.toFixed(1)}%</b></div><div class="bar"><i style="width:${p}%"></i></div></div>`}
+function renderProg(){
+  const all=items().filter(x=>!x.hide);
+  let iO=0,vH=0,vT=0,vM=0,dn=0;
+  const cat={};const inf={};INF.forEach(x=>inf[x[0]]=[0,0]);
+  for(const it of all){const s=info(it);if(s.own)iO++;if(s.done)dn++;
+    if(!s.isCol){vH+=s.has;vT+=s.tot;vM+=s.max}
+    const c=cat[it.c]||(cat[it.c]=[0,0]);c[0]+=s.done?1:0;c[1]++;
+    if(it.f==="i"){const lv=S.lv[it.id]||{};for(const [k] of INF){inf[k][1]++;if(lv[k]!=null&&lv[k]!==""&&+lv[k]>=10)inf[k][0]++}}}
+  const p=all.length?dn/all.length:0, R=52, C=2*Math.PI*R;
+  $("ring").innerHTML=`<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--chip)" stroke-width="10"/><circle cx="60" cy="60" r="${R}" fill="none" stroke="url(#g)" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C*p} ${C}"/><defs><linearGradient id="g"><stop offset="0" stop-color="var(--ember)"/><stop offset="1" stop-color="var(--ember2)"/></linearGradient></defs></svg><div class="c"><div class="big">${(p*100).toFixed(1)}%</div><div class="lbl">完全制覇</div><div class="lbl">${dn} / ${all.length}</div></div>`;
+  $("heroStats").innerHTML=bar("アイテム入手",iO,all.length)+bar("変質形態の所持（武器・盾・触媒）",vH,vT)+bar("最大強化済みの形態",vM,vT);
+  $("catStats").innerHTML=CATS.filter(c=>cat[c]).map(c=>bar(c,cat[c][0],cat[c][1])).join("")+Object.keys(cat).filter(c=>!CATS.includes(c)).map(c=>bar(c,cat[c][0],cat[c][1])).join("");
+  $("infStats").innerHTML=INF.map(([k,j,e])=>bar(j+"（"+e+"）",inf[k][0],inf[k][1])).join("");
+}
+
+/* ---------- 一覧 ---------- */
+let shown=60; const open=new Set();
+function filtered(){
+  const q=$("q").value.trim().toLowerCase(), fc=$("fc").value, fs=$("fs").value;
+  return items().filter(it=>{
+    if(fc&&it.c!==fc)return false;
+    if(q&&!(it.j.toLowerCase().includes(q)||(it.e||"").toLowerCase().includes(q)))return false;
+    if(fs){const s=info(it);
+      if(fs==="none"&&s.own)return false; if(fs==="own"&&!s.own)return false;
+      if(fs==="infTodo"&&(it.f!=="i"||s.has===s.tot))return false;
+      if(fs==="maxTodo"&&(s.isCol||s.max===s.tot))return false;
+      if(fs==="done"&&!s.done)return false; if(fs==="todo"&&s.done)return false;}
+    return true;});
+}
+function itemHTML(it){
+  const s=info(it), isOpen=open.has(it.id);
+  const tag = s.isCol?(s.own?"入手済み":"未入手"):(it.f==="i"?`所持 ${s.has}/16・最大 ${s.max}/16`:(s.has?(s.max?"最大":`+${(S.lv[it.id]||{}).n}`):"未入手"));
+  let body="";
+  if(isOpen){
+    const m=maxLv(it.f), sl=slots(it), lv=S.lv[it.id]||{};
+    const opts=v=>`<option value="">—</option>`+Array.from({length:m+1},(_,i)=>`<option value="${i}"${String(v)===String(i)?" selected":""}>+${i}</option>`).join("");
+    const meta=`<div class="meta">${esc(it.c)}・${it.f==="i"?"変質可／最大+10":it.f==="t"?"変質不可／最大+10":it.f==="u"?"変質不可／最大+5":it.f==="n"?"強化なし":"収集アイテム"}${it.hide?"・集計から除外中":""}</div>`;
+    const vars = sl.length&&it.f!=="n" ? `<div class="vars">${sl.map(k=>{const d=INF.find(x=>x[0]===k),v=lv[k],has=v!=null&&v!=="";return `<label class="v${has&&+v>=m?" max":has?" has":""}"><span class="n">${esc(d[1])}<small>${esc(d[2])}</small></span><select data-lv="${esc(it.id)}" data-k="${k}" aria-label="${esc(d[1])}の強化値">${opts(v)}</select></label>`}).join("")}</div>`:"";
+    const acts=`<div class="acts">${it.f==="i"?`<button class="btn sm" data-act="allmax">全形態を最大に</button>`:""}${sl.length&&it.f!=="n"?`<button class="btn sm" data-act="max">${it.f==="i"?"ノーマルを最大に":"最大にする"}</button><button class="btn sm" data-act="clear">強化値をクリア</button>`:""}<button class="btn sm" data-act="edit">編集</button></div>`;
+    body=`<div class="body">${meta}${vars}${acts}</div>`;
+  }
+  return `<div class="it" data-id="${esc(it.id)}"><div class="hd"><button class="chk${s.own?" on":""}" data-act="own" aria-label="入手済み">${s.own?"✓":""}</button><div class="nm"><div class="j">${esc(it.j)}</div><div class="e">${esc(it.e||"")}</div></div><div class="tag${s.done?" done":""}">${s.done?"完了":esc(tag)}</div></div>${body}</div>`;
+}
+function renderList(){
+  const arr=filtered();
+  $("cnt").textContent=`${arr.length}件`;
+  $("items").innerHTML=arr.length?arr.slice(0,shown).map(itemHTML).join(""):`<div class="empty">条件に合うアイテムがありません</div>`;
+  $("moreBtn").hidden=arr.length<=shown;
+}
+function renderAll(){renderProg();renderList()}
+const byId = id => items().find(x=>x.id===id);
+
+$("items").addEventListener("click",e=>{
+  const row=e.target.closest(".it"); if(!row)return; const id=row.dataset.id, it=byId(id); if(!it)return;
+  const a=e.target.closest("[data-act]")?.dataset.act;
+  if(e.target.closest("select"))return;
+  if(a==="own"){
+    const s=info(it);
+    if(s.own){delete S.own[id];delete S.lv[id]} else {S.own[id]=1}
+    save();renderAll();return;
+  }
+  if(a==="allmax"){S.lv[id]={};INF.forEach(([k])=>S.lv[id][k]=10);save();renderAll();toast("全16形態を+10にしました");return}
+  if(a==="max"){S.lv[id]=Object.assign(S.lv[id]||{},{n:maxLv(it.f)});save();renderAll();return}
+  if(a==="clear"){delete S.lv[id];save();renderAll();return}
+  if(a==="edit"){openEdit(it);return}
+  if(e.target.closest(".hd")){ if(it.f==="c"){ if(S.own[id])delete S.own[id]; else S.own[id]=1; save();renderAll(); } else { open.has(id)?open.delete(id):open.add(id); renderList(); } }
+});
+$("items").addEventListener("change",e=>{
+  const sel=e.target.closest("select[data-lv]"); if(!sel)return;
+  const id=sel.dataset.lv,k=sel.dataset.k; S.lv[id]=S.lv[id]||{};
+  if(sel.value==="")delete S.lv[id][k]; else S.lv[id][k]=+sel.value;
+  if(!Object.keys(S.lv[id]).length)delete S.lv[id];
+  save();renderAll();
+});
+let qt; $("q").addEventListener("input",()=>{clearTimeout(qt);qt=setTimeout(()=>{shown=60;renderList()},150)});
+["fc","fs"].forEach(x=>$(x).addEventListener("change",()=>{shown=60;renderList()}));
+$("moreBtn").addEventListener("click",()=>{shown+=60;renderList()});
+
+/* ---------- 編集・追加 ---------- */
+let editing=null;
+function openEdit(it){editing=it;$("ej").value=it.j;$("ee").value=it.e||"";$("ef").value=it.f;$("ehide").checked=!!it.hide;$("eDel").hidden=!String(it.id).startsWith("custom:");try{$("dlg").showModal()}catch(e){$("dlg").setAttribute("open","")}}
+$("editForm").addEventListener("submit",e=>{
+  const v=e.submitter?.value; if(!editing){return}
+  const id=editing.id;
+  if(v==="save"){
+    const patch={j:$("ej").value.trim()||editing.j,e:$("ee").value.trim(),f:$("ef").value,hide:$("ehide").checked};
+    if(id.startsWith("custom:")){const c=S.custom.find(x=>x.id===id);Object.assign(c,patch)}
+    else S.edits[id]=patch;
+    save();renderAll();toast("保存しました");
+  } else if(v==="del"){S.custom=S.custom.filter(x=>x.id!==id);delete S.lv[id];delete S.own[id];save();renderAll();toast("削除しました")}
+  editing=null;
+});
+$("addForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const it={id:"custom:"+Date.now().toString(36),j:$("aj").value.trim(),e:$("ae").value.trim(),f:$("af").value,c:$("ac").value};
+  if(!it.j)return; S.custom.push(it); save(); renderAll(); e.target.reset(); toast("追加しました：「"+it.j+"」");
+});
+$("expBtn").addEventListener("click",async()=>{const t=JSON.stringify(S);$("io").value=t;try{await navigator.clipboard.writeText(t);toast("コピーしました")}catch(e){$("io").select();toast("下の欄から手動でコピーしてください")}});
+$("impBtn").addEventListener("click",()=>{try{const r=JSON.parse($("io").value);if(!r||typeof r!=="object"||!r.lv)throw 0;S=Object.assign({own:{},lv:{},edits:{},custom:[]},r);save();renderAll();toast("読み込みました")}catch(e){toast("JSONを読み込めませんでした")}});
+let resetArm=0;
+$("resetBtn").addEventListener("click",()=>{if(Date.now()-resetArm>3000){resetArm=Date.now();$("resetBtn").textContent="もう一度押すとリセット";setTimeout(()=>$("resetBtn").textContent="進捗をすべてリセット",3000);return}S.own={};S.lv={};save();renderAll();$("resetBtn").textContent="進捗をすべてリセット";toast("進捗をリセットしました")});
+
+/* ---------- タブ ---------- */
+function tab(t){document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.t===t));["prog","list","data"].forEach(s=>$(s).hidden=s!==t)}
+document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{tab(b.dataset.t);if(b.dataset.t!=="data")history.replaceState(null,"","#"+b.dataset.t)}));
+const catOpts=CATS.map(c=>`<option>${esc(c)}</option>`).join("");
+$("fc").innerHTML=`<option value="">すべてのカテゴリ</option>`+catOpts; $("ac").innerHTML=catOpts;
+const h=location.hash.slice(1); if(["prog","list","data"].includes(h))tab(h);
+renderAll();
+}
+</script>
+</body>
+</html>
