@@ -85,6 +85,14 @@ input:focus-visible,select:focus-visible,button:focus-visible,textarea:focus-vis
 .sync{font-size:13px;color:var(--mute)}
 dialog{border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink);max-width:480px;width:calc(100% - 24px)}
 dialog::backdrop{background:rgba(0,0,0,.5)}
+.locs{margin:4px 0 10px;display:grid;gap:6px}
+.loc{font-size:13px;line-height:1.45;background:var(--chip);border-radius:10px;padding:8px 10px}
+.loc b{font-weight:600}
+.bdg{display:inline-block;font-size:12px;line-height:1.5;padding:0 6px;border-radius:6px;border:1px solid var(--line);color:var(--mute);margin:2px 4px 0 0;white-space:nowrap}
+.bdg.w{border-color:var(--ember);color:var(--ember)}
+.ar .hd{cursor:default}
+.ar .desc{font-size:13px;color:var(--mute);line-height:1.45;margin-top:2px}
+.ar .k{font-size:12px;color:var(--mute)}
 @media(max-width:600px){.hero{grid-template-columns:1fr;justify-items:center}.ring{width:min(220px,70vw)}.stats{width:100%}}
 </style>
 </head>
@@ -95,7 +103,8 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 </header>
 <nav role="tablist">
 <button role="tab" data-t="prog" aria-selected="true">進捗</button>
-<button role="tab" data-t="list" aria-selected="false">一覧・検索</button>
+<button role="tab" data-t="list" aria-selected="false">一覧</button>
+<button role="tab" data-t="area" aria-selected="false">エリア</button>
 <button role="tab" data-t="data" aria-selected="false">データ</button>
 </nav>
 <main>
@@ -107,6 +116,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 <div class="grid2">
 <div class="card"><h2>カテゴリ別</h2><div class="mini" id="catStats"></div></div>
 <div class="card"><h2>変質別の最大強化</h2><div class="mini" id="infStats"></div></div>
+<div class="card"><h2>エリア別の入手</h2><div class="mini" id="areaStats"></div></div>
 </div>
 </section>
 
@@ -129,6 +139,26 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 <div class="count" id="cnt"></div>
 <div class="list" id="items"></div>
 <div class="more"><button class="btn" id="moreBtn" hidden>さらに表示</button></div>
+</section>
+
+<section id="area" hidden>
+<div class="controls">
+<select id="aa" aria-label="エリア"></select>
+<div class="r">
+<select id="ak" aria-label="入手方法">
+<option value="">すべての入手方法</option>
+<option value="field">フィールドに落ちている</option>
+<option value="敵">敵・ボス・ミミックなど</option>
+<option value="商人">商人・錬成・NPC</option>
+<option value="取り逃し注意">取り逃し注意</option>
+<option value="NG+以降">NG+以降</option>
+</select>
+<select id="ao" aria-label="状態"><option value="">すべて</option><option value="todo">未入手のみ</option></select>
+</div>
+</div>
+<div class="count" id="acnt"></div>
+<div class="list" id="aitems"></div>
+<p class="note">入手場所の説明はデータ元の英語のままです。「解放」は、その品が店に並んだり受け取れるようになるエリアです。</p>
 </section>
 
 <section id="data" hidden>
@@ -159,7 +189,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 <div class="card">
 <h2>データについて</h2>
 <p class="note">変質は15種類（重厚・鋭利・熟練・澄んだ・結晶・炎・混沌・雷・深み・闇・毒・出血・生まれ・祝福・亡者）＋ノーマルの16形態で数えます。変質できない武器は1形態（+10または+5が最大）です。</p>
-<p class="note">収録データは手入力の初期値です。名前や変質可否・最大強化値がゲームと違う場合は、一覧で行を開いて「編集」から直せます。</p>
+<p class="note">アイテム一覧・変質可否・最大強化値・入手場所は、オープンソースのDS3ランダマイザー（Archipelago、MITライセンス）のデータをもとにしています。敵のランダムドロップは別の攻略データベースから補っており、一部のみです。日本語名は分かるものだけ入れてあり、それ以外は英語名で表示します。違う場合は一覧で行を開いて「編集」から直せます。</p>
 </div>
 </div>
 </section>
@@ -178,44 +208,15 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 </form></dialog>
 <div class="toast" id="toast"></div>
 
+<script src="data.js"></script>
 <script>
 {
-/* ---------- 初期データ  "日本語名|English|フラグ"  i=変質可+10 t=変質不可+10 u=変質不可+5 n=強化なし c=収集のみ ---------- */
-const RAW = {
-"短剣":`ダガー|Dagger|i;盗賊の短刀|Bandit's Knife|i;パリングダガー|Parrying Dagger|i;山賊の双短刀|Brigand Twindaggers|i;鴉人の大鉈|Corvian Greatknife|i;メイルブレイカー|Mail Breaker|i;ハルペー|Harpe|i;学者の燭台|Scholar's Candlestick|u;尾骨の短剣|Tailbone Short Sword|i;アクアマリンのダガー|Aquamarine Dagger|i;濁った手鎌|Murky Hand Scythe|i;腐れたグルーの短剣|Rotten Ghru Dagger|i`,
-"直剣":`ロングソード|Long Sword|i;ブロードソード|Broadsword|i;ショートソード|Shortsword|i;折れた直剣|Broken Straight Sword|i;アストラの直剣|Astora Straight Sword|i;ダークソード|Dark Sword|i;太陽の直剣|Sunlight Straight Sword|i;ロスリック騎士の剣|Lothric Knight Sword|i;棘の直剣|Barbed Straight Sword|i;モリオンブレード|Morion Blade|i;アンリの直剣|Anri's Straight Sword|i;イルシールの直剣|Irithyll Straight Sword|u;聖職者の燭台|Cleric's Candlestick|u;ロスリックの聖剣|Lothric's Holy Sword|u;輪の騎士の直剣|Ringed Knight Straight Sword|u`,
-"大剣":`バスタードソード|Bastard Sword|i;クレイモア|Claymore|i;フランベルジェ|Flamberge|i;執行者の大剣|Executioner's Greatsword|u;ウォルニールの聖剣|Wolnir's Holy Sword|u;月光の大剣|Moonlight Greatsword|u;狼騎士の大剣|Wolf Knight's Greatsword|u;ファランの大剣|Farron Greatsword|u;亡者狩りの大剣|Hollowslayer Greatsword|u;ストームルーラー|Storm Ruler|u;黒騎士の剣|Black Knight Sword|u;双王子の大剣|Twin Princes' Greatsword|u;竜血の大剣|Drakeblood Greatsword|u;火継ぎの大剣|Firelink Greatsword|u;裁きの大剣|Greatsword of Judgment|u;ゲールの大剣|Gael's Greatsword|u;オニキスブレード|Onyx Blade|u;汚れた大剣|Defiled Greatsword|u;ロリアンの大剣|Lorian's Greatsword|u`,
-"特大剣":`ツヴァイヘンダー|Zweihander|i;グレートソード|Greatsword|i;アストラの大剣|Astora Greatsword|i;ロスリック騎士の大剣|Lothric Knight Greatsword|i;大聖堂騎士の大剣|Cathedral Knight Greatsword|i;煙の特大剣|Fume Ultra Greatsword|u;冒涜の大剣|Profaned Greatsword|u;輪の騎士の双大剣|Ringed Knight Paired Greatswords|u`,
-"曲剣":`シミター|Scimitar|i;ファルシオン|Falchion|i;ショーテル|Shotel|i;カーサスの曲刀|Carthus Curved Sword|i;カーサスのショーテル|Carthus Shotel|i;法王騎士の曲剣|Pontiff Knight Curved Sword|u;嵐の曲剣|Storm Curved Sword|u;絵画守りの曲刀|Painting Guardian's Curved Sword|i;三日月の剣|Crescent Moon Sword|u;腐れたグルーの曲剣|Rotten Ghru Curved Sword|i;踊り子の双魔剣|Dancer's Enchanted Swords|u;傭兵の双刀|Sellsword Twinblades|i;番人の双刀|Warden Twinblades|i;追従者のサーベル|Follower Sabre|i;デーモンの傷跡|Demon's Scar|u`,
-"大曲剣":`逐われ人の大剣|Exile Greatsword|i;老狼の曲剣|Old Wolf Curved Sword|u;ハラルドの大曲剣|Harald Curved Greatsword|i;叢雲|Murakumo|i;カーサスの大曲剣|Carthus Curved Greatsword|i`,
-"刀":`打刀|Uchigatana|i;物干し竿|Washing Pole|i;黒刀|Black Blade|i;血狂い|Bloodlust|i;混沌の刃|Chaos Blade|u;闇朧|Darkdrift|u;擦り切れた刀|Frayed Blade|u;鬼切と姥断|Onikiri and Ubadachi|i`,
-"刺剣":`エストック|Estoc|i;レイピア|Rapier|i;リカールの刺剣|Ricard's Rapier|i;結晶老の刺剣|Crystal Sage's Rapier|u;イルシールの刺剣|Irithyll Rapier|i`,
-"斧":`ハンドアクス|Hand Axe|i;バトルアクス|Battle Axe|i;竜狩りの斧|Dragonslayer's Axe|u;山賊の斧|Brigand Axe|i;肉断ち包丁|Butcher Knife|i;深みのバトルアクス|Deep Battle Axe|u;エレオノーラ|Eleonora|i;蛇人の手斧|Man Serpent Hatchet|i;隷属の斧|Thrall Axe|i;有翼騎士の双斧|Winged Knight Twinaxes|i;ミルウッドのバトルアクス|Millwood Battle Axe|i`,
-"大斧":`グレートアクス|Greataxe|i;黒騎士の大斧|Black Knight Greataxe|u;竜狩りの大斧|Dragonslayer Greataxe|u;デーモンの大斧|Demon's Greataxe|u;ヨームの大鉈|Yhorm's Great Machete|u;大地を探す者|Earth Seeker|u`,
-"槌":`クラブ|Club|i;メイス|Mace|i;モーニングスター|Morning Star|i;ウォーピック|Warpick|i;つるはし|Pickaxe|i;補強された棍棒|Reinforced Club|i;鍛冶屋の金槌|Blacksmith Hammer|i;ヘイゼルのつるはし|Heysel Pick|u;棘付きメイス|Spiked Mace|i`,
-"大槌":`大きな棍棒|Large Club|i;大棍棒|Great Club|i;グレートメイス|Great Mace|i;ガーゴイルの炎槌|Gargoyle Flame Hammer|i;ボルドの大槌|Vordt's Great Hammer|u;古き王の大槌|Old King's Great Hammer|u;スモウの大槌|Smough's Great Hammer|u;モーンの大槌|Morne's Great Hammer|u;レドの大槌|Ledo's Great Hammer|u;震える石槌|Quakestone Hammer|i;大竜牙|Dragon Tooth|i;大木槌|Great Wooden Hammer|i`,
-"拳・爪":`セスタス|Caestus|i;鉤爪|Claw|i;傀儡の鉤爪|Manikin Claws|i;暗い手|Dark Hand|n;デーモンの拳|Demon's Fist|u;鴉の鉤爪|Crow Talons|i`,
-"槍":`スピア|Spear|i;ウィングドスピア|Winged Spear|i;パルチザン|Partizan|i;パイク|Pike|i;ロスリック騎士の長槍|Lothric Knight Long Spear|i;ガーゴイルの炎槍|Gargoyle Flame Spear|i;腐れたグルーの槍|Rotten Ghru Spear|i;尾骨の槍|Tailbone Spear|i;はんだごて|Soldering Iron|i;竜狩りの剣槍|Dragonslayer Swordspear|u;ヨルシカの槍|Yorshka's Spear|u;アルスターの槍|Arstor's Spear|u;聖なる二又槍|Saint Bident|i;ドラングの双槍|Drang Twinspears|i;輪の騎士の槍|Ringed Knight Spear|u;竜狩りの槍|Dragonslayer Spear|u`,
-"斧槍":`ハルバード|Halberd|i;ルッツェルン|Lucerne|i;グレイブ|Glaive|i;黒騎士の斧槍|Black Knight Glaive|u;赤柄の斧槍|Red Hilted Halberd|i;焼却の火口|Immolation Tinder|u;グンダの斧槍|Gundyr's Halberd|u;有翼騎士の斧槍|Winged Knight Halberd|i;三日月斧|Crescent Axe|u;割れ葉の大剣|Splitleaf Greatsword|i;ドラングのハンマー|Drang Hammers|i`,
-"鎌":`大鎌|Great Scythe|i;命狩りの鎌|Lifehunt Scythe|u;法王騎士の大鎌|Pontiff Knight Great Scythe|i;フリーデの大鎌|Friede's Great Scythe|u;鴉人の大鎌|Great Corvian Scythe|i`,
-"鞭":`ウィップ|Whip|i;ノッチドウィップ|Notched Whip|i;斑の鞭|Spotted Whip|i;魔女の髪|Witch's Locks|u;アリアンデルの薔薇|Rose of Ariandel|u`,
-"弓・クロスボウ":`ショートボウ|Short Bow|t;コンポジットボウ|Composite Bow|t;ロングボウ|Longbow|t;ファリスの黒弓|Black Bow of Pharis|t;暗月の長弓|Darkmoon Longbow|u;鬼殺しの大弓|Onislayer Greatbow|u;竜狩りの大弓|Dragonslayer Greatbow|u;白樺の弓|White Birch Bow|t;ミルウッドの大弓|Millwood Greatbow|t;ライトクロスボウ|Light Crossbow|t;アーバレスト|Arbalest|t;ヘビークロスボウ|Heavy Crossbow|t;スナイパークロス|Sniper Crossbow|t;アヴェリン|Avelyn|t;騎士のクロスボウ|Knight's Crossbow|t;連射クロスボウ|Repeating Crossbow|t`,
-"触媒":`魔術師の杖|Sorcerer's Staff|t;宮廷魔術師の杖|Court Sorcerer's Staff|t;異端の杖|Heretic's Staff|t;魔女樹の枝|Witchtree Branch|t;語り部の杖|Storyteller's Staff|t;物乞いの杖|Mendicant's Staff|t;蛆人の杖|Man-grub's Staff|t;大司教の大杖|Archdeacon's Great Staff|t;イザリスの杖|Izalith Staff|t;賢者の結晶杖|Sage's Crystal Staff|u;黄金の儀式槍|Golden Ritual Spear|t;濁った長杖|Murky Longstaff|t;呪術の火|Pyromancy Flame|t;タリスマン|Talisman|t;聖女のタリスマン|Saint's Talisman|t;太陽なきタリスマン|Sunless Talisman|t;白髪のタリスマン|White Hair Talisman|t;布のタリスマン|Canvas Talisman|t;聖職者の聖鈴|Cleric's Sacred Chime|t;司祭の聖鈴|Priest's Chime|t;ヨルシカの聖鈴|Yorshka's Chime|t;カイザの聖鈴|Caitha's Chime|t;結晶の聖鈴|Crystal Chime|t;フィリアノールの聖鈴|Sacred Chime of Filianore|t;聖樹の鈴草|Saint-tree Bellvine|t`,
-"盾":`バックラー|Buckler|i;小さな革の盾|Small Leather Shield|i;ターゲットシールド|Target Shield|i;戦士の円盾|Warrior's Round Shield|i;鉄の円盾|Iron Round Shield|i;カドゥケウスの円盾|Caduceus Round Shield|i;結晶輪の盾|Crystal Ring Shield|u;聖花の盾|Sacred Bloom Shield|i;霊木の盾|Ethereal Oak Shield|i;豚の盾|Porcine Shield|i;板の盾|Plank Shield|i;革の盾|Leather Shield|i;騎士の盾|Knight Shield|i;草紋の盾|Grass Crest Shield|i;カイトシールド|Kite Shield|i;ロスリック騎士の盾|Lothric Knight Shield|i;太陽の盾|Sunlight Shield|i;銀騎士の盾|Silver Knight Shield|i;精霊樹の紋章盾|Spirit Tree Crest Shield|i;青い木の盾|Blue Wooden Shield|i;紅白の円盾|Red and White Round Shield|i;エルクホーンの円盾|Elkhorn Round Shield|i;ルウェリンの盾|Llewellyn Shield|i;竜紋章の盾|Dragon Crest Shield|i;欲する盾|Shield of Want|i;スパイクシールド|Spiked Shield|i;ピアスシールド|Pierce Shield|i;カーサスの盾|Carthus Shield|i;法王騎士の盾|Pontiff Knight Shield|i;金翼の紋章盾|Golden Wing Crest Shield|i;黒騎士の盾|Black Knight Shield|u;東国の鉄盾|Eastern Iron Shield|i;軍神の木盾|Wargod Wooden Shield|i;東西の盾|East-West Shield|i;ホークウッドの盾|Hawkwood's Shield|i;紋章の盾|Crest Shield|i;竜頭の盾|Dragonhead Shield|i;銀鷲のカイトシールド|Silver Eagle Kite Shield|i;金鷹の盾|Golden Falcon Shield|i;嘆きの盾|Moaning Shield|u;骨車の盾|Bonewheel Shield|i;石のパルマ|Stone Parma|i;追従者の盾|Follower Shield|i`,
-"大盾":`ロスリック騎士の大盾|Lothric Knight Greatshield|i;大聖堂騎士の大盾|Cathedral Knight Greatshield|i;狼騎士の大盾|Wolf Knight's Greatshield|i;ハベルの大盾|Havel's Greatshield|i;栄光の大盾|Greatshield of Glory|i;竜狩りの大盾|Dragonslayer Greatshield|i;古竜の大盾|Ancient Dragon Greatshield|u;双竜の大盾|Twin Dragon Greatshield|i;ヨームの大盾|Yhorm's Greatshield|u;呪い除けの大盾|Curse Ward Greatshield|i;巨人の扉盾|Giant Door Shield|i;黒騎士の大盾|Black Iron Greatshield|i;石の大盾|Stone Greatshield|i`,
-"指輪":`生命の指輪|Life Ring|c;生命の指輪+1|Life Ring+1|c;生命の指輪+2|Life Ring+2|c;生命の指輪+3|Life Ring+3|c;緑花の指輪|Chloranthy Ring|c;緑花の指輪+1|Chloranthy Ring+1|c;緑花の指輪+2|Chloranthy Ring+2|c;緑花の指輪+3|Chloranthy Ring+3|c;ハベルの指輪|Havel's Ring|c;ハベルの指輪+1|Havel's Ring+1|c;ハベルの指輪+2|Havel's Ring+2|c;ハベルの指輪+3|Havel's Ring+3|c;寵愛の指輪|Ring of Favor|c;寵愛の指輪+1|Ring of Favor+1|c;寵愛の指輪+2|Ring of Favor+2|c;寵愛の指輪+3|Ring of Favor+3|c;鉄の加護の指輪|Ring of Steel Protection|c;鉄の加護の指輪+1|Ring of Steel Protection+1|c;鉄の加護の指輪+2|Ring of Steel Protection+2|c;鉄の加護の指輪+3|Ring of Steel Protection+3|c;炎石の指輪|Flame Stoneplate Ring|c;炎石の指輪+1|Flame Stoneplate Ring+1|c;炎石の指輪+2|Flame Stoneplate Ring+2|c;炎石の指輪+3|Flame Stoneplate Ring+3|c;雷石の指輪|Thunder Stoneplate Ring|c;雷石の指輪+1|Thunder Stoneplate Ring+1|c;雷石の指輪+2|Thunder Stoneplate Ring+2|c;雷石の指輪+3|Thunder Stoneplate Ring+3|c;魔石の指輪|Magic Stoneplate Ring|c;魔石の指輪+1|Magic Stoneplate Ring+1|c;魔石の指輪+2|Magic Stoneplate Ring+2|c;魔石の指輪+3|Magic Stoneplate Ring+3|c;闇石の指輪|Dark Stoneplate Ring|c;闇石の指輪+1|Dark Stoneplate Ring+1|c;闇石の指輪+2|Dark Stoneplate Ring+2|c;闇石の指輪+3|Dark Stoneplate Ring+3|c;まだら石の指輪|Speckled Stoneplate Ring|c;まだら石の指輪+1|Speckled Stoneplate Ring+1|c;血咬の指輪|Bloodbite Ring|c;血咬の指輪+1|Bloodbite Ring+1|c;毒咬の指輪|Poisonbite Ring|c;毒咬の指輪+1|Poisonbite Ring+1|c;冷咬の指輪|Chillbite Ring|c;呪咬の指輪|Cursebite Ring|c;肉咬の指輪|Fleshbite Ring|c;肉咬の指輪+1|Fleshbite Ring+1|c;木目の指輪|Wood Grain Ring|c;木目の指輪+1|Wood Grain Ring+1|c;木目の指輪+2|Wood Grain Ring+2|c;学者の指輪|Scholar Ring|c;聖女の指輪|Priestess Ring|c;赤い涙石の指輪|Red Tearstone Ring|c;青い涙石の指輪|Blue Tearstone Ring|c;狼の指輪|Wolf Ring|c;狼の指輪+1|Wolf Ring+1|c;狼の指輪+2|Wolf Ring+2|c;狼の指輪+3|Wolf Ring+3|c;獅子の指輪|Leo Ring|c;犠牲の指輪|Ring of Sacrifice|c;若竜の指輪|Young Dragon Ring|c;咆哮の竜印の指輪|Bellowing Dragoncrest Ring|c;大沼の指輪|Great Swamp Ring|c;魔女の指輪|Witch's Ring|c;モーンの指輪|Morne's Ring|c;太陽の長子の指輪|Ring of the Sun's First Born|c;長い竜印の指輪|Lingering Dragoncrest Ring|c;長い竜印の指輪+1|Lingering Dragoncrest Ring+1|c;長い竜印の指輪+2|Lingering Dragoncrest Ring+2|c;長い竜印の指輪+3|Lingering Dragoncrest Ring+3|c;賢者の指輪|Sage Ring|c;賢者の指輪+1|Sage Ring+1|c;賢者の指輪+2|Sage Ring+2|c;眠り竜の指輪|Slumbering Dragoncrest Ring|c;狩人の指輪|Hunter's Ring|c;騎士の指輪|Knight's Ring|c;ロイドの剣の指輪|Lloyd's Sword Ring|c;ロイドの盾の指輪|Lloyd's Shield Ring|c;エストの指輪|Estus Ring|c;灰のエストの指輪|Ashen Estus Ring|c;馬蹄の指輪|Horsehoof Ring|c;カーサスの血指輪|Carthus Bloodring|c;カーサスの乳指輪|Carthus Milkring|c;反転の指輪|Reversal Ring|c;法王の右眼|Pontiff's Right Eye|c;法王の左眼|Pontiff's Left Eye|c;宵闇の冠の指輪|Dusk Crown Ring|c;暗月の指輪|Darkmoon Ring|c;スズメバチの指輪|Hornet Ring|c;邪眼の指輪|Ring of the Evil Eye|c;邪眼の指輪+1|Ring of the Evil Eye+1|c;邪眼の指輪+2|Ring of the Evil Eye+2|c;邪眼の指輪+3|Ring of the Evil Eye+3|c;鷹の指輪|Hawk Ring|c;貪欲な金蛇の指輪|Covetous Gold Serpent Ring|c;貪欲な金蛇の指輪+1|Covetous Gold Serpent Ring+1|c;貪欲な金蛇の指輪+2|Covetous Gold Serpent Ring+2|c;貪欲な金蛇の指輪+3|Covetous Gold Serpent Ring+3|c;貪欲な銀蛇の指輪|Covetous Silver Serpent Ring|c;貪欲な銀蛇の指輪+1|Covetous Silver Serpent Ring+1|c;貪欲な銀蛇の指輪+2|Covetous Silver Serpent Ring+2|c;貪欲な銀蛇の指輪+3|Covetous Silver Serpent Ring+3|c;太陽の王女の指輪|Sun Princess Ring|c;銀猫の指輪|Silvercat Ring|c;隠密の指輪|Obscuring Ring|c;偽りの闇の指輪|Untrue Dark Ring|c;偽りの白の指輪|Untrue White Ring|c;髑髏の指輪|Skull Ring|c;災厄の指輪|Calamity Ring|c;ファランの指輪|Farron Ring|c;アルドリッチの蒼玉|Aldrich's Sapphire|c;アルドリッチの紅玉|Aldrich's Ruby|c;雷の鉤爪の指輪|Lightning Clutch Ring|c;炎の鉤爪の指輪|Fire Clutch Ring|c;闇の鉤爪の指輪|Dark Clutch Ring|c;魔力の鉤爪の指輪|Magic Clutch Ring|c;フリンの指輪|Flynn's Ring|c;囚人の鎖|Prisoner's Chain|c;竜鱗の指輪|Dragonscale Ring|c;聖者の指輪|Saint's Ring|c;深みの指輪|Deep Ring|c;騎士殺しの指輪|Knight Slayer's Ring|c`,
-"魔術":`ソウルの矢|Soul Arrow|c;強いソウルの矢|Great Soul Arrow|c;ソウルの太矢|Heavy Soul Arrow|c;強いソウルの太矢|Great Heavy Soul Arrow|c;追尾するソウルの結晶塊|Homing Soulmass|c;追尾する結晶塊|Homing Crystal Soulmass|c;ソウルの槍|Soul Spear|c;結晶の槍|Crystal Soul Spear|c;深みのソウル|Deep Soul|c;強い深みのソウル|Great Deep Soul|c;魔力の武器|Magic Weapon|c;強い魔力の武器|Great Magic Weapon|c;結晶の魔力の武器|Crystal Magic Weapon|c;魔力の盾|Magic Shield|c;強い魔力の盾|Great Magic Shield|c;見えない武器|Hidden Weapon|c;見えない体|Hidden Body|c;照らす光|Cast Light|c;修理|Repair|c;音無し|Spook|c;音寄せ|Aural Decoy|c;カメレオン|Chameleon|c;ファランの矢|Farron Dart|c;強いファランの矢|Great Farron Dart|c;ファランの雹|Farron Hail|c;ファランの瞬剣|Farron Flashsword|c;病み霧|Pestilent Mist|c;ソウルの大剣|Soul Greatsword|c;ソウルの奔流|Soul Stream|c;古い月光|Old Moonlight|c;白竜の息|White Dragon Breath|c;歪んだ光の壁|Twisted Wall of Light|c;瞬間凍結|Snap Freeze|c;親和|Affinity|c;結晶の雹|Crystal Hail|c`,
-"呪術":`火の玉|Fireball|c;火球|Fire Orb|c;発火|Combustion|c;大発火|Great Combustion|c;炎の鞭|Fire Whip|c;混沌の苗床の残滓|Chaos Bed Vestiges|c;大きな混沌の火球|Great Chaos Fire Orb|c;炎の奔流|Fire Surge|c;炎の嵐|Firestorm|c;混沌の嵐|Chaos Storm|c;毒の霧|Poison Mist|c;猛毒の霧|Toxic Mist|c;酸の噴射|Acid Surge|c;鉄の体|Iron Flesh|c;発汗|Flash Sweat|c;カーサスの炎弧|Carthus Flame Arc|c;カーサスの烽火|Carthus Beacon|c;内なる大力|Power Within|c;聖なる炎|Sacred Flame|c;冒涜の炎|Profaned Flame|c;魅了|Rapport|c;ぬくもりの火|Warmth|c;岩投げ|Boulder Heave|c;弾ける火の玉|Bursting Fireball|c;黒蛇|Black Serpent|c;黒炎の火球|Black Fire Orb|c;黒炎|Black Flame|c;煮えたぎる混沌|Seething Chaos|c;浮遊する混沌|Floating Chaos|c;炎の扇|Flame Fan|c`,
-"奇跡":`回復|Heal|c;中回復|Med Heal|c;大回復|Great Heal|c;大回復の抜粋|Great Heal Excerpt|c;太陽の光の癒し|Soothing Sunlight|c;太陽の光の恵み|Bountiful Sunlight|c;継続回復|Replenishment|c;大きな継続回復|Bountiful Light|c;癒しの涙|Caressing Tears|c;拒絶の涙|Tears of Denial|c;帰還|Homeward|c;フォース|Force|c;神の怒り|Wrath of the Gods|c;放つフォース|Emit Force|c;雷の槍|Lightning Spear|c;大きな雷の槍|Great Lightning Spear|c;太陽の光の槍|Sunlight Spear|c;雷の嵐|Lightning Storm|c;雷の杭|Lightning Stake|c;蝕み|Gnaw|c;ドーリスの蝕み|Dorhys' Gnawing|c;魔法防護|Magic Barrier|c;大魔法防護|Great Magic Barrier|c;祝福の武器|Blessed Weapon|c;誓約の刃|Sacred Oath|c;暗月の剣|Darkmoon Blade|c;沈黙の禁則|Vow of Silence|c;深みの加護|Deep Protection|c;贖罪|Atonement|c;闇の剣|Dark Blade|c;死者の活性|Dead Again|c;雷の矢|Lightning Arrow|c;回復の投射|Projected Heal|c;神の光の柱|Divine Pillars of Light|c;白い冠の道|Way of White Corona|c;導きを求める|Seek Guidance|c;命狩りの鎌|Lifehunt Scythe (Miracle)|c;雷の武器|Lightning Blade|c`,
-"防具セット":`騎士セット|Knight Set|c;伝令セット|Herald Set|c;傭兵セット|Sellsword Set|c;戦士セット|Warrior Set|c;暗殺者セット|Assassin Set|c;魔術師セット|Sorcerer Set|c;呪術師セット|Pyromancer Set|c;聖職者セット|Cleric Set|c;持たざる者セット|Deprived Set|c;ロスリック騎士セット|Lothric Knight Set|c;黒騎士セット|Black Knight Set|c;ハベルセット|Havel's Set|c;堕ちた騎士セット|Fallen Knight Set|c;カタリナセット|Catarina Set|c;狼騎士セット|Wolf Knight Set|c;遠征騎士セット|Outrider Knight Set|c;逐われ人セット|Exile Set|c;竜狩りセット|Dragonslayer Set|c;大聖堂騎士セット|Cathedral Knight Set|c;法王騎士セット|Pontiff Knight Set|c;ファーナムセット|Faraam Set|c;山賊セット|Brigand Set|c;上級騎士セット|Elite Knight Set|c;竜血の騎士セット|Drakeblood Set|c;モーンセット|Morne's Set|c;グンダセット|Gundyr's Set|c;スモウセット|Smough's Set|c;大司教セット|Archdeacon Set|c;影セット|Shadow Set|c;黒鉄セット|Black Iron Set|c;火の魔女セット|Fire Witch Set|c;輪の騎士セット|Ringed Knight Set|c;ハラルド軍団セット|Harald Legion Set|c;奴隷騎士セット|Slave Knight Set|c;ミルウッド騎士セット|Millwood Knight Set|c`
-};
-const WEAPON_CATS = ["短剣","直剣","大剣","特大剣","曲剣","大曲剣","刀","刺剣","斧","大斧","槌","大槌","拳・爪","槍","斧槍","鎌","鞭","弓・クロスボウ","触媒","盾","大盾"];
+/* ---------- 初期データ（data.js） ---------- */
+const D = window.DS3DATA || {cats:[],areas:[],items:[]};
 const INF = [["n","ノーマル","Normal"],["hv","重厚","Heavy"],["sh","鋭利","Sharp"],["rf","熟練","Refined"],["sm","澄んだ","Simple"],["cr","結晶","Crystal"],["fi","炎","Fire"],["ch","混沌","Chaos"],["li","雷","Lightning"],["dp","深み","Deep"],["dk","闇","Dark"],["po","毒","Poison"],["bl","出血","Blood"],["rw","生まれ","Raw"],["bs","祝福","Blessed"],["ho","亡者","Hollow"]];
-const CATS = Object.keys(RAW);
-const slug = s => s.toLowerCase().replace(/[^a-z0-9+]+/g,"-").replace(/^-|-$/g,"");
-const BASE = [];
-for (const c of CATS) RAW[c].split(";").forEach(line=>{const [j,e,f]=line.split("|").map(x=>x.trim());BASE.push({id:c+":"+(slug(e)||j),j,e,f,c})});
-
+const CATS = D.cats;
+const slug = s => String(s).toLowerCase().replace(/[^a-z0-9+]+/g,"");
+const BASE = D.items.map(([e,j,c,f,dlc,iid,L])=>({id:e,j:j||e,e:j?e:"",c,f,dlc,L}));
 const esc = s => String(s??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 const $ = id => document.getElementById(id);
 const toast = m => {const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("show"),1800)};
@@ -226,6 +227,11 @@ let S = {own:{},lv:{},edits:{},custom:[],ts:0};
 const LSK = "ds3-tracker-v1";
 try{const x=JSON.parse(localStorage.getItem(LSK)||"null");if(x)S=Object.assign(S,x)}catch(e){}
 
+// 旧バージョン（手入力データ）のIDを新しいIDへ移す
+(()=>{const old=k=>k.includes(":")&&!k.startsWith("custom:");const keys=[...Object.keys(S.own),...Object.keys(S.lv),...Object.keys(S.edits||{})];if(!keys.some(old))return;
+ const by={};BASE.forEach(b=>by[slug(b.id)]=b.id);by["longsword"]="Longsword";
+ const mv=o=>{const r={};for(const[k,v]of Object.entries(o||{})){if(!old(k)){r[k]=v;continue}const n=by[slug(k.split(":").slice(1).join(":"))];if(n)r[n]=v}return r};
+ S.own=mv(S.own);S.lv=mv(S.lv);S.edits={};})();
 const items = () => {
   const arr = BASE.concat(S.custom||[]).map(b=>Object.assign({},b,(S.edits||{})[b.id]||{}));
   return arr.filter(x=>!x.del);
@@ -278,6 +284,7 @@ function renderProg(){
   $("ring").innerHTML=`<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--chip)" stroke-width="10"/><circle cx="60" cy="60" r="${R}" fill="none" stroke="url(#g)" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C*p} ${C}"/><defs><linearGradient id="g"><stop offset="0" stop-color="var(--ember)"/><stop offset="1" stop-color="var(--ember2)"/></linearGradient></defs></svg><div class="c"><div class="big">${(p*100).toFixed(1)}%</div><div class="lbl">完全制覇</div><div class="lbl">${dn} / ${all.length}</div></div>`;
   $("heroStats").innerHTML=bar("アイテム入手",iO,all.length)+bar("変質形態の所持（武器・盾・触媒）",vH,vT)+bar("最大強化済みの形態",vM,vT);
   $("catStats").innerHTML=CATS.filter(c=>cat[c]).map(c=>bar(c,cat[c][0],cat[c][1])).join("")+Object.keys(cat).filter(c=>!CATS.includes(c)).map(c=>bar(c,cat[c][0],cat[c][1])).join("");
+  $("areaStats").innerHTML=D.areas.map(a=>{const r=areaRows(a),seen=new Set(),u=r.filter(([it])=>!seen.has(it.id)&&seen.add(it.id));return u.length?bar(a,u.filter(([it])=>info(it).own).length,u.length):""}).join("");
   $("infStats").innerHTML=INF.map(([k,j,e])=>bar(j+"（"+e+"）",inf[k][0],inf[k][1])).join("");
 }
 
@@ -305,9 +312,29 @@ function itemHTML(it){
     const meta=`<div class="meta">${esc(it.c)}・${it.f==="i"?"変質可／最大+10":it.f==="t"?"変質不可／最大+10":it.f==="u"?"変質不可／最大+5":it.f==="n"?"強化なし":"収集アイテム"}${it.hide?"・集計から除外中":""}</div>`;
     const vars = sl.length&&it.f!=="n" ? `<div class="vars">${sl.map(k=>{const d=INF.find(x=>x[0]===k),v=lv[k],has=v!=null&&v!=="";return `<label class="v${has&&+v>=m?" max":has?" has":""}"><span class="n">${esc(d[1])}<small>${esc(d[2])}</small></span><select data-lv="${esc(it.id)}" data-k="${k}" aria-label="${esc(d[1])}の強化値">${opts(v)}</select></label>`}).join("")}</div>`:"";
     const acts=`<div class="acts">${it.f==="i"?`<button class="btn sm" data-act="allmax">全形態を最大に</button>`:""}${sl.length&&it.f!=="n"?`<button class="btn sm" data-act="max">${it.f==="i"?"ノーマルを最大に":"最大にする"}</button><button class="btn sm" data-act="clear">強化値をクリア</button>`:""}<button class="btn sm" data-act="edit">編集</button></div>`;
-    body=`<div class="body">${meta}${vars}${acts}</div>`;
+    body=`<div class="body">${meta}${locHTML(it)}${vars}${acts}</div>`;
   }
   return `<div class="it" data-id="${esc(it.id)}"><div class="hd"><button class="chk${s.own?" on":""}" data-act="own" aria-label="入手済み">${s.own?"✓":""}</button><div class="nm"><div class="j">${esc(it.j)}</div><div class="e">${esc(it.e||"")}</div></div><div class="tag${s.done?" done":""}">${s.done?"完了":esc(tag)}</div></div>${body}</div>`;
+}
+function locHTML(it){
+  if(!it.L||!it.L.length)return"";
+  return `<div class="locs">${it.L.map(([a,d,k,u])=>`<div class="loc"><b>${esc(a)}</b>${u?`（解放：${esc(u)}）`:""}　${esc(d)}<div>${k.map(x=>`<span class="bdg${x==="取り逃し注意"?" w":""}">${esc(x)}</span>`).join("")}</div></div>`).join("")}</div>`;
+}
+/* ---------- エリア ---------- */
+const ENEMY=["ボス","強敵","ミミック","結晶トカゲ","敵対NPC","敵ドロップ"], SHOP=["商人","ボスソウル錬成","NPC"];
+function areaRows(area){const r=[];for(const it of items()){if(it.hide)continue;(it.L||[]).forEach((l,i)=>{if(l[0]===area)r.push([it,l])})}return r}
+function renderArea(){
+  const area=$("aa").value, k=$("ak").value, o=$("ao").value;
+  let rows=areaRows(area).filter(([it,l])=>{
+    if(o==="todo"&&info(it).own)return false;
+    if(k==="field")return !l[2].some(x=>ENEMY.includes(x)||SHOP.includes(x)||x==="初期装備");
+    if(k==="敵")return l[2].some(x=>ENEMY.includes(x));
+    if(k==="商人")return l[2].some(x=>SHOP.includes(x));
+    if(k)return l[2].includes(k);
+    return true;});
+  const all=areaRows(area), got=all.filter(([it])=>info(it).own).length;
+  $("acnt").textContent=`${rows.length}件表示・このエリアの入手 ${got} / ${all.length}`;
+  $("aitems").innerHTML=rows.length?rows.map(([it,[a,d,kk,u]])=>{const s=info(it);return `<div class="it ar" data-id="${esc(it.id)}"><div class="hd"><button class="chk${s.own?" on":""}" data-act="own" aria-label="入手済み">${s.own?"✓":""}</button><div class="nm"><div class="j">${esc(it.j)}</div><div class="e">${esc(it.e||"")}　<span class="k">${esc(it.c)}</span></div><div class="desc">${u?`解放：${esc(u)}　`:""}${esc(d)}</div><div>${kk.map(x=>`<span class="bdg${x==="取り逃し注意"?" w":""}">${esc(x)}</span>`).join("")}</div></div></div></div>`}).join(""):`<div class="empty">該当するアイテムはありません</div>`;
 }
 function renderList(){
   const arr=filtered();
@@ -315,7 +342,7 @@ function renderList(){
   $("items").innerHTML=arr.length?arr.slice(0,shown).map(itemHTML).join(""):`<div class="empty">条件に合うアイテムがありません</div>`;
   $("moreBtn").hidden=arr.length<=shown;
 }
-function renderAll(){renderProg();renderList()}
+function renderAll(){renderProg();renderList();renderArea()}
 const byId = id => items().find(x=>x.id===id);
 
 $("items").addEventListener("click",e=>{
@@ -331,7 +358,7 @@ $("items").addEventListener("click",e=>{
   if(a==="max"){S.lv[id]=Object.assign(S.lv[id]||{},{n:maxLv(it.f)});save();renderAll();return}
   if(a==="clear"){delete S.lv[id];save();renderAll();return}
   if(a==="edit"){openEdit(it);return}
-  if(e.target.closest(".hd")){ if(it.f==="c"){ if(S.own[id])delete S.own[id]; else S.own[id]=1; save();renderAll(); } else { open.has(id)?open.delete(id):open.add(id); renderList(); } }
+  if(e.target.closest(".hd")){ open.has(id)?open.delete(id):open.add(id); renderList(); }
 });
 $("items").addEventListener("change",e=>{
   const sel=e.target.closest("select[data-lv]"); if(!sel)return;
@@ -340,6 +367,8 @@ $("items").addEventListener("change",e=>{
   if(!Object.keys(S.lv[id]).length)delete S.lv[id];
   save();renderAll();
 });
+$("aitems").addEventListener("click",e=>{const b=e.target.closest("[data-act=own]");if(!b)return;const id=b.closest(".it").dataset.id,it=byId(id);if(!it)return;if(info(it).own){delete S.own[id];delete S.lv[id]}else S.own[id]=1;save();renderAll()});
+["aa","ak","ao"].forEach(x=>$(x).addEventListener("change",renderArea));
 let qt; $("q").addEventListener("input",()=>{clearTimeout(qt);qt=setTimeout(()=>{shown=60;renderList()},150)});
 ["fc","fs"].forEach(x=>$(x).addEventListener("change",()=>{shown=60;renderList()}));
 $("moreBtn").addEventListener("click",()=>{shown+=60;renderList()});
@@ -369,11 +398,12 @@ let resetArm=0;
 $("resetBtn").addEventListener("click",()=>{if(Date.now()-resetArm>3000){resetArm=Date.now();$("resetBtn").textContent="もう一度押すとリセット";setTimeout(()=>$("resetBtn").textContent="進捗をすべてリセット",3000);return}S.own={};S.lv={};save();renderAll();$("resetBtn").textContent="進捗をすべてリセット";toast("進捗をリセットしました")});
 
 /* ---------- タブ ---------- */
-function tab(t){document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.t===t));["prog","list","data"].forEach(s=>$(s).hidden=s!==t)}
+function tab(t){document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.t===t));["prog","list","area","data"].forEach(s=>$(s).hidden=s!==t)}
 document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{tab(b.dataset.t);if(b.dataset.t!=="data")history.replaceState(null,"","#"+b.dataset.t)}));
 const catOpts=CATS.map(c=>`<option>${esc(c)}</option>`).join("");
 $("fc").innerHTML=`<option value="">すべてのカテゴリ</option>`+catOpts; $("ac").innerHTML=catOpts;
-const h=location.hash.slice(1); if(["prog","list","data"].includes(h))tab(h);
+$("aa").innerHTML=D.areas.map(a=>`<option>${esc(a)}</option>`).join("");
+const h=location.hash.slice(1); if(["prog","list","area","data"].includes(h))tab(h);
 renderAll();
 }
 </script>
